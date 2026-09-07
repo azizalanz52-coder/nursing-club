@@ -40,7 +40,6 @@ export default function EventsPreview() {
       if (savedEvents) {
         const parsed = JSON.parse(savedEvents);
         if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          // استخدام Map لتصفية أي تكرار بالأسماء وتثبيت أول 3 عناصر فقط فريدة
           const uniqueMap = new Map();
           parsed.forEach(ev => {
             const title = ev.title?.trim();
@@ -48,7 +47,6 @@ export default function EventsPreview() {
               uniqueMap.set(title, ev);
             }
           });
-          
           const uniqueArray = Array.from(uniqueMap.values());
           if (uniqueArray.length > 0) {
             setEventsList(uniqueArray.slice(0, 3));
@@ -64,7 +62,6 @@ export default function EventsPreview() {
     <section className="py-20 bg-[#630517] text-white" dir="rtl">
       <div className="max-w-7xl mx-auto px-6">
 
-        {/* رأس القسم: العنوان يمين والزر يسار */}
         <div className="flex flex-row justify-between items-center mb-16 gap-4">
           <div className="space-y-3 text-right">
             <span className="inline-block px-4 py-1.5 rounded-full bg-[#F5D061]/20 text-[#F5D061] text-xs font-black tracking-widest uppercase border border-[#F5D061]/30">
@@ -86,11 +83,10 @@ export default function EventsPreview() {
           </Link>
         </div>
 
-        {/* شبكة عرض 3 بطاقات بالضبط وبدون أي تكرار */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {eventsList.slice(0, 3).map((event, index) => (
             <div
-              key={event.id || index}
+              key={event.id || `${event.title}-${index}`}
               className="relative rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between group min-h-[420px] bg-slate-950 border border-[#F5D061]/30 transition-all hover:scale-[1.02]"
             >
               <div className="absolute inset-0 z-0 overflow-hidden bg-slate-950">
