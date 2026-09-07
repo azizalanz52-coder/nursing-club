@@ -2,24 +2,23 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const router = useRouter();
 
   const handleDirectLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (phone) {
-      localStorage.setItem("userPhone", phone);
+    if (phone.trim()) {
+      localStorage.setItem("userPhone", phone.trim());
     }
-    if (name) {
-      localStorage.setItem("userName", name);
+    if (name.trim()) {
+      localStorage.setItem("userName", name.trim());
     }
-    router.push("/");
-    router.refresh();
+    
+    // استخدام التوجيه المباشر لتجنب أي تعليق في المتصفح أو الجوال
+    window.location.href = "/";
   };
 
   return (
