@@ -3,17 +3,17 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { db } from './../lib/firebase';
+import { db } from '../../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 
 interface PassionSlide {
-  id: number;
+  id: string;
   image: string;
   quote: string;
 }
 
 interface DiscoverEvent {
-  id: number;
+  id: string;
   title: string;
   category: string;
   description: string;
@@ -65,158 +65,30 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
-  const defaultPassionSlides: PassionSlide[] = [
-    { id: 1, image: '/header-banner.png', quote: '«التمريض ليس مجرد مهنة، بل هو فن وعِلم يلامس حياة الإنسان في أصعب لحظاته.»' },
-    { id: 2, image: '/logo.png', quote: '«بالعطاء المستمر والعمل الجماعي نصنع أثراً يخلده الزمن في قلوب المجتمع.»' },
-    { id: 3, image: '/header-banner.png', quote: '«نطمح لأن نكون المنارة التي تضيء دروب التميز لكل ممرض وممرضة في جامعة حفر الباطن.»' }
-  ];
+  // Convert uploaded image file to Base64 to save safely in Firestore database
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
 
-  const [passionSlides, setPassionSlides] = useState<PassionSlide[]>(defaultPassionSlides);
+  // Passion Slides States
+  const [passionSlides, setPassionSlides] = useState<PassionSlide[]>([]);
   const [newPassionQuote, setNewPassionQuote] = useState<string>('');
   const [newPassionImage, setNewPassionImage] = useState<string>('/header-banner.png');
 
-  useEffect(() => {
-    const saved = localStorage.getItem('UHB_PASSION_SLIDES');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.length > 0) setPassionSlides(parsed);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }, []);
-
-  const handleAddPassionSlide = (e: FormEvent) => {
-    e.preventDefault();
-    const newSlide: PassionSlide = {
-      id: Date.now(),
-      image: newPassionImage,
-      quote: newPassionQuote || 'شغف، عطاء، واحترافية في خدمة المجتمع.'
-    };
-    const updated = [...passionSlides, newSlide];
-    setPassionSlides(updated);
-    localStorage.setItem('UHB_PASSION_SLIDES', JSON.stringify(updated));
-    setNewPassionQuote('');
-    setNewPassionImage('/header-banner.png');
-    alert('تم إضافة الشريحة بنجاح!');
-  };
-
-  const handleDeletePassionSlide = (id: number) => {
-    const updated = passionSlides.filter((s) => s.id !== id);
-    setPassionSlides(updated);
-    localStorage.setItem('UHB_PASSION_SLIDES', JSON.stringify(updated));
-  };
-
-  const defaultDiscoverEvents: DiscoverEvent[] = [
-    {
-      id: 1,
-      title: 'حفل تدشين نادي كلية التمريض',
-      category: 'أنشطة كبرى',
-      description: 'دشن وكيل الجامعة للشؤون الأكاديمية أ.د. محمد بن عتيق العنزي، وبحضور عميد كلية التمريض د. جلال نعيم الحربي، نادي كلية التمريض - شطر الطلاب لحظة فخر في مسيرة الكلية، سُعدنا فيها بحضوركم ومشاركتكم، وبإذن الله القادم أجمل',
-      images: ['/logo.png', '/header-banner.png']
-    },
-    {
-      id: 2,
-      title: 'حملة القياسات الحيوية والتثقيف الصحي',
-      category: 'خدمة المجتمع',
-      description: 'فعالية توعوية ميدانية لقياس العلامات الحيوية وتقديم الاستشارات للزوار.',
-      images: ['/logo.png', '/header-banner.png']
-    }
-  ];
-
-  const [discoverEvents, setDiscoverEvents] = useState<DiscoverEvent[]>(defaultDiscoverEvents);
-  const [selectedEventId, setSelectedEventId] = useState<number>(1);
-
+  // Discover Events States
+  const [discoverEvents, setDiscoverEvents] = useState<DiscoverEvent[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [newDiscTitle, setNewDiscTitle] = useState<string>('');
   const [newDiscCategory, setNewDiscCategory] = useState<string>('أنشطة كبرى');
   const [newDiscDesc, setNewDiscDesc] = useState<string>('');
   const [newDiscImages, setNewDiscImages] = useState<string[]>([]);
 
-  useEffect(() => {
-    const savedDiscover = localStorage.getItem('UHB_DISCOVER_EVENTS');
-    if (savedDiscover) {
-      try {
-        const parsed = JSON.parse(savedDiscover);
-        if (parsed && parsed.length > 0) setDiscoverEvents(parsed);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }, []);
-
-  const handleSelectMultipleImagesForNewEvent = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files);
-      const urls = filesArray.map((file) => URL.createObjectURL(file));
-      setNewDiscImages((prev) => [...prev, ...urls]);
-    }
-  };
-
-  const handleCreateNewDiscoverEvent = (e: FormEvent) => {
-    e.preventDefault();
-    if (!newDiscTitle.trim()) {
-      alert('يرجى كتابة عنوان الفعالية.');
-      return;
-    }
-    const newEventObj: DiscoverEvent = {
-      id: Date.now(),
-      title: newDiscTitle,
-      category: newDiscCategory,
-      description: newDiscDesc || 'فعالية تابعة لنادي التمريض بجامعة حفر الباطن.',
-      images: newDiscImages.length > 0 ? newDiscImages : ['/logo.png']
-    };
-
-    const updated = [newEventObj, ...discoverEvents];
-    setDiscoverEvents(updated);
-    localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
-    setNewDiscTitle('');
-    setNewDiscDesc('');
-    setNewDiscImages([]);
-    alert('تم إنشاء الفعالية وإضافة الصور بنجاح إلى المعرض!');
-  };
-
-  const handleAddMultipleImagesToExistingEvent = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files);
-      const urls = filesArray.map((file) => URL.createObjectURL(file));
-
-      const updated = discoverEvents.map((ev) => {
-        if (ev.id === selectedEventId) {
-          return { ...ev, images: [...ev.images, ...urls] };
-        }
-        return ev;
-      });
-
-      setDiscoverEvents(updated);
-      localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
-      alert('تم رفع وإضافة الصور بنجاح للفعالية!');
-    }
-  };
-
-  const handleRemoveImageFromEvent = (imgIndex: number) => {
-    const updated = discoverEvents.map((ev) => {
-      if (ev.id === selectedEventId) {
-        const newImages = ev.images.filter((_, idx) => idx !== imgIndex);
-        return { ...ev, images: newImages.length > 0 ? newImages : ['/logo.png'] };
-      }
-      return ev;
-    });
-
-    setDiscoverEvents(updated);
-    localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
-  };
-
-  const handleDeleteEntireDiscoverEvent = (id: number) => {
-    if (confirm('هل أنت متأكد من حذف هذه الفعالية بالكامل من المعرض؟')) {
-      const updated = discoverEvents.filter((ev) => ev.id !== id);
-      setDiscoverEvents(updated);
-      localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
-    }
-  };
-
-  const currentEditedEvent = discoverEvents.find((ev) => ev.id === selectedEventId) || discoverEvents[0];
-
+  // Other States
   const [events, setEvents] = useState<EventItem[]>([
     {
       id: '1',
@@ -236,6 +108,284 @@ export default function AdminDashboard() {
   const [newPoster, setNewPoster] = useState<string>('/header-banner.png');
   const [newDesc, setNewDesc] = useState<string>('');
 
+  const [banners, setBanners] = useState<BannerItem[]>([
+    {
+      id: '1',
+      tag: 'نادي التمريض • جامعة حفر الباطن',
+      title: 'نادي التمريض',
+      image: '/header-banner.png',
+      buttonText: 'اكتشف النادي',
+      buttonLink: '/discover'
+    }
+  ]);
+
+  const [bannerTag, setBannerTag] = useState<string>('');
+  const [bannerTitle, setBannerTitle] = useState<string>('');
+  const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
+
+  const [requests, setRequests] = useState<Record<string, string>[]>([]);
+
+  const [committees, setCommittees] = useState<Committee[]>([
+    { 
+      id: 'design', 
+      name: 'التصميم', 
+      maleLeader: 'عبدالعزيز العنزي', 
+      femaleLeader: 'شجون الحربي', 
+      members: [
+        { name: 'سارة محمد', role: 'مصممة جرافيك', status: 'نشط' },
+        { name: 'عمر خالد', role: 'مصمم موشن جرافيك', status: 'نشط' },
+        { name: 'فاطمة أحمد', role: 'مسؤولة الهوية البصرية', status: 'نشط' }
+      ] 
+    },
+    { id: 'media', name: 'الاعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
+    { id: 'events-org', name: 'تنظيم الفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', members: [] },
+    { id: 'hr', name: 'الموارد البشرية', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي', members: [] },
+    { id: 'pr', name: 'العلاقات العامة', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي', members: [] },
+    { id: 'scientific', name: 'المحتوى العلمي', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي', members: [] },
+    { id: 'quality', name: 'الجودة والتطوير', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري', members: [] },
+  ]);
+
+  const [selectedCommitteeId, setSelectedCommitteeId] = useState<string>('design');
+  const currentCommittee = committees.find((c) => c.id === selectedCommitteeId) || committees[0];
+
+  const [newMemberName, setNewMemberName] = useState<string>('');
+  const [newMemberRole, setNewMemberRole] = useState<string>('');
+
+  // Fetch Cloud & Local Data on Mount
+  useEffect(() => {
+    // Local storage items
+    const savedEvents = localStorage.getItem('UHB_EVENTS');
+    if (savedEvents) {
+      try {
+        const parsed = JSON.parse(savedEvents);
+        if (parsed && parsed.length > 0) setEvents(parsed);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const savedBanners = localStorage.getItem('UHB_BANNERS');
+    if (savedBanners) {
+      try {
+        const parsed = JSON.parse(savedBanners);
+        if (parsed && parsed.length > 0) setBanners(parsed);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Cloud Firebase Fetching
+    const fetchCloudData = async () => {
+      try {
+        // Passion Slides Cloud
+        const passionSnap = await getDocs(collection(db, 'site_passion_slides'));
+        if (!passionSnap.empty) {
+          const slides: PassionSlide[] = [];
+          passionSnap.forEach((d) => {
+            slides.push({ id: d.id, ...d.data() } as PassionSlide);
+          });
+          setPassionSlides(slides);
+        } else {
+          const defaultSlides: PassionSlide[] = [
+            { id: '1', image: '/header-banner.png', quote: '«التمريض ليس مجرد مهنة، بل هو فن وعِلم يلامس حياة الإنسان في أصعب لحظاته.»' },
+            { id: '2', image: '/logo.png', quote: '«بالعطاء المستمر والعمل الجماعي نصنع أثراً يخلده الزمن في قلوب المجتمع.»' },
+            { id: '3', image: '/header-banner.png', quote: '«نطمح لأن نكون المنارة التي تضيء دروب التميز لكل ممرض وممرضة في جامعة حفر الباطن.»' }
+          ];
+          setPassionSlides(defaultSlides);
+        }
+
+        // Discover Events Cloud
+        const discoverSnap = await getDocs(collection(db, 'site_discover_events'));
+        if (!discoverSnap.empty) {
+          const eventsList: DiscoverEvent[] = [];
+          discoverSnap.forEach((d) => {
+            eventsList.push({ id: d.id, ...d.data() } as DiscoverEvent);
+          });
+          setDiscoverEvents(eventsList);
+          setSelectedEventId(eventsList[0]?.id || '');
+        } else {
+          const defaultEvents: DiscoverEvent[] = [
+            {
+              id: '1',
+              title: 'حفل تدشين نادي كلية التمريض',
+              category: 'أنشطة كبرى',
+              description: 'دشن وكيل الجامعة للشؤون الأكاديمية أ.د. محمد بن عتيق العنزي، وبحضور عميد كلية التمريض د. جلال نعيم الحربي، نادي كلية التمريض - شطر الطلاب لحظة فخر في مسيرة الكلية، سُعدنا فيها بحضوركم ومشاركتكم، وبإذن الله القادم أجمل',
+              images: ['/logo.png', '/header-banner.png']
+            },
+            {
+              id: '2',
+              title: 'حملة القياسات الحيوية والتثقيف الصحي',
+              category: 'خدمة المجتمع',
+              description: 'فعالية توعوية ميدانية لقياس العلامات الحيوية وتقديم الاستشارات للزوار.',
+              images: ['/logo.png', '/header-banner.png']
+            }
+          ];
+          setDiscoverEvents(defaultEvents);
+          setSelectedEventId('1');
+        }
+
+        // Applications Requests
+        const querySnapshot = await getDocs(collection(db, 'applications'));
+        const fetchedRequests = querySnapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data()
+        })) as Record<string, string>[];
+        if (fetchedRequests.length > 0) {
+          setRequests(fetchedRequests);
+        }
+
+        // Committees
+        const commSnapshot = await getDocs(collection(db, 'committees'));
+        if (!commSnapshot.empty) {
+          const cloudMap: Record<string, Partial<Committee>> = {};
+          commSnapshot.forEach((d) => { cloudMap[d.id] = d.data() as Partial<Committee>; });
+          setCommittees((prev) => prev.map((c) => cloudMap[c.id] ? { ...c, ...cloudMap[c.id] } : c));
+        }
+      } catch (err) {
+        console.error('Error fetching cloud data:', err);
+      }
+    };
+
+    fetchCloudData();
+  }, []);
+
+  // --- Passion Slides Cloud Handlers ---
+  const handleAddPassionSlide = async (e: FormEvent) => {
+    e.preventDefault();
+    const slideId = Date.now().toString();
+    const newSlide: PassionSlide = {
+      id: slideId,
+      image: newPassionImage,
+      quote: newPassionQuote || 'شغف، عطاء، واحترافية في خدمة المجتمع.'
+    };
+
+    try {
+      await setDoc(doc(db, 'site_passion_slides', slideId), newSlide);
+      const updated = [...passionSlides, newSlide];
+      setPassionSlides(updated);
+      setNewPassionQuote('');
+      setNewPassionImage('/header-banner.png');
+      alert('تم إضافة الشريحة وحفظها سحابياً للجميع بنجاح!');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء الحفظ السحابي.');
+    }
+  };
+
+  const handleDeletePassionSlide = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'site_passion_slides', id));
+      const updated = passionSlides.filter((s) => s.id !== id);
+      setPassionSlides(updated);
+      alert('تم حذف الشريحة من السحابة بنجاح.');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // --- Discover Events Cloud Handlers ---
+  const handleSelectMultipleImagesForNewEvent = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      const base64Images: string[] = [];
+      for (const file of filesArray) {
+        const base64 = await convertFileToBase64(file);
+        base64Images.push(base64);
+      }
+      setNewDiscImages((prev) => [...prev, ...base64Images]);
+    }
+  };
+
+  const handleCreateNewDiscoverEvent = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newDiscTitle.trim()) {
+      alert('يرجى كتابة عنوان الفعالية.');
+      return;
+    }
+    const eventId = Date.now().toString();
+    const newEventObj: DiscoverEvent = {
+      id: eventId,
+      title: newDiscTitle,
+      category: newDiscCategory,
+      description: newDiscDesc || 'فعالية تابعة لنادي التمريض بجامعة حفر الباطن.',
+      images: newDiscImages.length > 0 ? newDiscImages : ['/logo.png']
+    };
+
+    try {
+      await setDoc(doc(db, 'site_discover_events', eventId), newEventObj);
+      const updated = [newEventObj, ...discoverEvents];
+      setDiscoverEvents(updated);
+      setSelectedEventId(eventId);
+      setNewDiscTitle('');
+      setNewDiscDesc('');
+      setNewDiscImages([]);
+      alert('تم إنشاء الفعالية ونشر الصور سحابياً للجميع في المعرض!');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء النشر السحابي.');
+    }
+  };
+
+  const handleAddMultipleImagesToExistingEvent = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && selectedEventId) {
+      const filesArray = Array.from(e.target.files);
+      const base64Images: string[] = [];
+      for (const file of filesArray) {
+        const base64 = await convertFileToBase64(file);
+        base64Images.push(base64);
+      }
+
+      const targetEvent = discoverEvents.find((ev) => ev.id === selectedEventId);
+      if (!targetEvent) return;
+
+      const updatedImages = [...targetEvent.images, ...base64Images];
+      const updatedEventObj = { ...targetEvent, images: updatedImages };
+
+      try {
+        await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
+        const updatedList = discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev));
+        setDiscoverEvents(updatedList);
+        alert('تم رفع وإضافة الصور سحابياً بنجاح للجميع!');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const handleRemoveImageFromEvent = async (imgIndex: number) => {
+    const targetEvent = discoverEvents.find((ev) => ev.id === selectedEventId);
+    if (!targetEvent) return;
+
+    const filteredImages = targetEvent.images.filter((_, idx) => idx !== imgIndex);
+    const updatedImages = filteredImages.length > 0 ? filteredImages : ['/logo.png'];
+    const updatedEventObj = { ...targetEvent, images: updatedImages };
+
+    try {
+      await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
+      const updatedList = discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev));
+      setDiscoverEvents(updatedList);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteEntireDiscoverEvent = async (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذه الفعالية بالكامل من المعرض والسحابة؟')) {
+      try {
+        await deleteDoc(doc(db, 'site_discover_events', id));
+        const updated = discoverEvents.filter((ev) => ev.id !== id);
+        setDiscoverEvents(updated);
+        if (updated.length > 0) setSelectedEventId(updated[0].id);
+        alert('تم حذف الفعالية سحابياً بنجاح.');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const currentEditedEvent = discoverEvents.find((ev) => ev.id === selectedEventId) || discoverEvents[0];
+
+  // --- Other Handlers ---
   const handleAddEvent = (e: FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
@@ -268,21 +418,6 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_EVENTS', JSON.stringify(updatedEvents));
   };
 
-  const [banners, setBanners] = useState<BannerItem[]>([
-    {
-      id: '1',
-      tag: 'نادي التمريض • جامعة حفر الباطن',
-      title: 'نادي التمريض',
-      image: '/header-banner.png',
-      buttonText: 'اكتشف النادي',
-      buttonLink: '/discover'
-    }
-  ]);
-
-  const [bannerTag, setBannerTag] = useState<string>('');
-  const [bannerTitle, setBannerTitle] = useState<string>('');
-  const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
-
   const handleAddBanner = (e: FormEvent) => {
     e.preventDefault();
     if (!bannerTitle.trim()) {
@@ -311,77 +446,6 @@ export default function AdminDashboard() {
     setBanners(updatedBanners);
     localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
   };
-
-  const [requests, setRequests] = useState<Record<string, string>[]>([]);
-
-  const [committees, setCommittees] = useState<Committee[]>([
-    { 
-      id: 'design', 
-      name: 'التصميم', 
-      maleLeader: 'عبدالعزيز العنزي', 
-      femaleLeader: 'شجون الحربي', 
-      members: [
-        { name: 'سارة محمد', role: 'مصممة جرافيك', status: 'نشط' },
-        { name: 'عمر خالد', role: 'مصمم موشن جرافيك', status: 'نشط' },
-        { name: 'فاطمة أحمد', role: 'مسؤولة الهوية البصرية', status: 'نشط' }
-      ] 
-    },
-    { id: 'media', name: 'الاعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
-    { id: 'events-org', name: 'تنظيم الفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', members: [] },
-    { id: 'hr', name: 'الموارد البشرية', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي', members: [] },
-    { id: 'pr', name: 'العلاقات العامة', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي', members: [] },
-    { id: 'scientific', name: 'المحتوى العلمي', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي', members: [] },
-    { id: 'quality', name: 'الجودة والتطوير', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري', members: [] },
-  ]);
-
-  const [selectedCommitteeId, setSelectedCommitteeId] = useState<string>('design');
-  const currentCommittee = committees.find((c) => c.id === selectedCommitteeId) || committees[0];
-
-  useEffect(() => {
-    const savedEvents = localStorage.getItem('UHB_EVENTS');
-    if (savedEvents) {
-      try {
-        const parsed = JSON.parse(savedEvents);
-        if (parsed && parsed.length > 0) setEvents(parsed);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    const savedBanners = localStorage.getItem('UHB_BANNERS');
-    if (savedBanners) {
-      try {
-        const parsed = JSON.parse(savedBanners);
-        if (parsed && parsed.length > 0) setBanners(parsed);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    const fetchCloudData = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'applications'));
-        const fetchedRequests = querySnapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data()
-        })) as Record<string, string>[];
-        if (fetchedRequests.length > 0) {
-          setRequests(fetchedRequests);
-        }
-
-        const commSnapshot = await getDocs(collection(db, 'committees'));
-        if (!commSnapshot.empty) {
-          const cloudMap: Record<string, Partial<Committee>> = {};
-          commSnapshot.forEach((d) => { cloudMap[d.id] = d.data() as Partial<Committee>; });
-          setCommittees((prev) => prev.map((c) => cloudMap[c.id] ? { ...c, ...cloudMap[c.id] } : c));
-        }
-      } catch (err) {
-        console.error('Error fetching data:', err);
-      }
-    };
-
-    fetchCloudData();
-  }, []);
 
   const handleAcceptRequest = async (id: string) => {
     try {
@@ -416,9 +480,6 @@ export default function AdminDashboard() {
       alert('حدث خطأ أثناء الحفظ.');
     }
   };
-
-  const [newMemberName, setNewMemberName] = useState<string>('');
-  const [newMemberRole, setNewMemberRole] = useState<string>('');
 
   const handleAddMemberSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -470,8 +531,8 @@ export default function AdminDashboard() {
             UHB
           </span>
           <div>
-            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض</h1>
-            <p className="text-xs text-slate-500">إدارة الفعاليات والبانرات والقادة والأعضاء</p>
+            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (سحابي متكامل ☁️)</h1>
+            <p className="text-xs text-slate-500">إدارة الفعاليات والبانرات والمعرض وبطاقة شغف وعطاء سحابياً</p>
           </div>
         </div>
 
@@ -487,8 +548,8 @@ export default function AdminDashboard() {
 
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {[
-            { id: 'passion', label: '✨ إدارة بطاقة "شغف وعطاء"' },
-            { id: 'discover', label: '🖼️ إدارة معرض "اكتشف النادي"' },
+            { id: 'discover', label: '🖼️ إدارة معرض "اكتشف النادي" (سحابي)' },
+            { id: 'passion', label: '✨ إدارة بطاقة "شغف وعطاء" (سحابي)' },
             { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
             { id: 'banners', label: '🖼️ إدارة البانرات (الهيدر)' },
             { id: 'team', label: '👥 إدارة القادة والأعضاء' },
@@ -509,74 +570,11 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {activeTab === 'passion' && (
-          <div className="space-y-8">
-            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">إدارة صور وعبارات بطاقة "شغف، عطاء، واحترافية"</h3>
-              
-              <form onSubmit={handleAddPassionSlide} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر صورة الشريحة من جهازك</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setNewPassionImage(URL.createObjectURL(e.target.files[0]));
-                      }
-                    }}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
-                  />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">المقولة أو العبارة الترويجية</label>
-                  <textarea
-                    rows={2}
-                    placeholder="اكتب العبارة..."
-                    value={newPassionQuote}
-                    onChange={(e) => setNewPassionQuote(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <button
-                    type="submit"
-                    className="bg-[#630517] text-[#F5D061] px-6 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 cursor-pointer"
-                  >
-                    + إضافة الشريحة المتحركة للبطاقة
-                  </button>
-                </div>
-              </form>
-
-              <div className="space-y-4">
-                <h4 className="font-extrabold text-slate-900 text-sm">الشرائح الحالية ({passionSlides.length})</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {passionSlides.map((slide) => (
-                    <div key={slide.id} className="relative h-44 rounded-2xl overflow-hidden border border-slate-200 group shadow-sm bg-slate-900">
-                      <img src={slide.image} alt="شريحة" className="w-full h-full object-cover opacity-50" />
-                      <div className="absolute inset-0 p-4 flex flex-col justify-between z-10 text-white text-xs">
-                        <p className="font-bold line-clamp-3 text-[#F5D061]">{slide.quote}</p>
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePassionSlide(slide.id)}
-                          className="self-end bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-black shadow cursor-pointer"
-                        >
-                          حذف
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {activeTab === 'discover' && (
           <div className="space-y-8">
             
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة مع معرض صور متعدد</h3>
+              <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة مع معرض صور سحابي</h3>
               
               <form onSubmit={handleCreateNewDiscoverEvent} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -613,7 +611,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر صور المعرض (يمكنك تحديد أكثر من صورة دفعة واحدة 📁)</label>
+                  <label className="text-xs font-bold text-slate-700">اختر صور المعرض (متعددة 📁)</label>
                   <input
                     type="file"
                     accept="image/*"
@@ -621,7 +619,7 @@ export default function AdminDashboard() {
                     onChange={handleSelectMultipleImagesForNewEvent}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
-                  <p className="text-xs text-emerald-700 font-bold mt-1">تم اختيار {newDiscImages.length} صور للفعالية الجديدة حتى الآن.</p>
+                  <p className="text-xs text-emerald-700 font-bold mt-1">تم اختيار {newDiscImages.length} صور للفعالية الجديدة جاهزة للرفع السحابي.</p>
                 </div>
 
                 {newDiscImages.length > 0 && (
@@ -639,14 +637,14 @@ export default function AdminDashboard() {
                     type="submit"
                     className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 cursor-pointer"
                   >
-                    + إنشاء وإضافة الفعالية للمعرض
+                    + رفع ونشر الفعالية سحابياً للجميع
                   </button>
                 </div>
               </form>
             </div>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">إدارة الصور وإضافتها للفعاليات القائمة</h3>
+              <h3 className="text-xl font-black text-slate-900">إدارة الصور وإضافتها للفعاليات القائمة (سحابي)</h3>
               
               <div className="flex flex-wrap gap-3">
                 {discoverEvents.map((ev) => (
@@ -660,51 +658,119 @@ export default function AdminDashboard() {
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    {ev.title} ({ev.images.length} صور)
+                    {ev.title} ({ev.images?.length || 0} صور)
                   </button>
                 ))}
               </div>
 
-              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-                <div className="flex justify-between items-center flex-wrap gap-4">
-                  <h4 className="font-extrabold text-slate-900 text-sm">إضافة صور جديدة لـ: {currentEditedEvent.title}</h4>
+              {currentEditedEvent && (
+                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+                  <div className="flex justify-between items-center flex-wrap gap-4">
+                    <h4 className="font-extrabold text-slate-900 text-sm">إضافة صور جديدة لـ: {currentEditedEvent.title}</h4>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteEntireDiscoverEvent(currentEditedEvent.id)}
+                      className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 cursor-pointer"
+                    >
+                      حذف هذه الفعالية بالكامل من السحابة ✕
+                    </button>
+                  </div>
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleAddMultipleImagesToExistingEvent}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
+                  />
+                </div>
+              )}
+
+              {currentEditedEvent && (
+                <div className="space-y-4">
+                  <h4 className="font-extrabold text-slate-900 text-sm">الصور الحالية بالسحابة للفعالية ({currentEditedEvent.images?.length || 0})</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                    {currentEditedEvent.images?.map((img, idx) => (
+                      <div key={idx} className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 group bg-slate-100 shadow-sm">
+                        <img src={img} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImageFromEvent(idx)}
+                          className="absolute top-2 right-2 bg-red-600 text-white w-7 h-7 rounded-full text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
+        {activeTab === 'passion' && (
+          <div className="space-y-8">
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+              <h3 className="text-xl font-black text-slate-900">إدارة صور وعبارات بطاقة "شغف، عطاء، واحترافية" (سحابي)</h3>
+              
+              <form onSubmit={handleAddPassionSlide} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">اختر صورة الشريحة من جهازك</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const base64 = await convertFileToBase64(e.target.files[0]);
+                        setNewPassionImage(base64);
+                      }
+                    }}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">المقولة أو العبارة الترويجية</label>
+                  <textarea
+                    rows={2}
+                    placeholder="اكتب العبارة..."
+                    value={newPassionQuote}
+                    onChange={(e) => setNewPassionQuote(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                  />
+                </div>
+                <div className="sm:col-span-2">
                   <button
-                    type="button"
-                    onClick={() => handleDeleteEntireDiscoverEvent(currentEditedEvent.id)}
-                    className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 cursor-pointer"
+                    type="submit"
+                    className="bg-[#630517] text-[#F5D061] px-6 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 cursor-pointer"
                   >
-                    حذف هذه الفعالية بالكامل ✕
+                    + إضافة الشريحة سحابياً للجميع
                   </button>
                 </div>
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleAddMultipleImagesToExistingEvent}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
-                />
-              </div>
+              </form>
 
               <div className="space-y-4">
-                <h4 className="font-extrabold text-slate-900 text-sm">الصور الحالية للفعالية ({currentEditedEvent.images.length})</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                  {currentEditedEvent.images.map((img, idx) => (
-                    <div key={idx} className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 group bg-slate-100 shadow-sm">
-                      <img src={img} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveImageFromEvent(idx)}
-                        className="absolute top-2 right-2 bg-red-600 text-white w-7 h-7 rounded-full text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
-                      >
-                        ✕
-                      </button>
+                <h4 className="font-extrabold text-slate-900 text-sm">الشرائح السحابية الحالية ({passionSlides.length})</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {passionSlides.map((slide) => (
+                    <div key={slide.id} className="relative h-44 rounded-2xl overflow-hidden border border-slate-200 group shadow-sm bg-slate-900">
+                      <img src={slide.image} alt="شريحة" className="w-full h-full object-cover opacity-50" />
+                      <div className="absolute inset-0 p-4 flex flex-col justify-between z-10 text-white text-xs">
+                        <p className="font-bold line-clamp-3 text-[#F5D061]">{slide.quote}</p>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePassionSlide(slide.id)}
+                          className="self-end bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-black shadow cursor-pointer"
+                        >
+                          حذف
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-
           </div>
         )}
 
@@ -764,9 +830,9 @@ export default function AdminDashboard() {
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
                       if (e.target.files && e.target.files[0]) {
-                        const fileUrl = URL.createObjectURL(e.target.files[0]);
+                        const fileUrl = await convertFileToBase64(e.target.files[0]);
                         setNewPoster(fileUrl);
                       }
                     }}
@@ -865,9 +931,9 @@ export default function AdminDashboard() {
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
                       if (e.target.files && e.target.files[0]) {
-                        const fileUrl = URL.createObjectURL(e.target.files[0]);
+                        const fileUrl = await convertFileToBase64(e.target.files[0]);
                         setBannerImage(fileUrl);
                       }
                     }}
