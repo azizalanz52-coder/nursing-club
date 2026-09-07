@@ -10,8 +10,8 @@ export const metadata = {
   title: 'Nursing Club | UHB',
   description: 'نادي التمريض - جامعة حفر الباطن',
   icons: {
-    icon: '/logo.png',
-    apple: '/logo.png',
+    icon: '/nursing-icon.png',
+    apple: '/nursing-icon.png',
   },
 }
 
