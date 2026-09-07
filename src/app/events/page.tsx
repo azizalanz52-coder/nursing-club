@@ -113,48 +113,64 @@ export default function EventsPage() {
             filteredEvents.map((ev) => (
               <div
                 key={ev.id}
-                className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-lg flex flex-col justify-between group hover:shadow-xl transition-all"
+                className="relative rounded-3xl overflow-hidden shadow-xl flex flex-col justify-between group min-h-[420px] bg-slate-900 border border-slate-800 transition-all hover:scale-[1.01]"
               >
-                {/* بوستر الفعالية */}
-                <div className="relative h-52 w-full bg-slate-100 overflow-hidden">
+                {/* خلفية البوستر مع التعتيم */}
+                <div className="absolute inset-0 z-0">
                   <Image
                     src={ev.poster || '/logo.png'}
                     alt={ev.title}
                     fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="object-cover opacity-40 group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute top-4 right-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-black shadow ${
-                      ev.status === 'upcoming' 
-                        ? 'bg-amber-400 text-slate-900' 
-                        : 'bg-slate-900 text-white'
-                    }`}>
-                      {ev.status === 'upcoming' ? '✨ قريباً' : 'انتهت ✓'}
-                    </span>
-                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-slate-900/40" />
                 </div>
 
-                {/* محتوى الفعالية */}
-                <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                {/* المحتوى العلوي: الشارة */}
+                <div className="relative z-10 p-6 flex justify-between items-start">
+                  <span className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-xl shadow-md">
+                    🏥
+                  </span>
+                  <span className={`px-4 py-1.5 rounded-full text-xs font-black shadow-lg flex items-center gap-1.5 ${
+                    ev.status === 'upcoming' 
+                      ? 'bg-[#F5D061] text-slate-950' 
+                      : 'bg-slate-800 text-slate-200 border border-slate-700'
+                  }`}>
+                    {ev.status === 'upcoming' ? '⏱️ قريبًا' : '✓ انتهت'}
+                  </span>
+                </div>
+
+                {/* المحتوى السفلي: العنوان، التفاصيل، الأيقونات، وزر الدخول */}
+                <div className="relative z-10 p-6 space-y-5 flex-1 flex flex-col justify-end">
                   <div className="space-y-2">
-                    <h3 className="text-xl font-black text-slate-900 group-hover:text-[#630517] transition-colors">
+                    <h3 className="text-2xl font-black text-white group-hover:text-[#F5D061] transition-colors leading-tight">
                       {ev.title}
                     </h3>
-                    <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
+                    <p className="text-slate-300 text-xs sm:text-sm line-clamp-2 leading-relaxed">
                       {ev.description}
                     </p>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100 space-y-2 text-xs font-bold text-slate-600">
-                    <div className="flex items-center gap-2">
+                  {/* معلومات التاريخ والمكان بتصميم الأقراص الأنيقة */}
+                  <div className="grid grid-cols-1 gap-2 pt-2">
+                    <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 text-xs font-bold text-slate-200">
                       <span>📍</span>
-                      <span>{ev.location}</span>
+                      <span className="truncate">{ev.location}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span>📆</span>
-                      <span>{ev.date}</span>
+                    <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 text-xs font-bold text-slate-200">
+                      <span>📅</span>
+                      <span className="truncate">{ev.date}</span>
                     </div>
                   </div>
+
+                  {/* زر الدخول للفعالية */}
+                  <button 
+                    onClick={() => alert(`تفاصيل فعالية: ${ev.title}\nالمكان: ${ev.location}\nالتاريخ: ${ev.date}`)}
+                    className="w-full bg-[#F5D061] hover:bg-[#e6c152] text-slate-950 py-3 rounded-xl font-black text-xs sm:text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer mt-2"
+                  >
+                    <span>تفاصيل الفعالية</span>
+                    <span>←</span>
+                  </button>
                 </div>
 
               </div>
