@@ -6,8 +6,10 @@ import Image from 'next/image';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const name = localStorage.getItem('userName');
     if (name) {
       setUserName(name);
@@ -20,6 +22,10 @@ export default function Navbar() {
     setUserName(null);
     window.location.href = '/';
   };
+
+  if (!mounted) {
+    return null; // تجنب اختلاف العرض بين الخادم والمتصفح
+  }
 
   return (
     <header className="w-full bg-white border-b border-slate-100 sticky top-0 z-50">
@@ -64,7 +70,7 @@ export default function Navbar() {
                 <span>لوحة التحكم</span>
               </Link>
 
-              <span className="text-xs font-bold text-rose-950 bg-rose-50 px-3 py-2 rounded-xl border border-rose-100 hidden sm:inline-block">
+              <span className="text-xs font-bold text-rose-950 bg-rose-50 px-3 py-2 rounded-xl border border-rose-100">
                 {userName}
               </span>
 
