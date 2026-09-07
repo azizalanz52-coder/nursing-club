@@ -7,30 +7,30 @@ export default function EventsPreview() {
   const defaultEvents = [
     {
       id: '1',
-      title: 'ملتقى التمريض التفاعلي 2026',
-      date: '25 سبتمبر 2026',
-      location: 'مسرح جامعة حفر الباطن',
+      title: 'اليوم العالمي للتمريض',
+      date: '26 سبتمبر 2026',
+      location: 'مسرح المبنى 2',
       status: 'upcoming',
       poster: '/header-banner.png',
-      description: 'ملتقى يهدف إلى استعراض أحدث الممارسات في التمريض وورش عمل تفاعلية.'
+      description: 'فعالية تابعة لنادي التمريض.'
     },
     {
       id: '2',
-      title: 'حملة التوعية بالسكري',
-      date: '15 مايو 2026',
-      location: 'المجمع التجاري - حفر الباطن',
+      title: 'حفل تدشين كلية التمريض',
+      date: '5 أكتوبر 2025',
+      location: 'الطلاب: كلية التمريض الطالبات: مسرح الياسمين',
       status: 'past',
-      poster: '/header-banner.png',
-      description: 'حملة ميدانية استهدفت التوعية بأخطار السكري وتقديم فحوصات مجانية.'
+      poster: '/logo.png',
+      description: 'فعالية تابعة لنادي التمريض.'
     },
     {
       id: '3',
-      title: 'اليوم العالمي للتمريض',
-      date: '01 ديسمبر 2026',
-      location: 'جامعة حفر الباطن',
-      status: 'upcoming',
+      title: 'الإسعافات الأولية',
+      date: '27 أبريل 2026',
+      location: 'الطلاب: المعرض الدائم الطالبات: أمام المسرح الطلابي',
+      status: 'past',
       poster: '/header-banner.png',
-      description: 'احتفالية سنوية لتكريم وتقدير جهود مهنة التمريض العظيمة.'
+      description: 'فعالية تابعة لنادي التمريض.'
     }
   ];
 
@@ -42,9 +42,16 @@ export default function EventsPreview() {
       try {
         const parsed = JSON.parse(savedEvents);
         if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          // نأخذ أول 3 عناصر فقط وبدون تكرار قاطع
-          const uniqueEvents = Array.from(new Map(parsed.map(item => [item.id || item.title, item])).values());
-          setEventsList(uniqueEvents.slice(0, 3));
+          // دمج فريد 100% يمنع تكرار أي عنصر بناءً على العنوان
+          const combined = [...parsed, ...defaultEvents];
+          const uniqueMap = new Map();
+          combined.forEach(ev => {
+            const key = ev.title?.trim();
+            if (key && !uniqueMap.has(key)) {
+              uniqueMap.set(key, ev);
+            }
+          });
+          setEventsList(Array.from(uniqueMap.values()).slice(0, 3));
         }
       } catch (e) {
         console.error(e);
@@ -78,7 +85,7 @@ export default function EventsPreview() {
           </Link>
         </div>
 
-        {/* شبكة عرض 3 بطاقات فقط وبدون تكرار */}
+        {/* شبكة عرض 3 بطاقات فقط وبدون أي تكرار */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {eventsList.map((event, index) => (
             <div
