@@ -12,16 +12,17 @@ export default function Footer() {
             صنع بواسطة: عبدالعزيز العنزي
           </span>
 
-          {/* روابط التواصل الاجتماعي الرسمية */}
+          {/* روابط التواصل الاجتماعي مرتبة باتجاه إنجليزي صحيح */}
           <div className="flex items-center gap-2">
             <a
               href="https://x.com/Nurs_club" 
               target="_blank"
               rel="noopener noreferrer"
               className="bg-black/40 hover:bg-black/60 border border-[#F5D061]/30 text-white px-3 py-2 rounded-xl transition-all shadow flex items-center gap-1.5"
+              dir="ltr"
               title="حسابنا على إكس"
             >
-              <span>𝕏</span>
+              <span className="font-bold">𝕏</span>
               <span>@Nurs_club</span>
             </a>
 
@@ -30,9 +31,10 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="bg-black/40 hover:bg-black/60 border border-[#F5D061]/30 text-white px-3 py-2 rounded-xl transition-all shadow flex items-center gap-1.5"
+              dir="ltr"
               title="حسابنا على تيك توك"
             >
-              <span>🎵</span>
+              <span className="font-bold">⚡</span>
               <span>@Nurs_club</span>
             </a>
           </div>
