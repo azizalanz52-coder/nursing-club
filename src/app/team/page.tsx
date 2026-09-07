@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
 
-const defaultCommitteesData = [
-  { id: 'design', name: 'لجنة التصميم', description: 'الهوية البصرية، تصميم البوسترات، والمحتوى المرئي.', icon: '🎨', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شهد المرواني' },
+const committeesData = [
+  { id: 'design', name: 'لجنة التصميم', description: 'الهوية البصرية، تصميم البوسترات، والمحتوى المرئي.', icon: '🎨', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي' },
   { id: 'media', name: 'لجنة الإعلام', description: 'منصات التواصل، التغطيات الحية، وصناعة المحتوى.', icon: '📸', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري' },
   { id: 'pr', name: 'لجنة العلاقات العامة', description: 'بناء الشراكات، استقبال الضيوف، والتنسيق الخارجي.', icon: '🌐', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي' },
   { id: 'quality', name: 'لجنة الجودة والتطوير', description: 'تقييم الأداء، قياس رضا الأعضاء، وتحسين العمل.', icon: '📊', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري' },
@@ -14,40 +14,6 @@ const defaultCommitteesData = [
 ];
 
 export default function TeamPage() {
-  const [committees, setCommittees] = useState(defaultCommitteesData);
-
-  useEffect(() => {
-    const loadSavedData = () => {
-      const savedCommittees = localStorage.getItem('UHB_COMMITTEES_DATA');
-      if (savedCommittees) {
-        try {
-          const parsedArray = JSON.parse(savedCommittees);
-          if (parsedArray && parsedArray.length > 0) {
-            const updated = defaultCommitteesData.map(comm => {
-              const found = parsedArray.find((c: any) => c.id === comm.id);
-              if (found) {
-                return {
-                  ...comm,
-                  maleLeader: found.maleLeader || comm.maleLeader,
-                  femaleLeader: found.femaleLeader || comm.femaleLeader,
-                };
-              }
-              return comm;
-            });
-            setCommittees(updated);
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    };
-
-    loadSavedData();
-    // الاستماع لأي تحديث يحدث في التخزين المحلي
-    window.addEventListener('storage', loadSavedData);
-    return () => window.removeEventListener('storage', loadSavedData);
-  }, []);
-
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
@@ -67,7 +33,7 @@ export default function TeamPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {committees.map((committee) => (
+          {committeesData.map((committee) => (
             <Link
               key={committee.id}
               href={`/team/${committee.id}`}

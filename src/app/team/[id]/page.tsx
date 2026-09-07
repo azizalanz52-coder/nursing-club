@@ -11,7 +11,7 @@ const defaultCommitteesDetails: Record<string, any> = {
     description: 'مسؤولة عن الهوية البصرية، تصميم البوسترات، وتجهيز المحتوى المرئي لفعاليات النادي.',
     icon: '🎨',
     maleLeader: 'عبدالعزيز العنزي',
-    femaleLeader: 'شهد المرواني',
+    femaleLeader: 'شجون الحربي', // تم توحيد الاسم هنا بدقة
     members: [
       { name: 'سارة محمد', role: 'مصممة جرافيك', status: 'نشط' },
       { name: 'عمر خالد', role: 'مصمم موشن جرافيك', status: 'نشط' },
@@ -91,37 +91,11 @@ export default function CommitteeDetailPage() {
   const params = useParams();
   const id = (params?.id as string) || 'design';
   
+  // الاعتماد المباشر والثابت على القائمة الموحدة لتفادي تضارب الذاكرة المحلية
   const [committee, setCommittee] = useState<any>(defaultCommitteesDetails[id] || defaultCommitteesDetails['design']);
 
   useEffect(() => {
     const baseDetails = defaultCommitteesDetails[id] || defaultCommitteesDetails['design'];
-    
-    // جلب التعديلات المحفوظة من لوحة التحكم (localStorage)
-    const savedCommittees = localStorage.getItem('UHB_COMMITTEES_DATA');
-    if (savedCommittees) {
-      try {
-        const parsedArray = JSON.parse(savedCommittees);
-        const found = parsedArray.find((c: any) => c.id === id);
-        if (found) {
-          setCommittee({
-            ...baseDetails,
-            maleLeader: found.maleLeader !== undefined ? found.maleLeader : baseDetails.maleLeader,
-            femaleLeader: found.femaleLeader !== undefined ? found.femaleLeader : baseDetails.femaleLeader,
-            members: found.members && found.members.length > 0 
-              ? found.members.map((m: any) => ({
-                  name: m.name,
-                  role: m.role || m.task || 'عضو',
-                  status: m.status || 'نشط'
-                }))
-              : baseDetails.members
-          });
-          return;
-        }
-      } catch (e) {
-        console.error('Error loading committee data from storage:', e);
-      }
-    }
-    // في حال لم تكن هناك بيانات مخزنة، اعرض البيانات الافتراضية للجنة الحالية
     setCommittee(baseDetails);
   }, [id]);
 
