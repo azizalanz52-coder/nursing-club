@@ -1,11 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
-const committeesDetails: Record<string, any> = {
+const defaultCommitteesDetails: Record<string, any> = {
   design: {
+    id: 'design',
     name: 'لجنة التصميم',
     description: 'مسؤولة عن الهوية البصرية، تصميم البوسترات، وتجهيز المحتوى المرئي لفعاليات النادي.',
     icon: '🎨',
@@ -18,6 +19,7 @@ const committeesDetails: Record<string, any> = {
     ]
   },
   media: {
+    id: 'media',
     name: 'لجنة الإعلام',
     description: 'إدارة منصات التواصل الاجتماعي، التغطيات الحية، وصناعة المحتوى الإعلامي المرئي والمكتوب.',
     icon: '📸',
@@ -29,6 +31,7 @@ const committeesDetails: Record<string, any> = {
     ]
   },
   pr: {
+    id: 'pr',
     name: 'لجنة العلاقات العامة',
     description: 'بناء الشراكات، استقبال الضيوف، والتنسيق الفعّال بين النادي والجهات الخارجية.',
     icon: '🌐',
@@ -39,6 +42,7 @@ const committeesDetails: Record<string, any> = {
     ]
   },
   quality: {
+    id: 'quality',
     name: 'لجنة الجودة والتطوير',
     description: 'مراجعة وتقييم الأداء، قياس رضا الأعضاء، وتقديم مقترحات تحسين العمل المؤسسي.',
     icon: '📊',
@@ -49,6 +53,7 @@ const committeesDetails: Record<string, any> = {
     ]
   },
   scientific: {
+    id: 'scientific',
     name: 'لجنة المحتوى العلمي',
     description: 'إعداد ومراجعة المطويات الطبية، تنظيم المحاضرات التخصصية، ودعم الأنشطة الأكاديمية.',
     icon: '🔬',
@@ -59,6 +64,7 @@ const committeesDetails: Record<string, any> = {
     ]
   },
   hr: {
+    id: 'hr',
     name: 'لجنة الموارد البشرية',
     description: 'إدارة شؤون الأعضاء، متابعة الانضمام، وتنظيم تقييمات الأداء والتحفيز.',
     icon: '👥',
@@ -69,6 +75,7 @@ const committeesDetails: Record<string, any> = {
     ]
   },
   'events-org': {
+    id: 'events-org',
     name: 'لجنة التنظيم والفعاليات',
     description: 'التخطيط الميداني للفعاليات، إدارة الحشود، والتنسيق اللوجستي للورش والملتقيات.',
     icon: '📅',
@@ -82,8 +89,36 @@ const committeesDetails: Record<string, any> = {
 
 export default function CommitteeDetailPage() {
   const params = useParams();
-  const id = params?.id as string;
-  const committee = committeesDetails[id] || committeesDetails['design'];
+  const id = (params?.id as string) || 'design';
+  
+  const [committee, setCommittee] = useState<any>(defaultCommitteesDetails[id] || defaultCommitteesDetails['design']);
+
+  useEffect(() => {
+    // جلب التعديلات المحفوظة من لوحة التحكم (localStorage)
+    const savedCommittees = localStorage.getItem('UHB_COMMITTEES_DATA');
+    if (savedCommittees) {
+      try {
+        const parsedArray = JSON.parse(savedCommittees);
+        const found = parsedArray.find((c: any) => c.id === id);
+        if (found) {
+          // دمج الأوصاف والأيقونات الثابتة مع التعديلات الحية للقادة والأعضاء
+          const baseDetails = defaultCommitteesDetails[id] || {};
+          setCommittee({
+            ...baseDetails,
+            maleLeader: found.maleLeader,
+            femaleLeader: found.femaleLeader,
+            members: found.members.map((m: any) => ({
+              name: m.name,
+              role: m.role || m.task || 'عضو',
+              status: m.status || 'نشط'
+            }))
+          });
+        }
+      } catch (e) {
+        console.error('Error loading committee data from storage:', e);
+      }
+    }
+  }, [id]);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
@@ -128,7 +163,7 @@ export default function CommitteeDetailPage() {
               <p className="text-xs text-slate-500 mt-1">قائمة المنتسبين والمنضمين رسمياً لهذه اللجنة</p>
             </div>
             <span className="px-3 py-1 bg-[#630517] text-[#F5D061] rounded-xl text-xs font-bold shadow">
-              {committee.members.length} أعضاء
+              {committee.members?.length || 0} أعضاء
             </span>
           </div>
 
@@ -142,11 +177,11 @@ export default function CommitteeDetailPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {committee.members.map((m: any, idx: number) => (
+                {committee.members?.map((m: any, idx: number) => (
                   <tr key={idx} className="hover:bg-slate-50/80 transition-all">
                     <td className="py-4 pr-4 font-bold text-slate-900 flex items-center gap-2">
                       <span className="w-8 h-8 rounded-full bg-[#630517]/10 text-[#630517] flex items-center justify-center text-xs font-black">
-                        {m.name.charAt(0)}
+                        {m.name ? m.name.charAt(0) : 'ع'}
                       </span>
                       {m.name}
                     </td>
