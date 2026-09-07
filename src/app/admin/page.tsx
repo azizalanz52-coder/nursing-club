@@ -10,7 +10,6 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners'>('team');
 
-  // حماية صارمة لمنع أي شخص غيرك من دخول صفحة الأدمن
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
     if (phone !== '0553731265') {
@@ -19,7 +18,6 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
-  // 1. إدارة الفعاليات والبوسترات
   const [events, setEvents] = useState([
     {
       id: '1',
@@ -76,7 +74,6 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_EVENTS', JSON.stringify(updatedEvents));
   };
 
-  // 2. إدارة البانرات والهيدر
   const [banners, setBanners] = useState([
     {
       id: '1',
@@ -92,10 +89,9 @@ export default function AdminDashboard() {
   const [bannerTitle, setBannerTitle] = useState('');
   const [bannerImage, setBannerImage] = useState('/header-banner.png');
 
-  // 3. طلبات الانضمام (من Firebase)
   const [requests, setRequests] = useState<any[]>([]);
 
-  // 4. إدارة اللجان وقادة والأعضاء (سحابي عبر Firebase)
+  // اللجان
   const [committees, setCommittees] = useState([
     { id: 'design', name: 'لجنة التصميم', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي', members: [] },
     { id: 'media', name: 'لجنة الإعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
@@ -132,7 +128,6 @@ export default function AdminDashboard() {
 
     const fetchCloudData = async () => {
       try {
-        // جلب طلبات الانضمام
         const querySnapshot = await getDocs(collection(db, 'applications'));
         const fetchedRequests = querySnapshot.docs.map(docSnap => ({
           id: docSnap.id,
@@ -142,7 +137,6 @@ export default function AdminDashboard() {
           setRequests(fetchedRequests);
         }
 
-        // جلب بيانات اللجان السحابية
         const commSnapshot = await getDocs(collection(db, 'committees'));
         if (!commSnapshot.empty) {
           const cloudMap: Record<string, any> = {};
@@ -201,22 +195,19 @@ export default function AdminDashboard() {
     }
   };
 
-  // حفظ التعديلات سحابياً في Firebase عند تغيير القادة أو الأعضاء
-  const handleLeaderChange = async (type: 'maleLeader' | 'femaleLeader', val: string) => {
-    const updated = committees.map(c => c.id === selectedCommitteeId ? { ...c, [type]: val } : c);
-    setCommittees(updated);
-
-    const targetComm = updated.find(c => c.id === selectedCommitteeId);
-    if (targetComm) {
-      try {
-        await setDoc(doc(db, 'committees', selectedCommitteeId), {
-          maleLeader: targetComm.maleLeader,
-          femaleLeader: targetComm.femaleLeader,
-          members: targetComm.members || []
-        }, { merge: true });
-      } catch (err) {
-        console.error('Error saving to cloud:', err);
-      }
+  // زر الحفظ الصريح (Submit) للقادة
+  const handleSaveLeaders = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await setDoc(doc(db, 'committees', selectedCommitteeId), {
+        maleLeader: currentCommittee.maleLeader,
+        femaleLeader: currentCommittee.femaleLeader,
+        members: currentCommittee.members || []
+      }, { merge: true });
+      alert(`تم حفظ تعديلات ${currentCommittee.name} سحابياً بنجاح! ستظهر الآن على جميع الأجهزة.`);
+    } catch (err) {
+      console.error('Error saving leaders:', err);
+      alert('حدث خطأ أثناء الحفظ.');
     }
   };
 
@@ -227,55 +218,40 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!newMemberName.trim()) return;
 
-    const updated = committees.map(c => {
-      if (c.id === selectedCommitteeId) {
-        return {
-          ...c,
-          members: [...(c.members || []), { name: newMemberName, role: newMemberRole || 'عضو', status: 'نشط' }]
-        };
-      }
-      return c;
-    });
+    const updatedMembers = [...(currentCommittee.members || []), { name: newMemberName, role: newMemberRole || 'عضو', status: 'نشط' }];
+    const updated = committees.map(c => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c);
     setCommittees(updated);
     setNewMemberName('');
     setNewMemberRole('');
 
-    const targetComm = updated.find(c => c.id === selectedCommitteeId);
-    if (targetComm) {
-      try {
-        await setDoc(doc(db, 'committees', selectedCommitteeId), {
-          maleLeader: targetComm.maleLeader,
-          femaleLeader: targetComm.femaleLeader,
-          members: targetComm.members
-        }, { merge: true });
-      } catch (err) {
-        console.error(err);
-      }
+    try {
+      await setDoc(doc(db, 'committees', selectedCommitteeId), {
+        maleLeader: currentCommittee.maleLeader,
+        femaleLeader: currentCommittee.femaleLeader,
+        members: updatedMembers
+      }, { merge: true });
+      alert('تم إضافة العضو وحفظه سحابياً بنجاح!');
+    } catch (err) {
+      console.error(err);
     }
   };
 
   const handleDeleteMember = async (index: number) => {
-    const updated = committees.map(c => {
-      if (c.id === selectedCommitteeId) {
-        const updatedMembers = [...(c.members || [])];
-        updatedMembers.splice(index, 1);
-        return { ...c, members: updatedMembers };
-      }
-      return c;
-    });
+    const updatedMembers = [...(currentCommittee.members || [])];
+    updatedMembers.splice(index, 1);
+
+    const updated = committees.map(c => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c);
     setCommittees(updated);
 
-    const targetComm = updated.find(c => c.id === selectedCommitteeId);
-    if (targetComm) {
-      try {
-        await setDoc(doc(db, 'committees', selectedCommitteeId), {
-          maleLeader: targetComm.maleLeader,
-          femaleLeader: targetComm.femaleLeader,
-          members: targetComm.members
-        }, { merge: true });
-      } catch (err) {
-        console.error(err);
-      }
+    try {
+      await setDoc(doc(db, 'committees', selectedCommitteeId), {
+        maleLeader: currentCommittee.maleLeader,
+        femaleLeader: currentCommittee.femaleLeader,
+        members: updatedMembers
+      }, { merge: true });
+      alert('تم حذف العضو وتحديث السحابة بنجاح!');
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -288,8 +264,8 @@ export default function AdminDashboard() {
             UHB
           </span>
           <div>
-            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (سحابي متزامن)</h1>
-            <p className="text-xs text-slate-500">التعديلات تحفظ وتظهر فوراً على جميع الأجهزة والجوالات</p>
+            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (حفظ يدوي سحابي)</h1>
+            <p className="text-xs text-slate-500">عدل واضغط زر الحفظ لتتزامن البيانات مع جميع الأجهزة</p>
           </div>
         </div>
 
@@ -307,7 +283,7 @@ export default function AdminDashboard() {
           {[
             { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
             { id: 'banners', label: '🖼️ إدارة البانرات (الهيدر)' },
-            { id: 'team', label: '👥 إدارة القادة والأعضاء (سحابي)' },
+            { id: 'team', label: '👥 إدارة القادة والأعضاء (مع زر حفظ)' },
             { id: 'requests', label: '📥 طلبات الانضمام (Firebase)' },
           ].map((tab) => (
             <button
@@ -376,7 +352,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">مسار البوستر (صورة)</label>
+                  <label className="text-xs font-bold text-slate-600">مسار البوستر</label>
                   <input
                     type="text"
                     placeholder="مثال: /logo.png"
@@ -439,7 +415,7 @@ export default function AdminDashboard() {
         {activeTab === 'banners' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">إضافة بانر رئيسي جديد (المناسبات)</h3>
+              <h3 className="text-xl font-black text-slate-900">إضافة بانر رئيسي جديد</h3>
               
               <form onSubmit={handleAddBanner} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -524,7 +500,7 @@ export default function AdminDashboard() {
         {activeTab === 'team' && (
           <div className="space-y-6">
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-base font-extrabold text-slate-900">اختر اللجنة لإدارة قادتها وأعضائها (تحديث سحابي فوري)</h3>
+              <h3 className="text-base font-extrabold text-slate-900">اختر اللجنة لتعديل قادتها وأعضائها</h3>
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'design', name: 'لجنة التصميم' },
@@ -550,9 +526,10 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+            {/* نموذج تعديل القادة مع زر Submit صريح */}
+            <form onSubmit={handleSaveLeaders} className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                <h3 className="text-xl font-black text-slate-900">إدارة {currentCommittee.name}</h3>
+                <h3 className="text-xl font-black text-slate-900">إدارة قادة {currentCommittee.name}</h3>
                 <span className="text-xs bg-[#630517]/10 text-[#630517] font-bold px-3 py-1 rounded-full">
                   {(currentCommittee.members || []).length} أعضاء
                 </span>
@@ -560,84 +537,102 @@ export default function AdminDashboard() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500">قائد الطلاب (يحفظ تلقائياً)</label>
+                  <label className="text-xs font-bold text-slate-500">قائد الطلاب</label>
                   <input
                     type="text"
                     value={currentCommittee.maleLeader}
-                    onChange={(e) => handleLeaderChange('maleLeader', e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCommittees(committees.map(c => c.id === selectedCommitteeId ? { ...c, maleLeader: val } : c));
+                    }}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500">قائدة الطالبات (يحفظ تلقائياً)</label>
+                  <label className="text-xs font-bold text-slate-500">قائدة الطالبات</label>
                   <input
                     type="text"
                     value={currentCommittee.femaleLeader}
-                    onChange={(e) => handleLeaderChange('femaleLeader', e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCommittees(committees.map(c => c.id === selectedCommitteeId ? { ...c, femaleLeader: val } : c));
+                    }}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
               </div>
 
-              <div className="space-y-4 pt-4 border-t border-slate-100">
-                <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين</h4>
-                {(!currentCommittee.members || currentCommittee.members.length === 0) ? (
-                  <p className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-2xl">لا يوجد أعضاء حالياً.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-right text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                          <th className="pb-2 pr-2">اسم العضو</th>
-                          <th className="pb-2">الدور</th>
-                          <th className="pb-2 text-left pl-2">إجراء</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {currentCommittee.members.map((m: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-slate-50">
-                            <td className="py-3 pr-2 font-bold text-slate-900">{m.name}</td>
-                            <td className="py-3 text-slate-600">{m.role}</td>
-                            <td className="py-3 text-left pl-2">
-                              <button
-                                onClick={() => handleDeleteMember(idx)}
-                                className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100"
-                              >
-                                حذف
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                <form onSubmit={handleAddMember} className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
-                  <input
-                    type="text"
-                    placeholder="اسم العضو الجديد"
-                    value={newMemberName}
-                    onChange={(e) => setNewMemberName(e.target.value)}
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
-                  />
-                  <input
-                    type="text"
-                    placeholder="الدور أو المهمة"
-                    value={newMemberRole}
-                    onChange={(e) => setNewMemberRole(e.target.value)}
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
-                  />
-                  <button
-                    type="submit"
-                    className="bg-[#630517] text-[#F5D061] py-2.5 rounded-xl font-bold text-xs shadow hover:brightness-110"
-                  >
-                    + إضافة عضو للجنة
-                  </button>
-                </form>
+              {/* زر الحفظ (Submit) الصريح للقادة */}
+              <div>
+                <button
+                  type="submit"
+                  className="bg-[#630517] text-[#F5D061] px-6 py-2.5 rounded-xl font-black text-xs shadow hover:brightness-110 transition-all"
+                >
+                  💾 حفظ التغييرات (قادة اللجنة)
+                </button>
               </div>
+            </form>
 
+            {/* إدارة أعضاء اللجنة */}
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+              <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة</h4>
+              {(!currentCommittee.members || currentCommittee.members.length === 0) ? (
+                <p className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-2xl">لا يوجد أعضاء حالياً.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                        <th className="pb-2 pr-2">اسم العضو</th>
+                        <th className="pb-2">الدور</th>
+                        <th className="pb-2 text-left pl-2">إجراء</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {currentCommittee.members.map((m: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="py-3 pr-2 font-bold text-slate-900">{m.name}</td>
+                          <td className="py-3 text-slate-600">{m.role}</td>
+                          <td className="py-3 text-left pl-2">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMember(idx)}
+                              className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100"
+                            >
+                              حذف
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <form onSubmit={handleAddMember} className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
+                <input
+                  type="text"
+                  placeholder="اسم العضو الجديد"
+                  value={newMemberName}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                />
+                <input
+                  type="text"
+                  placeholder="الدور أو المهمة"
+                  value={newMemberRole}
+                  onChange={(e) => setNewMemberRole(e.target.value)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                />
+                <button
+                  type="submit"
+                  className="bg-[#630517] text-[#F5D061] py-2.5 rounded-xl font-bold text-xs shadow hover:brightness-110"
+                >
+                  + إضافة عضو وحفظه
+                </button>
+              </form>
             </div>
+
           </div>
         )}
 
@@ -673,12 +668,14 @@ export default function AdminDashboard() {
                         </td>
                         <td className="py-4 text-left pl-2 flex gap-2 justify-end">
                           <button
+                            type="button"
                             onClick={() => handleAcceptRequest(req.id)}
                             className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100"
                           >
                             قبول
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleDeleteRequest(req.id)}
                             className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100"
                           >
