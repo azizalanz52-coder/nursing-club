@@ -2,11 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners'>('team');
+
+  // حماية صارمة لمنع أي شخص غيرك من دخول صفحة الأدمن حتى لو عبر الرابط المباشر
+  useEffect(() => {
+    const phone = localStorage.getItem('userPhone');
+    if (phone !== '0553731265') {
+      alert('عذراً، هذه الصفحة مخصصة للمدير فقط.');
+      router.push('/');
+    }
+  }, [router]);
 
   // 1. إدارة الفعاليات والبوسترات
   const [events, setEvents] = useState([

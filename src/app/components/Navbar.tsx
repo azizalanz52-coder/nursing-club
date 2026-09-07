@@ -6,26 +6,29 @@ import Image from 'next/image';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
+  const [userPhone, setUserPhone] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     const name = localStorage.getItem('userName');
-    if (name) {
-      setUserName(name);
-    }
+    const phone = localStorage.getItem('userPhone');
+    if (name) setUserName(name);
+    if (phone) setUserPhone(phone);
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('userPhone');
     localStorage.removeItem('userName');
     setUserName(null);
+    setUserPhone(null);
     window.location.href = '/';
   };
 
-  if (!mounted) {
-    return null; // تجنب اختلاف العرض بين الخادم والمتصفح
-  }
+  if (!mounted) return null;
+
+  // ظهور زر لوحة التحكم والوصول مقتصر حصرياً على رقمك
+  const isAdmin = userPhone === '0553731265';
 
   return (
     <header className="w-full bg-white border-b border-slate-100 sticky top-0 z-50">
@@ -62,13 +65,15 @@ export default function Navbar() {
 
           {userName ? (
             <div className="flex items-center gap-2">
-              <Link 
-                href="/admin"
-                className="bg-[#630517] text-[#F5D061] px-3 py-2 rounded-xl text-xs font-black shadow hover:brightness-110 transition-all flex items-center gap-1"
-              >
-                <span>⚙️</span>
-                <span>لوحة التحكم</span>
-              </Link>
+              {isAdmin && (
+                <Link 
+                  href="/admin"
+                  className="bg-[#630517] text-[#F5D061] px-3 py-2 rounded-xl text-xs font-black shadow hover:brightness-110 transition-all flex items-center gap-1"
+                >
+                  <span>⚙️</span>
+                  <span>لوحة التحكم</span>
+                </Link>
+              )}
 
               <span className="text-xs font-bold text-rose-950 bg-rose-50 px-3 py-2 rounded-xl border border-rose-100">
                 {userName}
