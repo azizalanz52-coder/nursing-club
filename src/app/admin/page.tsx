@@ -358,14 +358,29 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
+                {/* زر اختيار الملفات المباشر + خانة النص */}
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">مسار أو رابط بوستر الفعالية (مثال: /header-banner.png)</label>
+                  <label className="text-xs font-bold text-slate-600">اختر بوستر الفعالية من جهازك أو أدخل رابطه</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          const fileUrl = URL.createObjectURL(file);
+                          setNewPoster(fileUrl);
+                        }
+                      }}
+                      className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
+                    />
+                  </div>
                   <input
                     type="text"
-                    placeholder="مثال: /header-banner.png"
+                    placeholder="أو اكتب مسار الصورة يدوياً (مثال: /header-banner.png)"
                     value={newPoster}
                     onChange={(e) => setNewPoster(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                    className="w-full mt-2 px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
 
@@ -448,13 +463,25 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">مسار أو رابط صورة البانر (مثال: /header-banner.png)</label>
+                  <label className="text-xs font-bold text-slate-600">اختر صورة البانر من جهازك أو أدخل رابطها</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const file = e.target.files[0];
+                        const fileUrl = URL.createObjectURL(file);
+                        setBannerImage(fileUrl);
+                      }
+                    }}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
+                  />
                   <input
                     type="text"
-                    placeholder="مثال: /header-banner.png"
+                    placeholder="أو اكتب مسار الصورة يدوياً"
                     value={bannerImage}
                     onChange={(e) => setBannerImage(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                    className="w-full mt-2 px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
 
