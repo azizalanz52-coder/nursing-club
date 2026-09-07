@@ -7,9 +7,8 @@ export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    // الانتقال المباشر عبر المتصفح لضمان فتح الصفحة فوراً
+  const handleDirectLogin = () => {
+    // الانتقال المباشر فور الضغط
     window.location.href = "/";
   };
 
@@ -25,7 +24,7 @@ export default function LoginPage() {
           <p className="text-amber-50/70 text-sm">أدخل رقم الجوال وكلمة المرور للمتابعة</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <div className="space-y-6">
           <div className="space-y-2 text-right">
             <label className="text-sm font-bold text-[#F5D061]">رقم الجوال</label>
             <input
@@ -34,7 +33,6 @@ export default function LoginPage() {
               onChange={(e) => setPhone(e.target.value)}
               placeholder="05xxxxxxxx"
               className="w-full px-4 py-3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] transition-all"
-              required
             />
           </div>
 
@@ -46,17 +44,17 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               className="w-full px-4 py-3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] transition-all"
-              required
             />
           </div>
 
           <button
-            type="submit"
+            type="button"
+            onClick={handleDirectLogin}
             className="w-full bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] py-3.5 rounded-xl font-black hover:brightness-110 active:scale-95 transition-all shadow-lg text-center cursor-pointer"
           >
             دخول للنظام
           </button>
-        </form>
+        </div>
 
         <div className="text-center pt-2 border-t border-[#F5D061]/10">
           <Link href="/" className="text-sm text-amber-50/70 hover:text-[#F5D061] transition-colors">
