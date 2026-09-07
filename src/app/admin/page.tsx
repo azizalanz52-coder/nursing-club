@@ -18,7 +18,6 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
-  // إدارة صور وعبارات "شغف، عطاء، واحترافية"
   const defaultPassionSlides = [
     { id: 1, image: '/header-banner.png', quote: '«التمريض ليس مجرد مهنة، بل هو فن وعِلم يلامس حياة الإنسان في أصعب لحظاته.»' },
     { id: 2, image: '/logo.png', quote: '«بالعطاء المستمر والعمل الجماعي نصنع أثراً يخلده الزمن في قلوب المجتمع.»' },
@@ -62,7 +61,6 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_PASSION_SLIDES', JSON.stringify(updated));
   };
 
-  // إدارة صور وفعاليات "اكتشف النادي" مع دعم رفع صور متعددة دفعة واحدة
   const defaultDiscoverEvents = [
     {
       id: 1,
@@ -83,7 +81,6 @@ export default function AdminDashboard() {
   const [discoverEvents, setDiscoverEvents] = useState(defaultDiscoverEvents);
   const [selectedEventId, setSelectedEventId] = useState<number>(1);
 
-  // حالات إضافة فعالية جديدة بالكامل مع صور متعددة
   const [newDiscTitle, setNewDiscTitle] = useState('');
   const [newDiscCategory, setNewDiscCategory] = useState('أنشطة كبرى');
   const [newDiscDesc, setNewDiscDesc] = useState('');
@@ -101,7 +98,6 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // دالة اختيار صور متعددة لإنشاء فعالية جديدة
   const handleSelectMultipleImagesForNewEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
@@ -133,7 +129,6 @@ export default function AdminDashboard() {
     alert('تم إنشاء الفعالية وإضافة الصور بنجاح إلى المعرض!');
   };
 
-  // رفع صور إضافية لفعالية قائمة
   const handleAddMultipleImagesToExistingEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
@@ -155,7 +150,7 @@ export default function AdminDashboard() {
   const handleRemoveImageFromEvent = (imgIndex: number) => {
     const updated = discoverEvents.map(ev => {
       if (ev.id === selectedEventId) {
-        const newImages = ev.images.filter((_, idx) => idx !== imgIndex);
+        const newImages = ev.images.filter((_: string, idx: number) => idx !== imgIndex);
         return { ...ev, images: newImages.length > 0 ? newImages : ['/logo.png'] };
       }
       return ev;
@@ -514,6 +509,7 @@ export default function AdminDashboard() {
                       <div className="absolute inset-0 p-4 flex flex-col justify-between z-10 text-white text-xs">
                         <p className="font-bold line-clamp-3 text-[#F5D061]">{slide.quote}</p>
                         <button
+                          type="button"
                           onClick={() => handleDeletePassionSlide(slide.id)}
                           className="self-end bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-black shadow cursor-pointer"
                         >
@@ -608,6 +604,7 @@ export default function AdminDashboard() {
                 {discoverEvents.map((ev) => (
                   <button
                     key={ev.id}
+                    type="button"
                     onClick={() => setSelectedEventId(ev.id)}
                     className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
                       selectedEventId === ev.id
@@ -624,6 +621,7 @@ export default function AdminDashboard() {
                 <div className="flex justify-between items-center flex-wrap gap-4">
                   <h4 className="font-extrabold text-slate-900 text-sm">إضافة صور جديدة لـ: {currentEditedEvent.title}</h4>
                   <button
+                    type="button"
                     onClick={() => handleDeleteEntireDiscoverEvent(currentEditedEvent.id)}
                     className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 cursor-pointer"
                   >
@@ -647,6 +645,7 @@ export default function AdminDashboard() {
                     <div key={idx} className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 group bg-slate-100 shadow-sm">
                       <img src={img} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
                       <button
+                        type="button"
                         onClick={() => handleRemoveImageFromEvent(idx)}
                         className="absolute top-2 right-2 bg-red-600 text-white w-7 h-7 rounded-full text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
                       >
@@ -769,6 +768,7 @@ export default function AdminDashboard() {
                         </td>
                         <td className="py-4 text-left pl-2">
                           <button
+                            type="button"
                             onClick={() => handleDeleteEvent(ev.id)}
                             className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                           >
@@ -865,6 +865,7 @@ export default function AdminDashboard() {
                         <td className="py-4 text-slate-500 truncate max-w-xs">{ban.image}</td>
                         <td className="py-4 text-left pl-2">
                           <button
+                            type="button"
                             onClick={() => handleDeleteBanner(ban.id)}
                             className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                           >
@@ -896,6 +897,7 @@ export default function AdminDashboard() {
                 ].map((com) => (
                   <button
                     key={com.id}
+                    type="button"
                     onClick={() => setSelectedCommitteeId(com.id)}
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       selectedCommitteeId === com.id
