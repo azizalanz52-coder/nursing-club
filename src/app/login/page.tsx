@@ -2,14 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const router = useRouter();
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("تسجيل دخول:", { phone, password });
+    
+    // توجيه مباشر إلى لوحة التحكم
+    router.push("/admin");
   };
 
   return (
@@ -51,7 +56,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] py-3.5 rounded-xl font-black hover:brightness-110 active:scale-95 transition-all shadow-lg text-center"
+            className="w-full bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] py-3.5 rounded-xl font-black hover:brightness-110 active:scale-95 transition-all shadow-lg text-center cursor-pointer"
           >
             دخول للنظام
           </button>
