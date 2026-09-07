@@ -4,14 +4,11 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../../lib/firebase';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const storage = getStorage();
   const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners' | 'discover' | 'passion'>('discover');
-  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -20,22 +17,6 @@ export default function AdminDashboard() {
       router.push('/');
     }
   }, [router]);
-
-  // دالة رفع الصور سحابياً إلى Firebase Storage لضمان عدم ضياعها
-  const uploadToCloud = async (file: File): Promise<string> => {
-    setUploading(true);
-    try {
-      const storageRef = ref(storage, `uploads/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snapshot.ref);
-      return url;
-    } catch (err) {
-      console.error('Error uploading image:', err);
-      throw err;
-    } finally {
-      setUploading(false);
-    }
-  };
 
   // إدارة صور وعبارات "شغف، عطاء، واحترافية"
   const defaultPassionSlides = [
@@ -120,23 +101,12 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // دالة اختيار صور متعددة لإنشاء فعالية جديدة سحابياً
-  const handleSelectMultipleImagesForNewEvent = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // دالة اختيار صور متعددة لإنشاء فعالية جديدة
+  const handleSelectMultipleImagesForNewEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
-      setUploading(true);
-      try {
-        const cloudUrls: string[] = [];
-        for (const file of filesArray) {
-          const url = await uploadToCloud(file);
-          cloudUrls.push(url);
-        }
-        setNewDiscImages(prev => [...prev, ...cloudUrls]);
-      } catch (err) {
-        alert('حدث خطأ أثناء رفع الصور.');
-      } finally {
-        setUploading(false);
-      }
+      const urls = filesArray.map(file => URL.createObjectURL(file));
+      setNewDiscImages(prev => [...prev, ...urls]);
     }
   };
 
@@ -160,36 +130,25 @@ export default function AdminDashboard() {
     setNewDiscTitle('');
     setNewDiscDesc('');
     setNewDiscImages([]);
-    alert('تم إنشاء الفعالية وإضافة الصور سحابياً بنجاح إلى المعرض!');
+    alert('تم إنشاء الفعالية وإضافة الصور بنجاح إلى المعرض!');
   };
 
-  // رفع صور إضافية سحابياً لفعالية قائمة
-  const handleAddMultipleImagesToExistingEvent = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // رفع صور إضافية لفعالية قائمة
+  const handleAddMultipleImagesToExistingEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
-      setUploading(true);
-      try {
-        const cloudUrls: string[] = [];
-        for (const file of filesArray) {
-          const url = await uploadToCloud(file);
-          cloudUrls.push(url);
+      const urls = filesArray.map(file => URL.createObjectURL(file));
+
+      const updated = discoverEvents.map(ev => {
+        if (ev.id === selectedEventId) {
+          return { ...ev, images: [...ev.images, ...urls] };
         }
+        return ev;
+      });
 
-        const updated = discoverEvents.map(ev => {
-          if (ev.id === selectedEventId) {
-            return { ...ev, images: [...ev.images, ...cloudUrls] };
-          }
-          return ev;
-        });
-
-        setDiscoverEvents(updated);
-        localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
-        alert('تم رفع وإضافة الصور سحابياً بنجاح للفعالية!');
-      } catch (err) {
-        alert('حدث خطأ أثناء رفع الصور.');
-      } finally {
-        setUploading(false);
-      }
+      setDiscoverEvents(updated);
+      localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
+      alert('تم رفع وإضافة الصور بنجاح للفعالية!');
     }
   };
 
@@ -235,7 +194,7 @@ export default function AdminDashboard() {
   const [newPoster, setNewPoster] = useState('/header-banner.png');
   const [newDesc, setNewDesc] = useState('');
 
-  const handleAddEvent = async (e: React.FormEvent) => {
+  const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
       alert('يرجى كتابة عنوان الفعالية.');
@@ -282,7 +241,7 @@ export default function AdminDashboard() {
   const [bannerTitle, setBannerTitle] = useState('');
   const [bannerImage, setBannerImage] = useState('/header-banner.png');
 
-  const handleAddBanner = async (e: React.FormEvent) => {
+  const handleAddBanner = (e: React.FormEvent) => {
     e.preventDefault();
     if (!bannerTitle.trim()) {
       alert('يرجى كتابة عنوان البانر.');
@@ -484,12 +443,6 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
 
-        {uploading && (
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-2xl text-xs font-bold text-center animate-pulse">
-            ⏳ جاري رفع الصور سحابياً، يرجى الانتظار...
-          </div>
-        )}
-
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {[
             { id: 'passion', label: '✨ إدارة بطاقة "شغف وعطاء"' },
@@ -524,10 +477,9 @@ export default function AdminDashboard() {
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
-                        const url = await uploadToCloud(e.target.files[0]);
-                        setNewPassionImage(url);
+                        setNewPassionImage(URL.createObjectURL(e.target.files[0]));
                       }
                     }}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
@@ -617,7 +569,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر صور المعرض (ترفع سحابياً بشكل دائم 📁)</label>
+                  <label className="text-xs font-bold text-slate-700">اختر صور المعرض (يمكنك تحديد أكثر من صورة دفعة واحدة 📁)</label>
                   <input
                     type="file"
                     accept="image/*"
@@ -625,7 +577,7 @@ export default function AdminDashboard() {
                     onChange={handleSelectMultipleImagesForNewEvent}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
-                  <p className="text-xs text-emerald-700 font-bold mt-1">تم رفع {newDiscImages.length} صور سحابياً للفعالية الجديدة حتى الآن.</p>
+                  <p className="text-xs text-emerald-700 font-bold mt-1">تم اختيار {newDiscImages.length} صور للفعالية الجديدة حتى الآن.</p>
                 </div>
 
                 {newDiscImages.length > 0 && (
@@ -670,7 +622,7 @@ export default function AdminDashboard() {
 
               <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
                 <div className="flex justify-between items-center flex-wrap gap-4">
-                  <h4 className="font-extrabold text-slate-900 text-sm">إضافة صور سحابية لـ: {currentEditedEvent.title}</h4>
+                  <h4 className="font-extrabold text-slate-900 text-sm">إضافة صور جديدة لـ: {currentEditedEvent.title}</h4>
                   <button
                     onClick={() => handleDeleteEntireDiscoverEvent(currentEditedEvent.id)}
                     className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 cursor-pointer"
@@ -761,14 +713,14 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر بوستر الفعالية (يرفع سحابياً)</label>
+                  <label className="text-xs font-bold text-slate-600">اختر بوستر الفعالية من جهازك أو أدخل رابطه</label>
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
-                        const url = await uploadToCloud(e.target.files[0]);
-                        setNewPoster(url);
+                        const fileUrl = URL.createObjectURL(e.target.files[0]);
+                        setNewPoster(fileUrl);
                       }
                     }}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
@@ -861,14 +813,14 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر صورة البانر (ترفع سحابياً)</label>
+                  <label className="text-xs font-bold text-slate-600">اختر صورة البانر من جهازك أو أدخل رابطها</label>
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
-                        const url = await uploadToCloud(e.target.files[0]);
-                        setBannerImage(url);
+                        const fileUrl = URL.createObjectURL(e.target.files[0]);
+                        setBannerImage(fileUrl);
                       }
                     }}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
@@ -959,7 +911,7 @@ export default function AdminDashboard() {
 
             <form onSubmit={handleSaveLeadersSubmit} className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                <h3 className="text-xl font-black text-slate-900">إدارة قادة {currentCommittee.name}</h3>
+                <h3 className="text-xl font-black text-slate-900">إدارة قادة لجنة {currentCommittee.name}</h3>
                 <span className="text-xs bg-[#630517]/10 text-[#630517] font-bold px-3 py-1 rounded-full">
                   {(currentCommittee.members || []).length} أعضاء
                 </span>
