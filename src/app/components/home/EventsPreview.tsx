@@ -7,41 +7,42 @@ export default function EventsPreview() {
   const [eventsList, setEventsList] = useState([
     {
       id: '1',
-      title: "حملة التوعية الصحية",
-      date: "2026/10/15",
-      location: "جامعة حفر الباطن",
+      title: "اليوم العالمي للتمريض",
+      date: "26 سبتمبر 2026",
+      location: "مسرح المبنى 2",
       status: "upcoming",
       poster: "/header-banner.png",
-      description: "حملة توعوية صحية شاملة لمنسوبي وزوار الجامعة."
+      description: "فعالية تابعة لنادي التمريض."
     },
     {
       id: '2',
-      title: "ورشة مهارات التمريض",
-      date: "2026/11/05",
-      location: "كلية التمريض",
-      status: "upcoming",
-      poster: "/header-banner.png",
-      description: "ورشة عمل تفاعلية لأحدث المهارات الإكلينيكية والتمريضية."
+      title: "حفل تدشين كلية التمريض",
+      date: "5 أكتوبر 2025",
+      location: "كلية التمريض الطالبات: مسرح الياسمين",
+      status: "past",
+      poster: "/logo.png",
+      description: "فعالية تابعة لنادي التمريض."
     },
     {
       id: '3',
-      title: "اليوم العالمي للتمريض",
-      date: "2026/12/01",
-      location: "جامعة حفر الباطن",
-      status: "upcoming",
+      title: "الإسعافات الأولية",
+      date: "27 أبريل 2026",
+      location: "المعرض الدائم الطالبات: أمام المسرح الطلابي",
+      status: "past",
       poster: "/header-banner.png",
-      description: "احتفالية سنوية لتكريم وتقدير جهود مهنة التمريض العظيمة."
-    },
+      description: "فعالية تابعة لنادي التمريض."
+    }
   ]);
 
   useEffect(() => {
-    // جلب الفعاليات المضافة من لوحة التحكم (Admin)
+    // جلب الفعاليات المضافة من لوحة التحكم (Admin) حصرياً وبدون تكرار
     const savedEvents = localStorage.getItem('UHB_EVENTS');
     if (savedEvents) {
       try {
         const parsed = JSON.parse(savedEvents);
-        if (parsed && parsed.length > 0) {
-          setEventsList(parsed.slice(0, 3)); // نعرض أول 3 فعاليات في الرئيسية
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+          // نأخذ أول 3 فعاليات فريدة نظيفة
+          setEventsList(parsed.slice(0, 3));
         }
       } catch (e) {
         console.error(e);
@@ -83,13 +84,17 @@ export default function EventsPreview() {
               className="relative rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between group min-h-[420px] bg-slate-950 border border-[#F5D061]/30 transition-all hover:scale-[1.02]"
             >
               {/* خلفية البوستر بوضوح عالٍ وتعتيم متوازن */}
-              <div className="absolute inset-0 z-0 overflow-hidden">
+              <div className="absolute inset-0 z-0 overflow-hidden bg-slate-950">
                 <img
-                  src={event.poster || "/header-banner.png"}
+                  src={event.poster && event.poster.trim() !== "" ? event.poster : "/header-banner.png"}
                   alt={event.title}
-                  className="w-full h-full object-cover opacity-65 group-hover:scale-105 transition-transform duration-700"
+                  className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-700"
+                  onError={(e) => {
+                    // في حال فشل تحميل الصورة المعينة يتم الرجوع للصورة الافتراضية تلقائياً
+                    (e.target as HTMLImageElement).src = "/header-banner.png";
+                  }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-950/30" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-950/40" />
               </div>
 
               {/* شارة الحالة العلوية */}
@@ -117,11 +122,11 @@ export default function EventsPreview() {
                 </div>
 
                 <div className="pt-3 border-t border-white/20 space-y-2 text-xs font-bold text-slate-100">
-                  <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-3 py-2.5 rounded-xl border border-white/20 shadow-inner">
+                  <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-2.5 rounded-xl border border-white/20 shadow-inner">
                     <span>📍</span>
                     <span className="truncate">{event.location}</span>
                   </div>
-                  <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-3 py-2.5 rounded-xl border border-white/20 shadow-inner">
+                  <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-2.5 rounded-xl border border-white/20 shadow-inner">
                     <span>📆</span>
                     <span className="truncate">{event.date}</span>
                   </div>
