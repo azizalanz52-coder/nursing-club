@@ -18,7 +18,6 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
-  // الفعاليات
   const [events, setEvents] = useState([
     {
       id: '1',
@@ -26,7 +25,7 @@ export default function AdminDashboard() {
       date: '25 سبتمبر 2026',
       location: 'مسرح جامعة حفر الباطن',
       status: 'upcoming',
-      poster: '/logo.png',
+      poster: '/header-banner.png',
       description: 'ملتقى يهدف إلى استعراض أحدث الممارسات في التمريض وورش عمل تفاعلية.'
     }
   ]);
@@ -35,7 +34,7 @@ export default function AdminDashboard() {
   const [newDate, setNewDate] = useState('');
   const [newLocation, setNewLocation] = useState('');
   const [newStatus, setNewStatus] = useState<'upcoming' | 'past'>('upcoming');
-  const [newPoster, setNewPoster] = useState('/logo.png');
+  const [newPoster, setNewPoster] = useState('/header-banner.png');
   const [newDesc, setNewDesc] = useState('');
 
   const handleAddEvent = (e: React.FormEvent) => {
@@ -59,7 +58,7 @@ export default function AdminDashboard() {
     setNewTitle('');
     setNewDate('');
     setNewLocation('');
-    setNewPoster('/logo.png');
+    setNewPoster('/header-banner.png');
     setNewDesc('');
     alert('تم نشر الفعالية وحفظها بنجاح!');
   };
@@ -70,7 +69,6 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_EVENTS', JSON.stringify(updatedEvents));
   };
 
-  // البانرات
   const [banners, setBanners] = useState([
     {
       id: '1',
@@ -115,10 +113,8 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
   };
 
-  // طلبات الانضمام
   const [requests, setRequests] = useState<any[]>([]);
 
-  // اللجان
   const [committees, setCommittees] = useState([
     { 
       id: 'design', 
@@ -362,20 +358,14 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                {/* اختيار صورة البوستر مباشرة من ملفات الجهاز */}
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر بوستر الفعالية من جهازك</label>
+                  <label className="text-xs font-bold text-slate-600">مسار أو رابط بوستر الفعالية (مثال: /header-banner.png)</label>
                   <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const file = e.target.files[0];
-                        const fileUrl = URL.createObjectURL(file);
-                        setNewPoster(fileUrl);
-                      }
-                    }}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
+                    type="text"
+                    placeholder="مثال: /header-banner.png"
+                    value={newPoster}
+                    onChange={(e) => setNewPoster(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
 
@@ -457,20 +447,14 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                {/* اختيار صورة البانر مباشرة من ملفات الجهاز */}
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر صورة البانر من جهازك</label>
+                  <label className="text-xs font-bold text-slate-600">مسار أو رابط صورة البانر (مثال: /header-banner.png)</label>
                   <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const file = e.target.files[0];
-                        const fileUrl = URL.createObjectURL(file);
-                        setBannerImage(fileUrl);
-                      }
-                    }}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
+                    type="text"
+                    placeholder="مثال: /header-banner.png"
+                    value={bannerImage}
+                    onChange={(e) => setBannerImage(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
 

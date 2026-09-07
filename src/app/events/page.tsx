@@ -7,7 +7,6 @@ import Image from 'next/image';
 export default function EventsPage() {
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   
-  // الفعاليات الافتراضية
   const defaultEvents = [
     {
       id: '1',
@@ -41,7 +40,6 @@ export default function EventsPage() {
   const [events, setEvents] = useState(defaultEvents);
 
   useEffect(() => {
-    // جلب الفعاليات المضافة من لوحة التحكم (Admin)
     const saved = localStorage.getItem('UHB_EVENTS');
     if (saved) {
       try {
@@ -55,7 +53,6 @@ export default function EventsPage() {
     }
   }, []);
 
-  // تصفية الفعاليات حسب الفلتر (الكل / قريباً / انتهت)
   const filteredEvents = events.filter(ev => {
     if (filter === 'upcoming') return ev.status === 'upcoming';
     if (filter === 'past') return ev.status === 'past';
@@ -66,7 +63,6 @@ export default function EventsPage() {
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         
-        {/* شريط علوي للتنقل */}
         <div className="flex justify-between items-center">
           <Link href="/" className="text-sm font-bold text-[#630517] hover:underline flex items-center gap-1">
             ← العودة للرئيسية
@@ -76,13 +72,11 @@ export default function EventsPage() {
           </span>
         </div>
 
-        {/* عنوان الصفحة */}
         <div className="text-center max-w-3xl mx-auto space-y-3">
           <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">فعاليات وبرامج النادي</h1>
           <p className="text-slate-600 text-sm sm:text-base">استكشف الفعاليات القادمة والسابقة لنادي التمريض بكل حيوية وتفاصيل.</p>
         </div>
 
-        {/* أزرار الفلترة (الكل / قريباً / انتهت) */}
         <div className="flex justify-center items-center gap-2">
           {[
             { id: 'all', label: 'الكل' },
@@ -103,7 +97,6 @@ export default function EventsPage() {
           ))}
         </div>
 
-        {/* شبكة عرض الفعاليات */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredEvents.length === 0 ? (
             <div className="col-span-full py-16 text-center text-slate-400 text-sm bg-white rounded-3xl border border-slate-200">
@@ -113,9 +106,8 @@ export default function EventsPage() {
             filteredEvents.map((ev) => (
               <div
                 key={ev.id}
-                className="relative rounded-3xl overflow-hidden shadow-xl flex flex-col justify-between group min-h-[420px] bg-slate-900 border border-slate-800 transition-all hover:scale-[1.01]"
+                className="relative rounded-3xl overflow-hidden shadow-xl flex flex-col justify-between group min-h-[380px] bg-slate-900 border border-slate-800 transition-all hover:scale-[1.01]"
               >
-                {/* خلفية البوستر مع التعتيم */}
                 <div className="absolute inset-0 z-0">
                   <Image
                     src={ev.poster || '/logo.png'}
@@ -126,7 +118,6 @@ export default function EventsPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-slate-900/40" />
                 </div>
 
-                {/* المحتوى العلوي: الشارة */}
                 <div className="relative z-10 p-6 flex justify-between items-start">
                   <span className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-xl shadow-md">
                     🏥
@@ -140,7 +131,6 @@ export default function EventsPage() {
                   </span>
                 </div>
 
-                {/* المحتوى السفلي: العنوان، التفاصيل، الأيقونات، وزر الدخول */}
                 <div className="relative z-10 p-6 space-y-5 flex-1 flex flex-col justify-end">
                   <div className="space-y-2">
                     <h3 className="text-2xl font-black text-white group-hover:text-[#F5D061] transition-colors leading-tight">
@@ -151,7 +141,6 @@ export default function EventsPage() {
                     </p>
                   </div>
 
-                  {/* معلومات التاريخ والمكان بتصميم الأقراص الأنيقة */}
                   <div className="grid grid-cols-1 gap-2 pt-2">
                     <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 text-xs font-bold text-slate-200">
                       <span>📍</span>
@@ -162,15 +151,6 @@ export default function EventsPage() {
                       <span className="truncate">{ev.date}</span>
                     </div>
                   </div>
-
-                  {/* زر الدخول للفعالية */}
-                  <button 
-                    onClick={() => alert(`تفاصيل فعالية: ${ev.title}\nالمكان: ${ev.location}\nالتاريخ: ${ev.date}`)}
-                    className="w-full bg-[#F5D061] hover:bg-[#e6c152] text-slate-950 py-3 rounded-xl font-black text-xs sm:text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer mt-2"
-                  >
-                    <span>تفاصيل الفعالية</span>
-                    <span>←</span>
-                  </button>
                 </div>
 
               </div>
