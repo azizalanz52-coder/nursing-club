@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 
 export default function EventsPage() {
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
@@ -44,7 +43,7 @@ export default function EventsPage() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.length > 0) {
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
           setEvents(parsed);
         }
       } catch (e) {
@@ -103,19 +102,21 @@ export default function EventsPage() {
               لا توجد فعاليات مطابقة حالياً.
             </div>
           ) : (
-            filteredEvents.map((ev) => (
+            filteredEvents.map((ev, index) => (
               <div
-                key={ev.id}
-                className="relative rounded-3xl overflow-hidden shadow-xl flex flex-col justify-between group min-h-[380px] bg-slate-900 border border-slate-800 transition-all hover:scale-[1.01]"
+                key={ev.id || index}
+                className="relative rounded-3xl overflow-hidden shadow-xl flex flex-col justify-between group min-h-[400px] bg-slate-950 border border-slate-800 transition-all hover:scale-[1.01]"
               >
-                <div className="absolute inset-0 z-0">
-                  <Image
-                    src={ev.poster || '/logo.png'}
+                <div className="absolute inset-0 z-0 overflow-hidden bg-slate-950">
+                  <img
+                    src={ev.poster && ev.poster.trim() !== "" ? ev.poster : '/header-banner.png'}
                     alt={ev.title}
-                    fill
-                    className="object-cover opacity-40 group-hover:scale-105 transition-transform duration-500"
+                    className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/header-banner.png';
+                    }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-slate-900/40" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/75 to-slate-950/40" />
                 </div>
 
                 <div className="relative z-10 p-6 flex justify-between items-start">
@@ -133,20 +134,20 @@ export default function EventsPage() {
 
                 <div className="relative z-10 p-6 space-y-5 flex-1 flex flex-col justify-end">
                   <div className="space-y-2">
-                    <h3 className="text-2xl font-black text-white group-hover:text-[#F5D061] transition-colors leading-tight">
+                    <h3 className="text-2xl font-black text-white group-hover:text-[#F5D061] transition-colors leading-tight drop-shadow-md">
                       {ev.title}
                     </h3>
-                    <p className="text-slate-300 text-xs sm:text-sm line-clamp-2 leading-relaxed">
+                    <p className="text-slate-200 text-xs sm:text-sm line-clamp-2 leading-relaxed drop-shadow">
                       {ev.description}
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 gap-2 pt-2">
-                    <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 text-xs font-bold text-slate-200">
+                    <div className="flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-white/20 text-xs font-bold text-slate-200 shadow-inner">
                       <span>📍</span>
                       <span className="truncate">{ev.location}</span>
                     </div>
-                    <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 text-xs font-bold text-slate-200">
+                    <div className="flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-white/20 shadow-inner text-xs font-bold text-slate-200">
                       <span>📅</span>
                       <span className="truncate">{ev.date}</span>
                     </div>
