@@ -41,18 +41,15 @@ export default function RootLayout({
                 {/* المربع الدوار الثاني بعكس الاتجاه */}
                 <div className="absolute inset-[-6px] border border-[#F5D061]/30 rounded-[28px] animate-[spin_10s_linear_infinite_reverse]"></div>
                 
-                {/* مربع أبيض ناصع بخلفية فاخرة ليظهر الشعار بكامل وضوحه */}
-                <div className="relative w-24 h-24 bg-white border-2 border-[#F5D061] rounded-2xl flex flex-col items-center justify-center shadow-2xl overflow-hidden p-2">
+                {/* مربع الشعار بصورتك الخاصة (nurs-logo.png) */}
+                <div className="relative w-24 h-24 bg-white border-2 border-[#F5D061] rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden p-2">
                   <Image
-                    src="/logo.png"
-                    alt="شعار نادي التمريض"
-                    width={55}
-                    height={55}
-                    className="object-contain drop-shadow"
+                    src="/nurs-logo.png"
+                    alt="شعار NURS"
+                    width={75}
+                    height={75}
+                    className="object-contain"
                   />
-                  <span className="text-[9px] font-black text-[#630517] tracking-tighter mt-1">
-                    NURSING CLUB
-                  </span>
                 </div>
               </div>
 
