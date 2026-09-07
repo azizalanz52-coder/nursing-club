@@ -6,11 +6,14 @@ const kufam = Kufam({
   variable: "--font-kufam",
   subsets: ["arabic", "latin"],
 });
-export const metadata: Metadata = {
-  title: "Nursing Club | UHB",
-  description:
-    "Official website of Nursing Club at University of Hafr Al Batin",
-};
+export const metadata = {
+  title: 'Nursing Club | UHB',
+  description: 'نادي التمريض - جامعة حفر الباطن',
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
+}
 
 export default function RootLayout({
   children,
