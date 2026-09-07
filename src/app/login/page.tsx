@@ -7,8 +7,10 @@ export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleDirectLogin = () => {
-    // الانتقال المباشر فور الضغط
+ const handleDirectLogin = () => {
+    if (phone) {
+      localStorage.setItem("userPhone", phone);
+    }
     window.location.href = "/";
   };
 
