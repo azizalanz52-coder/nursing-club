@@ -155,15 +155,6 @@ export default function EventsPage() {
                       <span>{ev.date}</span>
                     </div>
                   </div>
-
-                  <div className="pt-2">
-                    <Link
-                      href="/discover"
-                      className="block w-full text-center bg-[#630517] text-[#F5D061] py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 transition-all"
-                    >
-                      التفاصيل والتسجيل
-                    </Link>
-                  </div>
                 </div>
 
               </div>
