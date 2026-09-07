@@ -54,7 +54,7 @@ export default function DiscoverPage() {
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % passionSlides.length);
-    }, 4000);
+    }, 4500);
     return () => clearInterval(timer);
   }, [passionSlides.length]);
 
@@ -63,7 +63,9 @@ export default function DiscoverPage() {
     if (savedPassion) {
       try {
         const parsed = JSON.parse(savedPassion);
-        if (parsed && parsed.length > 0) setPassionSlides(parsed);
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+          setPassionSlides(parsed);
+        }
       } catch (e) {
         console.error(e);
       }
@@ -73,7 +75,9 @@ export default function DiscoverPage() {
     if (savedDiscover) {
       try {
         const parsed = JSON.parse(savedDiscover);
-        if (parsed && parsed.length > 0) setDiscoverEvents(parsed);
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+          setDiscoverEvents(parsed);
+        }
       } catch (e) {
         console.error(e);
       }
@@ -85,6 +89,7 @@ export default function DiscoverPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       
+      {/* شريط عنوان الصفحة */}
       <div className="py-14 bg-white border-b border-slate-200 text-center px-4 shadow-sm">
         <span className="inline-block px-4 py-1.5 rounded-full bg-[#630517]/10 border border-[#630517]/20 text-[#630517] text-xs font-extrabold tracking-widest uppercase mb-3">
           استكشف عالمنا
@@ -93,6 +98,7 @@ export default function DiscoverPage() {
         <p className="text-slate-600 text-sm sm:text-base mt-2">تعرف على رؤيتنا، أنشطتنا، وشركاء النجاح</p>
       </div>
 
+      {/* 1. قسم الإحصائيات */}
       <section className="py-12 bg-[#630517] text-white border-b border-[#F5D061]/20 shadow-md">
         <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <div className="space-y-2">
@@ -114,6 +120,7 @@ export default function DiscoverPage() {
         </div>
       </section>
 
+      {/* 2. نبذة ورؤية النادي + بطاقة شغف عطاء واحترافية */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           
@@ -139,19 +146,25 @@ export default function DiscoverPage() {
             </div>
           </div>
 
+          {/* بطاقة شغف، عطاء، واحترافية المتحركة */}
           <div className="relative">
             <div className="absolute inset-0 bg-[#630517]/10 rounded-3xl blur-2xl transform rotate-3" />
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200 min-h-[380px] flex flex-col justify-between text-white p-8 sm:p-10">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200 min-h-[400px] flex flex-col justify-between text-white p-8 sm:p-10 bg-slate-950">
               
+              {/* خلفية الصورة بوضوح تام ودون حجب */}
               <div className="absolute inset-0 z-0">
                 <img
-                  src={activeSlide.image}
+                  src={activeSlide.image && activeSlide.image.trim() !== '' ? activeSlide.image : '/header-banner.png'}
                   alt="شغف وعطاء"
-                  className="w-full h-full object-cover scale-105 transition-all duration-1000"
+                  className="w-full h-full object-cover opacity-80 scale-105 transition-all duration-1000"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/header-banner.png';
+                  }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/70 to-slate-950/40" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-950/40" />
               </div>
 
+              {/* الشعار بالأعلى */}
               <div className="relative z-10 flex justify-between items-center">
                 <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl p-2 flex items-center justify-center shadow-lg border border-white/20 overflow-hidden">
                   <img src="/logo.png" alt="شعار النادي" className="w-full h-full object-contain" />
@@ -161,13 +174,15 @@ export default function DiscoverPage() {
                 </span>
               </div>
 
+              {/* النص والمقولة */}
               <div className="relative z-10 space-y-3 text-center my-6">
-                <h3 className="text-2xl sm:text-3xl font-black text-white">نادي التمريض</h3>
-                <p className="text-amber-50 text-sm sm:text-base leading-relaxed font-semibold transition-opacity duration-700">
+                <h3 className="text-2xl sm:text-3xl font-black text-white drop-shadow-md">نادي التمريض</h3>
+                <p className="text-amber-50 text-sm sm:text-base leading-relaxed font-semibold transition-opacity duration-700 drop-shadow">
                   {activeSlide.quote}
                 </p>
               </div>
 
+              {/* المؤشر */}
               <div className="relative z-10 space-y-3">
                 <div className="flex justify-center gap-2">
                   {passionSlides.map((_, idx) => (
@@ -189,6 +204,7 @@ export default function DiscoverPage() {
         </div>
       </section>
 
+      {/* 3. معرض الصور والأنشطة */}
       <section className="py-20 bg-slate-100/70 border-t border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -203,35 +219,42 @@ export default function DiscoverPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {discoverEvents.map((event) => (
-              <div
-                key={event.id}
-                onClick={() => setSelectedEvent(event)}
-                className="group relative h-80 rounded-3xl overflow-hidden border border-slate-200 bg-white shadow-md transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer"
-              >
-                <div className="absolute inset-0">
-                  <img
-                    src={event.images[0] || '/header-banner.png'}
-                    alt={event.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                  />
+            {discoverEvents.map((event) => {
+              const coverImage = (event.images && event.images.length > 0 && event.images[0]) ? event.images[0] : '/header-banner.png';
+              return (
+                <div
+                  key={event.id}
+                  onClick={() => setSelectedEvent(event)}
+                  className="group relative h-80 rounded-3xl overflow-hidden border border-slate-200 bg-slate-950 shadow-md transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer"
+                >
+                  <div className="absolute inset-0">
+                    <img
+                      src={coverImage}
+                      alt={event.title}
+                      className="w-full h-full object-cover opacity-85 group-hover:scale-110 transition-transform duration-700"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/header-banner.png';
+                      }}
+                    />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent z-10" />
+                  
+                  <div className="absolute bottom-0 right-0 left-0 p-6 z-20 space-y-2 text-right">
+                    <span className="inline-block px-3 py-1 rounded-full bg-[#F5D061] text-[#630517] font-bold text-xs shadow">
+                      {event.category || 'فعالية'} • {event.images?.length || 0} صور
+                    </span>
+                    <h4 className="text-xl font-black text-white leading-tight drop-shadow-md">{event.title}</h4>
+                    <p className="text-xs text-amber-50/90 font-medium line-clamp-1 drop-shadow">{event.description}</p>
+                  </div>
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent z-10" />
-                
-                <div className="absolute bottom-0 right-0 left-0 p-6 z-20 space-y-2 text-right">
-                  <span className="inline-block px-3 py-1 rounded-full bg-[#F5D061] text-[#630517] font-bold text-xs">
-                    {event.category} • {event.images.length} صور
-                  </span>
-                  <h4 className="text-xl font-black text-white leading-tight">{event.title}</h4>
-                  <p className="text-xs text-amber-50/80 font-medium line-clamp-1">{event.description}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
         </div>
       </section>
 
+      {/* النافذة المنبثقة (Modal) لعرض صور الفعالية بالكامل */}
       {selectedEvent && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
@@ -255,15 +278,18 @@ export default function DiscoverPage() {
               </p>
 
               <div>
-                <h4 className="font-extrabold text-slate-900 text-lg mb-4">معرض الصور ({selectedEvent.images.length} صورة)</h4>
+                <h4 className="font-extrabold text-slate-900 text-lg mb-4">معرض الصور ({selectedEvent.images?.length || 0} صورة)</h4>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {selectedEvent.images.map((img, idx) => (
+                  {selectedEvent.images?.map((img, idx) => (
                     <div key={idx} className="h-48 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative group bg-slate-100">
                       <img
                         src={img}
                         alt={`صورة ${idx + 1}`}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/header-banner.png';
+                        }}
                       />
                       <div className="absolute top-3 right-3 bg-black/60 text-[#F5D061] px-2.5 py-1 rounded-lg text-xs font-black">
                         #{idx + 1}
@@ -287,6 +313,7 @@ export default function DiscoverPage() {
         </div>
       )}
 
+      {/* 4. شركاء النجاح */}
       <section className="py-16 border-t border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-10">
           <div className="space-y-3">
@@ -309,6 +336,7 @@ export default function DiscoverPage() {
         </div>
       </section>
 
+      {/* زر العودة للرئيسية */}
       <div className="py-12 text-center bg-slate-50 border-t border-slate-200">
         <Link
           href="/"
