@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function EventsPreview() {
-  const defaultEvents = [
+  const [eventsList, setEventsList] = useState([
     {
       id: '1',
       title: 'اليوم العالمي للتمريض',
@@ -32,30 +32,31 @@ export default function EventsPreview() {
       poster: '/header-banner.png',
       description: 'فعالية تابعة لنادي التمريض.'
     }
-  ];
-
-  const [eventsList, setEventsList] = useState(defaultEvents);
+  ]);
 
   useEffect(() => {
-    const savedEvents = localStorage.getItem('UHB_EVENTS');
-    if (savedEvents) {
-      try {
+    try {
+      const savedEvents = localStorage.getItem('UHB_EVENTS');
+      if (savedEvents) {
         const parsed = JSON.parse(savedEvents);
         if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          // دمج فريد 100% يمنع تكرار أي عنصر بناءً على العنوان
-          const combined = [...parsed, ...defaultEvents];
+          // استخدام Map لتصفية أي تكرار بالأسماء وتثبيت أول 3 عناصر فقط فريدة
           const uniqueMap = new Map();
-          combined.forEach(ev => {
-            const key = ev.title?.trim();
-            if (key && !uniqueMap.has(key)) {
-              uniqueMap.set(key, ev);
+          parsed.forEach(ev => {
+            const title = ev.title?.trim();
+            if (title && !uniqueMap.has(title)) {
+              uniqueMap.set(title, ev);
             }
           });
-          setEventsList(Array.from(uniqueMap.values()).slice(0, 3));
+          
+          const uniqueArray = Array.from(uniqueMap.values());
+          if (uniqueArray.length > 0) {
+            setEventsList(uniqueArray.slice(0, 3));
+          }
         }
-      } catch (e) {
-        console.error(e);
       }
+    } catch (e) {
+      console.error(e);
     }
   }, []);
 
@@ -85,9 +86,9 @@ export default function EventsPreview() {
           </Link>
         </div>
 
-        {/* شبكة عرض 3 بطاقات فقط وبدون أي تكرار */}
+        {/* شبكة عرض 3 بطاقات بالضبط وبدون أي تكرار */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {eventsList.map((event, index) => (
+          {eventsList.slice(0, 3).map((event, index) => (
             <div
               key={event.id || index}
               className="relative rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between group min-h-[420px] bg-slate-950 border border-[#F5D061]/30 transition-all hover:scale-[1.02]"
