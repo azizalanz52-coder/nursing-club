@@ -9,8 +9,14 @@ const kufam = Kufam({
 export const metadata = {
   title: 'Nursing Club | UHB',
   description: 'نادي التمريض - جامعة حفر الباطن',
+  appleWebApp: {
+    capable: true,
+    title: 'Nursing Club | UHB',
+    statusBarStyle: 'default',
+  },
   icons: {
     icon: '/nursing-icon.png',
+    shortcut: '/nursing-icon.png',
     apple: '/nursing-icon.png',
   },
 }
