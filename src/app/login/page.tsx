@@ -33,14 +33,15 @@ export default function LoginPage() {
           <p className="text-amber-50/70 text-xs sm:text-sm">أدخل الاسم، رقم الجوال، وكلمة المرور للمتابعة</p>
         </div>
 
-        <form onSubmit={handleDirectLogin} className="space-y-4">
+        <form onSubmit={handleDirectLogin} className="space-y-4" autoComplete="off">
           <div className="space-y-1.5 text-right">
             <label className="text-xs sm:text-sm font-bold text-[#F5D061]">الاسم الكامل</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="عبدالعزيز العنزي"
+              placeholder="مثال: محمدأحمد العنزي"
+              autoComplete="off"
               className="w-full px-4 py-3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] text-sm"
               required
             />
@@ -52,7 +53,8 @@ export default function LoginPage() {
               type="text"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="05xxxxxxxx"
+              placeholder="0500000000"
+              autoComplete="off"
               className="w-full px-4 py-3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] text-sm"
               required
             />
@@ -65,6 +67,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
+              autoComplete="new-password"
               className="w-full px-4 py-3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] text-sm"
               required
             />
