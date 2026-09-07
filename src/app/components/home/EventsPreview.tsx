@@ -42,7 +42,9 @@ export default function EventsPreview() {
       try {
         const parsed = JSON.parse(savedEvents);
         if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          setEventsList(parsed.slice(0, 3));
+          // نأخذ أول 3 عناصر فقط وبدون تكرار قاطع
+          const uniqueEvents = Array.from(new Map(parsed.map(item => [item.id || item.title, item])).values());
+          setEventsList(uniqueEvents.slice(0, 3));
         }
       } catch (e) {
         console.error(e);
@@ -54,10 +56,10 @@ export default function EventsPreview() {
     <section className="py-20 bg-[#630517] text-white" dir="rtl">
       <div className="max-w-7xl mx-auto px-6">
 
-        {/* رأس القسم: العنوان يمين والزر في أعلى اليسار تماماً كما طلبت */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-6">
+        {/* رأس القسم: العنوان يمين والزر يسار */}
+        <div className="flex flex-row justify-between items-center mb-16 gap-4">
           <div className="space-y-3 text-right">
-            <span className="px-4 py-1.5 rounded-full bg-[#F5D061]/20 text-[#F5D061] text-xs font-black tracking-widest uppercase border border-[#F5D061]/30">
+            <span className="inline-block px-4 py-1.5 rounded-full bg-[#F5D061]/20 text-[#F5D061] text-xs font-black tracking-widest uppercase border border-[#F5D061]/30">
               أنشطة وفعاليات النادي
             </span>
             <h2 className="text-4xl sm:text-5xl font-black tracking-tight text-white">
@@ -76,8 +78,8 @@ export default function EventsPreview() {
           </Link>
         </div>
 
-        {/* شبكة عرض الفعاليات المصغرة */}
-        <div className="grid md:grid-cols-3 gap-8">
+        {/* شبكة عرض 3 بطاقات فقط وبدون تكرار */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {eventsList.map((event, index) => (
             <div
               key={event.id || index}
@@ -97,15 +99,15 @@ export default function EventsPreview() {
 
               <div className="relative z-10 p-6 flex justify-end">
                 <span className={`px-4 py-1.5 rounded-full text-xs font-black shadow-lg ${
-                  event.status === 'upcoming' 
+                  event.status === 'upcoming' || event.status === 'قريباً'
                     ? 'bg-[#F5D061] text-slate-950' 
                     : 'bg-slate-800 text-slate-200 border border-slate-700'
                 }`}>
-                  {event.status === 'upcoming' ? '⏱️ قريبًا' : '✓ انتهت'}
+                  {event.status === 'upcoming' || event.status === 'قريباً' ? '⏱️ قريبًا' : '✓ انتهت'}
                 </span>
               </div>
 
-              <div className="relative z-10 p-6 space-y-4 flex-1 flex flex-col justify-end">
+              <div className="relative z-10 p-6 space-y-4 flex-1 flex flex-col justify-end text-right">
                 <div className="space-y-2">
                   <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-[#F5D061] transition-colors line-clamp-1 drop-shadow-md">
                     {event.title}

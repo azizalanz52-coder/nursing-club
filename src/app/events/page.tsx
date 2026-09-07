@@ -44,7 +44,15 @@ export default function EventsPage() {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          setEvents(parsed);
+          // تصفية قاطعة لمنع أي تكرار بناءً على العنوان أو المعرف
+          const uniqueMap = new Map();
+          parsed.forEach(ev => {
+            const key = ev.title?.trim() || ev.id;
+            if (key && !uniqueMap.has(key)) {
+              uniqueMap.set(key, ev);
+            }
+          });
+          setEvents(Array.from(uniqueMap.values()));
         }
       } catch (e) {
         console.error(e);
@@ -132,7 +140,7 @@ export default function EventsPage() {
                   </span>
                 </div>
 
-                <div className="relative z-10 p-6 space-y-5 flex-1 flex flex-col justify-end">
+                <div className="relative z-10 p-6 space-y-5 flex-1 flex flex-col justify-end text-right">
                   <div className="space-y-2">
                     <h3 className="text-2xl font-black text-white group-hover:text-[#F5D061] transition-colors leading-tight drop-shadow-md">
                       {ev.title}
