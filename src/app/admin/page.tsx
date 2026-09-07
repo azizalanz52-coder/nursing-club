@@ -56,6 +56,7 @@ export default function AdminDashboard() {
     setNewDate('');
     setNewLocation('');
     setNewDesc('');
+    alert('تم نشر الفعالية بنجاح وحفظها!');
   };
 
   const handleDeleteEvent = (id: string) => {
@@ -82,91 +83,6 @@ export default function AdminDashboard() {
 
   // 3. طلبات الانضمام (من Firebase)
   const [requests, setRequests] = useState<any[]>([]);
-
-  useEffect(() => {
-    // جلب الفعاليات والبانرات من التخزين المحلي
-    const savedEvents = localStorage.getItem('UHB_EVENTS');
-    if (savedEvents) {
-      try {
-        const parsed = JSON.parse(savedEvents);
-        if (parsed && parsed.length > 0) setEvents(parsed);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    const savedBanners = localStorage.getItem('UHB_BANNERS');
-    if (savedBanners) {
-      try {
-        const parsed = JSON.parse(savedBanners);
-        if (parsed && parsed.length > 0) setBanners(parsed);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    // جلب الطلبات الحقيقية من Firebase
-    const fetchRequests = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'applications'));
-        const fetchedRequests = querySnapshot.docs.map(docSnap => ({
-          id: docSnap.id,
-          ...docSnap.data()
-        }));
-        if (fetchedRequests.length > 0) {
-          setRequests(fetchedRequests);
-        }
-      } catch (err) {
-        console.error('Error fetching applications:', err);
-      }
-    };
-
-    fetchRequests();
-  }, []);
-
-  const handleAddBanner = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bannerTitle.trim()) return;
-    const newBanner = {
-      id: Date.now().toString(),
-      tag: bannerTag || 'مناسبة خاصة',
-      title: bannerTitle,
-      image: bannerImage || '/header-banner.png',
-      buttonText: 'اكتشف النادي',
-      buttonLink: '/discover'
-    };
-    const updatedBanners = [newBanner, ...banners];
-    setBanners(updatedBanners);
-    localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
-    setBannerTag('');
-    setBannerTitle('');
-    alert('تم إضافة وتفعيل البانر بنجاح في الواجهة الرئيسية!');
-  };
-
-  const handleDeleteBanner = (id: string) => {
-    const updatedBanners = banners.filter(b => b.id !== id);
-    setBanners(updatedBanners);
-    localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
-  };
-
-  const handleAcceptRequest = async (id: string) => {
-    try {
-      const docRef = doc(db, 'applications', id);
-      await updateDoc(docRef, { status: 'تم القبول ✓' });
-      setRequests(requests.map(req => req.id === id ? { ...req, status: 'تم القبول ✓' } : req));
-    } catch (err) {
-      console.error('Error accepting request:', err);
-    }
-  };
-
-  const handleDeleteRequest = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, 'applications', id));
-      setRequests(requests.filter(req => req.id !== id));
-    } catch (err) {
-      console.error('Error deleting request:', err);
-    }
-  };
 
   // 4. إدارة اللجان والقادة والأعضاء
   const [committees, setCommittees] = useState([
@@ -227,10 +143,113 @@ export default function AdminDashboard() {
 
   const currentCommittee = committees.find(c => c.id === selectedCommitteeId) || committees[0];
 
+  useEffect(() => {
+    // جلب الفعاليات من التخزين المحلي
+    const savedEvents = localStorage.getItem('UHB_EVENTS');
+    if (savedEvents) {
+      try {
+        const parsed = JSON.parse(savedEvents);
+        if (parsed && parsed.length > 0) setEvents(parsed);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // جلب البانرات من التخزين المحلي
+    const savedBanners = localStorage.getItem('UHB_BANNERS');
+    if (savedBanners) {
+      try {
+        const parsed = JSON.parse(savedBanners);
+        if (parsed && parsed.length > 0) setBanners(parsed);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // جلب اللجان والقادة والأعضاء من التخزين المحلي لضمان بقاء التعديلات
+    const savedCommittees = localStorage.getItem('UHB_COMMITTEES_DATA');
+    if (savedCommittees) {
+      try {
+        const parsed = JSON.parse(savedCommittees);
+        if (parsed && parsed.length > 0) setCommittees(parsed);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // جلب الطلبات الحقيقية من Firebase
+    const fetchRequests = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'applications'));
+        const fetchedRequests = querySnapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data()
+        }));
+        if (fetchedRequests.length > 0) {
+          setRequests(fetchedRequests);
+        }
+      } catch (err) {
+        console.error('Error fetching applications:', err);
+      }
+    };
+
+    fetchRequests();
+  }, []);
+
+  // دالة لتحديث وحفظ اللجان في localStorage تلقائياً عند أي تعديل
+  const updateCommitteesState = (newCommitteesData: typeof committees) => {
+    setCommittees(newCommitteesData);
+    localStorage.setItem('UHB_COMMITTEES_DATA', JSON.stringify(newCommitteesData));
+  };
+
+  const handleAddBanner = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bannerTitle.trim()) return;
+    const newBanner = {
+      id: Date.now().toString(),
+      tag: bannerTag || 'مناسبة خاصة',
+      title: bannerTitle,
+      image: bannerImage || '/header-banner.png',
+      buttonText: 'اكتشف النادي',
+      buttonLink: '/discover'
+    };
+    const updatedBanners = [newBanner, ...banners];
+    setBanners(updatedBanners);
+    localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
+    setBannerTag('');
+    setBannerTitle('');
+    alert('تم إضافة وتفعيل البانر بنجاح في الواجهة الرئيسية!');
+  };
+
+  const handleDeleteBanner = (id: string) => {
+    const updatedBanners = banners.filter(b => b.id !== id);
+    setBanners(updatedBanners);
+    localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
+  };
+
+  const handleAcceptRequest = async (id: string) => {
+    try {
+      const docRef = doc(db, 'applications', id);
+      await updateDoc(docRef, { status: 'تم القبول ✓' });
+      setRequests(requests.map(req => req.id === id ? { ...req, status: 'تم القبول ✓' } : req));
+    } catch (err) {
+      console.error('Error accepting request:', err);
+    }
+  };
+
+  const handleDeleteRequest = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'applications', id));
+      setRequests(requests.filter(req => req.id !== id));
+    } catch (err) {
+      console.error('Error deleting request:', err);
+    }
+  };
+
   const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemberName.trim()) return;
-    setCommittees(committees.map(c => {
+    const updated = committees.map(c => {
       if (c.id === selectedCommitteeId) {
         return {
           ...c,
@@ -238,20 +257,27 @@ export default function AdminDashboard() {
         };
       }
       return c;
-    }));
+    });
+    updateCommitteesState(updated);
     setNewMemberName('');
     setNewMemberRole('');
   };
 
   const handleDeleteMember = (index: number) => {
-    setCommittees(committees.map(c => {
+    const updated = committees.map(c => {
       if (c.id === selectedCommitteeId) {
         const updatedMembers = [...c.members];
         updatedMembers.splice(index, 1);
         return { ...c, members: updatedMembers };
       }
       return c;
-    }));
+    });
+    updateCommitteesState(updated);
+  };
+
+  const handleLeaderChange = (type: 'maleLeader' | 'femaleLeader', val: string) => {
+    const updated = committees.map(c => c.id === selectedCommitteeId ? { ...c, [type]: val } : c);
+    updateCommitteesState(updated);
   };
 
   return (
@@ -539,10 +565,7 @@ export default function AdminDashboard() {
                   <input
                     type="text"
                     value={currentCommittee.maleLeader}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCommittees(committees.map(c => c.id === selectedCommitteeId ? { ...c, maleLeader: val } : c));
-                    }}
+                    onChange={(e) => handleLeaderChange('maleLeader', e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
@@ -551,10 +574,7 @@ export default function AdminDashboard() {
                   <input
                     type="text"
                     value={currentCommittee.femaleLeader}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCommittees(committees.map(c => c.id === selectedCommitteeId ? { ...c, femaleLeader: val } : c));
-                    }}
+                    onChange={(e) => handleLeaderChange('femaleLeader', e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
