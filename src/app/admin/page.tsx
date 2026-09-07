@@ -8,7 +8,7 @@ import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners'>('team');
+  const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners' | 'discover'>('discover');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -17,6 +17,79 @@ export default function AdminDashboard() {
       router.push('/');
     }
   }, [router]);
+
+  // إدارة صور "اكتشف النادي" (مضافة بأمان بدون المساس بكودك الأصلي)
+  const defaultDiscoverEvents = [
+    {
+      id: 1,
+      title: 'ملتقى التمريض السنوي التفاعلي',
+      category: 'أنشطة كبرى',
+      description: 'ملتقى شامل يستعرض أحدث الممارسات التمريضية وورش العمل التطبيقية لطلاب وطالبات الكلية.',
+      images: ['/header-banner.png', '/logo.png']
+    },
+    {
+      id: 2,
+      title: 'حملة القياسات الحيوية والتثقيف الصحي',
+      category: 'خدمة المجتمع',
+      description: 'فعالية توعوية ميدانية لقياس العلامات الحيوية وتقديم الاستشارات للزوار.',
+      images: ['/logo.png', '/header-banner.png']
+    },
+    {
+      id: 3,
+      title: 'ورشة الإسعافات الأولية المتقدمة',
+      category: 'ورش تدريبية',
+      description: 'دورة تدريبية مكثفة بالتعاون مع الكوادر الطبية المتخصصة لتمكين الأعضاء من التعامل مع الحالات الحرجة.',
+      images: ['/header-banner.png', '/logo.png']
+    }
+  ];
+
+  const [discoverEvents, setDiscoverEvents] = useState(defaultDiscoverEvents);
+  const [selectedEventId, setSelectedEventId] = useState<number>(1);
+
+  useEffect(() => {
+    const savedDiscover = localStorage.getItem('UHB_DISCOVER_EVENTS');
+    if (savedDiscover) {
+      try {
+        const parsed = JSON.parse(savedDiscover);
+        if (parsed && parsed.length > 0) setDiscoverEvents(parsed);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
+  const handleAddImageToEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const fileUrl = URL.createObjectURL(file);
+      
+      const updated = discoverEvents.map(ev => {
+        if (ev.id === selectedEventId) {
+          return { ...ev, images: [...ev.images, fileUrl] };
+        }
+        return ev;
+      });
+
+      setDiscoverEvents(updated);
+      localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
+      alert('تم رفع وإضافة الصورة بنجاح إلى الفعالية!');
+    }
+  };
+
+  const handleRemoveImageFromEvent = (imgIndex: number) => {
+    const updated = discoverEvents.map(ev => {
+      if (ev.id === selectedEventId) {
+        const newImages = ev.images.filter((_, idx) => idx !== imgIndex);
+        return { ...ev, images: newImages.length > 0 ? newImages : ['/header-banner.png'] };
+      }
+      return ev;
+    });
+
+    setDiscoverEvents(updated);
+    localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
+  };
+
+  const currentEditedEvent = discoverEvents.find(ev => ev.id === selectedEventId) || discoverEvents[0];
 
   const [events, setEvents] = useState([
     {
@@ -288,6 +361,7 @@ export default function AdminDashboard() {
 
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {[
+            { id: 'discover', label: '🖼️ إدارة صور "اكتشف النادي"' },
             { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
             { id: 'banners', label: '🖼️ إدارة البانرات (الهيدر)' },
             { id: 'team', label: '👥 إدارة القادة والأعضاء' },
@@ -306,6 +380,58 @@ export default function AdminDashboard() {
             </button>
           ))}
         </div>
+
+        {activeTab === 'discover' && (
+          <div className="space-y-8">
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+              <h3 className="text-xl font-black text-slate-900">إدارة صور معرض الأنشطة (اكتشف النادي)</h3>
+              <p className="text-xs text-slate-500">اختر الفعالية وارفع أكثر من 10 صور من جهازك لتظهر في معرض الصور التفاعلي.</p>
+              
+              <div className="flex flex-wrap gap-3">
+                {discoverEvents.map((ev) => (
+                  <button
+                    key={ev.id}
+                    onClick={() => setSelectedEventId(ev.id)}
+                    className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                      selectedEventId === ev.id
+                        ? 'bg-[#630517] text-[#F5D061] shadow'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {ev.title} ({ev.images.length} صور)
+                  </button>
+                ))}
+              </div>
+
+              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+                <h4 className="font-extrabold text-slate-900 text-sm">رفع صورة جديدة لـ: {currentEditedEvent.title}</h4>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAddImageToEvent}
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
+                />
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-extrabold text-slate-900 text-sm">الصور المرفوعة حالياً ({currentEditedEvent.images.length})</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                  {currentEditedEvent.images.map((img, idx) => (
+                    <div key={idx} className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 group bg-slate-100 shadow-sm">
+                      <img src={img} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => handleRemoveImageFromEvent(idx)}
+                        className="absolute top-2 right-2 bg-red-600 text-white w-7 h-7 rounded-full text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {activeTab === 'events' && (
           <div className="space-y-8">
@@ -358,7 +484,6 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                {/* زر اختيار الملفات المباشر + خانة النص */}
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-600">اختر بوستر الفعالية من جهازك أو أدخل رابطه</label>
                   <div className="flex gap-2">
