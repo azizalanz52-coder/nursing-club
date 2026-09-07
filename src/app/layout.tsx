@@ -41,14 +41,14 @@ export default function RootLayout({
                 {/* المربع الدوار الثاني بعكس الاتجاه */}
                 <div className="absolute inset-[-6px] border border-[#F5D061]/30 rounded-[28px] animate-[spin_10s_linear_infinite_reverse]"></div>
                 
-                {/* مربع الشعار بصورتك الخاصة (nurs-logo.png) */}
-                <div className="relative w-24 h-24 bg-white border-2 border-[#F5D061] rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden p-2">
+                {/* مربع الشعار بتصميم زجاجي متناسق بدون خلفية بيضاء */}
+                <div className="relative w-24 h-24 bg-[#4A030F]/90 backdrop-blur-md border border-[#F5D061]/50 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden p-3">
                   <Image
                     src="/nurs-logo.png"
                     alt="شعار NURS"
                     width={75}
                     height={75}
-                    className="object-contain"
+                    className="object-contain drop-shadow-md"
                   />
                 </div>
               </div>
