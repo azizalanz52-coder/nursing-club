@@ -47,7 +47,7 @@ export default function Navbar() {
           <Link href="/team" className="hover:text-rose-900 transition-colors">أعضاء النادي</Link>
         </nav>
 
-        {/* أزرار التفاعل (التقديم وتسجيل الدخول) */}
+        {/* أزرار التفاعل */}
         <div className="flex items-center gap-3">
           <Link 
             href="/join" 
@@ -58,9 +58,19 @@ export default function Navbar() {
 
           {userPhone ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-rose-950 bg-rose-50 px-3 py-2 rounded-xl border border-rose-100">
+              {/* زر لوحة التحكم يظهر فقط عند تسجيل الدخول */}
+              <Link 
+                href="/admin"
+                className="bg-[#630517] text-[#F5D061] px-3 py-2 rounded-xl text-xs font-black shadow hover:brightness-110 transition-all flex items-center gap-1"
+              >
+                <span>⚙️</span>
+                <span>لوحة التحكم</span>
+              </Link>
+
+              <span className="text-xs font-bold text-rose-950 bg-rose-50 px-3 py-2 rounded-xl border border-rose-100 hidden sm:inline-block">
                 {userPhone}
               </span>
+
               <button 
                 onClick={handleLogout}
                 className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1"
