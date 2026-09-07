@@ -5,6 +5,7 @@ import LeadershipPreview from "./components/home/LeadershipPreview";
 import CommitteesPreview from "./components/home/CommitteesPreview";
 import EventsPreview from "./components/home/EventsPreview";
 import Footer from "./components/Footer";
+
 export default function Home() {
   return (
     <main>
