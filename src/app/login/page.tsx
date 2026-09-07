@@ -2,16 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const router = useRouter();
 
- const handleDirectLogin = () => {
+  const handleDirectLogin = () => {
     if (phone) {
       localStorage.setItem("userPhone", phone);
     }
-    window.location.href = "/";
+    // استخدام أداة التوجيه الرسمية لـ Next.js
+    router.push("/");
+    router.refresh();
   };
 
   return (
