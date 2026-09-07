@@ -18,6 +18,7 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
+  // إدارة صور وعبارات "شغف، عطاء، واحترافية"
   const defaultPassionSlides = [
     { id: 1, image: '/header-banner.png', quote: '«التمريض ليس مجرد مهنة، بل هو فن وعِلم يلامس حياة الإنسان في أصعب لحظاته.»' },
     { id: 2, image: '/logo.png', quote: '«بالعطاء المستمر والعمل الجماعي نصنع أثراً يخلده الزمن في قلوب المجتمع.»' },
@@ -52,7 +53,7 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_PASSION_SLIDES', JSON.stringify(updated));
     setNewPassionQuote('');
     setNewPassionImage('/header-banner.png');
-    alert('تم إضافة الشريحة المتحركة بنجاح!');
+    alert('تم إضافة الشريحة بنجاح!');
   };
 
   const handleDeletePassionSlide = (id: number) => {
@@ -61,13 +62,14 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_PASSION_SLIDES', JSON.stringify(updated));
   };
 
+  // إدارة صور وفعاليات "اكتشف النادي" مع دعم رفع صور متعددة دفعة واحدة
   const defaultDiscoverEvents = [
     {
       id: 1,
-      title: 'ملتقى التمريض السنوي التفاعلي',
+      title: 'حفل تدشين نادي كلية التمريض',
       category: 'أنشطة كبرى',
-      description: 'ملتقى شامل يستعرض أحدث الممارسات التمريضية وورش العمل التطبيقية لطلاب وطالبات الكلية.',
-      images: ['/header-banner.png', '/logo.png']
+      description: 'دشن وكيل الجامعة للشؤون الأكاديمية أ.د. محمد بن عتيق العنزي، وبحضور عميد كلية التمريض د. جلال نعيم الحربي، نادي كلية التمريض - شطر الطلاب لحظة فخر في مسيرة الكلية، سُعدنا فيها بحضوركم ومشاركتكم، وبإذن الله القادم أجمل',
+      images: ['/logo.png', '/header-banner.png']
     },
     {
       id: 2,
@@ -75,24 +77,17 @@ export default function AdminDashboard() {
       category: 'خدمة المجتمع',
       description: 'فعالية توعوية ميدانية لقياس العلامات الحيوية وتقديم الاستشارات للزوار.',
       images: ['/logo.png', '/header-banner.png']
-    },
-    {
-      id: 3,
-      title: 'ورشة الإسعافات الأولية المتقدمة',
-      category: 'ورش تدريبية',
-      description: 'دورة تدريبية مكثفة بالتعاون مع الكوادر الطبية المتخصصة لتمكين الأعضاء من التعامل مع الحالات الحرجة.',
-      images: ['/header-banner.png', '/logo.png']
     }
   ];
 
   const [discoverEvents, setDiscoverEvents] = useState(defaultDiscoverEvents);
   const [selectedEventId, setSelectedEventId] = useState<number>(1);
 
-  // حقول إضافة فعالية جديدة لمعرض الصور
+  // حالات إضافة فعالية جديدة بالكامل مع صور متعددة
   const [newDiscTitle, setNewDiscTitle] = useState('');
-  const [newDiscCat, setNewDiscCat] = useState('أنشطة كبرى');
+  const [newDiscCategory, setNewDiscCategory] = useState('أنشطة كبرى');
   const [newDiscDesc, setNewDiscDesc] = useState('');
-  const [newDiscFirstImage, setNewDiscFirstImage] = useState('/header-banner.png');
+  const [newDiscImages, setNewDiscImages] = useState<string[]>([]);
 
   useEffect(() => {
     const savedDiscover = localStorage.getItem('UHB_DISCOVER_EVENTS');
@@ -106,44 +101,54 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  const handleAddDiscoverEvent = (e: React.FormEvent) => {
+  // دالة اختيار صور متعددة لإنشاء فعالية جديدة
+  const handleSelectMultipleImagesForNewEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      const urls = filesArray.map(file => URL.createObjectURL(file));
+      setNewDiscImages(prev => [...prev, ...urls]);
+    }
+  };
+
+  const handleCreateNewDiscoverEvent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDiscTitle.trim()) {
       alert('يرجى كتابة عنوان الفعالية.');
       return;
     }
-    const newEv = {
+    const newEventObj = {
       id: Date.now(),
       title: newDiscTitle,
-      category: newDiscCat,
-      description: newDiscDesc || 'فعالية تابعة لنادي التمريض.',
-      images: [newDiscFirstImage]
+      category: newDiscCategory,
+      description: newDiscDesc || 'فعالية تابعة لنادي التمريض بجامعة حفر الباطن.',
+      images: newDiscImages.length > 0 ? newDiscImages : ['/logo.png']
     };
-    const updated = [newEv, ...discoverEvents];
+
+    const updated = [newEventObj, ...discoverEvents];
     setDiscoverEvents(updated);
     localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
-    setSelectedEventId(newEv.id);
     setNewDiscTitle('');
     setNewDiscDesc('');
-    setNewDiscFirstImage('/header-banner.png');
-    alert('تم إضافة الفعالية الجديدة للمعرض بنجاح!');
+    setNewDiscImages([]);
+    alert('تم إنشاء الفعالية وإضافة الصور بنجاح إلى المعرض!');
   };
 
-  const handleAddImageToEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const fileUrl = URL.createObjectURL(file);
-      
+  // رفع صور إضافية لفعالية قائمة
+  const handleAddMultipleImagesToExistingEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      const urls = filesArray.map(file => URL.createObjectURL(file));
+
       const updated = discoverEvents.map(ev => {
         if (ev.id === selectedEventId) {
-          return { ...ev, images: [...ev.images, fileUrl] };
+          return { ...ev, images: [...ev.images, ...urls] };
         }
         return ev;
       });
 
       setDiscoverEvents(updated);
       localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
-      alert('تم رفع وإضافة الصورة بنجاح إلى الفعالية!');
+      alert('تم رفع وإضافة الصور بنجاح للفعالية!');
     }
   };
 
@@ -151,13 +156,21 @@ export default function AdminDashboard() {
     const updated = discoverEvents.map(ev => {
       if (ev.id === selectedEventId) {
         const newImages = ev.images.filter((_, idx) => idx !== imgIndex);
-        return { ...ev, images: newImages.length > 0 ? newImages : ['/header-banner.png'] };
+        return { ...ev, images: newImages.length > 0 ? newImages : ['/logo.png'] };
       }
       return ev;
     });
 
     setDiscoverEvents(updated);
     localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
+  };
+
+  const handleDeleteEntireDiscoverEvent = (id: number) => {
+    if (confirm('هل أنت متأكد من حذف هذه الفعالية بالكامل من المعرض؟')) {
+      const updated = discoverEvents.filter(ev => ev.id !== id);
+      setDiscoverEvents(updated);
+      localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
+    }
   };
 
   const currentEditedEvent = discoverEvents.find(ev => ev.id === selectedEventId) || discoverEvents[0];
@@ -218,7 +231,7 @@ export default function AdminDashboard() {
       id: '1',
       tag: 'نادي التمريض • جامعة حفر الباطن',
       title: 'نادي التمريض',
-      image: '/logo.png',
+      image: '/header-banner.png',
       buttonText: 'اكتشف النادي',
       buttonLink: '/discover'
     }
@@ -226,7 +239,7 @@ export default function AdminDashboard() {
 
   const [bannerTag, setBannerTag] = useState('');
   const [bannerTitle, setBannerTitle] = useState('');
-  const [bannerImage, setBannerImage] = useState('/logo.png');
+  const [bannerImage, setBannerImage] = useState('/header-banner.png');
 
   const handleAddBanner = (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,7 +260,7 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
     setBannerTag('');
     setBannerTitle('');
-    setBannerImage('/logo.png');
+    setBannerImage('/header-banner.png');
     alert('تم إضافة وتفعيل البانر بنجاح في الواجهة الرئيسية!');
   };
 
@@ -487,7 +500,7 @@ export default function AdminDashboard() {
                     type="submit"
                     className="bg-[#630517] text-[#F5D061] px-6 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 cursor-pointer"
                   >
-                    + إضافة الشريحة المتحركة
+                    + إضافة الشريحة المتحركة للبطاقة
                   </button>
                 </div>
               </form>
@@ -518,19 +531,19 @@ export default function AdminDashboard() {
         {activeTab === 'discover' && (
           <div className="space-y-8">
             
-            {/* نموذج إضافة فعالية جديدة بالكامل لمعرض الصور */}
+            {/* نموذج إضافة فعالية جديدة بالكامل مع صور متعددة دفعة واحدة */}
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة لمعرض الصور (اكتشف النادي)</h3>
+              <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة مع معرض صور متعدد</h3>
               
-              <form onSubmit={handleAddDiscoverEvent} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+              <form onSubmit={handleCreateNewDiscoverEvent} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">عنوان الفعالية الجديدة</label>
                   <input
                     type="text"
-                    placeholder="مثال: حملة التبرع بالدم 2026"
+                    placeholder="مثال: حفل تدشين نادي كلية التمريض"
                     value={newDiscTitle}
                     onChange={(e) => setNewDiscTitle(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 focus:outline-none focus:border-[#630517]"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
 
@@ -538,39 +551,47 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-700">التصنيف</label>
                   <input
                     type="text"
-                    placeholder="مثال: خدمة المجتمع / أنشطة كبرى"
-                    value={newDiscCat}
-                    onChange={(e) => setNewDiscCat(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 focus:outline-none focus:border-[#630517]"
+                    placeholder="مثال: أنشطة كبرى، خدمة المجتمع"
+                    value={newDiscCategory}
+                    onChange={(e) => setNewDiscCategory(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700">وصف الفعالية</label>
                   <textarea
-                    rows={2}
-                    placeholder="اكتب نبذة مختصرة عن هذه الفعالية..."
+                    rows={3}
+                    placeholder="اكتب تفاصيل الفعالية..."
                     value={newDiscDesc}
                     onChange={(e) => setNewDiscDesc(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 focus:outline-none focus:border-[#630517]"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">الصورة الرئيسية الأولى للفعالية</label>
+                  <label className="text-xs font-bold text-slate-700">اختر صور المعرض (يمكنك تحديد أكثر من صورة دفعة واحدة 📁)</label>
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setNewDiscFirstImage(URL.createObjectURL(e.target.files[0]));
-                      }
-                    }}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
+                    multiple
+                    onChange={handleSelectMultipleImagesForNewEvent}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
+                  <p className="text-xs text-emerald-700 font-bold mt-1">تم اختيار {newDiscImages.length} صور للفعالية الجديدة حتى الآن.</p>
                 </div>
 
-                <div className="sm:col-span-2">
+                {newDiscImages.length > 0 && (
+                  <div className="sm:col-span-2 grid grid-cols-4 sm:grid-cols-6 gap-3 pt-2">
+                    {newDiscImages.map((img, idx) => (
+                      <div key={idx} className="h-20 rounded-xl overflow-hidden border border-slate-200 relative bg-slate-100">
+                        <img src={img} alt="معاينة" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="sm:col-span-2 pt-2">
                   <button
                     type="submit"
                     className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 cursor-pointer"
@@ -581,10 +602,9 @@ export default function AdminDashboard() {
               </form>
             </div>
 
-            {/* إدارة الصور للفعاليات الموجودة */}
+            {/* إدارة الصور للفعاليات الحالية الموجودة */}
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">إدارة ورفع صور الفعاليات</h3>
-              <p className="text-xs text-slate-500">اختر الفعالية أدناه ثم ارفع الصور لتنضم لمعرضها التفاعلي.</p>
+              <h3 className="text-xl font-black text-slate-900">إدارة الصور وإضافتها للفعاليات القائمة</h3>
               
               <div className="flex flex-wrap gap-3">
                 {discoverEvents.map((ev) => (
@@ -603,19 +623,30 @@ export default function AdminDashboard() {
               </div>
 
               <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-                <h4 className="font-extrabold text-slate-900 text-sm">إضافة صورة جديدة لـ: {currentEditedEvent?.title}</h4>
+                <div className="flex justify-between items-center flex-wrap gap-4">
+                  <h4 className="font-extrabold text-slate-900 text-sm">إضافة صور جديدة لـ: {currentEditedEvent.title}</h4>
+                  <button
+                    onClick={() => handleDeleteEntireDiscoverEvent(currentEditedEvent.id)}
+                    className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 cursor-pointer"
+                  >
+                    حذف هذه الفعالية بالكامل ✕
+                  </button>
+                </div>
+
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={handleAddImageToEvent}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
+                  multiple
+                  onChange={handleAddMultipleImagesToExistingEvent}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                 />
+                <p className="text-xs text-slate-500">ملاحظة: يمكنك اختيار أكثر من صورة معاً من جهازك وسوف تضاف مباشرة للمعرض.</p>
               </div>
 
               <div className="space-y-4">
-                <h4 className="font-extrabold text-slate-900 text-sm">الصور المرفوعة حالياً ({currentEditedEvent?.images.length || 0})</h4>
+                <h4 className="font-extrabold text-slate-900 text-sm">الصور الحالية للفعالية ({currentEditedEvent.images.length})</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                  {currentEditedEvent?.images.map((img, idx) => (
+                  {currentEditedEvent.images.map((img, idx) => (
                     <div key={idx} className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 group bg-slate-100 shadow-sm">
                       <img src={img} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
                       <button
@@ -691,7 +722,8 @@ export default function AdminDashboard() {
                     accept="image/*"
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
-                        setNewPoster(URL.createObjectURL(e.target.files[0]));
+                        const fileUrl = URL.createObjectURL(e.target.files[0]);
+                        setNewPoster(fileUrl);
                       }
                     }}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
@@ -790,7 +822,8 @@ export default function AdminDashboard() {
                     accept="image/*"
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
-                        setBannerImage(URL.createObjectURL(e.target.files[0]));
+                        const fileUrl = URL.createObjectURL(e.target.files[0]);
+                        setBannerImage(fileUrl);
                       }
                     }}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
