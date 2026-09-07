@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { db } from '../../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 const defaultCommitteesDetails: Record<string, any> = {
   design: {
@@ -11,7 +13,7 @@ const defaultCommitteesDetails: Record<string, any> = {
     description: 'مسؤولة عن الهوية البصرية، تصميم البوسترات، وتجهيز المحتوى المرئي لفعاليات النادي.',
     icon: '🎨',
     maleLeader: 'عبدالعزيز العنزي',
-    femaleLeader: 'شجون الحربي', // تم توحيد الاسم هنا بدقة
+    femaleLeader: 'شجون الحربي',
     members: [
       { name: 'سارة محمد', role: 'مصممة جرافيك', status: 'نشط' },
       { name: 'عمر خالد', role: 'مصمم موشن جرافيك', status: 'نشط' },
@@ -90,13 +92,30 @@ const defaultCommitteesDetails: Record<string, any> = {
 export default function CommitteeDetailPage() {
   const params = useParams();
   const id = (params?.id as string) || 'design';
+  const baseDetails = defaultCommitteesDetails[id] || defaultCommitteesDetails['design'];
   
-  // الاعتماد المباشر والثابت على القائمة الموحدة لتفادي تضارب الذاكرة المحلية
-  const [committee, setCommittee] = useState<any>(defaultCommitteesDetails[id] || defaultCommitteesDetails['design']);
+  const [committee, setCommittee] = useState<any>(baseDetails);
 
   useEffect(() => {
-    const baseDetails = defaultCommitteesDetails[id] || defaultCommitteesDetails['design'];
-    setCommittee(baseDetails);
+    const fetchCloudCommittee = async () => {
+      try {
+        const docRef = doc(db, 'committees', id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const cloudData = docSnap.data();
+          setCommittee({
+            ...baseDetails,
+            maleLeader: cloudData.maleLeader || baseDetails.maleLeader,
+            femaleLeader: cloudData.femaleLeader || baseDetails.femaleLeader,
+            members: cloudData.members && cloudData.members.length > 0 ? cloudData.members : baseDetails.members
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching single committee from cloud:', err);
+      }
+    };
+
+    fetchCloudCommittee();
   }, [id]);
 
   return (

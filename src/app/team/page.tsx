@@ -1,9 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { db } from '../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
-const committeesData = [
+const initialCommittees = [
   { id: 'design', name: 'لجنة التصميم', description: 'الهوية البصرية، تصميم البوسترات، والمحتوى المرئي.', icon: '🎨', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي' },
   { id: 'media', name: 'لجنة الإعلام', description: 'منصات التواصل، التغطيات الحية، وصناعة المحتوى.', icon: '📸', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري' },
   { id: 'pr', name: 'لجنة العلاقات العامة', description: 'بناء الشراكات، استقبال الضيوف، والتنسيق الخارجي.', icon: '🌐', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي' },
@@ -14,6 +16,38 @@ const committeesData = [
 ];
 
 export default function TeamPage() {
+  const [committees, setCommittees] = useState(initialCommittees);
+
+  useEffect(() => {
+    const fetchCloudCommittees = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'committees'));
+        if (!querySnapshot.empty) {
+          const cloudDataMap: Record<string, any> = {};
+          querySnapshot.forEach((docSnap) => {
+            cloudDataMap[docSnap.id] = docSnap.data();
+          });
+
+          const merged = initialCommittees.map((comm) => {
+            if (cloudDataMap[comm.id]) {
+              return {
+                ...comm,
+                maleLeader: cloudDataMap[comm.id].maleLeader || comm.maleLeader,
+                femaleLeader: cloudDataMap[comm.id].femaleLeader || comm.femaleLeader,
+              };
+            }
+            return comm;
+          });
+          setCommittees(merged);
+        }
+      } catch (err) {
+        console.error('Error fetching cloud committees:', err);
+      }
+    };
+
+    fetchCloudCommittees();
+  }, []);
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
@@ -33,7 +67,7 @@ export default function TeamPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {committeesData.map((committee) => (
+          {committees.map((committee) => (
             <Link
               key={committee.id}
               href={`/team/${committee.id}`}

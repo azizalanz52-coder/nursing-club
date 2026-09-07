@@ -4,13 +4,13 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners'>('team');
 
-  // حماية صارمة لمنع أي شخص غيرك من دخول صفحة الأدمن حتى لو عبر الرابط المباشر
+  // حماية صارمة لمنع أي شخص غيرك من دخول صفحة الأدمن
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
     if (phone !== '0553731265') {
@@ -95,63 +95,18 @@ export default function AdminDashboard() {
   // 3. طلبات الانضمام (من Firebase)
   const [requests, setRequests] = useState<any[]>([]);
 
-  // 4. إدارة اللجان والقادة والأعضاء
+  // 4. إدارة اللجان وقادة والأعضاء (سحابي عبر Firebase)
   const [committees, setCommittees] = useState([
-    {
-      id: 'design',
-      name: 'لجنة التصميم',
-      maleLeader: 'عبدالعزيز العنزي',
-      femaleLeader: 'شهد المرواني',
-      members: [{ name: 'سارة محمد', role: 'مصممة جرافيك' }, { name: 'عمر خالد', role: 'مصمم موشن جرافيك' }]
-    },
-    {
-      id: 'media',
-      name: 'لجنة الإعلام',
-      maleLeader: 'راشد السبيعي',
-      femaleLeader: 'ريم الشمري',
-      members: [{ name: 'فيصل السعيد', role: 'مصور ميداني' }]
-    },
-    {
-      id: 'pr',
-      name: 'لجنة العلاقات العامة',
-      maleLeader: 'خالد القحطاني',
-      femaleLeader: 'ديمة العتيبي',
-      members: []
-    },
-    {
-      id: 'quality',
-      name: 'لجنة الجودة والتطوير',
-      maleLeader: 'سلطان الحربي',
-      femaleLeader: 'نورة الدوسري',
-      members: []
-    },
-    {
-      id: 'scientific',
-      name: 'لجنة المحتوى العلمي',
-      maleLeader: 'فهد المطيري',
-      femaleLeader: 'أفنان العنزي',
-      members: []
-    },
-    {
-      id: 'hr',
-      name: 'لجنة الموارد البشرية',
-      maleLeader: 'تركي العنزي',
-      femaleLeader: 'سارة الرشيدي',
-      members: []
-    },
-    {
-      id: 'events-org',
-      name: 'لجنة التنظيم والفعاليات',
-      maleLeader: 'فيصل الدوسري',
-      femaleLeader: 'غادة العمري',
-      members: []
-    },
+    { id: 'design', name: 'لجنة التصميم', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي', members: [] },
+    { id: 'media', name: 'لجنة الإعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
+    { id: 'pr', name: 'لجنة العلاقات العامة', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي', members: [] },
+    { id: 'quality', name: 'لجنة الجودة والتطوير', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري', members: [] },
+    { id: 'scientific', name: 'لجنة المحتوى العلمي', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي', members: [] },
+    { id: 'hr', name: 'لجنة الموارد البشرية', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي', members: [] },
+    { id: 'events-org', name: 'لجنة التنظيم والفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', members: [] },
   ]);
 
   const [selectedCommitteeId, setSelectedCommitteeId] = useState('design');
-  const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberRole, setNewMemberRole] = useState('');
-
   const currentCommittee = committees.find(c => c.id === selectedCommitteeId) || committees[0];
 
   useEffect(() => {
@@ -175,18 +130,9 @@ export default function AdminDashboard() {
       }
     }
 
-    const savedCommittees = localStorage.getItem('UHB_COMMITTEES_DATA');
-    if (savedCommittees) {
+    const fetchCloudData = async () => {
       try {
-        const parsed = JSON.parse(savedCommittees);
-        if (parsed && parsed.length > 0) setCommittees(parsed);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    const fetchRequests = async () => {
-      try {
+        // جلب طلبات الانضمام
         const querySnapshot = await getDocs(collection(db, 'applications'));
         const fetchedRequests = querySnapshot.docs.map(docSnap => ({
           id: docSnap.id,
@@ -195,18 +141,21 @@ export default function AdminDashboard() {
         if (fetchedRequests.length > 0) {
           setRequests(fetchedRequests);
         }
+
+        // جلب بيانات اللجان السحابية
+        const commSnapshot = await getDocs(collection(db, 'committees'));
+        if (!commSnapshot.empty) {
+          const cloudMap: Record<string, any> = {};
+          commSnapshot.forEach(d => { cloudMap[d.id] = d.data(); });
+          setCommittees(prev => prev.map(c => cloudMap[c.id] ? { ...c, ...cloudMap[c.id] } : c));
+        }
       } catch (err) {
-        console.error('Error fetching applications:', err);
+        console.error('Error fetching data:', err);
       }
     };
 
-    fetchRequests();
+    fetchCloudData();
   }, []);
-
-  const updateCommitteesState = (newCommitteesData: typeof committees) => {
-    setCommittees(newCommitteesData);
-    localStorage.setItem('UHB_COMMITTEES_DATA', JSON.stringify(newCommitteesData));
-  };
 
   const handleAddBanner = (e: React.FormEvent) => {
     e.preventDefault();
@@ -239,7 +188,7 @@ export default function AdminDashboard() {
       await updateDoc(docRef, { status: 'تم القبول ✓' });
       setRequests(requests.map(req => req.id === id ? { ...req, status: 'تم القبول ✓' } : req));
     } catch (err) {
-      console.error('Error accepting request:', err);
+      console.error(err);
     }
   };
 
@@ -248,42 +197,86 @@ export default function AdminDashboard() {
       await deleteDoc(doc(db, 'applications', id));
       setRequests(requests.filter(req => req.id !== id));
     } catch (err) {
-      console.error('Error deleting request:', err);
+      console.error(err);
     }
   };
 
-  const handleAddMember = (e: React.FormEvent) => {
+  // حفظ التعديلات سحابياً في Firebase عند تغيير القادة أو الأعضاء
+  const handleLeaderChange = async (type: 'maleLeader' | 'femaleLeader', val: string) => {
+    const updated = committees.map(c => c.id === selectedCommitteeId ? { ...c, [type]: val } : c);
+    setCommittees(updated);
+
+    const targetComm = updated.find(c => c.id === selectedCommitteeId);
+    if (targetComm) {
+      try {
+        await setDoc(doc(db, 'committees', selectedCommitteeId), {
+          maleLeader: targetComm.maleLeader,
+          femaleLeader: targetComm.femaleLeader,
+          members: targetComm.members || []
+        }, { merge: true });
+      } catch (err) {
+        console.error('Error saving to cloud:', err);
+      }
+    }
+  };
+
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState('');
+
+  const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemberName.trim()) return;
+
     const updated = committees.map(c => {
       if (c.id === selectedCommitteeId) {
         return {
           ...c,
-          members: [...c.members, { name: newMemberName, role: newMemberRole || 'عضو' }]
+          members: [...(c.members || []), { name: newMemberName, role: newMemberRole || 'عضو', status: 'نشط' }]
         };
       }
       return c;
     });
-    updateCommitteesState(updated);
+    setCommittees(updated);
     setNewMemberName('');
     setNewMemberRole('');
+
+    const targetComm = updated.find(c => c.id === selectedCommitteeId);
+    if (targetComm) {
+      try {
+        await setDoc(doc(db, 'committees', selectedCommitteeId), {
+          maleLeader: targetComm.maleLeader,
+          femaleLeader: targetComm.femaleLeader,
+          members: targetComm.members
+        }, { merge: true });
+      } catch (err) {
+        console.error(err);
+      }
+    }
   };
 
-  const handleDeleteMember = (index: number) => {
+  const handleDeleteMember = async (index: number) => {
     const updated = committees.map(c => {
       if (c.id === selectedCommitteeId) {
-        const updatedMembers = [...c.members];
+        const updatedMembers = [...(c.members || [])];
         updatedMembers.splice(index, 1);
         return { ...c, members: updatedMembers };
       }
       return c;
     });
-    updateCommitteesState(updated);
-  };
+    setCommittees(updated);
 
-  const handleLeaderChange = (type: 'maleLeader' | 'femaleLeader', val: string) => {
-    const updated = committees.map(c => c.id === selectedCommitteeId ? { ...c, [type]: val } : c);
-    updateCommitteesState(updated);
+    const targetComm = updated.find(c => c.id === selectedCommitteeId);
+    if (targetComm) {
+      try {
+        await setDoc(doc(db, 'committees', selectedCommitteeId), {
+          maleLeader: targetComm.maleLeader,
+          femaleLeader: targetComm.femaleLeader,
+          members: targetComm.members
+        }, { merge: true });
+      } catch (err) {
+        console.error(err);
+      }
+    }
   };
 
   return (
@@ -295,8 +288,8 @@ export default function AdminDashboard() {
             UHB
           </span>
           <div>
-            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (صلاحيات كاملة)</h1>
-            <p className="text-xs text-slate-500">إدارة البانرات، الفعاليات، اللجان، الأعضاء، والطلبات بكل صلاحية</p>
+            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (سحابي متزامن)</h1>
+            <p className="text-xs text-slate-500">التعديلات تحفظ وتظهر فوراً على جميع الأجهزة والجوالات</p>
           </div>
         </div>
 
@@ -314,7 +307,7 @@ export default function AdminDashboard() {
           {[
             { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
             { id: 'banners', label: '🖼️ إدارة البانرات (الهيدر)' },
-            { id: 'team', label: '👥 إدارة القادة والأعضاء باللجان' },
+            { id: 'team', label: '👥 إدارة القادة والأعضاء (سحابي)' },
             { id: 'requests', label: '📥 طلبات الانضمام (Firebase)' },
           ].map((tab) => (
             <button
@@ -446,7 +439,7 @@ export default function AdminDashboard() {
         {activeTab === 'banners' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">إضافة بانر رئيسي جديد (اليوم الوطني / المناسبات)</h3>
+              <h3 className="text-xl font-black text-slate-900">إضافة بانر رئيسي جديد (المناسبات)</h3>
               
               <form onSubmit={handleAddBanner} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -472,7 +465,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">مسار صورة البانر (في مجلد public)</label>
+                  <label className="text-xs font-bold text-slate-600">مسار صورة البانر</label>
                   <input
                     type="text"
                     placeholder="مثال: /header-banner.png"
@@ -531,9 +524,17 @@ export default function AdminDashboard() {
         {activeTab === 'team' && (
           <div className="space-y-6">
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-base font-extrabold text-slate-900">اختر اللجنة لإدارة قادتها وأعضائها</h3>
+              <h3 className="text-base font-extrabold text-slate-900">اختر اللجنة لإدارة قادتها وأعضائها (تحديث سحابي فوري)</h3>
               <div className="flex flex-wrap gap-2">
-                {committees.map((com) => (
+                {[
+                  { id: 'design', name: 'لجنة التصميم' },
+                  { id: 'media', name: 'لجنة الإعلام' },
+                  { id: 'pr', name: 'لجنة العلاقات العامة' },
+                  { id: 'quality', name: 'لجنة الجودة والتطوير' },
+                  { id: 'scientific', name: 'لجنة المحتوى العلمي' },
+                  { id: 'hr', name: 'لجنة الموارد البشرية' },
+                  { id: 'events-org', name: 'لجنة التنظيم والفعاليات' },
+                ].map((com) => (
                   <button
                     key={com.id}
                     onClick={() => setSelectedCommitteeId(com.id)}
@@ -553,13 +554,13 @@ export default function AdminDashboard() {
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
                 <h3 className="text-xl font-black text-slate-900">إدارة {currentCommittee.name}</h3>
                 <span className="text-xs bg-[#630517]/10 text-[#630517] font-bold px-3 py-1 rounded-full">
-                  {currentCommittee.members.length} أعضاء
+                  {(currentCommittee.members || []).length} أعضاء
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500">قائد الطلاب</label>
+                  <label className="text-xs font-bold text-slate-500">قائد الطلاب (يحفظ تلقائياً)</label>
                   <input
                     type="text"
                     value={currentCommittee.maleLeader}
@@ -568,7 +569,7 @@ export default function AdminDashboard() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500">قائدة الطالبات</label>
+                  <label className="text-xs font-bold text-slate-500">قائدة الطالبات (يحفظ تلقائياً)</label>
                   <input
                     type="text"
                     value={currentCommittee.femaleLeader}
@@ -580,7 +581,7 @@ export default function AdminDashboard() {
 
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين</h4>
-                {currentCommittee.members.length === 0 ? (
+                {(!currentCommittee.members || currentCommittee.members.length === 0) ? (
                   <p className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-2xl">لا يوجد أعضاء حالياً.</p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -593,7 +594,7 @@ export default function AdminDashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {currentCommittee.members.map((m, idx) => (
+                        {currentCommittee.members.map((m: any, idx: number) => (
                           <tr key={idx} className="hover:bg-slate-50">
                             <td className="py-3 pr-2 font-bold text-slate-900">{m.name}</td>
                             <td className="py-3 text-slate-600">{m.role}</td>
