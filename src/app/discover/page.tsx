@@ -2,20 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { db } from '../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 const DEFAULT_PASSION_SLIDES = [
   {
-    id: 1,
+    id: '1',
     image: '/header-banner.png',
     quote: '«التمريض ليس مجرد مهنة، بل هو فن وعِلم يلامس حياة الإنسان في أصعب لحظاته.»'
   },
   {
-    id: 2,
+    id: '2',
     image: '/logo.png',
     quote: '«بالعطاء المستمر والعمل الجماعي نصنع أثراً يخلده الزمن في قلوب المجتمع.»'
   },
   {
-    id: 3,
+    id: '3',
     image: '/header-banner.png',
     quote: '«نطمح لأن نكون المنارة التي تضيء دروب التميز لكل ممرض وممرضة في جامعة حفر الباطن.»'
   }
@@ -23,21 +25,21 @@ const DEFAULT_PASSION_SLIDES = [
 
 const DEFAULT_DISCOVER_EVENTS = [
   {
-    id: 1,
+    id: '1',
     title: 'ملتقى التمريض السنوي التفاعلي',
     category: 'أنشطة كبرى',
     description: 'ملتقى شامل يستعرض أحدث الممارسات التمريضية وورش العمل التطبيقية لطلاب وطالبات الكلية.',
     images: ['/header-banner.png', '/logo.png']
   },
   {
-    id: 2,
+    id: '2',
     title: 'حملة القياسات الحيوية والتثقيف الصحي',
     category: 'خدمة المجتمع',
     description: 'فعالية توعوية ميدانية لقياس العلامات الحيوية وتقديم الاستشارات للزوار.',
     images: ['/logo.png', '/header-banner.png']
   },
   {
-    id: 3,
+    id: '3',
     title: 'ورشة الإسعافات الأولية المتقدمة',
     category: 'ورش تدريبية',
     description: 'دورة تدريبية مكثفة بالتعاون مع الكوادر الطبية المتخصصة لتمكين الأعضاء من التعامل مع الحالات الحرجة.',
@@ -58,30 +60,39 @@ export default function DiscoverPage() {
     return () => clearInterval(timer);
   }, [passionSlides.length]);
 
+  // Fetch Cloud Data from Firebase Firestore
   useEffect(() => {
-    const savedPassion = localStorage.getItem('UHB_PASSION_SLIDES');
-    if (savedPassion) {
+    const fetchCloudContent = async () => {
       try {
-        const parsed = JSON.parse(savedPassion);
-        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          setPassionSlides(parsed);
+        // Fetch Passion Slides
+        const passionSnap = await getDocs(collection(db, 'site_passion_slides'));
+        if (!passionSnap.empty) {
+          const slides: any[] = [];
+          passionSnap.forEach((d) => {
+            slides.push({ id: d.id, ...d.data() });
+          });
+          if (slides.length > 0) {
+            setPassionSlides(slides);
+          }
         }
-      } catch (e) {
-        console.error(e);
-      }
-    }
 
-    const savedDiscover = localStorage.getItem('UHB_DISCOVER_EVENTS');
-    if (savedDiscover) {
-      try {
-        const parsed = JSON.parse(savedDiscover);
-        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          setDiscoverEvents(parsed);
+        // Fetch Discover Events
+        const discoverSnap = await getDocs(collection(db, 'site_discover_events'));
+        if (!discoverSnap.empty) {
+          const eventsList: any[] = [];
+          discoverSnap.forEach((d) => {
+            eventsList.push({ id: d.id, ...d.data() });
+          });
+          if (eventsList.length > 0) {
+            setDiscoverEvents(eventsList);
+          }
         }
-      } catch (e) {
-        console.error(e);
+      } catch (err) {
+        console.error('Error fetching cloud data for discover page:', err);
       }
-    }
+    };
+
+    fetchCloudContent();
   }, []);
 
   const activeSlide = passionSlides[currentSlide] || passionSlides[0];
@@ -151,7 +162,7 @@ export default function DiscoverPage() {
             <div className="absolute inset-0 bg-[#630517]/10 rounded-3xl blur-2xl transform rotate-3" />
             <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200 min-h-[400px] flex flex-col justify-between text-white p-8 sm:p-10 bg-slate-950">
               
-              {/* خلفية الصورة بوضوح تام ودون حجب */}
+              {/* خلفية الصورة */}
               <div className="absolute inset-0 z-0">
                 <img
                   src={activeSlide.image && activeSlide.image.trim() !== '' ? activeSlide.image : '/header-banner.png'}
@@ -215,7 +226,7 @@ export default function DiscoverPage() {
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">
               لقطات من فعالياتنا وبرامجنا
             </h2>
-            <p className="text-slate-600 text-sm">اضغط على أي فعالية لاستعراض معرض الصور الكامل المرفوع من لوحة التحكم</p>
+            <p className="text-slate-600 text-sm">اضغط على أي فعالية لاستعراض معرض الصور الكامل المرفوع سحابياً</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
