@@ -19,7 +19,6 @@ export default function RootLayout({
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // إخفاء شاشة التحميل بعد 3 ثوانٍ (3000 ملي ثانية)
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 3000);
@@ -30,26 +29,37 @@ export default function RootLayout({
     <html lang="ar" className={`${kufam.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-800">
         {isLoading ? (
-          <main className="min-h-screen bg-[#630517] flex items-center justify-center px-4 relative overflow-hidden fixed inset-0 z-50" dir="rtl">
-            <div className="absolute w-96 h-96 bg-[#F5D061]/10 rounded-full blur-3xl pointer-events-none"></div>
-
-            <div className="max-w-md w-full bg-black/40 backdrop-blur-xl border border-[#F5D061]/30 p-8 rounded-3xl shadow-2xl text-center space-y-6 text-white relative z-10">
+          <main className="min-h-screen bg-[#4A030F] flex items-center justify-center px-4 relative overflow-hidden fixed inset-0 z-50" dir="rtl">
+            
+            {/* البوكس الزجاجي الداخلي */}
+            <div className="max-w-md w-full bg-[#35020A]/80 backdrop-blur-xl border border-[#F5D061]/20 p-8 rounded-3xl shadow-2xl text-center space-y-6 text-white relative z-10 flex flex-col items-center">
               
-              <div className="relative w-20 h-20 mx-auto bg-[#630517]/80 border border-[#F5D061]/40 rounded-2xl flex items-center justify-center shadow-inner overflow-hidden">
-                <Image
-                  src="/logo.png"
-                  alt="شعار نادي التمريض"
-                  width={50}
-                  height={50}
-                  className="object-contain drop-shadow"
-                />
+              {/* حاوية الشعار مع المربعات الددوارة */}
+              <div className="relative w-24 h-24 flex items-center justify-center my-2">
+                {/* المربع الدوار الأول */}
+                <div className="absolute inset-0 border border-[#F5D061]/40 rounded-2xl animate-[spin_6s_linear_infinite]"></div>
+                {/* المربع الدوار الثاني بعكس الاتجاه */}
+                <div className="absolute inset-[-6px] border border-[#F5D061]/20 rounded-3xl animate-[spin_10s_linear_infinite_reverse]"></div>
+                
+                {/* مربع الشعار الثابت في المنتصف */}
+                <div className="relative w-16 h-16 bg-[#5A0412] border border-[#F5D061]/60 rounded-xl flex items-center justify-center shadow-inner overflow-hidden">
+                  <Image
+                    src="/logo.png"
+                    alt="شعار نادي التمريض"
+                    width={38}
+                    height={38}
+                    className="object-contain drop-shadow"
+                  />
+                </div>
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-4 py-1 rounded-full bg-[#F5D061]/10 border border-[#F5D061]/30 text-[#F5D061] text-xs font-bold tracking-wider uppercase">
+              {/* شارة جاري تجهيز التجربة */}
+              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#5A0412] border border-[#F5D061]/30 text-[#F5D061] text-xs font-bold tracking-wider uppercase shadow-inner">
                 <span>✨</span>
                 <span>جاري تجهيز التجربة</span>
               </div>
 
+              {/* النص الترحيبي والصلاة على النبي */}
               <div className="space-y-2">
                 <h2 className="text-xl sm:text-2xl font-black text-[#FFFDF7] leading-relaxed">
                   اللهم صل وسلم على نبينا محمد
@@ -59,11 +69,13 @@ export default function RootLayout({
                 </p>
               </div>
 
-              <div className="w-full bg-black/60 rounded-full h-2.5 p-0.5 border border-[#F5D061]/20 overflow-hidden">
-                <div className="bg-gradient-to-r from-[#F5D061] to-[#E2B739] h-full rounded-full animate-pulse w-full"></div>
+              {/* شريط التحميل المدرج والسميك */}
+              <div className="w-full bg-[#240106] rounded-full h-3.5 p-0.5 border border-[#F5D061]/20 overflow-hidden shadow-inner">
+                <div className="bg-gradient-to-r from-[#C99C21] via-[#E2B739] to-[#F5D061] h-full rounded-full animate-pulse w-full shadow-md"></div>
               </div>
 
-              <div className="text-[11px] text-[#F5D061]/70 font-semibold tracking-wider uppercase">
+              {/* التوقيع السفلي */}
+              <div className="text-[11px] text-[#F5D061]/70 font-semibold tracking-wider uppercase pt-1">
                 نادي التمريض • جامعة حفر الباطن
               </div>
 
