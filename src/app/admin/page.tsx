@@ -41,7 +41,7 @@ export default function AdminDashboard() {
   const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
-      alert('يرجى كتابة عنوان الفعالية على الأقل.');
+      alert('يرجى كتابة عنوان الفعالية.');
       return;
     }
     const newEvent = {
@@ -50,7 +50,7 @@ export default function AdminDashboard() {
       date: newDate || 'قريباً',
       location: newLocation || 'جامعة حفر الباطن',
       status: newStatus,
-      poster: newPoster.startsWith('/') ? newPoster : `/${newPoster}`,
+      poster: newPoster,
       description: newDesc || 'فعالية تابعة لنادي التمريض.'
     };
     const updatedEvents = [newEvent, ...events];
@@ -92,12 +92,11 @@ export default function AdminDashboard() {
       alert('يرجى كتابة عنوان البانر.');
       return;
     }
-    const formattedImage = bannerImage.startsWith('/') ? bannerImage : `/${bannerImage}`;
     const newBanner = {
       id: Date.now().toString(),
       tag: bannerTag || 'مناسبة خاصة',
       title: bannerTitle,
-      image: formattedImage,
+      image: bannerImage,
       buttonText: 'اكتشف النادي',
       buttonLink: '/discover'
     };
@@ -363,14 +362,20 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
+                {/* اختيار صورة البوستر مباشرة من ملفات الجهاز */}
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">مسار البوستر (مثال: /logo.png)</label>
+                  <label className="text-xs font-bold text-slate-600">اختر بوستر الفعالية من جهازك</label>
                   <input
-                    type="text"
-                    placeholder="مثال: /logo.png"
-                    value={newPoster}
-                    onChange={(e) => setNewPoster(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const file = e.target.files[0];
+                        const fileUrl = URL.createObjectURL(file);
+                        setNewPoster(fileUrl);
+                      }
+                    }}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
                   />
                 </div>
 
@@ -452,14 +457,20 @@ export default function AdminDashboard() {
                   />
                 </div>
 
+                {/* اختيار صورة البانر مباشرة من ملفات الجهاز */}
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">مسار صورة البانر (مثال: /header-banner.png)</label>
+                  <label className="text-xs font-bold text-slate-600">اختر صورة البانر من جهازك</label>
                   <input
-                    type="text"
-                    placeholder="مثال: /header-banner.png"
-                    value={bannerImage}
-                    onChange={(e) => setBannerImage(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const file = e.target.files[0];
+                        const fileUrl = URL.createObjectURL(file);
+                        setBannerImage(fileUrl);
+                      }
+                    }}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
                   />
                 </div>
 
@@ -491,7 +502,7 @@ export default function AdminDashboard() {
                       <tr key={ban.id} className="hover:bg-slate-50">
                         <td className="py-4 pr-2 font-bold text-[#630517]">{ban.tag}</td>
                         <td className="py-4 text-slate-900 font-extrabold">{ban.title}</td>
-                        <td className="py-4 text-slate-500">{ban.image}</td>
+                        <td className="py-4 text-slate-500 truncate max-w-xs">{ban.image}</td>
                         <td className="py-4 text-left pl-2">
                           <button
                             onClick={() => handleDeleteBanner(ban.id)}
