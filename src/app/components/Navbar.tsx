@@ -58,7 +58,7 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           <Link 
             href="/join" 
-            className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold px-4 py-2 rounded-xl text-sm transition-all shadow-sm"
+            className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] font-black text-xs sm:text-sm shadow-lg hover:brightness-110 transition-all cursor-pointer"
           >
             انضم للنادي
           </Link>
