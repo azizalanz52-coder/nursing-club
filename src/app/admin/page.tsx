@@ -6,7 +6,7 @@ import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners'>('team');
 
   // 1. إدارة الفعاليات والبوسترات
   const [events, setEvents] = useState([
@@ -144,7 +144,6 @@ export default function AdminDashboard() {
   const currentCommittee = committees.find(c => c.id === selectedCommitteeId) || committees[0];
 
   useEffect(() => {
-    // جلب الفعاليات من التخزين المحلي
     const savedEvents = localStorage.getItem('UHB_EVENTS');
     if (savedEvents) {
       try {
@@ -155,7 +154,6 @@ export default function AdminDashboard() {
       }
     }
 
-    // جلب البانرات من التخزين المحلي
     const savedBanners = localStorage.getItem('UHB_BANNERS');
     if (savedBanners) {
       try {
@@ -166,7 +164,6 @@ export default function AdminDashboard() {
       }
     }
 
-    // جلب اللجان والقادة والأعضاء من التخزين المحلي لضمان بقاء التعديلات
     const savedCommittees = localStorage.getItem('UHB_COMMITTEES_DATA');
     if (savedCommittees) {
       try {
@@ -177,7 +174,6 @@ export default function AdminDashboard() {
       }
     }
 
-    // جلب الطلبات الحقيقية من Firebase
     const fetchRequests = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, 'applications'));
@@ -196,7 +192,6 @@ export default function AdminDashboard() {
     fetchRequests();
   }, []);
 
-  // دالة لتحديث وحفظ اللجان في localStorage تلقائياً عند أي تعديل
   const updateCommitteesState = (newCommitteesData: typeof committees) => {
     setCommittees(newCommitteesData);
     localStorage.setItem('UHB_COMMITTEES_DATA', JSON.stringify(newCommitteesData));
@@ -283,7 +278,6 @@ export default function AdminDashboard() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       
-      {/* شريط الأدمن العلوي */}
       <div className="bg-white border-b border-slate-200 py-4 px-6 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-3">
           <span className="w-10 h-10 rounded-xl bg-[#630517] text-[#F5D061] flex items-center justify-center font-black text-lg shadow">
@@ -305,7 +299,6 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
 
-        {/* أزرار التنقل بين الأقسام */}
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {[
             { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
@@ -327,7 +320,6 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* 1. قسم الفعاليات والبوسترات */}
         {activeTab === 'events' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
@@ -401,7 +393,6 @@ export default function AdminDashboard() {
               </form>
             </div>
 
-            {/* جدول الفعاليات */}
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-4">
               <h3 className="text-xl font-black text-slate-900">الفعاليات الحالية ({events.length})</h3>
               <div className="overflow-x-auto">
@@ -441,7 +432,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 2. قسم إدارة البانرات (الهيدر) */}
         {activeTab === 'banners' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
@@ -492,7 +482,6 @@ export default function AdminDashboard() {
               </form>
             </div>
 
-            {/* جدول البانرات الحالية */}
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-4">
               <h3 className="text-xl font-black text-slate-900">البانرات النشطة ({banners.length})</h3>
               <div className="overflow-x-auto">
@@ -528,7 +517,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 3. قسم إدارة اللجان والقادة والأعضاء */}
         {activeTab === 'team' && (
           <div className="space-y-6">
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
@@ -558,7 +546,6 @@ export default function AdminDashboard() {
                 </span>
               </div>
 
-              {/* تعديل القادة */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500">قائد الطلاب</label>
@@ -580,7 +567,6 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* إدارة الأعضاء */}
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين</h4>
                 {currentCommittee.members.length === 0 ? (
@@ -643,7 +629,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 4. طلبات الانضمام الحقيقية من Firebase */}
         {activeTab === 'requests' && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <h3 className="text-xl font-black text-slate-900">طلبات انضمام الأعضاء (من قاعدة البيانات)</h3>

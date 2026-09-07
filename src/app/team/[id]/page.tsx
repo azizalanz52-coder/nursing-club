@@ -94,6 +94,8 @@ export default function CommitteeDetailPage() {
   const [committee, setCommittee] = useState<any>(defaultCommitteesDetails[id] || defaultCommitteesDetails['design']);
 
   useEffect(() => {
+    const baseDetails = defaultCommitteesDetails[id] || defaultCommitteesDetails['design'];
+    
     // جلب التعديلات المحفوظة من لوحة التحكم (localStorage)
     const savedCommittees = localStorage.getItem('UHB_COMMITTEES_DATA');
     if (savedCommittees) {
@@ -101,23 +103,26 @@ export default function CommitteeDetailPage() {
         const parsedArray = JSON.parse(savedCommittees);
         const found = parsedArray.find((c: any) => c.id === id);
         if (found) {
-          // دمج الأوصاف والأيقونات الثابتة مع التعديلات الحية للقادة والأعضاء
-          const baseDetails = defaultCommitteesDetails[id] || {};
           setCommittee({
             ...baseDetails,
-            maleLeader: found.maleLeader,
-            femaleLeader: found.femaleLeader,
-            members: found.members.map((m: any) => ({
-              name: m.name,
-              role: m.role || m.task || 'عضو',
-              status: m.status || 'نشط'
-            }))
+            maleLeader: found.maleLeader !== undefined ? found.maleLeader : baseDetails.maleLeader,
+            femaleLeader: found.femaleLeader !== undefined ? found.femaleLeader : baseDetails.femaleLeader,
+            members: found.members && found.members.length > 0 
+              ? found.members.map((m: any) => ({
+                  name: m.name,
+                  role: m.role || m.task || 'عضو',
+                  status: m.status || 'نشط'
+                }))
+              : baseDetails.members
           });
+          return;
         }
       } catch (e) {
         console.error('Error loading committee data from storage:', e);
       }
     }
+    // في حال لم تكن هناك بيانات مخزنة، اعرض البيانات الافتراضية للجنة الحالية
+    setCommittee(baseDetails);
   }, [id]);
 
   return (
@@ -188,7 +193,7 @@ export default function CommitteeDetailPage() {
                     <td className="py-4 text-slate-600 font-medium">{m.role}</td>
                     <td className="py-4">
                       <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                        {m.status}
+                        {m.status || 'نشط'}
                       </span>
                     </td>
                   </tr>
