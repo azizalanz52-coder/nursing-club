@@ -1,106 +1,104 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { db } from '@/lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+
+const initialCommittees = [
+  { id: 'design', name: 'لجنة التصميم', description: 'الهوية البصرية، تصميم البوسترات، والمحتوى المرئي.', icon: '🎨', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي' },
+  { id: 'media', name: 'لجنة الإعلام', description: 'منصات التواصل، التغطيات الحية، وصناعة المحتوى.', icon: '📸', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري' },
+  { id: 'pr', name: 'لجنة العلاقات العامة', description: 'بناء الشراكات، استقبال الضيوف، والتنسيق الخارجي.', icon: '🌐', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي' },
+  { id: 'quality', name: 'لجنة الجودة والتطوير', description: 'تقييم الأداء، قياس رضا الأعضاء، وتحسين العمل.', icon: '📊', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري' },
+  { id: 'scientific', name: 'لجنة المحتوى العلمي', description: 'المطويات الطبية، المحاضرات، والدعم الأكاديمي.', icon: '🔬', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي' },
+  { id: 'hr', name: 'لجنة الموارد البشرية', description: 'إدارة الأعضاء، المتابعة، والتقييم والتحفيز.', icon: '👥', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي' },
+  { id: 'events-org', name: 'لجنة التنظيم والفعاليات', description: 'التخطيط الميداني، إدارة الحشود، والفعاليات.', icon: '📅', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري' },
+];
 
 export default function CommitteesPreview() {
-  const committees = [
-    {
-      id: '1',
-      title: 'لجنة التصميم والجرافيك',
-      description: 'مسؤولة عن الهوية البصرية، تصميم المنشورات، البنرات، والمحتوى المرئي للنادي.',
-      icon: '🎨'
-    },
-    {
-      id: '2',
-      title: 'اللجنة العلمية والبحثية',
-      description: 'إعداد الأوراق البحثية، المحتوى العلمي، وورش العمل التمريضية الأكاديمية.',
-      icon: '🔬'
-    },
-    {
-      id: '3',
-      title: 'لجنة التنظيم والفعاليات',
-      description: 'التخطيط الميداني وإدارة الحشود وتنظيم الملتقيات والمعارض الكبرى.',
-      icon: '📅'
-    },
-    {
-      id: '4',
-      title: 'لجنة العلاقات العامة والإعلام',
-      description: 'بناء الشراكات المجتمعية، إدارة منصات التواصل، والتغطيات الإعلامية.',
-      icon: '🤝'
-    },
-    {
-      id: '5',
-      title: 'لجنة التطوع خدمة المجتمع',
-      description: 'تنظيم الحملات التوعوية الميدانية والقياسات الحيوية للزوار والمنسوبين.',
-      icon: '❤️'
-    },
-    {
-      id: '6',
-      title: 'اللجنة التقنية والدعم الرقمي',
-      description: 'إدارة الموقع الإلكتروني، الأنظمة الرقمية، والدعم التقني لفعاليات النادي.',
-      icon: '💻'
-    },
-    {
-      id: '7',
-      title: 'لجنة الدعم اللوجستي والتجهيز',
-      description: 'تأمين وتجهيز المستلزمات الطبية والأدوات اللازمة للأنشطة والفعاليات.',
-      icon: '⚙️'
-    }
-  ];
+  const [committees, setCommittees] = useState(initialCommittees);
+
+  useEffect(() => {
+    const fetchCloudCommittees = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'committees'));
+        if (!querySnapshot.empty) {
+          const cloudDataMap: Record<string, any> = {};
+          querySnapshot.forEach((docSnap) => {
+            cloudDataMap[docSnap.id] = docSnap.data();
+          });
+
+          const merged = initialCommittees.map((comm) => {
+            if (cloudDataMap[comm.id]) {
+              return {
+                ...comm,
+                maleLeader: cloudDataMap[comm.id].maleLeader || comm.maleLeader,
+                femaleLeader: cloudDataMap[comm.id].femaleLeader || comm.femaleLeader,
+              };
+            }
+            return comm;
+          });
+          setCommittees(merged);
+        }
+      } catch (err) {
+        console.error('Error fetching cloud committees:', err);
+      }
+    };
+
+    fetchCloudCommittees();
+  }, []);
 
   return (
-    <section className="py-20 bg-[#630517] text-white" dir="rtl">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="py-20 bg-slate-50 text-slate-800" dir="rtl">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         
-        <div className="flex flex-col md:flex-row justify-between items-center mb-16 gap-4">
-          <div className="space-y-3 text-right">
-            <span className="inline-block px-4 py-1.5 rounded-full bg-[#F5D061]/20 text-[#F5D061] text-xs font-black tracking-widest uppercase border border-[#F5D061]/30">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-right">
+          <div className="space-y-3">
+            <span className="inline-block px-4 py-1.5 rounded-full bg-[#630517]/10 text-[#630517] text-xs font-extrabold tracking-widest uppercase border border-[#630517]/20">
               هيكل النادي التنظيمي
             </span>
-            <h2 className="text-4xl sm:text-5xl font-black tracking-tight text-white">
-              لجان نادي التمريض (7 لجان)
+            <h2 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">
+              لجان نادي التمريض السبع
             </h2>
-            <p className="text-slate-200 text-sm sm:text-base">
-              نخبة من الكوادر الطلابية الموزعة على سبع لجان تخصصية لصناعة الأثر والتميز.
+            <p className="text-slate-600 text-sm sm:text-base">
+              اضغط على أي لجنة لاستعراض أعضائها وقادتها والانضمام إليها مباشرة.
             </p>
           </div>
 
           <Link
             href="/team"
-            className="px-6 py-3 rounded-2xl bg-[#F5D061] text-[#630517] font-black text-xs sm:text-sm shadow-lg hover:brightness-110 transition-all shrink-0"
+            className="px-6 py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs sm:text-sm shadow-lg hover:brightness-110 transition-all shrink-0"
           >
-            عرض أعضاء اللجان ←
+            عرض كافة التفاصيل ←
           </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {committees.map((comm) => (
-            <div
-              key={comm.id}
-              className="relative rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between group min-h-[320px] bg-slate-950 border border-[#F5D061]/30 p-8 transition-all hover:scale-[1.02]"
+          {committees.map((committee) => (
+            <Link
+              key={committee.id}
+              href={`/team/${committee.id}`}
+              className="bg-white rounded-3xl border border-slate-200 p-7 shadow-lg shadow-slate-100 flex flex-col justify-between space-y-6 hover:shadow-xl hover:border-[#630517]/50 hover:scale-[1.02] transition-all cursor-pointer group"
             >
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-900/40 z-0" />
-
-              <div className="relative z-10 flex justify-between items-start">
-                <span className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-2xl shadow-md">
-                  {comm.icon}
-                </span>
-                <span className="px-3 py-1 rounded-full bg-[#F5D061]/20 text-[#F5D061] text-xs font-black border border-[#F5D061]/30">
-                  لجنة معتمدة
-                </span>
+              <div className="space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#630517]/10 border border-[#630517]/20 flex items-center justify-center text-2xl group-hover:bg-[#630517] group-hover:text-[#F5D061] transition-all">
+                  {committee.icon}
+                </div>
+                <h3 className="text-xl font-black text-slate-900 group-hover:text-[#630517] transition-colors">{committee.name}</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">{committee.description}</p>
               </div>
 
-              <div className="relative z-10 space-y-3 text-right pt-6">
-                <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-[#F5D061] transition-colors">
-                  {comm.title}
-                </h3>
-                <p className="text-slate-200 text-xs sm:text-sm leading-relaxed">
-                  {comm.description}
-                </p>
+              <div className="pt-4 border-t border-slate-100 space-y-2 text-xs">
+                <div className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/60">
+                  <span className="text-slate-400 font-bold">قائد الطلاب:</span>
+                  <span className="font-extrabold text-slate-900">{committee.maleLeader}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/60">
+                  <span className="text-slate-400 font-bold">قائدة الطالبات:</span>
+                  <span className="font-extrabold text-slate-900">{committee.femaleLeader}</span>
+                </div>
               </div>
-
-            </div>
+            </Link>
           ))}
         </div>
 
