@@ -23,7 +23,7 @@ const defaultCommitteesDetails: Record<string, any> = {
   media: {
     id: 'media',
     name: 'لجنة الإعلام',
-    description: 'إدارة منصات التواصل الاجتماعي، التغطيات الحية، وصناعة المحتوى الإعلامي المرئي والمكتوب.',
+    description: 'إدارة منصات التواصل الاجتماعي، التغطيات الحية، وصناعة المحتوى المرئي والمكتوب.',
     icon: '📸',
     maleLeader: 'راشد السبيعي',
     femaleLeader: 'ريم الشمري',
@@ -95,7 +95,6 @@ export default function CommitteeDetailPage() {
   const baseDetails = defaultCommitteesDetails[id] || defaultCommitteesDetails['design'];
   
   const [committee, setCommittee] = useState<any>(baseDetails);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchCloudCommittee = async () => {
@@ -112,9 +111,7 @@ export default function CommitteeDetailPage() {
           });
         }
       } catch (err) {
-        console.error('Error fetching single committee from cloud:', err);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching committee from cloud:', err);
       }
     };
 

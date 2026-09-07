@@ -18,7 +18,6 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
-  // الفعاليات
   const [events, setEvents] = useState([
     {
       id: '1',
@@ -66,7 +65,6 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_EVENTS', JSON.stringify(updatedEvents));
   };
 
-  // البانرات
   const [banners, setBanners] = useState([
     {
       id: '1',
@@ -82,12 +80,20 @@ export default function AdminDashboard() {
   const [bannerTitle, setBannerTitle] = useState('');
   const [bannerImage, setBannerImage] = useState('/header-banner.png');
 
-  // طلبات الانضمام
   const [requests, setRequests] = useState<any[]>([]);
 
-  // اللجان (سحابي)
   const [committees, setCommittees] = useState([
-    { id: 'design', name: 'لجنة التصميم', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي', members: [] },
+    { 
+      id: 'design', 
+      name: 'لجنة التصميم', 
+      maleLeader: 'عبدالعزيز العنزي', 
+      femaleLeader: 'شجون الحربي', 
+      members: [
+        { name: 'سارة محمد', role: 'مصممة جرافيك', status: 'نشط' },
+        { name: 'عمر خالد', role: 'مصمم موشن جرافيك', status: 'نشط' },
+        { name: 'فاطمة أحمد', role: 'مسؤولة الهوية البصرية', status: 'نشط' }
+      ] 
+    },
     { id: 'media', name: 'لجنة الإعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
     { id: 'pr', name: 'لجنة العلاقات العامة', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي', members: [] },
     { id: 'quality', name: 'لجنة الجودة والتطوير', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري', members: [] },
@@ -189,7 +195,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // 💾 زر الـ Submit الصريح لحفظ وتحديث قادة اللجان سحابياً
+  // 💾 زر الـ Submit لحفظ قادة اللجنة سحابياً
   const handleSaveLeadersSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -198,17 +204,17 @@ export default function AdminDashboard() {
         femaleLeader: currentCommittee.femaleLeader,
         members: currentCommittee.members || []
       }, { merge: true });
-      alert(`تم حفظ وتحديث قادة "${currentCommittee.name}" سحابياً بنجاح! ستظهر الآن فوراً على جميع الأجهزة.`);
+      alert(`تم حفظ وتحديث قادة "${currentCommittee.name}" سحابياً بنجاح!`);
     } catch (err) {
       console.error('Error saving leaders:', err);
-      alert('حدث خطأ أثناء الاتصال بقاعدة البيانات.');
+      alert('حدث خطأ أثناء الحفظ.');
     }
   };
 
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('');
 
-  // 💾 زر الـ Submit الصريح لإضافة عضو جديد للجنة
+  // 💾 زر الـ Submit لإضافة عضو جديد للجنة
   const handleAddMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemberName.trim()) return;
@@ -228,7 +234,6 @@ export default function AdminDashboard() {
       alert('تم إضافة العضو وحفظه سحابياً بنجاح!');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء حفظ العضو.');
     }
   };
 
@@ -260,8 +265,8 @@ export default function AdminDashboard() {
             UHB
           </span>
           <div>
-            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (مع أزرار الحفظ الصريحة)</h1>
-            <p className="text-xs text-slate-500">عدل واضغط زر الحفظ (Submit) لتتزامن البيانات مع جميع الأجهزة</p>
+            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض</h1>
+            <p className="text-xs text-slate-500">عدل البيانات واضغط زر الحفظ (Submit) لتتزامن فوراً</p>
           </div>
         </div>
 
@@ -522,7 +527,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* نموذج قادة اللجان مع زر Submit صريح */}
+            {/* نموذج تعديل القادة مع زر Submit واضح */}
             <form onSubmit={handleSaveLeadersSubmit} className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
                 <h3 className="text-xl font-black text-slate-900">إدارة قادة {currentCommittee.name}</h3>
@@ -558,18 +563,18 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* زر الـ Submit الصريح لحفظ القادة */}
+              {/* زر الحفظ الصريح */}
               <div>
                 <button
                   type="submit"
-                  className="bg-[#630517] text-[#F5D061] px-6 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 transition-all"
+                  className="bg-[#630517] text-[#F5D061] px-6 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 transition-all cursor-pointer"
                 >
-                  💾 حفظ التغييرات سحابياً (قادة اللجنة)
+                  💾 حفظ وتحديث قادة اللجنة (Submit)
                 </button>
               </div>
             </form>
 
-            {/* إدارة أعضاء اللجنة مع زر Submit للإضافة */}
+            {/* جدول الأعضاء */}
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة</h4>
               {(!currentCommittee.members || currentCommittee.members.length === 0) ? (
@@ -622,7 +627,7 @@ export default function AdminDashboard() {
                 />
                 <button
                   type="submit"
-                  className="bg-[#630517] text-[#F5D061] py-2.5 rounded-xl font-bold text-xs shadow hover:brightness-110"
+                  className="bg-[#630517] text-[#F5D061] py-2.5 rounded-xl font-bold text-xs shadow hover:brightness-110 cursor-pointer"
                 >
                   + إضافة عضو وحفظه سحابياً
                 </button>
@@ -634,7 +639,7 @@ export default function AdminDashboard() {
 
         {activeTab === 'requests' && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-            <h3 className="text-xl font-black text-slate-900">طلبات انضمام الأعضاء (من قاعدة البيانات)</h3>
+            <h3 className="text-xl font-black text-slate-900">طلبات انضمام الأعضاء</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs">
                 <thead>
