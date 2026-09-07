@@ -13,8 +13,8 @@ export default function LoginPage() {
     e.preventDefault();
     console.log("تسجيل دخول:", { phone, password });
     
-    // توجيه مباشر إلى لوحة التحكم
-    router.push("/admin");
+    // توجيه المستخدم للصفحة الرئيسية بشكل طبيعي
+    router.push("/");
   };
 
   return (
