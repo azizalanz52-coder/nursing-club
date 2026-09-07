@@ -34,20 +34,24 @@ export default function RootLayout({
             {/* البوكس الزجاجي الداخلي */}
             <div className="max-w-md w-full bg-[#35020A]/85 backdrop-blur-xl border border-[#F5D061]/30 p-8 rounded-3xl shadow-2xl text-center space-y-6 text-white relative z-10 flex flex-col items-center">
               
-              {/* حاوية الشعار مع المربعات الددوارة */}
-              <div className="relative w-32 h-32 flex items-center justify-center my-2">
-                {/* المربع الدوار الأول */}
-                <div className="absolute inset-0 border-2 border-[#F5D061]/60 rounded-3xl animate-[spin_6s_linear_infinite] shadow-lg"></div>
-                {/* المربع الدوار الثاني بعكس الاتجاه */}
-                <div className="absolute inset-[-6px] border border-[#F5D061]/30 rounded-[28px] animate-[spin_10s_linear_infinite_reverse]"></div>
+              {/* حاوية الشعار مع المربعات الددوارة المتناسقة ولمعة الخلفية */}
+              <div className="relative w-28 h-28 flex items-center justify-center my-2">
                 
-                {/* مربع الشعار بتصميم زجاجي متناسق بدون خلفية بيضاء */}
-                <div className="relative w-24 h-24 bg-[#4A030F]/90 backdrop-blur-md border border-[#F5D061]/50 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden p-3">
+                {/* لمعة وخلفية مضيئة وحيوية خلف الشعار */}
+                <div className="absolute inset-2 bg-gradient-to-tr from-[#F5D061]/20 via-[#C99C21]/10 to-transparent rounded-2xl blur-md animate-pulse"></div>
+
+                {/* المربع الدوار الأول بحجم متناسق */}
+                <div className="absolute inset-2 border border-[#F5D061]/60 rounded-2xl animate-[spin_6s_linear_infinite] shadow-lg"></div>
+                {/* المربع الدوار الثاني بعكس الاتجاه */}
+                <div className="absolute inset-0 border border-[#F5D061]/30 rounded-3xl animate-[spin_10s_linear_infinite_reverse]"></div>
+                
+                {/* مربع الشعار بتصميم زجاجي متناسق وراقي */}
+                <div className="relative w-20 h-20 bg-[#4A030F]/90 backdrop-blur-md border border-[#F5D061]/60 rounded-xl flex items-center justify-center shadow-2xl overflow-hidden p-2.5 z-10">
                   <Image
                     src="/nurs-logo.png"
                     alt="شعار NURS"
-                    width={75}
-                    height={75}
+                    width={60}
+                    height={60}
                     className="object-contain drop-shadow-md"
                   />
                 </div>
