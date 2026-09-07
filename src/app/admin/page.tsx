@@ -18,6 +18,7 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
+  // الفعاليات
   const [events, setEvents] = useState([
     {
       id: '1',
@@ -39,14 +40,17 @@ export default function AdminDashboard() {
 
   const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim()) {
+      alert('يرجى كتابة عنوان الفعالية على الأقل.');
+      return;
+    }
     const newEvent = {
       id: Date.now().toString(),
       title: newTitle,
       date: newDate || 'قريباً',
       location: newLocation || 'جامعة حفر الباطن',
       status: newStatus,
-      poster: newPoster || '/logo.png',
+      poster: newPoster.startsWith('/') ? newPoster : `/${newPoster}`,
       description: newDesc || 'فعالية تابعة لنادي التمريض.'
     };
     const updatedEvents = [newEvent, ...events];
@@ -55,8 +59,9 @@ export default function AdminDashboard() {
     setNewTitle('');
     setNewDate('');
     setNewLocation('');
+    setNewPoster('/logo.png');
     setNewDesc('');
-    alert('تم نشر الفعالية بنجاح وحفظها!');
+    alert('تم نشر الفعالية وحفظها بنجاح!');
   };
 
   const handleDeleteEvent = (id: string) => {
@@ -65,6 +70,7 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_EVENTS', JSON.stringify(updatedEvents));
   };
 
+  // البانرات
   const [banners, setBanners] = useState([
     {
       id: '1',
@@ -80,8 +86,40 @@ export default function AdminDashboard() {
   const [bannerTitle, setBannerTitle] = useState('');
   const [bannerImage, setBannerImage] = useState('/header-banner.png');
 
+  const handleAddBanner = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bannerTitle.trim()) {
+      alert('يرجى كتابة عنوان البانر.');
+      return;
+    }
+    const formattedImage = bannerImage.startsWith('/') ? bannerImage : `/${bannerImage}`;
+    const newBanner = {
+      id: Date.now().toString(),
+      tag: bannerTag || 'مناسبة خاصة',
+      title: bannerTitle,
+      image: formattedImage,
+      buttonText: 'اكتشف النادي',
+      buttonLink: '/discover'
+    };
+    const updatedBanners = [newBanner, ...banners];
+    setBanners(updatedBanners);
+    localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
+    setBannerTag('');
+    setBannerTitle('');
+    setBannerImage('/header-banner.png');
+    alert('تم إضافة وتفعيل البانر بنجاح في الواجهة الرئيسية!');
+  };
+
+  const handleDeleteBanner = (id: string) => {
+    const updatedBanners = banners.filter(b => b.id !== id);
+    setBanners(updatedBanners);
+    localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
+  };
+
+  // طلبات الانضمام
   const [requests, setRequests] = useState<any[]>([]);
 
+  // اللجان
   const [committees, setCommittees] = useState([
     { 
       id: 'design', 
@@ -151,31 +189,6 @@ export default function AdminDashboard() {
     fetchCloudData();
   }, []);
 
-  const handleAddBanner = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bannerTitle.trim()) return;
-    const newBanner = {
-      id: Date.now().toString(),
-      tag: bannerTag || 'مناسبة خاصة',
-      title: bannerTitle,
-      image: bannerImage || '/header-banner.png',
-      buttonText: 'اكتشف النادي',
-      buttonLink: '/discover'
-    };
-    const updatedBanners = [newBanner, ...banners];
-    setBanners(updatedBanners);
-    localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
-    setBannerTag('');
-    setBannerTitle('');
-    alert('تم إضافة وتفعيل البانر بنجاح في الواجهة الرئيسية!');
-  };
-
-  const handleDeleteBanner = (id: string) => {
-    const updatedBanners = banners.filter(b => b.id !== id);
-    setBanners(updatedBanners);
-    localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
-  };
-
   const handleAcceptRequest = async (id: string) => {
     try {
       const docRef = doc(db, 'applications', id);
@@ -195,7 +208,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // 💾 زر الـ Submit لحفظ قادة اللجنة سحابياً
   const handleSaveLeadersSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -214,7 +226,6 @@ export default function AdminDashboard() {
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('');
 
-  // 💾 زر الـ Submit لإضافة عضو جديد للجنة
   const handleAddMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemberName.trim()) return;
@@ -266,7 +277,7 @@ export default function AdminDashboard() {
           </span>
           <div>
             <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض</h1>
-            <p className="text-xs text-slate-500">عدل البيانات واضغط زر الحفظ (Submit) لتتزامن فوراً</p>
+            <p className="text-xs text-slate-500">إدارة الفعاليات والبانرات والقادة والأعضاء</p>
           </div>
         </div>
 
@@ -284,7 +295,7 @@ export default function AdminDashboard() {
           {[
             { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
             { id: 'banners', label: '🖼️ إدارة البانرات (الهيدر)' },
-            { id: 'team', label: '👥 إدارة القادة والأعضاء (مع زر Submit)' },
+            { id: 'team', label: '👥 إدارة القادة والأعضاء' },
             { id: 'requests', label: '📥 طلبات الانضمام (Firebase)' },
           ].map((tab) => (
             <button
@@ -353,7 +364,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">مسار البوستر</label>
+                  <label className="text-xs font-bold text-slate-600">مسار البوستر (مثال: /logo.png)</label>
                   <input
                     type="text"
                     placeholder="مثال: /logo.png"
@@ -366,7 +377,7 @@ export default function AdminDashboard() {
                 <div className="sm:col-span-2">
                   <button
                     type="submit"
-                    className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 transition-all"
+                    className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 transition-all cursor-pointer"
                   >
                     + نشر الفعالية في الموقع
                   </button>
@@ -399,7 +410,7 @@ export default function AdminDashboard() {
                         <td className="py-4 text-left pl-2">
                           <button
                             onClick={() => handleDeleteEvent(ev.id)}
-                            className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100"
+                            className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                           >
                             حذف
                           </button>
@@ -442,7 +453,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">مسار صورة البانر</label>
+                  <label className="text-xs font-bold text-slate-600">مسار صورة البانر (مثال: /header-banner.png)</label>
                   <input
                     type="text"
                     placeholder="مثال: /header-banner.png"
@@ -455,7 +466,7 @@ export default function AdminDashboard() {
                 <div className="sm:col-span-2">
                   <button
                     type="submit"
-                    className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 transition-all"
+                    className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 transition-all cursor-pointer"
                   >
                     + إضافة وتفعيل البانر في الواجهة
                   </button>
@@ -484,7 +495,7 @@ export default function AdminDashboard() {
                         <td className="py-4 text-left pl-2">
                           <button
                             onClick={() => handleDeleteBanner(ban.id)}
-                            className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100"
+                            className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                           >
                             حذف
                           </button>
@@ -515,7 +526,7 @@ export default function AdminDashboard() {
                   <button
                     key={com.id}
                     onClick={() => setSelectedCommitteeId(com.id)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       selectedCommitteeId === com.id
                         ? 'bg-[#630517] text-[#F5D061] shadow'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -527,7 +538,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* نموذج تعديل القادة مع زر Submit واضح */}
             <form onSubmit={handleSaveLeadersSubmit} className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
                 <h3 className="text-xl font-black text-slate-900">إدارة قادة {currentCommittee.name}</h3>
@@ -563,7 +573,6 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* زر الحفظ الصريح */}
               <div>
                 <button
                   type="submit"
@@ -574,7 +583,6 @@ export default function AdminDashboard() {
               </div>
             </form>
 
-            {/* جدول الأعضاء */}
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة</h4>
               {(!currentCommittee.members || currentCommittee.members.length === 0) ? (
@@ -598,7 +606,7 @@ export default function AdminDashboard() {
                             <button
                               type="button"
                               onClick={() => handleDeleteMember(idx)}
-                              className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100"
+                              className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                             >
                               حذف
                             </button>
@@ -671,14 +679,14 @@ export default function AdminDashboard() {
                           <button
                             type="button"
                             onClick={() => handleAcceptRequest(req.id)}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100"
+                            className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
                           >
                             قبول
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteRequest(req.id)}
-                            className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100"
+                            className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                           >
                             رفض
                           </button>
