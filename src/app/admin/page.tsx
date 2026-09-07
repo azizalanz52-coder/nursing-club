@@ -8,7 +8,7 @@ import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners' | 'discover'>('discover');
+  const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners' | 'discover' | 'passion'>('passion');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -18,7 +18,51 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
-  // إدارة صور "اكتشف النادي" (مضافة بأمان بدون المساس بكودك الأصلي)
+  // إدارة صور وعبارات "شغف، عطاء، واحترافية"
+  const defaultPassionSlides = [
+    { id: 1, image: '/header-banner.png', quote: 'التمريض ليس مجرد مهنة، بل هو فن وعِلم يلامس حياة الإنسان في أصعب لحظاته.' },
+    { id: 2, image: '/logo.png', quote: 'بالعطاء المستمر والعمل الجماعي نصنع أثراً يخلده الزمن في قلوب المجتمع.' },
+    { id: 3, image: '/header-banner.png', quote: 'نطمح لأن نكون المنارة التي تضيء دروب التميز لكل ممرض وممرضة في جامعة حفر الباطن.' }
+  ];
+
+  const [passionSlides, setPassionSlides] = useState(defaultPassionSlides);
+  const [newPassionQuote, setNewPassionQuote] = useState('');
+  const [newPassionImage, setNewPassionImage] = useState('/header-banner.png');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('UHB_PASSION_SLIDES');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.length > 0) setPassionSlides(parsed);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
+  const handleAddPassionSlide = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newSlide = {
+      id: Date.now(),
+      image: newPassionImage,
+      quote: newPassionQuote || 'شغف، عطاء، واحترافية في خدمة المجتمع.'
+    };
+    const updated = [...passionSlides, newSlide];
+    setPassionSlides(updated);
+    localStorage.setItem('UHB_PASSION_SLIDES', JSON.stringify(updated));
+    setNewPassionQuote('');
+    setNewPassionImage('/header-banner.png');
+    alert('تم إضافة الصورة والعبارة بنجاح إلى بطاقة شغف وعطاء!');
+  };
+
+  const handleDeletePassionSlide = (id: number) => {
+    const updated = passionSlides.filter(s => s.id !== id);
+    setPassionSlides(updated);
+    localStorage.setItem('UHB_PASSION_SLIDES', JSON.stringify(updated));
+  };
+
+  // إدارة صور وفعاليات "اكتشف النادي"
   const defaultDiscoverEvents = [
     {
       id: 1,
@@ -361,6 +405,7 @@ export default function AdminDashboard() {
 
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {[
+            { id: 'passion', label: '✨ إدارة بطاقة "شغف وعطاء"' },
             { id: 'discover', label: '🖼️ إدارة صور "اكتشف النادي"' },
             { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
             { id: 'banners', label: '🖼️ إدارة البانرات (الهيدر)' },
@@ -380,6 +425,69 @@ export default function AdminDashboard() {
             </button>
           ))}
         </div>
+
+        {activeTab === 'passion' && (
+          <div className="space-y-8">
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+              <h3 className="text-xl font-black text-slate-900">إدارة صور وعبارات بطاقة "شغف، عطاء، واحترافية"</h3>
+              <p className="text-xs text-slate-500">أضف صوراً من جهازك مع المقولة لتتبدل تلقائياً بشكل عشوائي ومتحرك داخل البطاقة.</p>
+              
+              <form onSubmit={handleAddPassionSlide} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">اختر صورة السلايدر من جهازك</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setNewPassionImage(URL.createObjectURL(e.target.files[0]));
+                      }
+                    }}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">المقولة أو العبارة الترويجية</label>
+                  <textarea
+                    rows={2}
+                    placeholder="اكتب العبارة التي ستظهر فوق الصورة..."
+                    value={newPassionQuote}
+                    onChange={(e) => setNewPassionQuote(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <button
+                    type="submit"
+                    className="bg-[#630517] text-[#F5D061] px-6 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 cursor-pointer"
+                  >
+                    + إضافة الشريحة المتحركة للبطاقة
+                  </button>
+                </div>
+              </form>
+
+              <div className="space-y-4">
+                <h4 className="font-extrabold text-slate-900 text-sm">الشرائح الحالية ({passionSlides.length})</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {passionSlides.map((slide) => (
+                    <div key={slide.id} className="relative h-44 rounded-2xl overflow-hidden border border-slate-200 group shadow-sm bg-slate-900">
+                      <img src={slide.image} alt="شريحة" className="w-full h-full object-cover opacity-50" />
+                      <div className="absolute inset-0 p-4 flex flex-col justify-between z-10 text-white text-xs">
+                        <p className="font-bold line-clamp-3 text-[#F5D061]">{slide.quote}</p>
+                        <button
+                          onClick={() => handleDeletePassionSlide(slide.id)}
+                          className="self-end bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-black shadow cursor-pointer"
+                        >
+                          حذف
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {activeTab === 'discover' && (
           <div className="space-y-8">
