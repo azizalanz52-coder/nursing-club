@@ -170,14 +170,14 @@ export default function JoinPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-black text-black mb-1.5">البريد الإلكتروني / الجامعي</label>
+                <label className="block text-sm font-black text-black mb-1.5">البريد الإلكتروني / </label>
                 <input
                   type="email"
                   name="email"
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="name@student.uhb.edu.sa"
+                  placeholder="name@gmail.com"
                   autoComplete="off"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-black font-medium focus:ring-2 focus:ring-rose-900 focus:outline-none text-sm placeholder:text-slate-400 bg-white"
                 />
