@@ -2,200 +2,94 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
 
-const defaultCommitteesDetails: Record<string, any> = {
-  design: {
-    id: 'design',
-    name: 'لجنة التصميم',
-    description: 'مسؤولة عن الهوية البصرية، تصميم البوسترات، وتجهيز المحتوى المرئي لفعاليات النادي.',
-    icon: '🎨',
-    maleLeader: 'عبدالعزيز العنزي',
-    femaleLeader: 'شهد المرواني',
-    members: [
-      { name: 'سارة محمد', role: 'مصممة جرافيك', status: 'نشط' },
-      { name: 'عمر خالد', role: 'مصمم موشن جرافيك', status: 'نشط' },
-      { name: 'فاطمة أحمد', role: 'مسؤولة الهوية البصرية', status: 'نشط' },
-    ]
-  },
-  media: {
-    id: 'media',
-    name: 'لجنة الإعلام',
-    description: 'إدارة منصات التواصل الاجتماعي، التغطيات الحية، وصناعة المحتوى الإعلامي المرئي والمكتوب.',
-    icon: '📸',
-    maleLeader: 'راشد السبيعي',
-    femaleLeader: 'ريم الشمري',
-    members: [
-      { name: 'فيصل السعيد', role: 'مصور ميداني', status: 'نشط' },
-      { name: 'أمل القحطاني', role: 'كاتبة محتوى', status: 'نشط' },
-    ]
-  },
-  pr: {
-    id: 'pr',
-    name: 'لجنة العلاقات العامة',
-    description: 'بناء الشراكات، استقبال الضيوف، والتنسيق الفعّال بين النادي والجهات الخارجية.',
-    icon: '🌐',
-    maleLeader: 'خالد القحطاني',
-    femaleLeader: 'ديمة العتيبي',
-    members: [
-      { name: 'تركي الشمري', role: 'منسق علاقات', status: 'نشط' },
-    ]
-  },
-  quality: {
-    id: 'quality',
-    name: 'لجنة الجودة والتطوير',
-    description: 'مراجعة وتقييم الأداء، قياس رضا الأعضاء، وتقديم مقترحات تحسين العمل المؤسسي.',
-    icon: '📊',
-    maleLeader: 'سلطان الحربي',
-    femaleLeader: 'نورة الدوسري',
-    members: [
-      { name: 'بشاير العنزي', role: 'مختصة قياس أداء', status: 'نشط' },
-    ]
-  },
-  scientific: {
-    id: 'scientific',
-    name: 'لجنة المحتوى العلمي',
-    description: 'إعداد ومراجعة المطويات الطبية، تنظيم المحاضرات التخصصية، ودعم الأنشطة الأكاديمية.',
-    icon: '🔬',
-    maleLeader: 'فهد المطيري',
-    femaleLeader: 'أفنان العنزي',
-    members: [
-      { name: 'عبدالله المطيري', role: 'باحث ومراجع علمي', status: 'نشط' },
-    ]
-  },
-  hr: {
-    id: 'hr',
-    name: 'لجنة الموارد البشرية',
-    description: 'إدارة شؤون الأعضاء، متابعة الانضمام، وتنظيم تقييمات الأداء والتحفيز.',
-    icon: '👥',
-    maleLeader: 'تركي العنزي',
-    femaleLeader: 'سارة الرشيدي',
-    members: [
-      { name: 'مها السبيعي', role: 'منسقة أعضاء', status: 'نشط' },
-    ]
-  },
-  'events-org': {
-    id: 'events-org',
-    name: 'لجنة التنظيم والفعاليات',
-    description: 'التخطيط الميداني للفعاليات، إدارة الحشود، والتنسيق اللوجستي للورش والملتقيات.',
-    icon: '📅',
-    maleLeader: 'فيصل الدوسري',
-    femaleLeader: 'غادة العمري',
-    members: [
-      { name: 'سلطان الدوسري', role: 'منسق ميداني', status: 'نشط' },
-    ]
-  },
-};
+// البيانات الافتراضية للجان السبع
+const defaultCommitteesData = [
+  { id: 'design', name: 'لجنة التصميم', description: 'الهوية البصرية، تصميم البوسترات، والمحتوى المرئي.', icon: '🎨', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شهد المرواني' },
+  { id: 'media', name: 'لجنة الإعلام', description: 'منصات التواصل، التغطيات الحية، وصناعة المحتوى.', icon: '📸', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري' },
+  { id: 'pr', name: 'لجنة العلاقات العامة', description: 'بناء الشراكات، استقبال الضيوف، والتنسيق الخارجي.', icon: '🌐', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي' },
+  { id: 'quality', name: 'لجنة الجودة والتطوير', description: 'تقييم الأداء، قياس رضا الأعضاء، وتحسين العمل.', icon: '📊', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري' },
+  { id: 'scientific', name: 'لجنة المحتوى العلمي', description: 'المطويات الطبية، المحاضرات، والدعم الأكاديمي.', icon: '🔬', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي' },
+  { id: 'hr', name: 'لجنة الموارد البشرية', description: 'إدارة الأعضاء، المتابعة، والتقييم والتحفيز.', icon: '👥', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي' },
+  { id: 'events-org', name: 'لجنة التنظيم والفعاليات', description: 'التخطيط الميداني، إدارة الحشود، والفعاليات.', icon: '📅', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري' },
+];
 
-export default function CommitteeDetailPage() {
-  const params = useParams();
-  const id = (params?.id as string) || 'design';
-  
-  const [committee, setCommittee] = useState<any>(defaultCommitteesDetails[id] || defaultCommitteesDetails['design']);
+export default function TeamPage() {
+  const [committees, setCommittees] = useState(defaultCommitteesData);
 
   useEffect(() => {
-    // جلب التعديلات المحفوظة من لوحة التحكم (localStorage)
+    // قراءة التعديلات المحدثة من لوحة التحكم تلقائياً
     const savedCommittees = localStorage.getItem('UHB_COMMITTEES_DATA');
     if (savedCommittees) {
       try {
         const parsedArray = JSON.parse(savedCommittees);
-        const found = parsedArray.find((c: any) => c.id === id);
-        if (found) {
-          // دمج الأوصاف والأيقونات الثابتة مع التعديلات الحية للقادة والأعضاء
-          const baseDetails = defaultCommitteesDetails[id] || {};
-          setCommittee({
-            ...baseDetails,
-            maleLeader: found.maleLeader,
-            femaleLeader: found.femaleLeader,
-            members: found.members.map((m: any) => ({
-              name: m.name,
-              role: m.role || m.task || 'عضو',
-              status: m.status || 'نشط'
-            }))
+        if (parsedArray && parsedArray.length > 0) {
+          // دمج الأسماء المحدثة للقادة مع البيانات الثابتة للأيقونات والأوصاف
+          const updated = defaultCommitteesData.map(comm => {
+            const found = parsedArray.find((c: any) => c.id === comm.id);
+            if (found) {
+              return {
+                ...comm,
+                maleLeader: found.maleLeader,
+                femaleLeader: found.femaleLeader,
+              };
+            }
+            return comm;
           });
+          setCommittees(updated);
         }
       } catch (e) {
-        console.error('Error loading committee data from storage:', e);
+        console.error('Error loading committees for team page:', e);
       }
     }
-  }, [id]);
+  }, []);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         
         <div className="flex justify-between items-center">
-          <Link href="/team" className="text-sm font-bold text-[#630517] hover:underline flex items-center gap-1">
-            ← العودة لجميع اللجان
+          <Link href="/" className="text-sm font-bold text-[#630517] hover:underline flex items-center gap-1">
+            ← العودة للرئيسية
           </Link>
           <span className="px-4 py-1 rounded-full bg-[#630517]/10 text-[#630517] text-xs font-extrabold tracking-wider uppercase border border-[#630517]/20">
-            بوابة الأعضاء والقادة
+            نادي التمريض • UHB
           </span>
         </div>
 
-        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-[#630517]/10 border border-[#630517]/20 flex items-center justify-center text-3xl shadow-sm">
-              {committee.icon}
-            </div>
-            <div>
-              <h1 className="text-3xl font-black text-slate-900">{committee.name}</h1>
-              <p className="text-slate-600 text-sm mt-1">{committee.description}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100 text-xs">
-            <div className="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200/80">
-              <span className="text-slate-400 font-bold">قائد الطلاب:</span>
-              <span className="font-extrabold text-slate-900 text-sm">{committee.maleLeader}</span>
-            </div>
-            <div className="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200/80">
-              <span className="text-slate-400 font-bold">قائدة الطالبات:</span>
-              <span className="font-extrabold text-slate-900 text-sm">{committee.femaleLeader}</span>
-            </div>
-          </div>
+        <div className="text-center max-w-3xl mx-auto space-y-3">
+          <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">لجان نادي التمريض السبع</h1>
+          <p className="text-slate-600 text-base">اضغط على أي لجنة لاستعراض أعضائها وقادتها والانضمام إليها مباشرة.</p>
         </div>
 
-        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-black text-slate-900">أعضاء {committee.name}</h2>
-              <p className="text-xs text-slate-500 mt-1">قائمة المنتسبين والمنضمين رسمياً لهذه اللجنة</p>
-            </div>
-            <span className="px-3 py-1 bg-[#630517] text-[#F5D061] rounded-xl text-xs font-bold shadow">
-              {committee.members?.length || 0} أعضاء
-            </span>
-          </div>
+        {/* شبكة اللجان (قابلة للضغط) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {committees.map((committee) => (
+            <Link
+              key={committee.id}
+              href={`/team/${committee.id}`}
+              className="bg-white rounded-3xl border border-slate-200 p-7 shadow-lg shadow-slate-100 flex flex-col justify-between space-y-6 hover:shadow-xl hover:border-[#630517]/50 hover:scale-[1.02] transition-all cursor-pointer group"
+            >
+              <div className="space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#630517]/10 border border-[#630517]/20 flex items-center justify-center text-2xl group-hover:bg-[#630517] group-hover:text-[#F5D061] transition-all">
+                  {committee.icon}
+                </div>
+                <h3 className="text-xl font-black text-slate-900 group-hover:text-[#630517] transition-colors">{committee.name}</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">{committee.description}</p>
+              </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-400 text-xs font-bold">
-                  <th className="pb-3 pr-4">اسم العضو</th>
-                  <th className="pb-3">المهمة / الدور</th>
-                  <th className="pb-3">الحالة</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {committee.members?.map((m: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-slate-50/80 transition-all">
-                    <td className="py-4 pr-4 font-bold text-slate-900 flex items-center gap-2">
-                      <span className="w-8 h-8 rounded-full bg-[#630517]/10 text-[#630517] flex items-center justify-center text-xs font-black">
-                        {m.name ? m.name.charAt(0) : 'ع'}
-                      </span>
-                      {m.name}
-                    </td>
-                    <td className="py-4 text-slate-600 font-medium">{m.role}</td>
-                    <td className="py-4">
-                      <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                        {m.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              <div className="pt-4 border-t border-slate-100 space-y-2 text-xs">
+                <div className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/60">
+                  <span className="text-slate-400 font-bold">قائد الطلاب:</span>
+                  <span className="font-extrabold text-slate-900">{committee.maleLeader}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/60">
+                  <span className="text-slate-400 font-bold">قائدة الطالبات:</span>
+                  <span className="font-extrabold text-slate-900">{committee.femaleLeader}</span>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
 
       </div>
