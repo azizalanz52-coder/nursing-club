@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-// البيانات الافتراضية للجان السبع
 const defaultCommitteesData = [
   { id: 'design', name: 'لجنة التصميم', description: 'الهوية البصرية، تصميم البوسترات، والمحتوى المرئي.', icon: '🎨', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شهد المرواني' },
   { id: 'media', name: 'لجنة الإعلام', description: 'منصات التواصل، التغطيات الحية، وصناعة المحتوى.', icon: '📸', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري' },
@@ -18,30 +17,35 @@ export default function TeamPage() {
   const [committees, setCommittees] = useState(defaultCommitteesData);
 
   useEffect(() => {
-    // قراءة التعديلات المحدثة من لوحة التحكم تلقائياً
-    const savedCommittees = localStorage.getItem('UHB_COMMITTEES_DATA');
-    if (savedCommittees) {
-      try {
-        const parsedArray = JSON.parse(savedCommittees);
-        if (parsedArray && parsedArray.length > 0) {
-          // دمج الأسماء المحدثة للقادة مع البيانات الثابتة للأيقونات والأوصاف
-          const updated = defaultCommitteesData.map(comm => {
-            const found = parsedArray.find((c: any) => c.id === comm.id);
-            if (found) {
-              return {
-                ...comm,
-                maleLeader: found.maleLeader,
-                femaleLeader: found.femaleLeader,
-              };
-            }
-            return comm;
-          });
-          setCommittees(updated);
+    const loadSavedData = () => {
+      const savedCommittees = localStorage.getItem('UHB_COMMITTEES_DATA');
+      if (savedCommittees) {
+        try {
+          const parsedArray = JSON.parse(savedCommittees);
+          if (parsedArray && parsedArray.length > 0) {
+            const updated = defaultCommitteesData.map(comm => {
+              const found = parsedArray.find((c: any) => c.id === comm.id);
+              if (found) {
+                return {
+                  ...comm,
+                  maleLeader: found.maleLeader || comm.maleLeader,
+                  femaleLeader: found.femaleLeader || comm.femaleLeader,
+                };
+              }
+              return comm;
+            });
+            setCommittees(updated);
+          }
+        } catch (e) {
+          console.error(e);
         }
-      } catch (e) {
-        console.error('Error loading committees for team page:', e);
       }
-    }
+    };
+
+    loadSavedData();
+    // الاستماع لأي تحديث يحدث في التخزين المحلي
+    window.addEventListener('storage', loadSavedData);
+    return () => window.removeEventListener('storage', loadSavedData);
   }, []);
 
   return (
@@ -62,7 +66,6 @@ export default function TeamPage() {
           <p className="text-slate-600 text-base">اضغط على أي لجنة لاستعراض أعضائها وقادتها والانضمام إليها مباشرة.</p>
         </div>
 
-        {/* شبكة اللجان (قابلة للضغط) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {committees.map((committee) => (
             <Link
