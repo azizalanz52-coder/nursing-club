@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const router = useRouter();
@@ -13,6 +14,9 @@ export default function LoginPage() {
     e.preventDefault();
     if (phone) {
       localStorage.setItem("userPhone", phone);
+    }
+    if (name) {
+      localStorage.setItem("userName", name);
     }
     router.push("/");
     router.refresh();
@@ -27,10 +31,22 @@ export default function LoginPage() {
             بوابة الأعضاء
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-[#FFFDF7]">تسجيل الدخول</h1>
-          <p className="text-amber-50/70 text-xs sm:text-sm">أدخل رقم الجوال وكلمة المرور للمتابعة</p>
+          <p className="text-amber-50/70 text-xs sm:text-sm">أدخل الاسم، رقم الجوال، وكلمة المرور للمتابعة</p>
         </div>
 
-        <form onSubmit={handleDirectLogin} className="space-y-5">
+        <form onSubmit={handleDirectLogin} className="space-y-4">
+          <div className="space-y-1.5 text-right">
+            <label className="text-xs sm:text-sm font-bold text-[#F5D061]">الاسم الكامل</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="عبدالعزيز العنزي"
+              className="w-full px-4 py-3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] text-sm"
+              required
+            />
+          </div>
+
           <div className="space-y-1.5 text-right">
             <label className="text-xs sm:text-sm font-bold text-[#F5D061]">رقم الجوال</label>
             <input
