@@ -95,6 +95,7 @@ export default function CommitteeDetailPage() {
   const baseDetails = defaultCommitteesDetails[id] || defaultCommitteesDetails['design'];
   
   const [committee, setCommittee] = useState<any>(baseDetails);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchCloudCommittee = async () => {
@@ -112,6 +113,8 @@ export default function CommitteeDetailPage() {
         }
       } catch (err) {
         console.error('Error fetching single committee from cloud:', err);
+      } finally {
+        setLoading(false);
       }
     };
 
