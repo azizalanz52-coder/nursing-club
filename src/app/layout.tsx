@@ -32,29 +32,32 @@ export default function RootLayout({
           <main className="min-h-screen bg-[#4A030F] flex items-center justify-center px-4 relative overflow-hidden fixed inset-0 z-50" dir="rtl">
             
             {/* البوكس الزجاجي الداخلي */}
-            <div className="max-w-md w-full bg-[#35020A]/80 backdrop-blur-xl border border-[#F5D061]/20 p-8 rounded-3xl shadow-2xl text-center space-y-6 text-white relative z-10 flex flex-col items-center">
+            <div className="max-w-md w-full bg-[#35020A]/85 backdrop-blur-xl border border-[#F5D061]/30 p-8 rounded-3xl shadow-2xl text-center space-y-6 text-white relative z-10 flex flex-col items-center">
               
               {/* حاوية الشعار مع المربعات الددوارة */}
-              <div className="relative w-24 h-24 flex items-center justify-center my-2">
+              <div className="relative w-32 h-32 flex items-center justify-center my-2">
                 {/* المربع الدوار الأول */}
-                <div className="absolute inset-0 border-2 border-[#F5D061]/60 rounded-2xl animate-[spin_6s_linear_infinite] shadow-lg"></div>
+                <div className="absolute inset-0 border-2 border-[#F5D061]/60 rounded-3xl animate-[spin_6s_linear_infinite] shadow-lg"></div>
                 {/* المربع الدوار الثاني بعكس الاتجاه */}
-                <div className="absolute inset-[-6px] border border-[#F5D061]/30 rounded-3xl animate-[spin_10s_linear_infinite_reverse]"></div>
+                <div className="absolute inset-[-6px] border border-[#F5D061]/30 rounded-[28px] animate-[spin_10s_linear_infinite_reverse]"></div>
                 
-                {/* مربع الشعار بلون أفتح وحيوي في المنتصف */}
-                <div className="relative w-16 h-16 bg-gradient-to-br from-[#7A0619] to-[#5A0412] border-2 border-[#F5D061] rounded-xl flex items-center justify-center shadow-xl overflow-hidden">
+                {/* مربع أبيض ناصع بخلفية فاخرة ليظهر الشعار بكامل وضوحه */}
+                <div className="relative w-24 h-24 bg-white border-2 border-[#F5D061] rounded-2xl flex flex-col items-center justify-center shadow-2xl overflow-hidden p-2">
                   <Image
                     src="/logo.png"
                     alt="شعار نادي التمريض"
-                    width={38}
-                    height={38}
-                    className="object-contain drop-shadow-md"
+                    width={55}
+                    height={55}
+                    className="object-contain drop-shadow"
                   />
+                  <span className="text-[9px] font-black text-[#630517] tracking-tighter mt-1">
+                    NURSING CLUB
+                  </span>
                 </div>
               </div>
 
               {/* شارة جاري تجهيز التجربة */}
-              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#5A0412] border border-[#F5D061]/30 text-[#F5D061] text-xs font-bold tracking-wider uppercase shadow-inner">
+              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#5A0412] border border-[#F5D061]/40 text-[#F5D061] text-xs font-bold tracking-wider uppercase shadow-inner">
                 <span>✨</span>
                 <span>جاري تجهيز التجربة</span>
               </div>
