@@ -1,129 +1,65 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
+import React from 'react';
 import Link from 'next/link';
 
-export default function EventsPreview() {
-  const [eventsList, setEventsList] = useState([
+export default function CommitteesPreview() {
+  const committees = [
     {
-      id: '1',
-      title: "حملة التوعية الصحية",
-      date: "2026/10/15",
-      location: "جامعة حفر الباطن",
-      status: "upcoming",
-      poster: "/header-banner.png",
-      description: "حملة توعوية صحية شاملة لمنسوبي وزوار الجامعة."
+      title: 'لجان التنظيم والفعاليات',
+      description: 'تنظيم الملتقيات، الورش، والأنشطة الميدانية للنادي بكفاءة واحترافية عالية.',
+      icon: '🎯'
     },
     {
-      id: '2',
-      title: "ورشة مهارات التمريض",
-      date: "2026/11/05",
-      location: "كلية التمريض",
-      status: "upcoming",
-      poster: "/header-banner.png",
-      description: "ورشة عمل تفاعلية لأحدث المهارات الإكلينيكية والتمريضية."
+      title: 'اللجنة العلمية والثقافية',
+      description: 'إعداد المحتوى العلمي، المحاضرات التثقيفية، وبرامج التطوير الأكاديمي.',
+      icon: '📚'
     },
     {
-      id: '3',
-      title: "اليوم العالمي للتمريض",
-      date: "2026/12/01",
-      location: "جامعة حفر الباطن",
-      status: "upcoming",
-      poster: "/header-banner.png",
-      description: "احتفالية سنوية لتكريم وتقدير جهود مهنة التمريض العظيمة."
-    },
-  ]);
-
-  useEffect(() => {
-    const savedEvents = localStorage.getItem('UHB_EVENTS');
-    if (savedEvents) {
-      try {
-        const parsed = JSON.parse(savedEvents);
-        if (parsed && parsed.length > 0) {
-          setEventsList(parsed.slice(0, 3));
-        }
-      } catch (e) {
-        console.error(e);
-      }
+      title: 'لجنة العلاقات العامة والإعلام',
+      description: 'إدارة منصات التواصل، التغطيات الإعلامية، وبناء الشراكات المجتمعية.',
+      icon: '🤝'
     }
-  }, []);
+  ];
 
   return (
-    <section className="py-20 bg-[#630517] text-white" dir="rtl">
+    <section className="py-20 bg-slate-50 text-slate-800" dir="rtl">
       <div className="max-w-7xl mx-auto px-6">
-
-        <div className="flex flex-col md:flex-row justify-between items-center mb-16 gap-4">
-          <div className="space-y-3 text-center md:text-right">
-            <span className="px-4 py-1.5 rounded-full bg-[#F5D061]/20 text-[#F5D061] text-xs font-black tracking-widest uppercase border border-[#F5D061]/30">
-              أنشطة وفعاليات النادي
-            </span>
-            <h2 className="text-4xl sm:text-5xl font-black tracking-tight text-white">
-              الفعاليات القادمة
-            </h2>
-            <p className="text-slate-200 text-sm sm:text-base">
-              تابع أحدث الملتقيات، الورش، والحملات الميدانية لنادي التمريض بجامعة حفر الباطن.
-            </p>
-          </div>
-
-          <Link
-            href="/events"
-            className="px-6 py-3 rounded-2xl bg-[#F5D061] text-[#630517] font-black text-xs sm:text-sm shadow-lg hover:brightness-110 transition-all"
-          >
-            عرض كل الفعاليات ←
-          </Link>
+        
+        <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
+          <span className="inline-block px-4 py-1.5 rounded-full bg-[#630517]/10 text-[#630517] text-xs font-black tracking-widest uppercase border border-[#630517]/20">
+            هيكل النادي
+          </span>
+          <h2 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">
+            لجان نادي التمريض
+          </h2>
+          <p className="text-slate-600 text-sm sm:text-base">
+            تعرف على اللجان التنظيمية التي تدير وتنسق مختلف أنشطة وبرامج النادي.
+          </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          {eventsList.map((event, index) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {committees.map((comm, index) => (
             <div
-              key={event.id || index}
-              className="relative rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between group min-h-[380px] bg-slate-900 border border-[#F5D061]/30 transition-all hover:scale-[1.02]"
+              key={index}
+              className="bg-white p-8 rounded-3xl shadow-xl border border-slate-200/80 flex flex-col justify-between space-y-6 hover:border-[#630517]/40 hover:shadow-2xl transition-all group"
             >
-              <div className="absolute inset-0 z-0">
-                <Image
-                  src={event.poster || "/header-banner.png"}
-                  alt={event.title}
-                  fill
-                  className="object-cover opacity-40 group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-slate-900/40" />
-              </div>
-
-              <div className="relative z-10 p-6 flex justify-end">
-                <span className={`px-4 py-1.5 rounded-full text-xs font-black shadow-lg ${
-                  event.status === 'upcoming' || event.status === 'قريباً' 
-                    ? 'bg-[#F5D061] text-slate-950' 
-                    : 'bg-slate-800 text-slate-200 border border-slate-700'
-                }`}>
-                  {event.status === 'upcoming' || event.status === 'قريباً' ? '⏱️ قريبًا' : '✓ انتهت'}
-                </span>
-              </div>
-
-              <div className="relative z-10 p-6 space-y-4 flex-1 flex flex-col justify-end">
-                <div className="space-y-2">
-                  <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-[#F5D061] transition-colors line-clamp-1">
-                    {event.title}
-                  </h3>
-                  {event.description && (
-                    <p className="text-slate-300 text-xs sm:text-sm line-clamp-2 leading-relaxed">
-                      {event.description}
-                    </p>
-                  )}
+              <div className="space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-[#630517]/10 flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform">
+                  {comm.icon}
                 </div>
-
-                <div className="pt-3 border-t border-white/10 space-y-2 text-xs font-bold text-slate-200">
-                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
-                    <span>📍</span>
-                    <span className="truncate">{event.location}</span>
-                  </div>
-                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
-                    <span>📆</span>
-                    <span className="truncate">{event.date}</span>
-                  </div>
-                </div>
+                <h3 className="text-2xl font-black text-slate-900 group-hover:text-[#630517] transition-colors">
+                  {comm.title}
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed">
+                  {comm.description}
+                </p>
               </div>
 
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-[#630517]">
+                <span>انضم إلينا</span>
+                <span>←</span>
+              </div>
             </div>
           ))}
         </div>
