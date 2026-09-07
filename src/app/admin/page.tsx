@@ -8,7 +8,7 @@ import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('discover');
+  const [activeTab, setActiveTab] = useState<string>('discover');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -24,9 +24,9 @@ export default function AdminDashboard() {
     { id: 3, image: '/header-banner.png', quote: '«نطمح لأن نكون المنارة التي تضيء دروب التميز لكل ممرض وممرضة في جامعة حفر الباطن.»' }
   ];
 
-  const [passionSlides, setPassionSlides] = useState(defaultPassionSlides);
-  const [newPassionQuote, setNewPassionQuote] = useState('');
-  const [newPassionImage, setNewPassionImage] = useState('/header-banner.png');
+  const [passionSlides, setPassionSlides] = useState<any[]>(defaultPassionSlides);
+  const [newPassionQuote, setNewPassionQuote] = useState<string>('');
+  const [newPassionImage, setNewPassionImage] = useState<string>('/header-banner.png');
 
   useEffect(() => {
     const saved = localStorage.getItem('UHB_PASSION_SLIDES');
@@ -40,7 +40,7 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  const handleAddPassionSlide = (e: any) => {
+  const handleAddPassionSlide = (e: React.FormEvent) => {
     e.preventDefault();
     const newSlide = {
       id: Date.now(),
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
     alert('تم إضافة الشريحة بنجاح!');
   };
 
-  const handleDeletePassionSlide = (id: any) => {
+  const handleDeletePassionSlide = (id: number) => {
     const updated = passionSlides.filter((s: any) => s.id !== id);
     setPassionSlides(updated);
     localStorage.setItem('UHB_PASSION_SLIDES', JSON.stringify(updated));
@@ -78,13 +78,13 @@ export default function AdminDashboard() {
     }
   ];
 
-  const [discoverEvents, setDiscoverEvents] = useState(defaultDiscoverEvents);
-  const [selectedEventId, setSelectedEventId] = useState(1);
+  const [discoverEvents, setDiscoverEvents] = useState<any[]>(defaultDiscoverEvents);
+  const [selectedEventId, setSelectedEventId] = useState<number>(1);
 
-  const [newDiscTitle, setNewDiscTitle] = useState('');
-  const [newDiscCategory, setNewDiscCategory] = useState('أنشطة كبرى');
-  const [newDiscDesc, setNewDiscDesc] = useState('');
-  const [newDiscImages, setNewDiscImages] = useState<any[]>([]);
+  const [newDiscTitle, setNewDiscTitle] = useState<string>('');
+  const [newDiscCategory, setNewDiscCategory] = useState<string>('أنشطة كبرى');
+  const [newDiscDesc, setNewDiscDesc] = useState<string>('');
+  const [newDiscImages, setNewDiscImages] = useState<string[]>([]);
 
   useEffect(() => {
     const savedDiscover = localStorage.getItem('UHB_DISCOVER_EVENTS');
@@ -98,15 +98,15 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  const handleSelectMultipleImagesForNewEvent = (e: any) => {
+  const handleSelectMultipleImagesForNewEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
-      const urls = filesArray.map((file: any) => URL.createObjectURL(file));
-      setNewDiscImages((prev: any) => [...prev, ...urls]);
+      const urls = filesArray.map((file: File) => URL.createObjectURL(file));
+      setNewDiscImages((prev: string[]) => [...prev, ...urls]);
     }
   };
 
-  const handleCreateNewDiscoverEvent = (e: any) => {
+  const handleCreateNewDiscoverEvent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDiscTitle.trim()) {
       alert('يرجى كتابة عنوان الفعالية.');
@@ -129,10 +129,10 @@ export default function AdminDashboard() {
     alert('تم إنشاء الفعالية وإضافة الصور بنجاح إلى المعرض!');
   };
 
-  const handleAddMultipleImagesToExistingEvent = (e: any) => {
+  const handleAddMultipleImagesToExistingEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
-      const urls = filesArray.map((file: any) => URL.createObjectURL(file));
+      const urls = filesArray.map((file: File) => URL.createObjectURL(file));
 
       const updated = discoverEvents.map((ev: any) => {
         if (ev.id === selectedEventId) {
@@ -147,10 +147,10 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleRemoveImageFromEvent = (imgIndex: any) => {
+  const handleRemoveImageFromEvent = (imgIndex: number) => {
     const updated = discoverEvents.map((ev: any) => {
       if (ev.id === selectedEventId) {
-        const newImages = ev.images.filter((_: any, idx: any) => idx !== imgIndex);
+        const newImages = ev.images.filter((_: any, idx: number) => idx !== imgIndex);
         return { ...ev, images: newImages.length > 0 ? newImages : ['/logo.png'] };
       }
       return ev;
@@ -160,7 +160,7 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_DISCOVER_EVENTS', JSON.stringify(updated));
   };
 
-  const handleDeleteEntireDiscoverEvent = (id: any) => {
+  const handleDeleteEntireDiscoverEvent = (id: number) => {
     if (confirm('هل أنت متأكد من حذف هذه الفعالية بالكامل من المعرض؟')) {
       const updated = discoverEvents.filter((ev: any) => ev.id !== id);
       setDiscoverEvents(updated);
@@ -170,7 +170,7 @@ export default function AdminDashboard() {
 
   const currentEditedEvent = discoverEvents.find((ev: any) => ev.id === selectedEventId) || discoverEvents[0];
 
-  const [events, setEvents] = useState([
+  const [events, setEvents] = useState<any[]>([
     {
       id: '1',
       title: 'ملتقى التمريض التفاعلي 2026',
@@ -182,14 +182,14 @@ export default function AdminDashboard() {
     }
   ]);
 
-  const [newTitle, setNewTitle] = useState('');
-  const [newDate, setNewDate] = useState('');
-  const [newLocation, setNewLocation] = useState('');
-  const [newStatus, setNewStatus] = useState('upcoming');
-  const [newPoster, setNewPoster] = useState('/header-banner.png');
-  const [newDesc, setNewDesc] = useState('');
+  const [newTitle, setNewTitle] = useState<string>('');
+  const [newDate, setNewDate] = useState<string>('');
+  const [newLocation, setNewLocation] = useState<string>('');
+  const [newStatus, setNewStatus] = useState<string>('upcoming');
+  const [newPoster, setNewPoster] = useState<string>('/header-banner.png');
+  const [newDesc, setNewDesc] = useState<string>('');
 
-  const handleAddEvent = (e: any) => {
+  const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
       alert('يرجى كتابة عنوان الفعالية.');
@@ -215,13 +215,13 @@ export default function AdminDashboard() {
     alert('تم نشر الفعالية وحفظها بنجاح!');
   };
 
-  const handleDeleteEvent = (id: any) => {
+  const handleDeleteEvent = (id: string) => {
     const updatedEvents = events.filter((ev: any) => ev.id !== id);
     setEvents(updatedEvents);
     localStorage.setItem('UHB_EVENTS', JSON.stringify(updatedEvents));
   };
 
-  const [banners, setBanners] = useState([
+  const [banners, setBanners] = useState<any[]>([
     {
       id: '1',
       tag: 'نادي التمريض • جامعة حفر الباطن',
@@ -232,11 +232,11 @@ export default function AdminDashboard() {
     }
   ]);
 
-  const [bannerTag, setBannerTag] = useState('');
-  const [bannerTitle, setBannerTitle] = useState('');
-  const [bannerImage, setBannerImage] = useState('/header-banner.png');
+  const [bannerTag, setBannerTag] = useState<string>('');
+  const [bannerTitle, setBannerTitle] = useState<string>('');
+  const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
 
-  const handleAddBanner = (e: any) => {
+  const handleAddBanner = (e: React.FormEvent) => {
     e.preventDefault();
     if (!bannerTitle.trim()) {
       alert('يرجى كتابة عنوان البانر.');
@@ -259,7 +259,7 @@ export default function AdminDashboard() {
     alert('تم إضافة وتفعيل البانر بنجاح في الواجهة الرئيسية!');
   };
 
-  const handleDeleteBanner = (id: any) => {
+  const handleDeleteBanner = (id: string) => {
     const updatedBanners = banners.filter((b: any) => b.id !== id);
     setBanners(updatedBanners);
     localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
@@ -267,7 +267,7 @@ export default function AdminDashboard() {
 
   const [requests, setRequests] = useState<any[]>([]);
 
-  const [committees, setCommittees] = useState([
+  const [committees, setCommittees] = useState<any[]>([
     { 
       id: 'design', 
       name: 'التصميم', 
@@ -287,7 +287,7 @@ export default function AdminDashboard() {
     { id: 'quality', name: 'الجودة والتطوير', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري', members: [] },
   ]);
 
-  const [selectedCommitteeId, setSelectedCommitteeId] = useState('design');
+  const [selectedCommitteeId, setSelectedCommitteeId] = useState<string>('design');
   const currentCommittee = committees.find((c: any) => c.id === selectedCommitteeId) || committees[0];
 
   useEffect(() => {
@@ -336,7 +336,7 @@ export default function AdminDashboard() {
     fetchCloudData();
   }, []);
 
-  const handleAcceptRequest = async (id: any) => {
+  const handleAcceptRequest = async (id: string) => {
     try {
       const docRef = doc(db, 'applications', id);
       await updateDoc(docRef, { status: 'تم القبول ✓' });
@@ -346,7 +346,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteRequest = async (id: any) => {
+  const handleDeleteRequest = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'applications', id));
       setRequests(requests.filter((req: any) => req.id !== id));
@@ -355,7 +355,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSaveLeadersSubmit = async (e: any) => {
+  const handleSaveLeadersSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await setDoc(doc(db, 'committees', selectedCommitteeId), {
@@ -370,10 +370,10 @@ export default function AdminDashboard() {
     }
   };
 
-  const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberRole, setNewMemberRole] = useState('');
+  const [newMemberName, setNewMemberName] = useState<string>('');
+  const [newMemberRole, setNewMemberRole] = useState<string>('');
 
-  const handleAddMemberSubmit = async (e: any) => {
+  const handleAddMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemberName.trim()) return;
 
@@ -395,7 +395,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteMember = async (index: any) => {
+  const handleDeleteMember = async (index: number) => {
     const updatedMembers = [...(currentCommittee.members || [])];
     updatedMembers.splice(index, 1);
 
@@ -579,7 +579,7 @@ export default function AdminDashboard() {
 
                 {newDiscImages.length > 0 && (
                   <div className="sm:col-span-2 grid grid-cols-4 sm:grid-cols-6 gap-3 pt-2">
-                    {newDiscImages.map((img: any, idx: any) => (
+                    {newDiscImages.map((img: any, idx: number) => (
                       <div key={idx} className="h-20 rounded-xl overflow-hidden border border-slate-200 relative bg-slate-100">
                         <img src={img} alt="معاينة" className="w-full h-full object-cover" />
                       </div>
@@ -642,7 +642,7 @@ export default function AdminDashboard() {
               <div className="space-y-4">
                 <h4 className="font-extrabold text-slate-900 text-sm">الصور الحالية للفعالية ({currentEditedEvent.images.length})</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                  {currentEditedEvent.images.map((img: any, idx: any) => (
+                  {currentEditedEvent.images.map((img: any, idx: number) => (
                     <div key={idx} className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 group bg-slate-100 shadow-sm">
                       <img src={img} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
                       <button
@@ -972,7 +972,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {currentCommittee.members.map((m: any, idx: any) => (
+                      {currentCommittee.members.map((m: any, idx: number) => (
                         <tr key={idx} className="hover:bg-slate-50">
                           <td className="py-3 pr-2 font-bold text-slate-900">{m.name}</td>
                           <td className="py-3 text-slate-600">{m.role}</td>
