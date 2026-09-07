@@ -125,15 +125,6 @@ export default function EventsPreview() {
                     <span>{event.date}</span>
                   </div>
                 </div>
-
-                <div className="pt-2">
-                  <Link
-                    href="/events"
-                    className="block w-full text-center bg-slate-100 hover:bg-[#630517] hover:text-[#F5D061] text-slate-700 py-2.5 rounded-xl font-bold text-xs transition-all border border-slate-200"
-                  >
-                    التفاصيل في صفحة الفعاليات
-                  </Link>
-                </div>
               </div>
 
             </div>
