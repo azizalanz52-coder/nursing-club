@@ -911,7 +911,7 @@ export default function AdminDashboard() {
 
             <form onSubmit={handleSaveLeadersSubmit} className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                <h3 className="text-xl font-black text-slate-900">إدارة قادة لجنة {currentCommittee.name}</h3>
+                <h3 className="text-xl font-black text-slate-900">إدارة قادة {currentCommittee.name}</h3>
                 <span className="text-xs bg-[#630517]/10 text-[#630517] font-bold px-3 py-1 rounded-full">
                   {(currentCommittee.members || []).length} أعضاء
                 </span>
