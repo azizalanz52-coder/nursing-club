@@ -51,7 +51,6 @@ export default function DiscoverPage() {
   const [discoverEvents, setDiscoverEvents] = useState(DEFAULT_DISCOVER_EVENTS);
   const [selectedEvent, setSelectedEvent] = useState<typeof DEFAULT_DISCOVER_EVENTS[0] | null>(null);
 
-  // السلايدر التلقائي لبطاقة شغف وعطاء
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % passionSlides.length);
@@ -59,7 +58,6 @@ export default function DiscoverPage() {
     return () => clearInterval(timer);
   }, [passionSlides.length]);
 
-  // جلب البيانات المخزنة من لوحة التحكم
   useEffect(() => {
     const savedPassion = localStorage.getItem('UHB_PASSION_SLIDES');
     if (savedPassion) {
@@ -87,7 +85,6 @@ export default function DiscoverPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       
-      {/* شريط عنوان الصفحة */}
       <div className="py-14 bg-white border-b border-slate-200 text-center px-4 shadow-sm">
         <span className="inline-block px-4 py-1.5 rounded-full bg-[#630517]/10 border border-[#630517]/20 text-[#630517] text-xs font-extrabold tracking-widest uppercase mb-3">
           استكشف عالمنا
@@ -96,7 +93,6 @@ export default function DiscoverPage() {
         <p className="text-slate-600 text-sm sm:text-base mt-2">تعرف على رؤيتنا، أنشطتنا، وشركاء النجاح</p>
       </div>
 
-      {/* 1. قسم الإحصائيات */}
       <section className="py-12 bg-[#630517] text-white border-b border-[#F5D061]/20 shadow-md">
         <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <div className="space-y-2">
@@ -118,7 +114,6 @@ export default function DiscoverPage() {
         </div>
       </section>
 
-      {/* 2. نبذة ورؤية النادي + بطاقة شغف عطاء واحترافية المتحركة بالصور */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           
@@ -144,12 +139,10 @@ export default function DiscoverPage() {
             </div>
           </div>
 
-          {/* بطاقة شغف، عطاء، واحترافية (مع صور السلايدر المتحركة والأوفرلاي) */}
           <div className="relative">
             <div className="absolute inset-0 bg-[#630517]/10 rounded-3xl blur-2xl transform rotate-3" />
             <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200 min-h-[380px] flex flex-col justify-between text-white p-8 sm:p-10">
               
-              {/* خلفية الصورة المتحركة مع أوفرلاي فخم */}
               <div className="absolute inset-0 z-0">
                 <img
                   src={activeSlide.image}
@@ -159,17 +152,15 @@ export default function DiscoverPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/70 to-slate-950/40" />
               </div>
 
-              {/* الشعار بالأعلى */}
               <div className="relative z-10 flex justify-between items-center">
-                <div className="w-14 h-14 bg-[#630517] text-[#F5D061] rounded-2xl flex items-center justify-center font-black text-xl shadow-lg border border-[#F5D061]/30">
-                  UHB
+                <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl p-2 flex items-center justify-center shadow-lg border border-white/20 overflow-hidden">
+                  <img src="/logo.png" alt="شعار النادي" className="w-full h-full object-contain" />
                 </div>
                 <span className="text-xs px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#F5D061] font-bold border border-white/10">
                   شغف، عطاء، واحترافية
                 </span>
               </div>
 
-              {/* النص والمقولة */}
               <div className="relative z-10 space-y-3 text-center my-6">
                 <h3 className="text-2xl sm:text-3xl font-black text-white">نادي التمريض</h3>
                 <p className="text-amber-50 text-sm sm:text-base leading-relaxed font-semibold transition-opacity duration-700">
@@ -177,7 +168,6 @@ export default function DiscoverPage() {
                 </p>
               </div>
 
-              {/* نقاط المؤشر وتذييل البطاقة */}
               <div className="relative z-10 space-y-3">
                 <div className="flex justify-center gap-2">
                   {passionSlides.map((_, idx) => (
@@ -199,7 +189,6 @@ export default function DiscoverPage() {
         </div>
       </section>
 
-      {/* 3. معرض الصور والأنشطة (مع سحب الصور المرفوعة من لوحة التحكم) */}
       <section className="py-20 bg-slate-100/70 border-t border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -243,7 +232,6 @@ export default function DiscoverPage() {
         </div>
       </section>
 
-      {/* النافذة المنبثقة (Modal) لعرض صور الفعالية بالكامل */}
       {selectedEvent && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
@@ -299,7 +287,6 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      {/* 4. شركاء النجاح */}
       <section className="py-16 border-t border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-10">
           <div className="space-y-3">
@@ -322,7 +309,6 @@ export default function DiscoverPage() {
         </div>
       </section>
 
-      {/* زر العودة للرئيسية */}
       <div className="py-12 text-center bg-slate-50 border-t border-slate-200">
         <Link
           href="/"
