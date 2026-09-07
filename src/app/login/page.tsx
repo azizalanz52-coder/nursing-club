@@ -2,19 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const router = useRouter();
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("تسجيل دخول:", { phone, password });
-    
-    // توجيه المستخدم للصفحة الرئيسية بشكل طبيعي
-    router.push("/");
+    // الانتقال المباشر عبر المتصفح لضمان فتح الصفحة فوراً
+    window.location.href = "/";
   };
 
   return (
