@@ -15,9 +15,9 @@ export const metadata = {
     statusBarStyle: 'default',
   },
   icons: {
-    icon: '/nursing-icon.png',
-    shortcut: '/nursing-icon.png',
-    apple: '/nursing-icon.png',
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
   },
 }
 
