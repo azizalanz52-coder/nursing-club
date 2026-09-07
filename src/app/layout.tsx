@@ -37,18 +37,18 @@ export default function RootLayout({
               {/* حاوية الشعار مع المربعات الددوارة */}
               <div className="relative w-24 h-24 flex items-center justify-center my-2">
                 {/* المربع الدوار الأول */}
-                <div className="absolute inset-0 border border-[#F5D061]/40 rounded-2xl animate-[spin_6s_linear_infinite]"></div>
+                <div className="absolute inset-0 border-2 border-[#F5D061]/60 rounded-2xl animate-[spin_6s_linear_infinite] shadow-lg"></div>
                 {/* المربع الدوار الثاني بعكس الاتجاه */}
-                <div className="absolute inset-[-6px] border border-[#F5D061]/20 rounded-3xl animate-[spin_10s_linear_infinite_reverse]"></div>
+                <div className="absolute inset-[-6px] border border-[#F5D061]/30 rounded-3xl animate-[spin_10s_linear_infinite_reverse]"></div>
                 
-                {/* مربع الشعار الثابت في المنتصف */}
-                <div className="relative w-16 h-16 bg-[#5A0412] border border-[#F5D061]/60 rounded-xl flex items-center justify-center shadow-inner overflow-hidden">
+                {/* مربع الشعار بلون أفتح وحيوي في المنتصف */}
+                <div className="relative w-16 h-16 bg-gradient-to-br from-[#7A0619] to-[#5A0412] border-2 border-[#F5D061] rounded-xl flex items-center justify-center shadow-xl overflow-hidden">
                   <Image
                     src="/logo.png"
                     alt="شعار نادي التمريض"
                     width={38}
                     height={38}
-                    className="object-contain drop-shadow"
+                    className="object-contain drop-shadow-md"
                   />
                 </div>
               </div>
