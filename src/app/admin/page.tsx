@@ -18,6 +18,7 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
+  // الفعاليات
   const [events, setEvents] = useState([
     {
       id: '1',
@@ -27,15 +28,6 @@ export default function AdminDashboard() {
       status: 'upcoming',
       poster: '/logo.png',
       description: 'ملتقى يهدف إلى استعراض أحدث الممارسات في التمريض وورش عمل تفاعلية.'
-    },
-    {
-      id: '2',
-      title: 'حملة التوعية بالسكري',
-      date: '15 مايو 2026',
-      location: 'المجمع التجاري - حفر الباطن',
-      status: 'past',
-      poster: '/logo.png',
-      description: 'حملة ميدانية استهدفت التوعية بأخطار السكري وتقديم فحوصات مجانية.'
     }
   ]);
 
@@ -74,6 +66,7 @@ export default function AdminDashboard() {
     localStorage.setItem('UHB_EVENTS', JSON.stringify(updatedEvents));
   };
 
+  // البانرات
   const [banners, setBanners] = useState([
     {
       id: '1',
@@ -89,9 +82,10 @@ export default function AdminDashboard() {
   const [bannerTitle, setBannerTitle] = useState('');
   const [bannerImage, setBannerImage] = useState('/header-banner.png');
 
+  // طلبات الانضمام
   const [requests, setRequests] = useState<any[]>([]);
 
-  // اللجان
+  // اللجان (سحابي)
   const [committees, setCommittees] = useState([
     { id: 'design', name: 'لجنة التصميم', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي', members: [] },
     { id: 'media', name: 'لجنة الإعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
@@ -195,8 +189,8 @@ export default function AdminDashboard() {
     }
   };
 
-  // زر الحفظ الصريح (Submit) للقادة
-  const handleSaveLeaders = async (e: React.FormEvent) => {
+  // 💾 زر الـ Submit الصريح لحفظ وتحديث قادة اللجان سحابياً
+  const handleSaveLeadersSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await setDoc(doc(db, 'committees', selectedCommitteeId), {
@@ -204,17 +198,18 @@ export default function AdminDashboard() {
         femaleLeader: currentCommittee.femaleLeader,
         members: currentCommittee.members || []
       }, { merge: true });
-      alert(`تم حفظ تعديلات ${currentCommittee.name} سحابياً بنجاح! ستظهر الآن على جميع الأجهزة.`);
+      alert(`تم حفظ وتحديث قادة "${currentCommittee.name}" سحابياً بنجاح! ستظهر الآن فوراً على جميع الأجهزة.`);
     } catch (err) {
       console.error('Error saving leaders:', err);
-      alert('حدث خطأ أثناء الحفظ.');
+      alert('حدث خطأ أثناء الاتصال بقاعدة البيانات.');
     }
   };
 
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('');
 
-  const handleAddMember = async (e: React.FormEvent) => {
+  // 💾 زر الـ Submit الصريح لإضافة عضو جديد للجنة
+  const handleAddMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemberName.trim()) return;
 
@@ -233,6 +228,7 @@ export default function AdminDashboard() {
       alert('تم إضافة العضو وحفظه سحابياً بنجاح!');
     } catch (err) {
       console.error(err);
+      alert('حدث خطأ أثناء حفظ العضو.');
     }
   };
 
@@ -264,8 +260,8 @@ export default function AdminDashboard() {
             UHB
           </span>
           <div>
-            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (حفظ يدوي سحابي)</h1>
-            <p className="text-xs text-slate-500">عدل واضغط زر الحفظ لتتزامن البيانات مع جميع الأجهزة</p>
+            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (مع أزرار الحفظ الصريحة)</h1>
+            <p className="text-xs text-slate-500">عدل واضغط زر الحفظ (Submit) لتتزامن البيانات مع جميع الأجهزة</p>
           </div>
         </div>
 
@@ -283,7 +279,7 @@ export default function AdminDashboard() {
           {[
             { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
             { id: 'banners', label: '🖼️ إدارة البانرات (الهيدر)' },
-            { id: 'team', label: '👥 إدارة القادة والأعضاء (مع زر حفظ)' },
+            { id: 'team', label: '👥 إدارة القادة والأعضاء (مع زر Submit)' },
             { id: 'requests', label: '📥 طلبات الانضمام (Firebase)' },
           ].map((tab) => (
             <button
@@ -526,8 +522,8 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* نموذج تعديل القادة مع زر Submit صريح */}
-            <form onSubmit={handleSaveLeaders} className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+            {/* نموذج قادة اللجان مع زر Submit صريح */}
+            <form onSubmit={handleSaveLeadersSubmit} className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
                 <h3 className="text-xl font-black text-slate-900">إدارة قادة {currentCommittee.name}</h3>
                 <span className="text-xs bg-[#630517]/10 text-[#630517] font-bold px-3 py-1 rounded-full">
@@ -562,18 +558,18 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* زر الحفظ (Submit) الصريح للقادة */}
+              {/* زر الـ Submit الصريح لحفظ القادة */}
               <div>
                 <button
                   type="submit"
-                  className="bg-[#630517] text-[#F5D061] px-6 py-2.5 rounded-xl font-black text-xs shadow hover:brightness-110 transition-all"
+                  className="bg-[#630517] text-[#F5D061] px-6 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 transition-all"
                 >
-                  💾 حفظ التغييرات (قادة اللجنة)
+                  💾 حفظ التغييرات سحابياً (قادة اللجنة)
                 </button>
               </div>
             </form>
 
-            {/* إدارة أعضاء اللجنة */}
+            {/* إدارة أعضاء اللجنة مع زر Submit للإضافة */}
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة</h4>
               {(!currentCommittee.members || currentCommittee.members.length === 0) ? (
@@ -609,7 +605,7 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              <form onSubmit={handleAddMember} className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
+              <form onSubmit={handleAddMemberSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
                 <input
                   type="text"
                   placeholder="اسم العضو الجديد"
@@ -628,7 +624,7 @@ export default function AdminDashboard() {
                   type="submit"
                   className="bg-[#630517] text-[#F5D061] py-2.5 rounded-xl font-bold text-xs shadow hover:brightness-110"
                 >
-                  + إضافة عضو وحفظه
+                  + إضافة عضو وحفظه سحابياً
                 </button>
               </form>
             </div>
