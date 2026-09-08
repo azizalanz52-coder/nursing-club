@@ -3,7 +3,7 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { db } from '../../lib/firebase';
+import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 
 interface PassionSlide {
@@ -153,12 +153,14 @@ export default function AdminDashboard() {
 
   // Fetch Cloud & Local Data on Mount
   useEffect(() => {
-    // Local storage items
+    // Local storage items with safe typing
     const savedEvents = localStorage.getItem('UHB_EVENTS');
     if (savedEvents) {
       try {
         const parsed = JSON.parse(savedEvents);
-        if (parsed && parsed.length > 0) setEvents(parsed);
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+          setEvents(parsed as EventItem[]);
+        }
       } catch (e) {
         console.error(e);
       }
@@ -168,7 +170,9 @@ export default function AdminDashboard() {
     if (savedBanners) {
       try {
         const parsed = JSON.parse(savedBanners);
-        if (parsed && parsed.length > 0) setBanners(parsed);
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+          setBanners(parsed as BannerItem[]);
+        }
       } catch (e) {
         console.error(e);
       }
