@@ -5,10 +5,41 @@ import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
+const DEFAULT_EVENTS = [
+  {
+    id: '1',
+    title: 'ملتقى التمريض التفاعلي 2026',
+    date: '25 سبتمبر 2026',
+    location: 'مسرح جامعة حفر الباطن',
+    status: 'upcoming',
+    poster: '/header-banner.png',
+    description: 'ملتقى يهدف إلى استعراض أحدث الممارسات في التمريض وورش عمل تفاعلية.'
+  },
+  {
+    id: '2',
+    title: 'حملة التوعية بالسكري',
+    date: '15 مايو 2026',
+    location: 'المجمع التجاري - حفر الباطن',
+    status: 'past',
+    poster: '/header-banner.png',
+    description: 'حملة ميدانية استهدفت التوعية بأخطار السكري وتقديم فحوصات مجانية.'
+  },
+  {
+    id: '3',
+    title: 'اليوم العالمي للتمريض',
+    date: '01 ديسمبر 2026',
+    location: 'جامعة حفر الباطن',
+    status: 'upcoming',
+    poster: '/header-banner.png',
+    description: 'احتفالية سنوية لتكريم وتقدير جهود مهنة التمريض العظيمة.'
+  }
+];
+
 export default function EventsPage() {
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState(DEFAULT_EVENTS);
 
+  // Fetch Cloud Events from Firebase Firestore
   useEffect(() => {
     const fetchCloudEvents = async () => {
       try {
@@ -18,9 +49,9 @@ export default function EventsPage() {
           eventsSnap.forEach((d) => {
             eventsList.push({ id: d.id, ...d.data() });
           });
-          setEvents(eventsList);
-        } else {
-          setEvents([]);
+          if (eventsList.length > 0) {
+            setEvents(eventsList);
+          }
         }
       } catch (err) {
         console.error('Error fetching cloud events:', err);
@@ -77,7 +108,7 @@ export default function EventsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredEvents.length === 0 ? (
             <div className="col-span-full py-16 text-center text-slate-400 text-sm bg-white rounded-3xl border border-slate-200">
-              لا توجد فعاليات مطابقة مضافة من لوحة التحكم حالياً.
+              لا توجد فعاليات مطابقة حالياً.
             </div>
           ) : (
             filteredEvents.map((ev, index) => (
@@ -125,7 +156,7 @@ export default function EventsPage() {
                       <span>📍</span>
                       <span className="truncate">{ev.location}</span>
                     </div>
-                    <div className="flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-white/20 shadow-inner">
+                    <div className="flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-white/20 shadow-inner text-xs font-bold text-slate-200">
                       <span>📅</span>
                       <span className="truncate">{ev.date}</span>
                     </div>
