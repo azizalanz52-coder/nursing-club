@@ -4,7 +4,7 @@ import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 
 interface PassionSlide {
@@ -44,6 +44,7 @@ interface CommitteeMember {
   name: string;
   role: string;
   status: string;
+  phone?: string;
 }
 
 interface Committee {
@@ -259,7 +260,7 @@ export default function AdminDashboard() {
     fetchCloudData();
   }, []);
 
-// --- Excel Import Handler ---
+  // --- Excel Import Handler ---
   const handleExcelImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -273,7 +274,7 @@ export default function AdminDashboard() {
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
 
-        console.log("Excel Raw Data:", data); // اطبع بيانات الإكسل كاملة للتأكد
+        console.log("Excel Raw Data:", data);
 
         if (!data || data.length < 2) {
           alert('الملف فارغ أو لا يحتوي على بيانات.');
@@ -285,8 +286,6 @@ export default function AdminDashboard() {
 
         for (const row of rows) {
           if (!row || row.length === 0) continue;
-
-          console.log("Current Row:", row); // اطبع كل صف عشان نشوف أي عمود فيه الاسم
 
           const fullName = String(row[1] || '').trim(); 
           const phone = String(row[2] || '').trim();    
@@ -573,18 +572,65 @@ export default function AdminDashboard() {
   const handleConfirmAcceptRequest = async () => {
     if (!selectedRequestId) return;
     try {
+      const targetRequest = requests.find((req) => req.id === selectedRequestId);
+      if (!targetRequest) {
+        alert('لم يتم العثور على بيانات المتقدم.');
+        return;
+      }
+
       const docRef = doc(db, 'applications', selectedRequestId);
       await updateDoc(docRef, { 
         status: 'مقبول',
         acceptedCommittee: acceptedCommittee,
         whatsappLink: whatsappLink 
       });
+
+      let targetCommitteeId = 'design';
+      if (acceptedCommittee.includes('تصميم')) targetCommitteeId = 'design';
+      else if (acceptedCommittee.includes('إعلام') || acceptedCommittee.includes('الاعلام')) targetCommitteeId = 'media';
+      else if (acceptedCommittee.includes('فعاليات')) targetCommitteeId = 'events-org';
+      else if (acceptedCommittee.includes('الموارد')) targetCommitteeId = 'hr';
+      else if (acceptedCommittee.includes('العلاقات')) targetCommitteeId = 'pr';
+      else if (acceptedCommittee.includes('العلمي')) targetCommitteeId = 'scientific';
+      else if (acceptedCommittee.includes('الجودة')) targetCommitteeId = 'quality';
+
+      const commDocRef = doc(db, 'committees', targetCommitteeId);
+      const commSnap = await getDoc(commDocRef);
+      
+      let existingMembers: CommitteeMember[] = [];
+      let maleLeader = 'قائد الطلاب';
+      let femaleLeader = 'قائدة الطالبات';
+
+      if (commSnap.exists()) {
+        const commData = commSnap.data();
+        existingMembers = commData.members || [];
+        maleLeader = commData.maleLeader || maleLeader;
+        femaleLeader = commData.femaleLeader || femaleLeader;
+      }
+
+      const newMemberObj: CommitteeMember = {
+        name: targetRequest.fullName,
+        role: targetRequest.major || 'عضو منضم',
+        status: 'نشط',
+        phone: targetRequest.phone || ''
+      };
+
+      const isAlreadyMember = existingMembers.some((m: CommitteeMember) => m.name === newMemberObj.name);
+      const updatedMembers = isAlreadyMember ? existingMembers : [...existingMembers, newMemberObj];
+
+      await setDoc(commDocRef, {
+        maleLeader,
+        femaleLeader,
+        members: updatedMembers
+      }, { merge: true });
+
       setRequests(requests.map((req) => req.id === selectedRequestId ? { ...req, status: 'مقبول', acceptedCommittee, whatsappLink } : req));
       setShowAcceptModal(false);
       setWhatsappLink('');
-      alert('تم قبول العضو بنجاح وإضافة رابط الواتساب!');
+      alert(`تم قبول العضو وإضافته تلقائياً إلى (${acceptedCommittee}) بنجاح! 🚀`);
     } catch (err) {
       console.error(err);
+      alert('حدث خطأ أثناء قبول العضو وإضافته تلقائياً.');
     }
   };
 
