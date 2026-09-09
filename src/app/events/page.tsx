@@ -2,62 +2,63 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { db } from '../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+
+const DEFAULT_EVENTS = [
+  {
+    id: '1',
+    title: 'ملتقى التمريض التفاعلي 2026',
+    date: '25 سبتمبر 2026',
+    location: 'مسرح جامعة حفر الباطن',
+    status: 'upcoming',
+    poster: '/header-banner.png',
+    description: 'ملتقى يهدف إلى استعراض أحدث الممارسات في التمريض وورش عمل تفاعلية.'
+  },
+  {
+    id: '2',
+    title: 'حملة التوعية بالسكري',
+    date: '15 مايو 2026',
+    location: 'المجمع التجاري - حفر الباطن',
+    status: 'past',
+    poster: '/header-banner.png',
+    description: 'حملة ميدانية استهدفت التوعية بأخطار السكري وتقديم فحوصات مجانية.'
+  },
+  {
+    id: '3',
+    title: 'اليوم العالمي للتمريض',
+    date: '01 ديسمبر 2026',
+    location: 'جامعة حفر الباطن',
+    status: 'upcoming',
+    poster: '/header-banner.png',
+    description: 'احتفالية سنوية لتكريم وتقدير جهود مهنة التمريض العظيمة.'
+  }
+];
 
 export default function EventsPage() {
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
-  
-  const defaultEvents = [
-    {
-      id: '1',
-      title: 'ملتقى التمريض التفاعلي 2026',
-      date: '25 سبتمبر 2026',
-      location: 'مسرح جامعة حفر الباطن',
-      status: 'upcoming',
-      poster: '/header-banner.png',
-      description: 'ملتقى يهدف إلى استعراض أحدث الممارسات في التمريض وورش عمل تفاعلية.'
-    },
-    {
-      id: '2',
-      title: 'حملة التوعية بالسكري',
-      date: '15 مايو 2026',
-      location: 'المجمع التجاري - حفر الباطن',
-      status: 'past',
-      poster: '/header-banner.png',
-      description: 'حملة ميدانية استهدفت التوعية بأخطار السكري وتقديم فحوصات مجانية.'
-    },
-    {
-      id: '3',
-      title: 'اليوم العالمي للتمريض',
-      date: '01 ديسمبر 2026',
-      location: 'جامعة حفر الباطن',
-      status: 'upcoming',
-      poster: '/header-banner.png',
-      description: 'احتفالية سنوية لتكريم وتقدير جهود مهنة التمريض العظيمة.'
-    }
-  ];
+  const [events, setEvents] = useState(DEFAULT_EVENTS);
 
-  const [events, setEvents] = useState(defaultEvents);
-
+  // Fetch Cloud Events from Firebase Firestore
   useEffect(() => {
-    const saved = localStorage.getItem('UHB_EVENTS');
-    if (saved) {
+    const fetchCloudEvents = async () => {
       try {
-        const parsed = JSON.parse(saved);
-        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          // تصفية قاطعة لمنع أي تكرار بناءً على العنوان أو المعرف
-          const uniqueMap = new Map();
-          parsed.forEach(ev => {
-            const key = ev.title?.trim() || ev.id;
-            if (key && !uniqueMap.has(key)) {
-              uniqueMap.set(key, ev);
-            }
+        const eventsSnap = await getDocs(collection(db, 'site_events'));
+        if (!eventsSnap.empty) {
+          const eventsList: any[] = [];
+          eventsSnap.forEach((d) => {
+            eventsList.push({ id: d.id, ...d.data() });
           });
-          setEvents(Array.from(uniqueMap.values()));
+          if (eventsList.length > 0) {
+            setEvents(eventsList);
+          }
         }
-      } catch (e) {
-        console.error(e);
+      } catch (err) {
+        console.error('Error fetching cloud events:', err);
       }
-    }
+    };
+
+    fetchCloudEvents();
   }, []);
 
   const filteredEvents = events.filter(ev => {
@@ -67,7 +68,7 @@ export default function EventsPage() {
   });
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
+    <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12 pt-28" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         
         <div className="flex justify-between items-center">
