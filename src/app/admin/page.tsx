@@ -259,7 +259,7 @@ export default function AdminDashboard() {
     fetchCloudData();
   }, []);
 
-  // --- Excel Import Handler ---
+// --- Excel Import Handler ---
   const handleExcelImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -267,13 +267,13 @@ export default function AdminDashboard() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const buffer = evt.target?.result;
+        const wb = XLSX.read(buffer, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
 
-        if (data.length < 2) {
+        if (!data || data.length < 2) {
           alert('الملف فارغ أو لا يحتوي على بيانات.');
           return;
         }
@@ -319,7 +319,7 @@ export default function AdminDashboard() {
         alert('حدث خطأ أثناء قراءة ملف الأكسل.');
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   // --- Passion Slides Cloud Handlers ---
