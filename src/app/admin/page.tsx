@@ -273,6 +273,8 @@ export default function AdminDashboard() {
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
 
+        console.log("Excel Raw Data:", data); // اطبع بيانات الإكسل كاملة للتأكد
+
         if (!data || data.length < 2) {
           alert('الملف فارغ أو لا يحتوي على بيانات.');
           return;
@@ -284,19 +286,18 @@ export default function AdminDashboard() {
         for (const row of rows) {
           if (!row || row.length === 0) continue;
 
-          // مطابقة دقيقة حسب ترتيب أعمدة جدولك:
-          const fullName = String(row[1] || '').trim(); // العمود B: الاسم الثلاثي
-          const phone = String(row[2] || '').trim();    // العمود C: رقم الهاتف
-          const universityId = String(row[3] || '').trim(); // العمود D: الرقم الجامعي
-          const major = String(row[4] || 'تمريض').trim();  // العمود E: المستوى الدراسي / التخصص
-          const firstChoice = String(row[5] || 'غير متوفر').trim(); // العمود F: الرغبة الأولى
-          const secondChoice = String(row[6] || 'غير متوفر').trim(); // العمود G: الرغبة الثانية
-          const thirdChoice = String(row[7] || 'غير متوفر').trim(); // العمود H: الرغبة الثالثة
+          console.log("Current Row:", row); // اطبع كل صف عشان نشوف أي عمود فيه الاسم
 
-          // نتخطى الصفوف الفارغة أو صفوف التجربة (مثل الصف الثاني اللي فيه نقاط)
+          const fullName = String(row[1] || '').trim(); 
+          const phone = String(row[2] || '').trim();    
+          const universityId = String(row[3] || '').trim(); 
+          const major = String(row[4] || 'تمريض').trim();  
+          const firstChoice = String(row[5] || 'غير متوفر').trim(); 
+          const secondChoice = String(row[6] || 'غير متوفر').trim(); 
+          const thirdChoice = String(row[7] || 'غير متوفر').trim(); 
+
           if (!fullName || fullName === '..' || fullName === '.' || fullName.length < 3) continue;
 
-          // استخدام الرقم الجامعي كمعرف فريد، وإذا لم يوجد يتم توليد معرف عشوائي
           const reqId = universityId.length > 5 ? universityId : `req_${Date.now()}_${Math.random()}`;
 
           const reqObj = {
@@ -315,7 +316,7 @@ export default function AdminDashboard() {
           count++;
         }
 
-        alert(`تم استيراد ${count} متقدماً بنجاح إلى السحابة بالترتيب الصحيح!`);
+        alert(`تم استيراد ${count} متقدماً بنجاح إلى السحابة!`);
         window.location.reload();
       } catch (err) {
         console.error('Error importing excel:', err);
