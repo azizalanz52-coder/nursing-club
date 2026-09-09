@@ -151,6 +151,10 @@ export default function AdminDashboard() {
   const [acceptedCommittee, setAcceptedCommittee] = useState<string>('لجنة التصميم');
   const [whatsappLink, setWhatsappLink] = useState<string>('');
 
+  // فلاتر طلبات الانضمام
+  const [requestSubTab, setRequestSubTab] = useState<'all' | 'accepted' | 'by-preference'>('all');
+  const [selectedCommitteeFilter, setSelectedCommitteeFilter] = useState<string>('لجنة التصميم');
+
   const [committees, setCommittees] = useState<Committee[]>([
     { 
       id: 'design', 
@@ -337,6 +341,7 @@ export default function AdminDashboard() {
     }
   };
 
+  // استيراد الأكسل مع منع التكرار تماماً بناءً على الرقم الجامعي أو رقم الجوال
   const handleExcelImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -356,7 +361,19 @@ export default function AdminDashboard() {
         }
 
         const rows = data.slice(1);
-        let count = 0;
+        let addedCount = 0;
+        let skippedCount = 0;
+
+        // جلب الموجودين حالياً بالسحابة لضمان عدم التكرار
+        const existingDocsSnap = await getDocs(collection(db, 'applications'));
+        const existingPhones = new Set();
+        const existingUnivIds = new Set();
+        
+        existingDocsSnap.forEach((d) => {
+          const dat = d.data();
+          if (dat.phone) existingPhones.add(String(dat.phone).trim());
+          if (dat.universityId) existingUnivIds.add(String(dat.universityId).trim());
+        });
 
         for (const row of rows) {
           if (!row || row.length === 0) continue;
@@ -370,6 +387,12 @@ export default function AdminDashboard() {
           const thirdChoice = String(row[7] || 'غير متوفر').trim(); 
 
           if (!fullName || fullName === '..' || fullName === '.' || fullName.length < 3) continue;
+
+          // التحقق من التكرار (إذا الرقم الجامعي أو الجوال مكرر، يتم تخطيه لتفادي التكرار)
+          if ((universityId && existingUnivIds.has(universityId)) || (phone && existingPhones.has(phone))) {
+            skippedCount++;
+            continue;
+          }
 
           const reqId = universityId.length > 5 ? universityId : `req_${Date.now()}_${Math.random()}`;
 
@@ -385,11 +408,13 @@ export default function AdminDashboard() {
             importedAt: new Date().toISOString()
           };
 
-          await setDoc(doc(db, 'applications', reqId), reqObj, { merge: true });
-          count++;
+          await setDoc(doc(db, 'applications', reqId), reqObj);
+          if (phone) existingPhones.add(phone);
+          if (universityId) existingUnivIds.add(universityId);
+          addedCount++;
         }
 
-        alert(`تم استيراد ${count} متقدماً بنجاح إلى السحابة!`);
+        alert(`تمت العملية بنجاح! 🚀\n- أُضيف جديد: ${addedCount}\n- تم تخطي المكرر: ${skippedCount}`);
         window.location.reload();
       } catch (err) {
         console.error('Error importing excel:', err);
@@ -787,6 +812,22 @@ export default function AdminDashboard() {
     }
   };
 
+  // إحصائيات المتقدمين لكل لجنة بناءً على الرغبة الأولى
+  const committeeNamesList = ['لجنة التصميم', 'اللجنة الإعلامية', 'لجنة تنظيم الفعاليات', 'لجنة الموارد البشرية', 'لجنة العلاقات العامة', 'لجنة المحتوى العلمي', 'لجنة الجودة والتطوير'];
+  
+  const getCountByPreference = (commName: string, prefKey: 'firstChoice' | 'secondChoice' | 'thirdChoice') => {
+    return requests.filter(r => r[prefKey]?.includes(commName.replace('لجنة ', '')) || r[prefKey] === commName).length;
+  };
+
+  // فلترة الطلبات حسب التبويب النشط
+  const filteredRequests = requests.filter(req => {
+    if (requestSubTab === 'accepted') return req.status === 'مقبول';
+    if (requestSubTab === 'by-preference') {
+      return req.firstChoice?.includes(selectedCommitteeFilter.replace('لجنة ', '')) || req.firstChoice === selectedCommitteeFilter;
+    }
+    return true; // الكل
+  });
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       
@@ -905,7 +946,6 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {/* صف المدير الأساسي */}
                   <tr className="hover:bg-slate-50 bg-rose-50/20">
                     <td className="py-4 pr-2 font-black text-[#630517]">عبدالعزيز العنزي (المشرف الأساسي)</td>
                     <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
@@ -918,7 +958,6 @@ export default function AdminDashboard() {
                           type="button"
                           onClick={() => togglePasswordVisibility('0553731265')}
                           className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
-                          title={showPasswords['0553731265'] ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                         >
                           {showPasswords['0553731265'] ? '👁️‍🗨️' : '👁️'}
                         </button>
@@ -934,7 +973,6 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
 
-                  {/* باقي المستخدمين المسجلين */}
                   {usersList.map((usr, idx) => (
                     <tr key={idx} className="hover:bg-slate-50">
                       <td className="py-4 pr-2 font-bold text-slate-900">{usr.fullName || 'مستخدم مسجل'}</td>
@@ -948,7 +986,6 @@ export default function AdminDashboard() {
                             type="button"
                             onClick={() => togglePasswordVisibility(usr.phone)}
                             className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
-                            title={showPasswords[usr.phone] ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                           >
                             {showPasswords[usr.phone] ? '👁️‍🗨️' : '👁️'}
                           </button>
@@ -960,21 +997,12 @@ export default function AdminDashboard() {
                           onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
                           className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
                         >
-                          <option value="System Admin">System Admin</option>
-                          <option value="General Supervisor">General Supervisor</option>
-                          <option value="رئيس لجنة / مشرف قسم">رئيس لجنة </option>
-                          <option value="عضو مميز">عضو مميز</option>
-                          <option value="عضو أساسي">عضو أساسي</option>
+                          <option value="System Admin">System Admin (مدير النظام)</option>
+                          <option value="General Supervisor">General Supervisor (مشرف عام)</option>
+                          <option value="رئيس لجنة / مشرف قسم">رئيس لجنة (إدارة اللجنة والأعضاء)</option>
+                          <option value="عضو مميز / منسق">عضو مميز (صلاحيات تفاعلية خاصة)</option>
+                          <option value="عضو أساسي">عضو أساسي (مشارك وفعال)</option>
                         </select>
-                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                          <strong>صلاحيات الرتبة الحالية:</strong> {
-                            (usr.role === 'System Admin') ? 'تحكم كامل بجميع خصائص الموقع والسحابة.' :
-                            (usr.role === 'General Supervisor') ? 'الإشراف على الأقسام والفعاليات ومتابعة اللجان.' :
-                            (usr.role === 'رئيس لجنة / مشرف قسم') ? 'إدارة أعضاء لجنته الخاصة ومتابعة المهام.' :
-                            (usr.role === 'عضو مميز / منسق') ? 'المشاركة الفعالة في تنظيم وإدارة الأنشطة والفعاليات.' :
-                            'الوصول للمحتوى العام ومتابعة إشعارات الحساب.'
-                          }
-                        </p>
                       </td>
                     </tr>
                   ))}
@@ -1632,8 +1660,8 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <div className="bg-emerald-50 border-2 border-emerald-300 p-6 rounded-3xl flex items-center justify-between flex-wrap gap-4 shadow-sm">
               <div className="space-y-1">
-                <h4 className="font-black text-emerald-900 text-base">📥 استيراد بيانات المتقدمين من ملف الأكسل</h4>
-                <p className="text-xs text-emerald-700">ارفع ملف الردود لجلب جميع الطلاب مع رغباتهم الثلاث مباشرة إلى سحابة Firebase!</p>
+                <h4 className="font-black text-emerald-900 text-base">📥 استيراد بيانات المتقدمين من ملف الأكسل (بدون تكرار 🛡️)</h4>
+                <p className="text-xs text-emerald-700">ارفع ملف الردود لجلب جميع الطلاب الجدد فقط، والنظام سيتجاهل الأسماء والأرقام المكررة تلقائياً!</p>
               </div>
               <input
                 type="file"
@@ -1643,8 +1671,65 @@ export default function AdminDashboard() {
               />
             </div>
 
+            {/* إحصائيات أعداد المتقدمين لكل لجنة حسب الرغبة الأولى */}
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+              <h4 className="font-black text-slate-900 text-sm">📊 إحصائيات المتقدمين لكل لجنة (حسب الرغبة الأولى)</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                {committeeNamesList.map((comm, i) => {
+                  const count = getCountByPreference(comm, 'firstChoice');
+                  return (
+                    <div key={i} className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-center space-y-1">
+                      <p className="text-[11px] font-bold text-slate-600 truncate">{comm}</p>
+                      <p className="text-lg font-black text-[#630517]">{count}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* فلاتر لعرض الكل، المقبولين، أو الفرز حسب الرغبة */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRequestSubTab('all')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'all' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                >
+                  📋 كل الطلبات ({requests.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRequestSubTab('accepted')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'accepted' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                >
+                  ✅ قائمة المقبولين ({requests.filter(r => r.status === 'مقبول').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRequestSubTab('by-preference')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'by-preference' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                >
+                  🎯 فرز حسب الرغبة الأولى
+                </button>
+              </div>
+
+              {requestSubTab === 'by-preference' && (
+                <select
+                  value={selectedCommitteeFilter}
+                  onChange={(e) => setSelectedCommitteeFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-900"
+                >
+                  {committeeNamesList.map((c, i) => (
+                    <option key={i} value={c}>{c}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">طلبات انضمام الأعضاء ({requests.length})</h3>
+              <h3 className="text-xl font-black text-slate-900">
+                {requestSubTab === 'accepted' ? 'قائمة الأعضاء المقبولين وإدارتهم' : 'طلبات انضمام الأعضاء'} ({filteredRequests.length})
+              </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs">
                   <thead>
@@ -1657,12 +1742,12 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {requests.length === 0 ? (
+                    {filteredRequests.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات انضمام حالياً.</td>
+                        <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات تطابق هذا الفرز حالياً.</td>
                       </tr>
                     ) : (
-                      requests.map((req) => (
+                      filteredRequests.map((req) => (
                         <tr key={req.id} className="hover:bg-slate-50">
                           <td className="py-4 pr-2 font-bold text-slate-900">
                             {req.fullName}
@@ -1712,7 +1797,7 @@ export default function AdminDashboard() {
                               onClick={() => handleDeleteRequest(req.id)}
                               className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                             >
-                              حذف نهائي 🗑️
+                              {req.status === 'مقبول' ? 'إزالة (طرد) 🗑️' : 'حذف نهائي 🗑️'}
                             </button>
                           </td>
                         </tr>
