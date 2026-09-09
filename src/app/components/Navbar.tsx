@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Link from 'next/link';
 import Image from 'next/image';
 import LoginModal from './LoginModal'; // استيراد نافذة تسجيل الدخول المنبثقة
+import { db } from '../lib/firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
@@ -13,6 +15,10 @@ export default function Navbar() {
   const [showNavbar, setShowNavbar] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // حالات الإشعارات الفورية (الترقية)
+  const [notification, setNotification] = useState<string | null>(null);
+  const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
   
   // حالة فتح وإغلاق نافذة تسجيل الدخول المنبثقة لمنع ظهور الشاشة السوداء السادة
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -24,7 +30,10 @@ export default function Navbar() {
     const isAuthAdmin = sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026';
     
     if (name) setUserName(name);
-    if (phone) setUserPhone(phone);
+    if (phone) {
+      setUserPhone(phone);
+      fetchUserNotification(phone);
+    }
     setAdminAuth(isAuthAdmin);
 
     // إضافة مسافة علوية تلقائية للجسم لمنع النافبار من تغطية المحتوى في أي صفحة
@@ -34,6 +43,36 @@ export default function Navbar() {
       document.body.style.paddingTop = '0px';
     };
   }, []);
+
+  // دالة جلب الإشعارات من سحابة Firestore بناءً على رقم الجوال
+  const fetchUserNotification = async (phone: string) => {
+    try {
+      const userRef = doc(db, 'users', phone);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        if (data.latestNotification) {
+          setNotification(data.latestNotification);
+          setShowNotificationModal(true);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching user notification:', err);
+    }
+  };
+
+  const handleDismissNotification = async () => {
+    if (!userPhone) return;
+    try {
+      // إزالة الإشعار من السحابة حتى لا يتكرر الظهور
+      const userRef = doc(db, 'users', userPhone);
+      await updateDoc(userRef, { latestNotification: null });
+      setShowNotificationModal(false);
+      setNotification(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // دالة إخفاء وإظهار النافبار عند التمرير
   useEffect(() => {
@@ -69,6 +108,30 @@ export default function Navbar() {
 
   return (
     <>
+      {/* نافذة الإشعار الفوري (تظهر فوراً عند الترقية أو تحديث الحساب) */}
+      {showNotificationModal && notification && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-4 border-2 border-[#F5D061]">
+            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl font-black shadow-lg">
+              🎉
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-black text-slate-900">إشعار جديد من الإدارة</h3>
+              <p className="text-slate-700 text-sm font-bold leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                {notification}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleDismissNotification}
+              className="w-full py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-sm shadow-md hover:brightness-110 cursor-pointer transition-all"
+            >
+              حسناً، شكراً لك 👍
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className={`w-full bg-white border-b border-slate-100 fixed top-0 z-50 transition-transform duration-300 ${showNavbar ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between" dir="rtl">
           
