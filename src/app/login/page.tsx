@@ -1,20 +1,31 @@
-"use client";
+'use client';
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
 
   const handleDirectLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (phone.trim()) {
-      localStorage.setItem("userPhone", phone.trim());
+    
+    const trimmedPhone = phone.trim();
+    const trimmedName = name.trim();
+
+    if (trimmedPhone) {
+      localStorage.setItem("userPhone", trimmedPhone);
     }
-    if (name.trim()) {
-      localStorage.setItem("userName", name.trim());
+    if (trimmedName) {
+      localStorage.setItem("userName", trimmedName);
+    }
+
+    // التحقق إذا كان الرقم هو رقم المدير لتفعيل مفتاح الدخول للوحة التحكم
+    if (trimmedPhone === '0553731265') {
+      sessionStorage.setItem('adminToken', 'SECURE_ADMIN_KEY_NURSING_2026');
     }
     
     // استخدام التوجيه المباشر لتجنب أي تعليق في المتصفح أو الجوال
@@ -40,7 +51,7 @@ export default function LoginPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="مثال: محمدأحمد العنزي"
+              placeholder="مثال: عبدالعزيز العنزي"
               autoComplete="off"
               className="w-full px-4 py-3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] text-sm"
               required

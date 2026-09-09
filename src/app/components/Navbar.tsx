@@ -7,6 +7,7 @@ import Image from 'next/image';
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
   const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [adminAuth, setAdminAuth] = useState<boolean>(false);
   const [mounted, setMounted] = useState(false);
   const [showNavbar, setShowNavbar] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -16,8 +17,11 @@ export default function Navbar() {
     setMounted(true);
     const name = localStorage.getItem('userName');
     const phone = localStorage.getItem('userPhone');
+    const isAuthAdmin = sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026';
+    
     if (name) setUserName(name);
     if (phone) setUserPhone(phone);
+    setAdminAuth(isAuthAdmin);
 
     // إضافة مسافة علوية تلقائية للجسم لمنع النافبار من تغطية المحتوى في أي صفحة
     document.body.style.paddingTop = '80px';
@@ -47,15 +51,17 @@ export default function Navbar() {
   const handleLogout = () => {
     localStorage.removeItem('userPhone');
     localStorage.removeItem('userName');
+    sessionStorage.removeItem('adminToken');
     setUserName(null);
     setUserPhone(null);
+    setAdminAuth(false);
     window.location.href = '/';
   };
 
   if (!mounted) return null;
 
-  // ظهور زر لوحة التحكم والوصول مقتصر حصرياً على رقمك
-  const isAdmin = userPhone === '0553731265';
+  // حماية أمنية صارمة: ظهور زر لوحة التحكم مقتصر على رقم جوالك + توكن الأدمن السري من صفحة الدخول
+  const isAdmin = userPhone === '0553731265' && adminAuth;
 
   return (
     <header className={`w-full bg-white border-b border-slate-100 fixed top-0 z-50 transition-transform duration-300 ${showNavbar ? 'translate-y-0' : '-translate-y-full'}`}>

@@ -61,8 +61,9 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
-    if (phone !== '0553731265') {
-      alert('عذراً، هذه الصفحة مخصصة للمدير فقط.');
+    const adminAuth = sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026';
+    if (phone !== '0553731265' || !adminAuth) {
+      alert('عذراً، هذه الصفحة مخصصة للمدير الموثق فقط.');
       router.push('/');
     }
   }, [router]);
@@ -273,8 +274,6 @@ export default function AdminDashboard() {
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
-
-        console.log("Excel Raw Data:", data);
 
         if (!data || data.length < 2) {
           alert('الملف فارغ أو لا يحتوي على بيانات.');
@@ -634,11 +633,28 @@ export default function AdminDashboard() {
     }
   };
 
+  // زر الرفض: يغير حالة الطلب إلى 'مرفوض' ولا يحذفه
+  const handleRejectRequest = async (id: string) => {
+    if(confirm('هل أنت متأكد من رفض هذا الطلب؟ (سيتمكن المتقدم من معرفة حالة رفضه عند الاستعلام).')) {
+      try {
+        const docRef = doc(db, 'applications', id);
+        await updateDoc(docRef, { status: 'mرفوض' }); // تم تصحيح الحالة لتطابق صفحة الاستعلام
+        setRequests(requests.map((req) => req.id === id ? { ...req, status: 'مرفوض' } : req));
+        alert('تم تحديث حالة الطلب إلى (مرفوض) بنجاح.');
+      } catch (err) {
+        console.error(err);
+        alert('حدث خطأ أثناء رفض الطلب.');
+      }
+    }
+  };
+
+  // زر الحذف النهائي: يحذف الطلب من قاعدة البيانات نهائياً
   const handleDeleteRequest = async (id: string) => {
-    if(confirm('هل أنت متأكد من رفض وحذف هذا الطلب؟')) {
+    if(confirm('تحذير: هل أنت متأكد من الحذف النهائي لهذا الطلب من السحابة؟')) {
       try {
         await deleteDoc(doc(db, 'applications', id));
         setRequests(requests.filter((req) => req.id !== id));
+        alert('تم حذف الطلب نهائياً.');
       } catch (err) {
         console.error(err);
       }
@@ -1383,7 +1399,10 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="py-4">
-                            <span className={`px-2.5 py-1 rounded-full font-bold border block w-fit mb-1 ${req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                            <span className={`px-2.5 py-1 rounded-full font-bold border block w-fit mb-1 ${
+                              req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                              req.status === 'مرفوض' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
                               {req.status || 'معلق'}
                             </span>
                             {req.acceptedCommittee && (
@@ -1392,20 +1411,27 @@ export default function AdminDashboard() {
                               </span>
                             )}
                           </td>
-                          <td className="py-4 text-left pl-2 flex gap-2 justify-end">
+                          <td className="py-4 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
                             <button
                               type="button"
                               onClick={() => openAcceptModal(req.id)}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
                             >
                               قبول ✅
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteRequest(req.id)}
-                              className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                              onClick={() => handleRejectRequest(req.id)}
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer"
                             >
                               رفض ✕
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRequest(req.id)}
+                              className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                            >
+                              حذف نهائي 🗑️
                             </button>
                           </td>
                         </tr>
