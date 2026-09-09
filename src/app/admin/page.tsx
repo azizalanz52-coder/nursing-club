@@ -845,8 +845,8 @@ export default function AdminDashboard() {
                           >
                             <option value="System Admin">System Admin</option>
                             <option value="General Supervisor">General Supervisor</option>
-                            <option value="رئيس لجنة / مشرف قسم">رئيس لجنة / مشرف قسم</option>
-                            <option value="عضو مميز / منسق">عضو مميز / منسق</option>
+                            <option value="رئيس لجنة / مشرف قسم">رئيس لجنة</option>
+                            <option value="عضو مميز / منسق">عضو مميز</option>
                             <option value="عضو أساسي">عضو أساسي</option>
                           </select>
                         </td>
