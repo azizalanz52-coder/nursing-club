@@ -10,6 +10,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
   const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null); // حالة حفظ رتبة العضو
   const [adminAuth, setAdminAuth] = useState<boolean>(false);
   const [mounted, setMounted] = useState(false);
   const [showNavbar, setShowNavbar] = useState(true);
@@ -32,7 +33,7 @@ export default function Navbar() {
     if (name) setUserName(name);
     if (phone) {
       setUserPhone(phone);
-      fetchUserNotification(phone);
+      fetchUserData(phone);
     }
     setAdminAuth(isAuthAdmin);
 
@@ -44,20 +45,26 @@ export default function Navbar() {
     };
   }, []);
 
-  // دالة جلب الإشعارات من سحابة Firestore بناءً على رقم الجوال
-  const fetchUserNotification = async (phone: string) => {
+  // دالة جلب بيانات المستخدم ورتبته والإشعارات من سحابة Firestore
+  const fetchUserData = async (phone: string) => {
     try {
       const userRef = doc(db, 'users', phone);
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
         const data = userSnap.data();
+        if (data.role) {
+          setUserRole(data.role);
+        } else {
+          setUserRole('عضو أساسي');
+        }
+
         if (data.latestNotification) {
           setNotification(data.latestNotification);
           setShowNotificationModal(true);
         }
       }
     } catch (err) {
-      console.error('Error fetching user notification:', err);
+      console.error('Error fetching user data:', err);
     }
   };
 
@@ -97,6 +104,7 @@ export default function Navbar() {
     sessionStorage.removeItem('adminToken');
     setUserName(null);
     setUserPhone(null);
+    setUserRole(null);
     setAdminAuth(false);
     window.location.href = '/';
   };
@@ -104,7 +112,7 @@ export default function Navbar() {
   if (!mounted) return null;
 
   // التحقق الأمني المباشر للمشرف (رقم جوالك + التوكن المخزن أو مطابقة سريعة)
-  const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026');
+  const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026') || (userRole === 'System Admin');
 
   return (
     <>
@@ -179,9 +187,11 @@ export default function Navbar() {
                   </Link>
                 )}
 
-                <span className="text-xs font-bold text-rose-950 bg-rose-50 px-3 py-2 rounded-xl border border-rose-100 max-w-[120px] truncate">
-                  {userName}
-                </span>
+                {/* عرض الاسم والرتبة المحدثة بوضوح */}
+                <div className="flex flex-col text-right bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 max-w-[140px]">
+                  <span className="text-xs font-bold text-rose-950 truncate">{userName}</span>
+                  <span className="text-[10px] font-black text-[#630517] truncate">{userRole || 'عضو أساسي'}</span>
+                </div>
 
                 <button 
                   onClick={handleLogout}
@@ -266,9 +276,14 @@ export default function Navbar() {
               {userName ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between bg-rose-50 p-3 rounded-2xl border border-rose-100">
-                    <span className="text-xs font-bold text-rose-950 truncate max-w-[180px]">
-                      👤 {userName}
-                    </span>
+                    <div>
+                      <span className="text-xs font-bold text-rose-950 block truncate max-w-[180px]">
+                        👤 {userName}
+                      </span>
+                      <span className="text-[10px] font-black text-[#630517] block">
+                        {userRole || 'عضو أساسي'}
+                      </span>
+                    </div>
                     <button 
                       onClick={handleLogout}
                       className="text-xs text-red-600 hover:text-red-800 font-bold px-2 py-1"
