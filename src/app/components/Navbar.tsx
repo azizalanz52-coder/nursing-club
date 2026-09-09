@@ -126,7 +126,7 @@ export default function Navbar() {
             href="/join" 
             className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#F5D061] to-[#C99C21] text-[#630517] font-black text-[11px] shadow"
           >
-            الانضمام
+            تقديم الانضمام للنادي
           </Link>
 
           <button
