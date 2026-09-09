@@ -5,39 +5,49 @@ import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
-const DEFAULT_EVENTS = [
+interface EventItem {
+  id: string;
+  title: string;
+  date: string;
+  location: string;
+  status: 'upcoming' | 'past';
+  poster: string;
+  description: string;
+}
+
+const DEFAULT_EVENTS: EventItem[] = [
   {
     id: '1',
-    title: 'ملتقى التمريض التفاعلي 2026',
-    date: '25 سبتمبر 2026',
-    location: 'مسرح جامعة حفر الباطن',
+    title: 'اليوم العالمي للتمريض',
+    date: '26 سبتمبر 2026',
+    location: 'مسرح المبنى 2',
     status: 'upcoming',
     poster: '/header-banner.png',
-    description: 'ملتقى يهدف إلى استعراض أحدث الممارسات في التمريض وورش عمل تفاعلية.'
+    description: 'فعالية تابعة لنادي التمريض.'
   },
   {
     id: '2',
-    title: 'حملة التوعية بالسكري',
-    date: '15 مايو 2026',
-    location: 'المجمع التجاري - حفر الباطن',
+    title: 'حفل تدشين كلية التمريض',
+    date: '5 أكتوبر 2025',
+    location: 'الطلاب: كلية التمريض الطالبات: مسرح الياسمين',
     status: 'past',
-    poster: '/header-banner.png',
-    description: 'حملة ميدانية استهدفت التوعية بأخطار السكري وتقديم فحوصات مجانية.'
+    poster: '/logo.png',
+    description: 'فعالية تابعة لنادي التمريض.'
   },
   {
     id: '3',
-    title: 'اليوم العالمي للتمريض',
-    date: '01 ديسمبر 2026',
-    location: 'جامعة حفر الباطن',
-    status: 'upcoming',
+    title: 'الإسعافات الأولية',
+    date: '27 أبريل 2026',
+    location: 'الطلاب: المعرض الدائم الطالبات: أمام المسرح الطلابي',
+    status: 'past',
     poster: '/header-banner.png',
-    description: 'احتفالية سنوية لتكريم وتقدير جهود مهنة التمريض العظيمة.'
+    description: 'فعالية تابعة لنادي التمريض.'
   }
 ];
 
 export default function EventsPage() {
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
-  const [events, setEvents] = useState(DEFAULT_EVENTS);
+  const [events, setEvents] = useState<EventItem[]>(DEFAULT_EVENTS);
 
   // Fetch Cloud Events from Firebase Firestore
   useEffect(() => {
@@ -45,9 +55,9 @@ export default function EventsPage() {
       try {
         const eventsSnap = await getDocs(collection(db, 'site_events'));
         if (!eventsSnap.empty) {
-          const eventsList: any[] = [];
+          const eventsList: EventItem[] = [];
           eventsSnap.forEach((d) => {
-            eventsList.push({ id: d.id, ...d.data() });
+            eventsList.push({ id: d.id, ...d.data() } as EventItem);
           });
           if (eventsList.length > 0) {
             setEvents(eventsList);
