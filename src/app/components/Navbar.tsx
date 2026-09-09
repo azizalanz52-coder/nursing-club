@@ -169,7 +169,7 @@ export default function Navbar() {
               onClick={() => setMobileMenuOpen(false)}
               className="text-[#630517] font-black transition-colors py-1"
             >
-              🔍 استعلام عن القبول
+               استعلام عن القبول
             </Link>
             <Link 
               href="/events" 
