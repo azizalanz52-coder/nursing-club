@@ -4,6 +4,7 @@ import Statistics from "./components/home/Statistics";
 import LeadershipPreview from "./components/home/LeadershipPreview";
 import CommitteesPreview from "./components/home/CommitteesPreview";
 import EventsPreview from "./components/home/EventsPreview";
+import WhatsAppCommunity from "./components/home/WhatsAppCommunity";
 import Footer from "./components/Footer";
 
 export default function Home() {
@@ -15,6 +16,7 @@ export default function Home() {
       <LeadershipPreview />
       <CommitteesPreview />
       <EventsPreview />
+      <WhatsAppCommunity />
       <Footer />
     </main>
   );
