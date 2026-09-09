@@ -2,60 +2,61 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { db } from '../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+
+const DEFAULT_EVENTS = [
+  {
+    id: '1',
+    title: 'اليوم العالمي للتمريض',
+    date: '26 سبتمبر 2026',
+    location: 'مسرح المبنى 2',
+    status: 'upcoming',
+    poster: '/header-banner.png',
+    description: 'فعالية تابعة لنادي التمريض.'
+  },
+  {
+    id: '2',
+    title: 'حفل تدشين كلية التمريض',
+    date: '5 أكتوبر 2025',
+    location: 'الطلاب: كلية التمريض الطالبات: مسرح الياسمين',
+    status: 'past',
+    poster: '/logo.png',
+    description: 'فعالية تابعة لنادي التمريض.'
+  },
+  {
+    id: '3',
+    title: 'الإسعافات الأولية',
+    date: '27 أبريل 2026',
+    location: 'الطلاب: المعرض الدائم الطالبات: أمام المسرح الطلابي',
+    status: 'past',
+    poster: '/header-banner.png',
+    description: 'فعالية تابعة لنادي التمريض.'
+  }
+];
 
 export default function EventsPreview() {
-  const [eventsList, setEventsList] = useState([
-    {
-      id: '1',
-      title: 'اليوم العالمي للتمريض',
-      date: '26 سبتمبر 2026',
-      location: 'مسرح المبنى 2',
-      status: 'upcoming',
-      poster: '/header-banner.png',
-      description: 'فعالية تابعة لنادي التمريض.'
-    },
-    {
-      id: '2',
-      title: 'حفل تدشين كلية التمريض',
-      date: '5 أكتوبر 2025',
-      location: 'الطلاب: كلية التمريض الطالبات: مسرح الياسمين',
-      status: 'past',
-      poster: '/logo.png',
-      description: 'فعالية تابعة لنادي التمريض.'
-    },
-    {
-      id: '3',
-      title: 'الإسعافات الأولية',
-      date: '27 أبريل 2026',
-      location: 'الطلاب: المعرض الدائم الطالبات: أمام المسرح الطلابي',
-      status: 'past',
-      poster: '/header-banner.png',
-      description: 'فعالية تابعة لنادي التمريض.'
-    }
-  ]);
+  const [eventsList, setEventsList] = useState(DEFAULT_EVENTS);
 
   useEffect(() => {
-    try {
-      const savedEvents = localStorage.getItem('UHB_EVENTS');
-      if (savedEvents) {
-        const parsed = JSON.parse(savedEvents);
-        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          const uniqueMap = new Map();
-          parsed.forEach(ev => {
-            const title = ev.title?.trim();
-            if (title && !uniqueMap.has(title)) {
-              uniqueMap.set(title, ev);
-            }
+    const fetchCloudEvents = async () => {
+      try {
+        const eventsSnap = await getDocs(collection(db, 'site_events'));
+        if (!eventsSnap.empty) {
+          const eventsList: any[] = [];
+          eventsSnap.forEach((d) => {
+            eventsList.push({ id: d.id, ...d.data() });
           });
-          const uniqueArray = Array.from(uniqueMap.values());
-          if (uniqueArray.length > 0) {
-            setEventsList(uniqueArray.slice(0, 3));
+          if (eventsList.length > 0) {
+            setEventsList(eventsList);
           }
         }
+      } catch (err) {
+        console.error('Error fetching cloud events preview:', err);
       }
-    } catch (e) {
-      console.error(e);
-    }
+    };
+
+    fetchCloudEvents();
   }, []);
 
   return (
