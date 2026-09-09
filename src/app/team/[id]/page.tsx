@@ -14,11 +14,7 @@ const defaultCommitteesDetails: Record<string, any> = {
     icon: '🎨',
     maleLeader: 'عبدالعزيز العنزي',
     femaleLeader: 'شجون الحربي',
-    members: [
-      { name: 'سارة محمد', role: 'مصممة جرافيك', status: 'نشط' },
-      { name: 'عمر خالد', role: 'مصمم موشن جرافيك', status: 'نشط' },
-      { name: 'فاطمة أحمد', role: 'مسؤولة الهوية البصرية', status: 'نشط' },
-    ]
+    members: []
   },
   media: {
     id: 'media',
@@ -27,10 +23,7 @@ const defaultCommitteesDetails: Record<string, any> = {
     icon: '📸',
     maleLeader: 'راشد السبيعي',
     femaleLeader: 'ريم الشمري',
-    members: [
-      { name: 'فيصل السعيد', role: 'مصور ميداني', status: 'نشط' },
-      { name: 'أمل القحطاني', role: 'كاتبة محتوى', status: 'نشط' },
-    ]
+    members: []
   },
   pr: {
     id: 'pr',
@@ -39,9 +32,7 @@ const defaultCommitteesDetails: Record<string, any> = {
     icon: '🌐',
     maleLeader: 'خالد القحطاني',
     femaleLeader: 'ديمة العتيبي',
-    members: [
-      { name: 'تركي الشمري', role: 'منسق علاقات', status: 'نشط' },
-    ]
+    members: []
   },
   quality: {
     id: 'quality',
@@ -50,9 +41,7 @@ const defaultCommitteesDetails: Record<string, any> = {
     icon: '📊',
     maleLeader: 'سلطان الحربي',
     femaleLeader: 'نورة الدوسري',
-    members: [
-      { name: 'بشاير العنزي', role: 'مختصة قياس أداء', status: 'نشط' },
-    ]
+    members: []
   },
   scientific: {
     id: 'scientific',
@@ -61,9 +50,7 @@ const defaultCommitteesDetails: Record<string, any> = {
     icon: '🔬',
     maleLeader: 'فهد المطيري',
     femaleLeader: 'أفنان العنزي',
-    members: [
-      { name: 'عبدالله المطيري', role: 'باحث ومراجع علمي', status: 'نشط' },
-    ]
+    members: []
   },
   hr: {
     id: 'hr',
@@ -72,9 +59,7 @@ const defaultCommitteesDetails: Record<string, any> = {
     icon: '👥',
     maleLeader: 'تركي العنزي',
     femaleLeader: 'سارة الرشيدي',
-    members: [
-      { name: 'مها السبيعي', role: 'منسقة أعضاء', status: 'نشط' },
-    ]
+    members: []
   },
   'events-org': {
     id: 'events-org',
@@ -83,9 +68,7 @@ const defaultCommitteesDetails: Record<string, any> = {
     icon: '📅',
     maleLeader: 'فيصل الدوسري',
     femaleLeader: 'غادة العمري',
-    members: [
-      { name: 'سلطان الدوسري', role: 'منسق ميداني', status: 'نشط' },
-    ]
+    members: []
   },
 };
 
@@ -95,8 +78,15 @@ export default function CommitteeDetailPage() {
   const baseDetails = defaultCommitteesDetails[id] || defaultCommitteesDetails['design'];
   
   const [committee, setCommittee] = useState<any>(baseDetails);
+  const [currentUserPhone, setCurrentUserPhone] = useState<string>('');
+  const [currentUserName, setCurrentUserName] = useState<string>('');
 
   useEffect(() => {
+    const phone = localStorage.getItem('userPhone') || '';
+    const name = localStorage.getItem('userName') || '';
+    setCurrentUserPhone(phone.trim());
+    setCurrentUserName(name.trim());
+
     const fetchCloudCommittee = async () => {
       try {
         const docRef = doc(db, 'committees', id);
@@ -116,7 +106,25 @@ export default function CommitteeDetailPage() {
     };
 
     fetchCloudCommittee();
-  }, [id]);
+  }, [id, baseDetails]);
+
+  // التحقق هل المستخدم الحالي هو المدير العام
+  const isAdmin = currentUserPhone === '0553731265';
+
+  // فلترة أمنية مشددة:
+  // - المدير يرى الجميع.
+  // - العضو العادي لا يرى سوى اسمه فقط إذا طابق رقم جواله أو اسمه المسجل في بيانات العضو بدقة، ودون إظهار أي عضو فارغ البيانات.
+  const displayedMembers = isAdmin 
+    ? (committee.members || [])
+    : (committee.members || []).filter((m: any) => {
+        const memberPhone = m.phone ? String(m.phone).trim() : '';
+        const memberName = m.name ? String(m.name).trim() : '';
+
+        const matchPhone = currentUserPhone !== '' && memberPhone === currentUserPhone;
+        const matchName = currentUserName !== '' && memberName === currentUserName;
+
+        return matchPhone || matchName;
+      });
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
@@ -158,10 +166,12 @@ export default function CommitteeDetailPage() {
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-black text-slate-900">أعضاء {committee.name}</h2>
-              <p className="text-xs text-slate-500 mt-1">قائمة المنتسبين والمنضمين رسمياً لهذه اللجنة</p>
+              <p className="text-xs text-slate-500 mt-1">
+                {isAdmin ? 'عرض لوحة التحكم (جميع الأعضاء)' : 'عرض خاص: يظهر اسمك فقط لضمان الخصوصية'}
+              </p>
             </div>
             <span className="px-3 py-1 bg-[#630517] text-[#F5D061] rounded-xl text-xs font-bold shadow">
-              {committee.members?.length || 0} أعضاء
+              {isAdmin ? `${committee.members?.length || 0} أعضاء` : (displayedMembers.length > 0 ? 'عضو مسجل' : 'خاص ومؤمن')}
             </span>
           </div>
 
@@ -175,22 +185,30 @@ export default function CommitteeDetailPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {committee.members?.map((m: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-slate-50/80 transition-all">
-                    <td className="py-4 pr-4 font-bold text-slate-900 flex items-center gap-2">
-                      <span className="w-8 h-8 rounded-full bg-[#630517]/10 text-[#630517] flex items-center justify-center text-xs font-black">
-                        {m.name ? m.name.charAt(0) : 'ع'}
-                      </span>
-                      {m.name}
-                    </td>
-                    <td className="py-4 text-slate-600 font-medium">{m.role}</td>
-                    <td className="py-4">
-                      <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                        {m.status || 'نشط'}
-                      </span>
+                {displayedMembers.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-slate-400 text-xs">
+                      {isAdmin ? 'لا توجد أعضاء في هذه اللجنة.' : 'لست مسجلاً في هذه اللجنة، أو أن أسماء وبقية الأعضاء مخفية لخصوصية الحسابات.'}
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  displayedMembers.map((m: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-slate-50/80 transition-all">
+                      <td className="py-4 pr-4 font-bold text-slate-900 flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-full bg-[#630517]/10 text-[#630517] flex items-center justify-center text-xs font-black">
+                          {m.name ? m.name.charAt(0) : 'ع'}
+                        </span>
+                        {m.name}
+                      </td>
+                      <td className="py-4 text-slate-600 font-medium">{m.role}</td>
+                      <td className="py-4">
+                        <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+                          {m.status || 'نشط'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
