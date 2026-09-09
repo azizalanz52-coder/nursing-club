@@ -10,8 +10,8 @@ export default function Statistics() {
       title: "فعالية"
     },
     {
-      number: "15+",
-      title: "مبادرة"
+      number: "رؤية",
+      title: "صناعة أثر مستدام"
     }
   ];
 

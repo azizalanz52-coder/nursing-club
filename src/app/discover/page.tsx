@@ -109,18 +109,18 @@ export default function DiscoverPage() {
         <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <div className="space-y-2">
             <h3 className="text-4xl sm:text-5xl font-black text-[#F5D061]">200+</h3>
-            <p className="text-amber-50/90 text-sm sm:text-base font-bold">عضو وعضوة</p>
+            <p className="text-amber-50/90 text-sm sm:text-base font-bold">عضو </p>
           </div>
           <div className="space-y-2">
             <h3 className="text-4xl sm:text-5xl font-black text-[#F5D061]">15+</h3>
             <p className="text-amber-50/90 text-sm sm:text-base font-bold">فعالية سنوية</p>
           </div>
           <div className="space-y-2">
-            <h3 className="text-4xl sm:text-5xl font-black text-[#F5D061]">300+</h3>
-            <p className="text-amber-50/90 text-sm sm:text-base font-bold">ساعة تطوعية</p>
+            <h3 className="text-4xl sm:text-5xl font-black text-[#F5D061]">«بصمة»</h3>
+            <p className="text-amber-50/90 text-sm sm:text-base font-bold">نبض يلامس القلوب أو عطاء بلا حدود</p>
           </div>
           <div className="space-y-2">
-            <h3 className="text-4xl sm:text-5xl font-black text-[#F5D061]">4+</h3>
+            <h3 className="text-4xl sm:text-5xl font-black text-[#F5D061]">2+</h3>
             <p className="text-amber-50/90 text-sm sm:text-base font-bold">سنوات من العطاء</p>
           </div>
         </div>

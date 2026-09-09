@@ -212,7 +212,7 @@ export default function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="block text-center w-full py-3 rounded-2xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition-colors"
               >
-                تسجيل الدخول
+                 تسجيل الدخول
               </Link>
             )}
           </div>
