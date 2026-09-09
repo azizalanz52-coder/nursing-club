@@ -10,7 +10,7 @@ export default function Hero() {
   const [banners, setBanners] = useState([
     {
       id: 'main',
-      tag: 'مرحباً بكم في نادي التمريض',
+      tag: 'مرحباً بكم ',
       title: 'نادي التمريض ',
       description: 'مجتمع طلابي يهدف إلى تطوير المعرفة، وبناء المهارات القيادية، وصناعة أثر في مجال التمريض بجامعة حفر الباطن.',
       image: '/header-banner.png',
@@ -161,7 +161,7 @@ export default function Hero() {
             <div className="space-y-2">
               <h3 className="text-2xl sm:text-3xl font-black text-[#F5D061]">مبروك تم قبولك!</h3>
               <p className="text-sm sm:text-base text-slate-200 leading-relaxed">
-                يسعدنا انضمامك إلى <span className="font-extrabold text-[#F5D061]">{acceptedData.committee}</span> في نادي التمريض بجامعة حفر الباطن.
+                يسعدنا انضمامك إلى <span className="font-extrabold text-[#F5D061]">{acceptedData.committee}</span> في نادي التمريض 
               </p>
             </div>
 
