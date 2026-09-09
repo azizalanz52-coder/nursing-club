@@ -47,6 +47,14 @@ interface PartnerItem {
   logo: string;
 }
 
+interface SuggestionItem {
+  id: string;
+  name: string;
+  content: string;
+  createdAt: string;
+  status: string;
+}
+
 interface CommitteeMember {
   name: string;
   role: string;
@@ -72,7 +80,7 @@ interface UserAccount {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners'>('users-manager');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions'>('users-manager');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -83,7 +91,6 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
-  // Convert uploaded image file to Base64 to save safely in Firestore database
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -93,12 +100,10 @@ export default function AdminDashboard() {
     });
   };
 
-  // Passion Slides States
   const [passionSlides, setPassionSlides] = useState<PassionSlide[]>([]);
   const [newPassionQuote, setNewPassionQuote] = useState<string>('');
   const [newPassionImage, setNewPassionImage] = useState<string>('/header-banner.png');
 
-  // Discover Events States
   const [discoverEvents, setDiscoverEvents] = useState<DiscoverEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [newDiscTitle, setNewDiscTitle] = useState<string>('');
@@ -106,7 +111,6 @@ export default function AdminDashboard() {
   const [newDiscDesc, setNewDiscDesc] = useState<string>('');
   const [newDiscImages, setNewDiscImages] = useState<string[]>([]);
 
-  // Events & Banners Cloud States + Editing State
   const [events, setEvents] = useState<EventItem[]>([]);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState<string>('');
@@ -121,16 +125,17 @@ export default function AdminDashboard() {
   const [bannerTitle, setBannerTitle] = useState<string>('');
   const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
 
-  // Partners Cloud States
   const [partners, setPartners] = useState<PartnerItem[]>([]);
   const [partnerName, setPartnerName] = useState<string>('');
   const [partnerCategory, setPartnerCategory] = useState<string>('شريك إستراتيجي');
   const [partnerLogo, setPartnerLogo] = useState<string>('/logo.png');
 
+  // Suggestions Cloud State
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
+
   const [requests, setRequests] = useState<Record<string, any>[]>([]);
   const [usersList, setUsersList] = useState<UserAccount[]>([]);
   
-  // --- Accept Request Modal States ---
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [acceptedCommittee, setAcceptedCommittee] = useState<string>('لجنة التصميم');
@@ -162,11 +167,9 @@ export default function AdminDashboard() {
   const [newMemberName, setNewMemberName] = useState<string>('');
   const [newMemberRole, setNewMemberRole] = useState<string>('');
 
-  // Fetch Cloud Data on Mount
   useEffect(() => {
     const fetchCloudData = async () => {
       try {
-        // Events Cloud
         const eventsSnap = await getDocs(collection(db, 'site_events'));
         if (!eventsSnap.empty) {
           const eventsList: EventItem[] = [];
@@ -175,7 +178,7 @@ export default function AdminDashboard() {
           });
           setEvents(eventsList);
         } else {
-          const defaultEvents: EventItem[] = [
+          setEvents([
             {
               id: '1',
               title: 'ملتقى التمريض التفاعلي 2026',
@@ -185,11 +188,9 @@ export default function AdminDashboard() {
               poster: '/header-banner.png',
               description: 'ملتقى يهدف إلى استعراض أحدث الممارسات في التمريض وورش عمل تفاعلية.'
             }
-          ];
-          setEvents(defaultEvents);
+          ]);
         }
 
-        // Banners Cloud
         const bannersSnap = await getDocs(collection(db, 'site_banners'));
         if (!bannersSnap.empty) {
           const bannersList: BannerItem[] = [];
@@ -198,7 +199,7 @@ export default function AdminDashboard() {
           });
           setBanners(bannersList);
         } else {
-          const defaultBanners: BannerItem[] = [
+          setBanners([
             {
               id: '1',
               tag: 'نادي التمريض • جامعة حفر الباطن',
@@ -207,11 +208,9 @@ export default function AdminDashboard() {
               buttonText: 'اكتشف النادي',
               buttonLink: '/discover'
             }
-          ];
-          setBanners(defaultBanners);
+          ]);
         }
 
-        // Partners Cloud
         const partnersSnap = await getDocs(collection(db, 'site_partners'));
         if (!partnersSnap.empty) {
           const partnersList: PartnerItem[] = [];
@@ -220,13 +219,21 @@ export default function AdminDashboard() {
           });
           setPartners(partnersList);
         } else {
-          const defaultPartners: PartnerItem[] = [
+          setPartners([
             { id: '1', name: 'جامعة حفر الباطن', category: 'شريك إستراتيجي', logo: '/logo.png' }
-          ];
-          setPartners(defaultPartners);
+          ]);
         }
 
-        // Passion Slides Cloud
+        // Fetch Suggestions from Cloud
+        const suggestionsSnap = await getDocs(collection(db, 'suggestions'));
+        if (!suggestionsSnap.empty) {
+          const suggestionsList: SuggestionItem[] = [];
+          suggestionsSnap.forEach((d) => {
+            suggestionsList.push({ id: d.id, ...d.data() } as SuggestionItem);
+          });
+          setSuggestions(suggestionsList);
+        }
+
         const passionSnap = await getDocs(collection(db, 'site_passion_slides'));
         if (!passionSnap.empty) {
           const slides: PassionSlide[] = [];
@@ -235,15 +242,13 @@ export default function AdminDashboard() {
           });
           setPassionSlides(slides);
         } else {
-          const defaultSlides: PassionSlide[] = [
+          setPassionSlides([
             { id: '1', image: '/header-banner.png', quote: '«التمريض ليس مجرد مهنة، بل هو فن وعِلم يلامس حياة الإنسان في أصعب لحظاته.»' },
             { id: '2', image: '/logo.png', quote: '«بالعطاء المستمر والعمل الجماعي نصنع أثراً يخلده الزمن في قلوب المجتمع.»' },
             { id: '3', image: '/header-banner.png', quote: '«نطمح لأن نكون المنارة التي تضيء دروب التميز لكل ممرض وممرضة في جامعة حفر الباطن.»' }
-          ];
-          setPassionSlides(defaultSlides);
+          ]);
         }
 
-        // Discover Events Cloud
         const discoverSnap = await getDocs(collection(db, 'site_discover_events'));
         if (!discoverSnap.empty) {
           const eventsList: DiscoverEvent[] = [];
@@ -258,14 +263,7 @@ export default function AdminDashboard() {
               id: '1',
               title: 'حفل تدشين نادي كلية التمريض',
               category: 'أنشطة كبرى',
-              description: 'دشن وكيل الجامعة للشؤون الأكاديمية أ.د. محمد بن عتيق العنزي، وبحضور عميد كلية التمريض د. جلال نعيم الحربي، نادي كلية التمريض - شطر الطلاب لحظة فخر في مسيرة الكلية، سُعدنا فيها بحضوركم ومشاركتكم، وبإذن الله القادم أجمل',
-              images: ['/logo.png', '/header-banner.png']
-            },
-            {
-              id: '2',
-              title: 'حملة القياسات الحيوية والتثقيف الصحي',
-              category: 'خدمة المجتمع',
-              description: 'فعالية توعوية ميدانية لقياس العلامات الحيوية وتقديم الاستشارات للزوار.',
+              description: 'دشن وكيل الجامعة للشؤون الأكاديمية أ.د. محمد بن عتيق العنزي، وبحضور عميد كلية التمريض د. جلال نعيم الحربي، نادي كلية التمريض - شطر الطلاب لحظة فخر في مسيرة الكلية',
               images: ['/logo.png', '/header-banner.png']
             }
           ];
@@ -273,7 +271,6 @@ export default function AdminDashboard() {
           setSelectedEventId('1');
         }
 
-        // Applications Requests
         const querySnapshot = await getDocs(collection(db, 'applications'));
         const fetchedRequests = querySnapshot.docs.map((docSnap) => ({
           id: docSnap.id,
@@ -283,7 +280,6 @@ export default function AdminDashboard() {
           setRequests(fetchedRequests);
         }
 
-        // Users & Passwords Collection
         const usersSnap = await getDocs(collection(db, 'users'));
         const fetchedUsers = usersSnap.docs.map((docSnap) => ({
           phone: docSnap.id,
@@ -291,7 +287,6 @@ export default function AdminDashboard() {
         })) as UserAccount[];
         setUsersList(fetchedUsers);
 
-        // Committees
         const commSnapshot = await getDocs(collection(db, 'committees'));
         if (!commSnapshot.empty) {
           const cloudMap: Record<string, Partial<Committee>> = {};
@@ -306,7 +301,6 @@ export default function AdminDashboard() {
     fetchCloudData();
   }, []);
 
-  // --- Update User Role Handler ---
   const handleRoleChange = async (phone: string, newRole: string) => {
     try {
       const userRef = doc(db, 'users', phone);
@@ -319,7 +313,19 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- Excel Import Handler ---
+  // --- Suggestion Delete Handler ---
+  const handleDeleteSuggestion = async (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا المقترح من السحابة؟')) {
+      try {
+        await deleteDoc(doc(db, 'suggestions', id));
+        setSuggestions(suggestions.filter((s) => s.id !== id));
+        alert('تم حذف المقترح بنجاح.');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
   const handleExcelImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -376,13 +382,12 @@ export default function AdminDashboard() {
         window.location.reload();
       } catch (err) {
         console.error('Error importing excel:', err);
-        alert('حدث خطأ أثناء قراءة ملف الأكسل، تأكد من صحة الأعمدة.');
+        alert('حدث خطأ أثناء قراءة ملف الأكسل.');
       }
     };
     reader.readAsArrayBuffer(file);
   };
 
-  // --- Passion Slides Cloud Handlers ---
   const handleAddPassionSlide = async (e: FormEvent) => {
     e.preventDefault();
     const slideId = Date.now().toString();
@@ -394,29 +399,25 @@ export default function AdminDashboard() {
 
     try {
       await setDoc(doc(db, 'site_passion_slides', slideId), newSlide);
-      const updated = [...passionSlides, newSlide];
-      setPassionSlides(updated);
+      setPassionSlides([...passionSlides, newSlide]);
       setNewPassionQuote('');
       setNewPassionImage('/header-banner.png');
-      alert('تم إضافة الشريحة وحفظها سحابياً للجميع بنجاح!');
+      alert('تم إضافة الشريحة وحفظها سحابياً بنجاح!');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء الحفظ السحابي.');
     }
   };
 
   const handleDeletePassionSlide = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'site_passion_slides', id));
-      const updated = passionSlides.filter((s) => s.id !== id);
-      setPassionSlides(updated);
-      alert('تم حذف الشريحة من السحابة بنجاح.');
+      setPassionSlides(passionSlides.filter((s) => s.id !== id));
+      alert('تم حذف الشريحة بنجاح.');
     } catch (err) {
       console.error(err);
     }
   };
 
-  // --- Discover Events Cloud Handlers ---
   const handleSelectMultipleImagesForNewEvent = async (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
@@ -431,31 +432,26 @@ export default function AdminDashboard() {
 
   const handleCreateNewDiscoverEvent = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newDiscTitle.trim()) {
-      alert('يرجى كتابة عنوان الفعالية.');
-      return;
-    }
+    if (!newDiscTitle.trim()) return;
     const eventId = Date.now().toString();
     const newEventObj: DiscoverEvent = {
       id: eventId,
       title: newDiscTitle,
       category: newDiscCategory,
-      description: newDiscDesc || 'فعالية تابعة لنادي التمريض بجامعة حفر الباطن.',
+      description: newDiscDesc || 'فعالية تابعة لنادي التمريض.',
       images: newDiscImages.length > 0 ? newDiscImages : ['/logo.png']
     };
 
     try {
       await setDoc(doc(db, 'site_discover_events', eventId), newEventObj);
-      const updated = [newEventObj, ...discoverEvents];
-      setDiscoverEvents(updated);
+      setDiscoverEvents([newEventObj, ...discoverEvents]);
       setSelectedEventId(eventId);
       setNewDiscTitle('');
       setNewDiscDesc('');
       setNewDiscImages([]);
-      alert('تم إنشاء الفعالية ونشر الصور سحابياً للجميع في المعرض!');
+      alert('تم إنشاء الفعالية ونشر الصور سحابياً للجميع!');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء النشر السحابي.');
     }
   };
 
@@ -476,9 +472,8 @@ export default function AdminDashboard() {
 
       try {
         await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
-        const updatedList = discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev));
-        setDiscoverEvents(updatedList);
-        alert('تم رفع وإضافة الصور سحابياً بنجاح للجميع!');
+        setDiscoverEvents(discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev)));
+        alert('تم رفع وإضافة الصور سحابياً بنجاح!');
       } catch (err) {
         console.error(err);
       }
@@ -495,21 +490,20 @@ export default function AdminDashboard() {
 
     try {
       await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
-      const updatedList = discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev));
-      setDiscoverEvents(updatedList);
+      setDiscoverEvents(discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev)));
     } catch (err) {
       console.error(err);
     }
   };
 
   const handleDeleteEntireDiscoverEvent = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذه الفعالية بالكامل من المعرض والسحابة؟')) {
+    if (confirm('هل أنت متأكد من حذف هذه الفعالية بالكامل؟')) {
       try {
         await deleteDoc(doc(db, 'site_discover_events', id));
         const updated = discoverEvents.filter((ev) => ev.id !== id);
         setDiscoverEvents(updated);
         if (updated.length > 0) setSelectedEventId(updated[0].id);
-        alert('تم حذف الفعالية سحابياً بنجاح.');
+        alert('تم الحذف بنجاح.');
       } catch (err) {
         console.error(err);
       }
@@ -518,13 +512,9 @@ export default function AdminDashboard() {
 
   const currentEditedEvent = discoverEvents.find((ev) => ev.id === selectedEventId) || discoverEvents[0];
 
-  // --- Events Cloud Handlers & Editing ---
   const handleSaveEventSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) {
-      alert('يرجى كتابة عنوان الفعالية.');
-      return;
-    }
+    if (!newTitle.trim()) return;
     const eventId = editingEventId ? editingEventId : Date.now().toString();
     const eventObj: EventItem = {
       id: eventId,
@@ -540,10 +530,10 @@ export default function AdminDashboard() {
       await setDoc(doc(db, 'site_events', eventId), eventObj);
       if (editingEventId) {
         setEvents(events.map((ev) => ev.id === eventId ? eventObj : ev));
-        alert('تم تعديل وتحديث الفعالية سحابياً بنجاح!');
+        alert('تم تعديل الفعالية بنجاح!');
       } else {
         setEvents([eventObj, ...events]);
-        alert('تم نشر الفعالية وحفظها سحابياً بنجاح!');
+        alert('تم نشر الفعالية بنجاح!');
       }
       setEditingEventId(null);
       setNewTitle('');
@@ -553,7 +543,6 @@ export default function AdminDashboard() {
       setNewDesc('');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء الحفظ السحابي.');
     }
   };
 
@@ -569,24 +558,19 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteEvent = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذه الفعالية من السحابة؟')) {
+    if (confirm('هل أنت متأكد من الحذف؟')) {
       try {
         await deleteDoc(doc(db, 'site_events', id));
         setEvents(events.filter((ev) => ev.id !== id));
-        alert('تم الحذف سحابياً بنجاح.');
       } catch (err) {
         console.error(err);
       }
     }
   };
 
-  // --- Banners Cloud Handlers ---
   const handleAddBanner = async (e: FormEvent) => {
     e.preventDefault();
-    if (!bannerTitle.trim()) {
-      alert('يرجى كتابة عنوان البانر.');
-      return;
-    }
+    if (!bannerTitle.trim()) return;
     const bannerId = Date.now().toString();
     const newBanner: BannerItem = {
       id: bannerId,
@@ -603,10 +587,9 @@ export default function AdminDashboard() {
       setBannerTag('');
       setBannerTitle('');
       setBannerImage('/header-banner.png');
-      alert('تم إضافة وتفعيل البانر سحابياً بنجاح في الواجهة الرئيسية!');
+      alert('تم إضافة وتفعيل البانر بنجاح!');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء الحفظ السحابي.');
     }
   };
 
@@ -614,19 +597,14 @@ export default function AdminDashboard() {
     try {
       await deleteDoc(doc(db, 'site_banners', id));
       setBanners(banners.filter((b) => b.id !== id));
-      alert('تم حذف البانر سحابياً.');
     } catch (err) {
       console.error(err);
     }
   };
 
-  // --- Partners Cloud Handlers ---
   const handleAddPartner = async (e: FormEvent) => {
     e.preventDefault();
-    if (!partnerName.trim()) {
-      alert('يرجى كتابة اسم الشريك أو الراعي.');
-      return;
-    }
+    if (!partnerName.trim()) return;
     const partnerId = Date.now().toString();
     const newPartner: PartnerItem = {
       id: partnerId,
@@ -641,26 +619,23 @@ export default function AdminDashboard() {
       setPartnerName('');
       setPartnerCategory('شريك إستراتيجي');
       setPartnerLogo('/logo.png');
-      alert('تم إضافة شريك النجاح وحفظه سحابياً بنجاح للجميع! 🤝');
+      alert('تم إضافة شريك النجاح بنجاح! 🤝');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء الحفظ السحابي.');
     }
   };
 
   const handleDeletePartner = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا الشريك من السحابة؟')) {
+    if (confirm('هل أنت متأكد من الحذف؟')) {
       try {
         await deleteDoc(doc(db, 'site_partners', id));
         setPartners(partners.filter((p) => p.id !== id));
-        alert('تم حذف الشريك سحابياً بنجاح.');
       } catch (err) {
         console.error(err);
       }
     }
   };
 
-  // --- Requests Handlers ---
   const openAcceptModal = (reqId: string) => {
     setSelectedRequestId(reqId);
     setShowAcceptModal(true);
@@ -670,10 +645,7 @@ export default function AdminDashboard() {
     if (!selectedRequestId) return;
     try {
       const targetRequest = requests.find((req) => req.id === selectedRequestId);
-      if (!targetRequest) {
-        alert('لم يتم العثور على بيانات المتقدم.');
-        return;
-      }
+      if (!targetRequest) return;
 
       const docRef = doc(db, 'applications', selectedRequestId);
       await updateDoc(docRef, { 
@@ -684,7 +656,7 @@ export default function AdminDashboard() {
 
       let targetCommitteeId = 'design';
       if (acceptedCommittee.includes('تصميم')) targetCommitteeId = 'design';
-      else if (acceptedCommittee.includes('إعلام') || acceptedCommittee.includes('الاعلام')) targetCommitteeId = 'media';
+      else if (acceptedCommittee.includes('إعلام')) targetCommitteeId = 'media';
       else if (acceptedCommittee.includes('فعاليات')) targetCommitteeId = 'events-org';
       else if (acceptedCommittee.includes('الموارد')) targetCommitteeId = 'hr';
       else if (acceptedCommittee.includes('العلاقات')) targetCommitteeId = 'pr';
@@ -712,8 +684,7 @@ export default function AdminDashboard() {
         phone: targetRequest.phone || ''
       };
 
-      const isAlreadyMember = existingMembers.some((m: CommitteeMember) => m.name === newMemberObj.name);
-      const updatedMembers = isAlreadyMember ? existingMembers : [...existingMembers, newMemberObj];
+      const updatedMembers = [...existingMembers, newMemberObj];
 
       await setDoc(commDocRef, {
         maleLeader,
@@ -727,37 +698,32 @@ export default function AdminDashboard() {
       alert(`تم قبول العضو وإضافته تلقائياً إلى (${acceptedCommittee}) بنجاح! 🚀`);
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء قبول العضو وإضافته تلقائياً.');
     }
   };
 
   const handleRejectRequest = async (id: string) => {
-    if(confirm('هل أنت متأكد من رفض هذا الطلب؟ (سيتمكن المتقدم من معرفة حالة رفضه عند الاستعلام).')) {
+    if(confirm('هل أنت متأكد من رفض الطلب؟')) {
       try {
         const docRef = doc(db, 'applications', id);
         await updateDoc(docRef, { status: 'مرفوض' });
         setRequests(requests.map((req) => req.id === id ? { ...req, status: 'مرفوض' } : req));
-        alert('تم تحديث حالة الطلب إلى (مرفوض) بنجاح.');
       } catch (err) {
         console.error(err);
-        alert('حدث خطأ أثناء رفض الطلب.');
       }
     }
   };
 
   const handleDeleteRequest = async (id: string) => {
-    if(confirm('تحذير: هل أنت متأكد من الحذف النهائي لهذا الطلب من السحابة؟')) {
+    if(confirm('هل أنت متأكد من الحذف النهائي للطلب؟')) {
       try {
         await deleteDoc(doc(db, 'applications', id));
         setRequests(requests.filter((req) => req.id !== id));
-        alert('تم حذف الطلب نهائياً.');
       } catch (err) {
         console.error(err);
       }
     }
   };
 
-  // --- Leaders & Members Handlers ---
   const handleSaveLeadersSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
@@ -766,10 +732,9 @@ export default function AdminDashboard() {
         femaleLeader: currentCommittee.femaleLeader,
         members: currentCommittee.members || []
       }, { merge: true });
-      alert(`تم حفظ وتحديث قادة "${currentCommittee.name}" سحابياً بنجاح!`);
+      alert(`تم حفظ وتحديث قادة "${currentCommittee.name}" بنجاح!`);
     } catch (err) {
-      console.error('Error saving leaders:', err);
-      alert('حدث خطأ أثناء الحفظ.');
+      console.error(err);
     }
   };
 
@@ -778,8 +743,7 @@ export default function AdminDashboard() {
     if (!newMemberName.trim()) return;
 
     const updatedMembers = [...(currentCommittee.members || []), { name: newMemberName, role: newMemberRole || 'عضو', status: 'نشط' }];
-    const updated = committees.map((c) => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c);
-    setCommittees(updated);
+    setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c));
     setNewMemberName('');
     setNewMemberRole('');
 
@@ -789,7 +753,7 @@ export default function AdminDashboard() {
         femaleLeader: currentCommittee.femaleLeader,
         members: updatedMembers
       }, { merge: true });
-      alert('تم إضافة العضو وحفظه سحابياً بنجاح!');
+      alert('تم إضافة العضو بنجاح!');
     } catch (err) {
       console.error(err);
     }
@@ -799,8 +763,7 @@ export default function AdminDashboard() {
     const updatedMembers = [...(currentCommittee.members || [])];
     updatedMembers.splice(index, 1);
 
-    const updated = committees.map((c) => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c);
-    setCommittees(updated);
+    setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c));
 
     try {
       await setDoc(doc(db, 'committees', selectedCommitteeId), {
@@ -808,7 +771,6 @@ export default function AdminDashboard() {
         femaleLeader: currentCommittee.femaleLeader,
         members: updatedMembers
       }, { merge: true });
-      alert('تم حذف العضو وتحديث السحابة بنجاح!');
     } catch (err) {
       console.error(err);
     }
@@ -817,7 +779,6 @@ export default function AdminDashboard() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       
-      {/* Navbar Admin */}
       <div className="bg-white border-b border-slate-200 py-4 px-6 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-3">
           <span className="w-10 h-10 rounded-xl bg-[#630517] text-[#F5D061] flex items-center justify-center font-black text-lg shadow">
@@ -825,7 +786,7 @@ export default function AdminDashboard() {
           </span>
           <div>
             <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (سحابي متكامل ☁️)</h1>
-            <p className="text-xs text-slate-500">إدارة الرتب والحسابات والفعاليات سحابياً</p>
+            <p className="text-xs text-slate-500">إدارة الرتب والمقترحات والفعاليات سحابياً</p>
           </div>
         </div>
 
@@ -842,20 +803,21 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {[
-            { id: 'users-manager', label: '🔑 إدارة الحسابات وكلمات السر والرتب' },
-            { id: 'discover', label: '🖼️ إدارة معرض "اكتشف النادي"' },
-            { id: 'passion', label: '✨ إدارة بطاقة "شغف وعطاء"' },
-            { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
-            { id: 'banners', label: '🖼️ إدارة البانرات الرئيسية' },
-            { id: 'partners', label: '🤝 إدارة شركاء النجاح والرعاة' },
-            { id: 'team', label: '👥 إدارة القادة والأعضاء' },
+            { id: 'users-manager', label: '🔑 الحسابات والرتب' },
+            { id: 'suggestions', label: '💡 آراء ومقترحات الطلاب' },
+            { id: 'discover', label: '🖼️ معرض "اكتشف النادي"' },
+            { id: 'passion', label: '✨ بطاقة "شغف وعطاء"' },
+            { id: 'events', label: '📅 الفعاليات والبوسترات' },
+            { id: 'banners', label: '🖼️ البانرات الرئيسية' },
+            { id: 'partners', label: '🤝 شركاء النجاح والرعاة' },
+            { id: 'team', label: '👥 القادة والأعضاء' },
             { id: 'requests', label: '📥 طلبات الانضمام والأكسل' },
           ].map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-6 py-2.5 rounded-2xl font-bold text-sm transition-all shadow-sm ${
+              className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
                 activeTab === tab.id
                   ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105'
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
@@ -866,7 +828,55 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* Tabs Content */}
+        {/* --- تبويب آراء ومقترحات الطلاب المضاف حديثاً --- */}
+        {activeTab === 'suggestions' && (
+          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">صندوق آراء ومقترحات الطلاب والزوار 💡</h3>
+                <p className="text-xs text-slate-500">هنا تظهر كافة المقترحات والأفكار التي يكتبها الزوار في الصفحة الرئيسية مباشرة.</p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-[#630517]/10 text-[#630517] font-bold text-xs">
+                إجمالي المقترحات: {suggestions.length}
+              </span>
+            </div>
+
+            {suggestions.length === 0 ? (
+              <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-sm font-bold">لا توجد مقترحات أو آراء مرسلة حتى الآن.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {suggestions.map((sug) => (
+                  <div key={sug.id} className="p-6 rounded-2xl border border-slate-200 bg-slate-50 shadow-sm flex flex-col justify-between space-y-4 relative group">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-black text-[#630517] text-sm">{sug.name || 'زائر كريم'}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {sug.createdAt ? new Date(sug.createdAt).toLocaleDateString('ar-SA') : ''}
+                        </span>
+                      </div>
+                      <p className="text-slate-700 text-xs sm:text-sm font-medium leading-relaxed bg-white p-4 rounded-xl border border-slate-200 shadow-inner">
+                        "{sug.content}"
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSuggestion(sug.id)}
+                        className="px-3 py-1.5 rounded-xl bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 cursor-pointer"
+                      >
+                        حذف المقترح ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'users-manager' && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
@@ -896,32 +906,26 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
 
-                  {usersList.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-slate-400">لا توجد حسابات مسجلة أخرى حالياً.</td>
+                  {usersList.map((usr, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50">
+                      <td className="py-4 pr-2 font-bold text-slate-900">{usr.fullName || 'مستخدم مسجل'}</td>
+                      <td className="py-4 text-slate-600 font-mono" dir="ltr">{usr.phone}</td>
+                      <td className="py-4 text-[#630517] font-mono font-bold bg-slate-100 px-2 rounded w-fit">{usr.password || 'غير متوفرة'}</td>
+                      <td className="py-4">
+                        <select
+                          value={usr.role || 'عضو أساسي'}
+                          onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
+                        >
+                          <option value="System Admin">System Admin</option>
+                          <option value="General Supervisor">General Supervisor</option>
+                          <option value="رئيس لجنة / مشرف قسم">رئيس لجنة</option>
+                          <option value="عضو مميز / منسق">عضو مميز</option>
+                          <option value="عضو أساسي">عضو أساسي</option>
+                        </select>
+                      </td>
                     </tr>
-                  ) : (
-                    usersList.map((usr, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="py-4 pr-2 font-bold text-slate-900">{usr.fullName || 'مستخدم مسجل'}</td>
-                        <td className="py-4 text-slate-600 font-mono" dir="ltr">{usr.phone}</td>
-                        <td className="py-4 text-[#630517] font-mono font-bold bg-slate-100 px-2 rounded w-fit">{usr.password || 'غير متوفرة'}</td>
-                        <td className="py-4">
-                          <select
-                            value={usr.role || 'عضو أساسي'}
-                            onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
-                            className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
-                          >
-                            <option value="System Admin">System Admin</option>
-                            <option value="General Supervisor">General Supervisor</option>
-                            <option value="رئيس لجنة / مشرف قسم">رئيس لجنة</option>
-                            <option value="عضو مميز / منسق">عضو مميز</option>
-                            <option value="عضو أساسي">عضو أساسي</option>
-                          </select>
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1194,7 +1198,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر بوستر الفعالية من جهازك أو أدخل رابطه</label>
+                  <label className="text-xs font-bold text-slate-600">اختر بوستر الفعالية من جهازك</label>
                   <input
                     type="file"
                     accept="image/*"
@@ -1204,7 +1208,7 @@ export default function AdminDashboard() {
                         setNewPoster(fileUrl);
                       }
                     }}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
                 </div>
 
@@ -1276,7 +1280,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-600">نص الشارة العلوية</label>
                   <input
                     type="text"
-                    placeholder="مثال: اليوم الوطني السعودي 🇸🇦"
+                    placeholder="مثال: مناسبة خاصة"
                     value={bannerTag}
                     onChange={(e) => setBannerTag(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
@@ -1287,7 +1291,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-600">عنوان البانر الرئيسي</label>
                   <input
                     type="text"
-                    placeholder="مثال: نحتفل بالوطن ونمضي قدماً"
+                    placeholder="مثال: نادي التمريض"
                     value={bannerTitle}
                     onChange={(e) => setBannerTitle(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
@@ -1305,7 +1309,7 @@ export default function AdminDashboard() {
                         setBannerImage(fileUrl);
                       }
                     }}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
                 </div>
 
@@ -1354,7 +1358,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- تبويب شركاء النجاح والرعاة المضاف حديثاً --- */}
         {activeTab === 'partners' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
@@ -1365,7 +1368,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-600">اسم الجهة أو الشريك</label>
                   <input
                     type="text"
-                    placeholder="مثال: مستشفى الملك فهد التخصصي"
+                    placeholder="مثال: وبل"
                     value={partnerName}
                     onChange={(e) => setPartnerName(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
@@ -1398,7 +1401,7 @@ export default function AdminDashboard() {
                         setPartnerLogo(fileUrl);
                       }
                     }}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
                 </div>
 
