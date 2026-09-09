@@ -278,13 +278,33 @@ export default function AdminDashboard() {
     fetchCloudData();
   }, []);
 
-  // --- Update User Role Handler ---
+  // --- Update User Role Handler (مع حفظ الصلاحيات وإعلام العضو) ---
   const handleRoleChange = async (phone: string, newRole: string) => {
     try {
       const userRef = doc(db, 'users', phone);
-      await updateDoc(userRef, { role: newRole });
+      
+      // تحديد الصلاحيات بناءً على الرتبة المختارَة لتظهر له تلقائياً
+      let permissionsDesc = '';
+      if (newRole === 'System Admin') {
+        permissionsDesc = 'الصلاحيات المطلقة على النظام (التحكم الكامل بجميع الأقسام، حذف ونشر الفعاليات، تعديل وإدارة رتب جميع الأعضاء، استيراد وتصدير بيانات الأكسل).';
+      } else if (newRole === 'General Supervisor') {
+        permissionsDesc = 'صلاحيات الإشراف العام على الأنشطة والفعاليات ومتابعة سير العمل في لجان النادي ومراجعة طلبات الأعضاء.';
+      } else if (newRole === 'رئيس لجنة / مشرف قسم') {
+        permissionsDesc = 'إدارة أعضاء اللجنة الخاصة به، متابعة المهام المسندة للجنة، ورفع التقارير والمقترحات.';
+      } else if (newRole === 'عضو مميز / منسق') {
+        permissionsDesc = 'المشاركة الفعالة في تنظيم المبادرات والأنشطة، التنسيق بين الأعضاء، وصلاحيات مساعدة في إدارة بعض المهام.';
+      } else {
+        permissionsDesc = 'المشاركة في فعاليات النادي، الانضمام للجان والقروبات، والتقديم على الأنشطة والبرامج.';
+      }
+
+      await updateDoc(userRef, { 
+        role: newRole,
+        pendingCongratulation: true,
+        assignedPermissions: permissionsDesc
+      });
+
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, role: newRole } : u));
-      alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح!`);
+      alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح وإرسال بطاقة التهنئة والصلاحيات له! 🎉`);
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء تحديث الرتبة.');

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Image from "next/image";
 import Link from "next/link";
 import { db } from '../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 export default function Hero() {
   const [banners, setBanners] = useState([
@@ -31,6 +31,11 @@ export default function Hero() {
   const [acceptedData, setAcceptedData] = useState<{ committee: string; whatsapp: string } | null>(null);
   const [showModal, setShowModal] = useState(false);
 
+  // --- States خاصة بتهنئة الترقية والصلاحيات القيادية ---
+  const [showRoleCongratModal, setShowRoleCongratModal] = useState(false);
+  const [myNewRole, setMyNewRole] = useState('');
+  const [myPermissions, setMyPermissions] = useState('');
+
   useEffect(() => {
     const savedBanners = localStorage.getItem('UHB_BANNERS');
     if (savedBanners) {
@@ -44,17 +49,34 @@ export default function Hero() {
       }
     }
 
-    // التحقق من حالة العضو السحابية إذا كان مسجلاً دخولاً
+    // التحقق من حالة العضو وططلبات القبول وتحديثات الرتب من سحابة فايربيس
     const userPhone = localStorage.getItem('userPhone');
     const userName = localStorage.getItem('userName');
 
     if (userPhone || userName) {
-      const checkAcceptance = async () => {
+      const checkUserData = async () => {
         try {
+          // 1. التحقق من وجود ترقية ورتبة جديدة وإشعار معلق
+          if (userPhone) {
+            const userDocRef = doc(db, 'users', userPhone);
+            const userSnap = await getDoc(userDocRef);
+            if (userSnap.exists()) {
+              const uData = userSnap.data();
+              if (uData.pendingCongratulation) {
+                setMyNewRole(uData.role || 'عضو أساسي');
+                setMyPermissions(uData.assignedPermissions || 'الصلاحيات العامة للنادي.');
+                setShowRoleCongratModal(true);
+
+                // إزالة علامة الانتظار لكي لا تظهر مجدداً في كل تحديث صفحة
+                await updateDoc(userDocRef, { pendingCongratulation: false });
+              }
+            }
+          }
+
+          // 2. التحقق من قبول الطلب وانضمامه للجنة
           const querySnapshot = await getDocs(collection(db, 'applications'));
           querySnapshot.forEach((docSnap) => {
             const data = docSnap.data();
-            // مطابقة برقم الجوال أو الاسم المسجل
             if (
               (userPhone && data.phone === userPhone) ||
               (userName && data.fullName === userName)
@@ -69,11 +91,11 @@ export default function Hero() {
             }
           });
         } catch (err) {
-          console.error('Error checking user acceptance:', err);
+          console.error('Error checking user acceptance or role update:', err);
         }
       };
 
-      checkAcceptance();
+      checkUserData();
     }
   }, []);
 
@@ -152,6 +174,42 @@ export default function Hero() {
         )}
 
       </div>
+
+      {/* --- نافذة تهنئة الترقية القيادية والصلاحيات --- */}
+      {showRoleCongratModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-300" dir="rtl">
+          <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 text-center border-4 border-[#F5D061] animate-in zoom-in-95 duration-300 text-slate-900">
+            <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-lg font-black">
+              🎉
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-2xl font-black text-slate-900">مبارك لك الثقة القيادية!</h2>
+              <p className="text-xs text-slate-500">تم ترقيتك رسمياً في نادي كلية التمريض - جامعة حفر الباطن</p>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+              <span className="text-xs text-slate-400 font-bold block">رتبتك القيادية الجديدة:</span>
+              <span className="text-lg font-black text-[#630517] bg-[#F5D061]/20 px-4 py-1.5 rounded-xl inline-block" dir="ltr">
+                {myNewRole}
+              </span>
+            </div>
+
+            <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200 text-right space-y-1">
+              <h4 className="text-xs font-black text-amber-900">📜 صلاحياتك ومهامك القيادية المعتمدة:</h4>
+              <p className="text-xs text-slate-700 leading-relaxed">{myPermissions}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowRoleCongratModal(false)}
+              className="w-full py-3.5 bg-[#630517] text-[#F5D061] rounded-2xl font-black text-sm shadow-lg hover:brightness-110 transition-all cursor-pointer"
+            >
+              بدء مهام العمل القيادي 🚀
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* نافذة التهنئة بالقبول ورابط الواتساب */}
       {showModal && acceptedData && (
