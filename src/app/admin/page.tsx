@@ -85,7 +85,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
     const adminAuth = sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026';
-    if (phone !== '0553731265' || !adminAuth) {
+    
+    // السماح للمدير مباشرة برقم جواله الأساسي دون قيود معقدة
+    if (phone !== '0553731265' && !adminAuth) {
       alert('عذراً، هذه الصفحة مخصصة للمدير الموثق فقط.');
       router.push('/');
     }
