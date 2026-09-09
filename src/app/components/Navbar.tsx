@@ -24,6 +24,22 @@ export default function Navbar() {
   // حالة فتح وإغلاق نافذة تسجيل الدخول المنبثقة لمنع ظهور الشاشة السوداء السادة
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
+  // دالة تحديد الصلاحيات بناءً على رتبة المستخدم لتظهر مثل الصورة تماماً
+  const getRolePermissions = (roleName: string) => {
+    switch (roleName) {
+      case 'System Admin':
+        return 'الصلاحيات المطلقة على النظام (التحكم الكامل بجميع الأقسام، حذف ونشر الفعاليات، تعديل وإدارة رتب جميع الأعضاء، استيراد وتصدير بيانات الأكسل، والتحكم بالبانرات والشرائح).';
+      case 'General Supervisor':
+        return 'صلاحيات الإشراف العام على الأنشطة والفعاليات ومتابعة سير العمل في لجان النادي ومراجعة طلبات الأعضاء.';
+      case 'رئيس لجنة / مشرف قسم':
+        return 'إدارة أعضاء اللجنة الخاصة به، متابعة المهام المسندة للجنة، ورفع التقارير والمقترحات.';
+      case 'عضو مميز / منسق':
+        return 'المشاركة الفعالة في تنظيم المبادرات والأنشطة، التنسيق بين الأعضاء، وصلاحيات مساعدة في إدارة بعض المهام.';
+      default:
+        return 'المشاركة في فعاليات النادي، الانضمام للجان والقروبات، والتقديم على الأنشطة والبرامج.';
+    }
+  };
+
   useEffect(() => {
     setMounted(true);
     const name = localStorage.getItem('userName');
@@ -116,26 +132,49 @@ export default function Navbar() {
 
   return (
     <>
-      {/* نافذة الإشعار الفوري (تظهر فوراً عند الترقية أو تحديث الحساب) */}
+      {/* نافذة الإشعار الفوري (بتصميم الصورة المطابق تماماً) */}
       {showNotificationModal && notification && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-4 border-2 border-[#F5D061]">
-            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl font-black shadow-lg">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
+          <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative">
+            
+            {/* أيقونة القبعة أو الاحتفال العلوية */}
+            <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl border-4 border-white -mt-14">
               🎉
             </div>
-            <div className="space-y-2">
-              <h3 className="text-lg font-black text-slate-900">إشعار جديد من الإدارة</h3>
-              <p className="text-slate-700 text-sm font-bold leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                {notification}
+
+            {/* العنوان والوصف */}
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-black text-slate-900">مبارك لك الثقة القيادية!</h3>
+              <p className="text-xs text-slate-500 font-medium">تم ترقيتك رسمياً في نادي كلية التمريض - جامعة حفر الباطن</p>
+            </div>
+
+            {/* مربع عرض الرتبة الجديدة */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-1.5 text-right shadow-inner">
+              <span className="text-[11px] font-bold text-slate-400 block">رتبتك القيادية الجديدة:</span>
+              <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl py-2 px-4 text-center">
+                <span className="text-base font-black text-[#630517]">{userRole || 'عضو أساسي'}</span>
+              </div>
+            </div>
+
+            {/* مربع عرض الصلاحيات المهنية */}
+            <div className="bg-amber-50/30 border border-amber-200/50 rounded-2xl p-4 space-y-1.5 text-right shadow-sm">
+              <span className="text-[11px] font-bold text-amber-900 block flex items-center gap-1">
+                <span>📜</span> صلا حياتك ومهامك القيادية المعتمدة:
+              </span>
+              <p className="text-xs text-slate-700 font-semibold leading-relaxed">
+                {getRolePermissions(userRole || 'عضو أساسي')}
               </p>
             </div>
+
+            {/* زر بدء المهام */}
             <button
               type="button"
               onClick={handleDismissNotification}
-              className="w-full py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-sm shadow-md hover:brightness-110 cursor-pointer transition-all"
+              className="w-full py-3.5 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-sm shadow-lg hover:brightness-110 cursor-pointer transition-all flex items-center justify-center gap-2"
             >
-              حسناً، شكراً لك 👍
+              <span>بدء مهام العمل القيادي 🚀</span>
             </button>
+
           </div>
         </div>
       )}
