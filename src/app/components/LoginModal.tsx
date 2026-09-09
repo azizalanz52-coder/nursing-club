@@ -22,8 +22,12 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
     try {
       const cleanPhone = phone.trim();
 
-      // 1. التحقق الصارم من حساب المشرف الأساسي (عبدالعزيز)
+      // 1. حماية صارمة خاصة بمدير النظام (عبدالعزيز) برقم الجوال وكلمة المرور السرية الحصرية
       if (cleanPhone === '0553731265') {
+        if (password !== 'qwer8901as') {
+          alert('كلمة المرور غير صحيحة لحساب المشرف العام.');
+          return;
+        }
         localStorage.setItem('userPhone', cleanPhone);
         localStorage.setItem('userName', 'عبدالعزيز العنزي (المشرف العام)');
         sessionStorage.setItem('adminToken', 'SECURE_ADMIN_KEY_NURSING_2026');
@@ -33,14 +37,14 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
         return;
       }
 
-      // 2. التحقق من قاعدة بيانات المستخدمين العاديين في Firebase بدقة تامة
+      // 2. التحقق من قاعدة بيانات المستخدمين العاديين في Firebase
       const userDocRef = doc(db, 'users', cleanPhone);
       const userSnap = await getDoc(userDocRef);
 
       if (userSnap.exists()) {
         const userData = userSnap.data();
         if (userData.password === password) {
-          sessionStorage.removeItem('adminToken');
+          sessionStorage.removeItem('adminToken'); // منع أي مستخدم عادي من أخذ صلاحية الأدمن
           localStorage.setItem('userPhone', cleanPhone);
           localStorage.setItem('userName', userData.fullName || 'مستخدم مسجل');
           alert(`مرحباً بك يا ${userData.fullName || 'صديقنا'}! تم تسجيل الدخول بنجاح.`);
