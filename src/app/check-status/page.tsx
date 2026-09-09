@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { db } from '@/lib/firebase'; // استخدام مسار الـ Alias المباشر لتجنب أخطاء مسارات النسب
+import { db } from '../lib/firebase'; // استخدام مسار الـ Alias المباشر لتجنب أخطاء مسارات النسب
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function CheckStatusPage() {
