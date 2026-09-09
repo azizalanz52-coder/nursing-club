@@ -82,11 +82,20 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions'>('users-manager');
 
+  // State لإدارة إظهار وإخفاء كلمات المرور لكل مستخدم عبر الـ phone مفتاحاً
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+
+  const togglePasswordVisibility = (phone: string) => {
+    setShowPasswords((prev) => ({
+      ...prev,
+      [phone]: !prev[phone]
+    }));
+  };
+
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
     const adminAuth = sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026';
     
-    // السماح للمدير مباشرة برقم جواله الأساسي دون قيود معقدة
     if (phone !== '0553731265' && !adminAuth) {
       alert('عذراً، هذه الصفحة مخصصة للمدير الموثق فقط.');
       router.push('/');
@@ -132,9 +141,7 @@ export default function AdminDashboard() {
   const [partnerCategory, setPartnerCategory] = useState<string>('شريك إستراتيجي');
   const [partnerLogo, setPartnerLogo] = useState<string>('/logo.png');
 
-  // Suggestions Cloud State
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
-
   const [requests, setRequests] = useState<Record<string, any>[]>([]);
   const [usersList, setUsersList] = useState<UserAccount[]>([]);
   
@@ -226,7 +233,6 @@ export default function AdminDashboard() {
           ]);
         }
 
-        // Fetch Suggestions from Cloud
         const suggestionsSnap = await getDocs(collection(db, 'suggestions'));
         if (!suggestionsSnap.empty) {
           const suggestionsList: SuggestionItem[] = [];
@@ -315,7 +321,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- Suggestion Delete Handler ---
   const handleDeleteSuggestion = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا المقترح من السحابة؟')) {
       try {
@@ -830,7 +835,6 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* --- تبويب آراء ومقترحات الطلاب المضاف حديثاً --- */}
         {activeTab === 'suggestions' && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
@@ -883,7 +887,7 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
               <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب الإدارية 🔑</h3>
-              <p className="text-xs text-slate-500">من هنا يمكنك استعراض جميع المشتركين وأرقامهم وكلمات سرهم وتحديد رتبهم بدقة.</p>
+              <p className="text-xs text-slate-500">كلمات المرور مخفية افتراضياً ويمكنك إظهارها عند الحاجة عبر النقر على علامة العين (👁️).</p>
             </div>
             
             <div className="overflow-x-auto">
@@ -892,15 +896,30 @@ export default function AdminDashboard() {
                   <tr className="border-b border-slate-200 text-slate-400 font-bold">
                     <th className="pb-3 pr-2">اسم المستخدم</th>
                     <th className="pb-3">رقم الجوال (اسم الدخول)</th>
-                    <th className="pb-3">كلمة المرور الظاهرة</th>
+                    <th className="pb-3">كلمة المرور</th>
                     <th className="pb-3">الرتبة والصلاحيات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {/* صف المدير الأساسي */}
                   <tr className="hover:bg-slate-50 bg-rose-50/20">
                     <td className="py-4 pr-2 font-black text-[#630517]">عبدالعزيز العنزي (المشرف الأساسي)</td>
                     <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
-                    <td className="py-4 text-[#630517] font-mono font-bold bg-slate-100 px-2 rounded w-fit">qwer8901as</td>
+                    <td className="py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#630517] font-mono font-bold bg-slate-100 px-2.5 py-1 rounded w-fit">
+                          {showPasswords['0553731265'] ? 'qwer8901as' : '••••••••'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => togglePasswordVisibility('0553731265')}
+                          className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
+                          title={showPasswords['0553731265'] ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                        >
+                          {showPasswords['0553731265'] ? '👁️‍🗨️' : '👁️'}
+                        </button>
+                      </div>
+                    </td>
                     <td className="py-4">
                       <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-black text-[11px]" dir="ltr">
                         System Admin
@@ -908,11 +927,26 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
 
+                  {/* باقي المستخدمين المسجلين */}
                   {usersList.map((usr, idx) => (
                     <tr key={idx} className="hover:bg-slate-50">
                       <td className="py-4 pr-2 font-bold text-slate-900">{usr.fullName || 'مستخدم مسجل'}</td>
                       <td className="py-4 text-slate-600 font-mono" dir="ltr">{usr.phone}</td>
-                      <td className="py-4 text-[#630517] font-mono font-bold bg-slate-100 px-2 rounded w-fit">{usr.password || 'غير متوفرة'}</td>
+                      <td className="py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#630517] font-mono font-bold bg-slate-100 px-2.5 py-1 rounded w-fit">
+                            {showPasswords[usr.phone] ? (usr.password || 'غير متوفرة') : '••••••••'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility(usr.phone)}
+                            className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
+                            title={showPasswords[usr.phone] ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                          >
+                            {showPasswords[usr.phone] ? '👁️‍🗨️' : '👁️'}
+                          </button>
+                        </div>
+                      </td>
                       <td className="py-4">
                         <select
                           value={usr.role || 'عضو أساسي'}
