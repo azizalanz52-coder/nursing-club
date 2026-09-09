@@ -55,9 +55,16 @@ interface Committee {
   members: CommitteeMember[];
 }
 
+interface UserAccount {
+  phone: string;
+  password?: string;
+  fullName?: string;
+  createdAt?: string;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners' | 'discover' | 'passion'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners' | 'discover' | 'passion' | 'users-manager'>('events');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -107,6 +114,7 @@ export default function AdminDashboard() {
   const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
 
   const [requests, setRequests] = useState<Record<string, any>[]>([]);
+  const [usersList, setUsersList] = useState<UserAccount[]>([]);
   
   // --- Accept Request Modal States ---
   const [showAcceptModal, setShowAcceptModal] = useState(false);
@@ -245,6 +253,13 @@ export default function AdminDashboard() {
         if (fetchedRequests.length > 0) {
           setRequests(fetchedRequests);
         }
+
+        // Users & Passwords Collection
+        const usersSnap = await getDocs(collection(db, 'users'));
+        const fetchedUsers = usersSnap.docs.map((docSnap) => ({
+          ...docSnap.data()
+        })) as UserAccount[];
+        setUsersList(fetchedUsers);
 
         // Committees
         const commSnapshot = await getDocs(collection(db, 'committees'));
@@ -633,7 +648,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // زر الرفض: تم تصحيح الحالة لتصبح 'مرفوض' بالعربي السليم
   const handleRejectRequest = async (id: string) => {
     if(confirm('هل أنت متأكد من رفض هذا الطلب؟ (سيتمكن المتقدم من معرفة حالة رفضه عند الاستعلام).')) {
       try {
@@ -648,7 +662,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // زر الحذف النهائي: يحذف الطلب من قاعدة البيانات نهائياً
   const handleDeleteRequest = async (id: string) => {
     if(confirm('تحذير: هل أنت متأكد من الحذف النهائي لهذا الطلب من السحابة؟')) {
       try {
@@ -752,6 +765,7 @@ export default function AdminDashboard() {
             { id: 'banners', label: '🖼️ إدارة البانرات (سحابي)' },
             { id: 'team', label: '👥 إدارة القادة والأعضاء' },
             { id: 'requests', label: '📥 طلبات الانضمام مع استيراد الأكسل (Firebase)' },
+            { id: 'users-manager', label: '🔑 حسابات وكلمات سر المستخدمين' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1440,6 +1454,48 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Users & Passwords Manager Tab */}
+        {activeTab === 'users-manager' && (
+          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4">
+              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين وكلمات السر 🔑</h3>
+              <p className="text-xs text-slate-500">من هنا يمكنك الاطلاع على أرقام جوالات المستخدمين وكلمات سرهم المسجلة لمساعدتهم عند نسيانها.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                    <th className="pb-3 pr-2">اسم المستخدم</th>
+                    <th className="pb-3">رقم الجوال (اسم الدخول)</th>
+                    <th className="pb-3">كلمة المرور</th>
+                    <th className="pb-3 text-left pl-2">الحالة</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  <tr className="hover:bg-slate-50">
+                    <td className="py-4 pr-2 font-bold text-slate-900">عبدالعزيز العنزي (المشرف العام)</td>
+                    <td className="py-4 text-slate-600" dir="ltr">0553731265</td>
+                    <td className="py-4 text-[#630517] font-mono font-bold">حساب المشرف الأساسي</td>
+                    <td className="py-4 text-left pl-2">
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold">مدير النظام</span>
+                    </td>
+                  </tr>
+                  {usersList.map((usr, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50">
+                      <td className="py-4 pr-2 font-bold text-slate-900">{usr.fullName || 'مستخدم مسجل'}</td>
+                      <td className="py-4 text-slate-600" dir="ltr">{usr.phone}</td>
+                      <td className="py-4 text-[#630517] font-mono font-bold">{usr.password || 'غير متوفرة'}</td>
+                      <td className="py-4 text-left pl-2">
+                        <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-bold">عضو سحابي</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

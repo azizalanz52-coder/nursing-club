@@ -1,151 +1,130 @@
 'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { db } from "./../lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { db } from '../lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-export default function LoginPage() {
+export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const router = useRouter();
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+
+  if (!isOpen) return null;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setErrorMessage("");
-
-    const trimmedPhone = phone.trim();
-    const trimmedPassword = password.trim();
-
-    if (!trimmedPhone || !trimmedPassword) {
-      setErrorMessage("الرجاء إدخال رقم الجوال وكلمة المرور.");
-      setLoading(false);
-      return;
-    }
-
-    // 1. استثناء رقم المدير الخاص بك حصرياً
-    if (trimmedPhone === '0553731265') {
-      localStorage.setItem("userPhone", trimmedPhone);
-      localStorage.setItem("userName", "المدير (عبدالعزيز العنزي)");
-      sessionStorage.setItem('adminToken', 'SECURE_ADMIN_KEY_NURSING_2026');
-      router.push("/");
+    if (!phone || !password) {
+      alert('الرجاء إدخال رقم الجوال وكلمة المرور.');
       return;
     }
 
     try {
-      // 2. التحقق الصارم من وجود رقم الجوال في قاعدة بيانات المتقدمين في Firebase
-      const q = query(collection(db, "applications"), where("phone", "==", trimmedPhone));
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        setErrorMessage("عذراً، هذا الرقم غير مسجل في نظام النادي. لا يمكنك الدخول.");
-        setLoading(false);
+      // 1. التحقق من حساب المدير العام مباشرة
+      if (phone === '0553731265') {
+        localStorage.setItem('userPhone', phone);
+        localStorage.setItem('userName', 'عبدالعزيز العنزي (المشرف)');
+        sessionStorage.setItem('adminToken', 'SECURE_ADMIN_KEY_NURSING_2026');
+        alert('أهلاً بك يا عبد العزيز (المشرف العام) 🚀');
+        onClose();
+        window.location.reload();
         return;
       }
 
-      let memberName = "عضو النادي";
-      let isRejected = false;
+      // 2. التحقق من قاعدة بيانات المستخدمين في Firebase
+      const userDocRef = doc(db, 'users', phone);
+      const userSnap = await getDoc(userDocRef);
 
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.fullName) {
-          memberName = data.fullName;
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        if (userData.password === password) {
+          // تسجيل دخول ناجح وثابت
+          localStorage.setItem('userPhone', phone);
+          localStorage.setItem('userName', userData.fullName || 'مسجل دخول');
+          if (userData.isAdmin) {
+            sessionStorage.setItem('adminToken', 'SECURE_ADMIN_KEY_NURSING_2026');
+          }
+          alert(`مرحباً بك يا ${userData.fullName || 'صديقنا'}! تم تسجيل الدخول بنجاح.`);
+          onClose();
+          window.location.reload();
+        } else {
+          alert('كلمة المرور غير صحيحة. تواصل مع المشرف (عبدالعزيز) لمساعدتك.');
         }
-        if (data.status === 'مرفوض') {
-          isRejected = true;
-        }
-      });
-
-      if (isRejected) {
-        setErrorMessage("عذراً، حالة طلبك مرفوضة ولا يمكنك الدخول للنظام.");
-        setLoading(false);
-        return;
+      } else {
+        // إذا لم يكن المستخدم مسجلاً، نسجل له حسابه تلقائياً ونحفظه لكي لا يضيع (أو نطلب منه التسجيل)
+        const newUser = {
+          phone,
+          password,
+          fullName: 'مستخدم جديد',
+          createdAt: new Date().toISOString()
+        };
+        await setDoc(userDocRef, newUser);
+        localStorage.setItem('userPhone', phone);
+        localStorage.setItem('userName', 'مستخدم جديد');
+        alert('تم إنشاء حسابك وتسجيل دخولك بنجاح في النظام!');
+        onClose();
+        window.location.reload();
       }
-
-      // 3. التحقق من كلمة المرور (يجب ألا تكون فارغة وأن تطابق الشروط الأمنية)
-      if (trimmedPassword.length < 6) {
-        setErrorMessage("كلمة المرور غير صحيحة. يرجى التأكد من البيانات.");
-        setLoading(false);
-        return;
-      }
-
-      // حفظ الجلسة والتوجيه بنجاح
-      localStorage.setItem("userPhone", trimmedPhone);
-      localStorage.setItem("userName", memberName);
-      router.push("/");
-
     } catch (err) {
-      console.error("Login error:", err);
-      setErrorMessage("حدث خطأ في الاتصال بقاعدة البيانات. حاول مرة أخرى.");
-      setLoading(false);
+      console.error('Login error:', err);
+      alert('حدث خطأ أثناء تسجيل الدخول. تأكد من اتصال الإنترنت.');
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#630517] flex items-center justify-center px-4 py-8" dir="rtl">
-      <div className="max-w-md w-full bg-black/40 backdrop-blur-md border border-[#F5D061]/30 p-6 sm:p-8 rounded-3xl shadow-2xl space-y-6 text-white">
-        
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-md p-4" dir="rtl">
+      <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border border-slate-100">
         <div className="text-center space-y-2">
-          <span className="inline-block px-4 py-1 rounded-full bg-[#F5D061]/10 border border-[#F5D061]/30 text-[#F5D061] text-xs font-bold tracking-widest uppercase">
-            بوابة الأعضاء
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-black text-[#FFFDF7]">تسجيل الدخول</h1>
-          <p className="text-amber-50/70 text-xs sm:text-sm">أدخل رقم الجوال المسجل في النظام وكلمة المرور</p>
+          <h3 className="text-2xl font-black text-slate-950">تسجيل الدخول / حسابي</h3>
+          <p className="text-xs text-slate-500">أدخل رقم جوالك وكلمة المرور للمتابعة</p>
         </div>
 
-        {errorMessage && (
-          <div className="bg-red-500/25 border border-red-500 text-red-100 px-4 py-3 rounded-xl text-xs font-bold text-center">
-            {errorMessage}
-          </div>
-        )}
-
-        <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
-          <div className="space-y-1.5 text-right">
-            <label className="text-xs sm:text-sm font-bold text-[#F5D061]">رقم الجوال</label>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-700">رقم الجوال</label>
             <input
               type="text"
+              placeholder="05xxxxxxxx"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="0500000000"
-              autoComplete="off"
-              className="w-full px-4 py-3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] text-sm"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-[#630517]"
+              dir="ltr"
               required
             />
           </div>
 
-          <div className="space-y-1.5 text-right">
-            <label className="text-xs sm:text-sm font-bold text-[#F5D061]">كلمة المرور</label>
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-700">كلمة المرور</label>
             <input
               type="password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="new-password"
-              className="w-full px-4 py-3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] text-sm"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-[#630517]"
+              dir="ltr"
               required
             />
           </div>
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] py-3.5 rounded-xl font-black text-sm sm:text-base hover:brightness-110 active:scale-95 transition-all shadow-lg text-center cursor-pointer disabled:opacity-50"
+            className="w-full py-3.5 rounded-xl font-black text-white shadow-lg transition-all cursor-pointer"
+            style={{ background: 'linear-gradient(135deg, #630517 0%, #3a030b 100%)' }}
           >
-            {loading ? "جاري التحقق من السحابة..." : "دخول للنظام"}
+            دخول 🚀
           </button>
         </form>
 
-        <div className="text-center pt-2 border-t border-[#F5D061]/10">
-          <Link href="/" className="text-xs sm:text-sm text-amber-50/70 hover:text-[#F5D061] transition-colors">
-            العودة للرئيسية ←
-          </Link>
+        <div className="text-center pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs text-slate-400 hover:text-slate-600 underline"
+          >
+            إغلاق النافذة
+          </button>
         </div>
-
       </div>
-    </main>
+    </div>
   );
 }
