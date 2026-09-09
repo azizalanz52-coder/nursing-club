@@ -9,7 +9,7 @@ export default function Footer() {
 
         <div className="flex flex-col sm:flex-row items-center gap-4 text-xs font-bold">
           <span className="text-[#F5D061]">
-            صنع بواسطة: عبدالعزيز العنزي
+            صنع بواسطة: عبدالعزيز سليمان العنزي
           </span>
 
           {/* روابط التواصل الاجتماعي مرتبة باتجاه إنجليزي صحيح */}
