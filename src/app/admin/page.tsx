@@ -76,6 +76,7 @@ interface UserAccount {
   fullName?: string;
   role?: string;
   createdAt?: string;
+  latestNotification?: string;
 }
 
 export default function AdminDashboard() {
@@ -312,9 +313,13 @@ export default function AdminDashboard() {
   const handleRoleChange = async (phone: string, newRole: string) => {
     try {
       const userRef = doc(db, 'users', phone);
-      await updateDoc(userRef, { role: newRole });
+      // تحديث الرتبة وإرسال إشعار ترحيب بالترقية يظهر للطالب بحسابه فوراً
+      await updateDoc(userRef, { 
+        role: newRole,
+        latestNotification: `مبروك! تم ترقيتك إلى رتبة (${newRole}) بنجاح 🎉`
+      });
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, role: newRole } : u));
-      alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح!`);
+      alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح وإرسال إشعار الترقية له!`);
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء تحديث الرتبة.');
