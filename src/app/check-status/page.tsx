@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { db } from '../lib/firebase'; // استخدام مسار الـ Alias المباشر لتجنب أخطاء مسارات النسب
+import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function CheckStatusPage() {
@@ -75,42 +75,85 @@ export default function CheckStatusPage() {
             <div className="pt-4 border-t border-slate-100">
               {result ? (
                 <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4 text-center">
-                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto text-xl font-bold">
-                    ✓
-                  </div>
-                  <div>
-                    <h3 className="font-black text-slate-900 text-base">{result.fullName}</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">الرقم الجامعي: {result.universityId || 'غير متوفر'}</p>
-                  </div>
+                  
+                  {/* حالة القبول: مقبول */}
+                  {result.status === 'مقبول' && (
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto text-xl font-bold">
+                        ✓
+                      </div>
+                      <div>
+                        <h3 className="font-black text-slate-900 text-base">{result.fullName}</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">الرقم الجامعي: {result.universityId || 'غير متوفر'}</p>
+                      </div>
 
-                  <div className="py-2 px-4 rounded-xl bg-white border border-slate-200/80 inline-block">
-                    <span className="text-xs text-slate-500 font-bold">الحالة: </span>
-                    <span className={`text-xs font-black ${result.status === 'مقبول' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      {result.status || 'معلق'}
-                    </span>
-                  </div>
+                      <div className="py-2 px-4 rounded-xl bg-white border border-slate-200/80 inline-block">
+                        <span className="text-xs text-slate-500 font-bold">الحالة: </span>
+                        <span className="text-xs font-black text-emerald-600">مقبول</span>
+                      </div>
 
-                  {result.status === 'مقبول' && result.acceptedCommittee && (
-                    <div className="space-y-2 bg-[#630517]/5 p-4 rounded-xl border border-[#630517]/10">
-                      <p className="text-xs font-bold text-[#630517]">مبروك! تم قبولك في:</p>
-                      <p className="text-sm font-black text-slate-900">{result.acceptedCommittee}</p>
-                      
-                      {result.whatsappLink && (
-                        <a
-                          href={result.whatsappLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block w-full py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow hover:bg-emerald-700 transition-colors mt-2"
-                        >
-                          💬 الانضمام لقروب الواتساب الخاص باللجنة
-                        </a>
+                      {result.acceptedCommittee && (
+                        <div className="space-y-2 bg-[#630517]/5 p-4 rounded-xl border border-[#630517]/10">
+                          <p className="text-xs font-bold text-[#630517]">مبروك! تم قبولك في:</p>
+                          <p className="text-sm font-black text-slate-900">{result.acceptedCommittee}</p>
+                          
+                          {result.whatsappLink && (
+                            <a
+                              href={result.whatsappLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block w-full py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow hover:bg-emerald-700 transition-colors mt-2"
+                            >
+                              💬 الانضمام لقروب الواتساب الخاص باللجنة
+                            </a>
+                          )}
+                        </div>
                       )}
-                    </div>
+                    </>
                   )}
 
-                  {result.status !== 'مقبول' && (
-                    <p className="text-xs text-slate-500">طلبك قيد المراجعة أو بانتظار القبول، تابعنا باستمرار!</p>
+                  {/* حالة القبول: مرفوض */}
+                  {result.status === 'مرفوض' && (
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto text-xl font-bold">
+                        ✕
+                      </div>
+                      <div>
+                        <h3 className="font-black text-slate-900 text-base">{result.fullName}</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">الرقم الجامعي: {result.universityId || 'غير متوفر'}</p>
+                      </div>
+
+                      <div className="py-2 px-4 rounded-xl bg-white border border-slate-200/80 inline-block">
+                        <span className="text-xs text-slate-500 font-bold">الحالة: </span>
+                        <span className="text-xs font-black text-red-600">مرفوض</span>
+                      </div>
+
+                      <div className="space-y-2 bg-red-50 p-4 rounded-xl border border-red-100">
+                        <p className="text-xs font-bold text-red-800">عذراً، نأسف لإبلاغك بأنه لم يتم قبول طلبك في النادي لهذا العام. نتمنى لك التوفيق دائماً!</p>
+                      </div>
+                    </>
                   )}
+
+                  {/* حالة القبول: معلق أو غير ذلك */}
+                  {result.status !== 'مقبول' && result.status !== 'مرفوض' && (
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto text-xl font-bold">
+                        ⏳
+                      </div>
+                      <div>
+                        <h3 className="font-black text-slate-900 text-base">{result.fullName}</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">الرقم الجامعي: {result.universityId || 'غير متوفر'}</p>
+                      </div>
+
+                      <div className="py-2 px-4 rounded-xl bg-white border border-slate-200/80 inline-block">
+                        <span className="text-xs text-slate-500 font-bold">الحالة: </span>
+                        <span className="text-xs font-black text-amber-600">قيد المراجعة (معلق)</span>
+                      </div>
+
+                      <p className="text-xs text-slate-500">طلبك قيد الدراسة من قِبل لجان القبول، تابعنا باستمرار!</p>
+                    </>
+                  )}
+
                 </div>
               ) : (
                 <div className="bg-red-50 text-red-700 p-4 rounded-2xl text-center text-xs font-bold border border-red-100">
