@@ -59,12 +59,13 @@ interface UserAccount {
   phone: string;
   password?: string;
   fullName?: string;
+  role?: string;
   createdAt?: string;
 }
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners' | 'discover' | 'passion' | 'users-manager'>('events');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests'>('users-manager');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -257,6 +258,7 @@ export default function AdminDashboard() {
         // Users & Passwords Collection
         const usersSnap = await getDocs(collection(db, 'users'));
         const fetchedUsers = usersSnap.docs.map((docSnap) => ({
+          phone: docSnap.id,
           ...docSnap.data()
         })) as UserAccount[];
         setUsersList(fetchedUsers);
@@ -275,6 +277,19 @@ export default function AdminDashboard() {
 
     fetchCloudData();
   }, []);
+
+  // --- Update User Role Handler ---
+  const handleRoleChange = async (phone: string, newRole: string) => {
+    try {
+      const userRef = doc(db, 'users', phone);
+      await updateDoc(userRef, { role: newRole });
+      setUsersList(usersList.map((u) => u.phone === phone ? { ...u, role: newRole } : u));
+      alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح!`);
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تحديث الرتبة.');
+    }
+  };
 
   // --- Excel Import Handler ---
   const handleExcelImport = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -742,7 +757,7 @@ export default function AdminDashboard() {
           </span>
           <div>
             <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (سحابي متكامل ☁️)</h1>
-            <p className="text-xs text-slate-500">إدارة الفعاليات والبانرات والمعرض وبطاقة شغف وعطاء سحابياً</p>
+            <p className="text-xs text-slate-500">إدارة الرتب والحسابات والفعاليات سحابياً</p>
           </div>
         </div>
 
@@ -756,16 +771,16 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
 
-        {/* Tabs */}
+        {/* Tabs (All in Arabic) */}
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {[
-            { id: 'discover', label: '🖼️ إدارة معرض "اكتشف النادي" (سحابي)' },
-            { id: 'passion', label: '✨ إدارة بطاقة "شغف وعطاء" (سحابي)' },
-            { id: 'events', label: '📅 إدارة الفعاليات والبوسترات (سحابي)' },
-            { id: 'banners', label: '🖼️ إدارة البانرات (سحابي)' },
+            { id: 'users-manager', label: '🔑 إدارة الحسابات وكلمات السر والرتب' },
+            { id: 'discover', label: '🖼️ إدارة معرض "اكتشف النادي"' },
+            { id: 'passion', label: '✨ إدارة بطاقة "شغف وعطاء"' },
+            { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
+            { id: 'banners', label: '🖼️ إدارة البانرات الرئيسية' },
             { id: 'team', label: '👥 إدارة القادة والأعضاء' },
-            { id: 'requests', label: '📥 طلبات الانضمام مع استيراد الأكسل (Firebase)' },
-            { id: 'users-manager', label: '🔑 حسابات وكلمات سر المستخدمين' },
+            { id: 'requests', label: '📥 طلبات الانضمام والأكسل' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -783,6 +798,67 @@ export default function AdminDashboard() {
         </div>
 
         {/* Tabs Content */}
+        {activeTab === 'users-manager' && (
+          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4">
+              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب الإدارية الخمس 🔑</h3>
+              <p className="text-xs text-slate-500">من هنا يمكنك استعراض جميع المشتركين وأرقامهم وكلمات سرهم وتحديد رتبهم بدقة.</p>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                    <th className="pb-3 pr-2">اسم المستخدم</th>
+                    <th className="pb-3">رقم الجوال (اسم الدخول)</th>
+                    <th className="pb-3">كلمة المرور الظاهرة</th>
+                    <th className="pb-3">الرتبة والصلاحيات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  <tr className="hover:bg-slate-50 bg-rose-50/20">
+                    <td className="py-4 pr-2 font-black text-[#630517]">عبدالعزيز العنزي (المشرف الأساسي)</td>
+                    <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
+                    <td className="py-4 text-[#630517] font-mono font-bold bg-slate-100 px-2 rounded w-fit">qwer8901as</td>
+                    <td className="py-4">
+                      <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-black text-[11px]">
+                        1. مدير النظام (أدمن مطلق)
+                      </span>
+                    </td>
+                  </tr>
+
+                  {usersList.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-slate-400">لا توجد حسابات مسجلة أخرى حالياً.</td>
+                    </tr>
+                  ) : (
+                    usersList.map((usr, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="py-4 pr-2 font-bold text-slate-900">{usr.fullName || 'مستخدم مسجل'}</td>
+                        <td className="py-4 text-slate-600 font-mono" dir="ltr">{usr.phone}</td>
+                        <td className="py-4 text-[#630517] font-mono font-bold bg-slate-100 px-2 rounded w-fit">{usr.password || 'غير متوفرة'}</td>
+                        <td className="py-4">
+                          <select
+                            value={usr.role || 'عضو أساسي'}
+                            onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
+                            className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
+                          >
+                            <option value="مدير النظام">1. مدير النظام (أدمن)</option>
+                            <option value="نائب المدير / مشرف عام">2. نائب المدير / مشرف عام</option>
+                            <option value="رئيس لجنة / مشرف قسم">3. رئيس لجنة / مشرف قسم</option>
+                            <option value="عضو مميز / منسق">4. عضو مميز / منسق</option>
+                            <option value="عضو أساسي">5. عضو أساسي</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'discover' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
@@ -1061,13 +1137,6 @@ export default function AdminDashboard() {
                     }}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
                   />
-                  <input
-                    type="text"
-                    placeholder="أو اكتب مسار الصورة يدوياً"
-                    value={newPoster}
-                    onChange={(e) => setNewPoster(e.target.value)}
-                    className="w-full mt-2 px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
-                  />
                 </div>
 
                 <div className="sm:col-span-2">
@@ -1157,7 +1226,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر صورة البانر من جهازك أو أدخل رابطها</label>
+                  <label className="text-xs font-bold text-slate-600">اختر صورة البانر من جهازك</label>
                   <input
                     type="file"
                     accept="image/*"
@@ -1168,13 +1237,6 @@ export default function AdminDashboard() {
                       }
                     }}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    placeholder="أو اكتب مسار الصورة يدوياً"
-                    value={bannerImage}
-                    onChange={(e) => setBannerImage(e.target.value)}
-                    className="w-full mt-2 px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
 
@@ -1293,7 +1355,7 @@ export default function AdminDashboard() {
                   type="submit"
                   className="bg-[#630517] text-[#F5D061] px-6 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 transition-all cursor-pointer"
                 >
-                  💾 حفظ وتحديث قادة اللجنة (Submit)
+                  💾 حفظ وتحديث قادة اللجنة
                 </button>
               </div>
             </form>
@@ -1361,12 +1423,10 @@ export default function AdminDashboard() {
 
         {activeTab === 'requests' && (
           <div className="space-y-6">
-            
-            {/* Excel Import Card */}
             <div className="bg-emerald-50 border-2 border-emerald-300 p-6 rounded-3xl flex items-center justify-between flex-wrap gap-4 shadow-sm">
               <div className="space-y-1">
                 <h4 className="font-black text-emerald-900 text-base">📥 استيراد بيانات المتقدمين من ملف الأكسل</h4>
-                <p className="text-xs text-emerald-700">ارفع ملف الردود لجلب جميع الطلاب مع رغباتهم الثلاث مباشرة إلى سحابة Firebase بضغطة زر!</p>
+                <p className="text-xs text-emerald-700">ارفع ملف الردود لجلب جميع الطلاب مع رغباتهم الثلاث مباشرة إلى سحابة Firebase!</p>
               </div>
               <input
                 type="file"
@@ -1392,7 +1452,7 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-slate-100">
                     {requests.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات انضمام. قم برفع ملف الأكسل بالأعلى لإضافتهم!</td>
+                        <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات انضمام حالياً.</td>
                       </tr>
                     ) : (
                       requests.map((req) => (
@@ -1454,48 +1514,6 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Users & Passwords Manager Tab */}
-        {activeTab === 'users-manager' && (
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-            <div className="border-b border-slate-100 pb-4">
-              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين وكلمات السر 🔑</h3>
-              <p className="text-xs text-slate-500">من هنا يمكنك الاطلاع على أرقام جوالات المستخدمين وكلمات سرهم المسجلة لمساعدتهم عند نسيانها.</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                    <th className="pb-3 pr-2">اسم المستخدم</th>
-                    <th className="pb-3">رقم الجوال (اسم الدخول)</th>
-                    <th className="pb-3">كلمة المرور</th>
-                    <th className="pb-3 text-left pl-2">الحالة</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  <tr className="hover:bg-slate-50">
-                    <td className="py-4 pr-2 font-bold text-slate-900">عبدالعزيز العنزي (المشرف العام)</td>
-                    <td className="py-4 text-slate-600" dir="ltr">0553731265</td>
-                    <td className="py-4 text-[#630517] font-mono font-bold">حساب المشرف الأساسي</td>
-                    <td className="py-4 text-left pl-2">
-                      <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold">مدير النظام</span>
-                    </td>
-                  </tr>
-                  {usersList.map((usr, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="py-4 pr-2 font-bold text-slate-900">{usr.fullName || 'مستخدم مسجل'}</td>
-                      <td className="py-4 text-slate-600" dir="ltr">{usr.phone}</td>
-                      <td className="py-4 text-[#630517] font-mono font-bold">{usr.password || 'غير متوفرة'}</td>
-                      <td className="py-4 text-left pl-2">
-                        <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-bold">عضو سحابي</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
         )}
