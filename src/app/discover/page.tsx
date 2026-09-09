@@ -47,10 +47,16 @@ const DEFAULT_DISCOVER_EVENTS = [
   }
 ];
 
+const DEFAULT_PARTNERS = [
+  { id: '1', name: 'وبل', category: 'شريك إستراتيجي', logo: '/wabal.png' },
+  { id: '2', name: 'كوفي غاء', category: 'شريك إستراتيجي', logo: '/ghaa.png' }
+];
+
 export default function DiscoverPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [passionSlides, setPassionSlides] = useState(DEFAULT_PASSION_SLIDES);
   const [discoverEvents, setDiscoverEvents] = useState(DEFAULT_DISCOVER_EVENTS);
+  const [partners, setPartners] = useState(DEFAULT_PARTNERS);
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
 
   useEffect(() => {
@@ -63,6 +69,7 @@ export default function DiscoverPage() {
   useEffect(() => {
     const fetchCloudContent = async () => {
       try {
+        // Fetch Passion Slides
         const passionSnap = await getDocs(collection(db, 'site_passion_slides'));
         if (!passionSnap.empty) {
           const slides: any[] = [];
@@ -74,6 +81,7 @@ export default function DiscoverPage() {
           }
         }
 
+        // Fetch Discover Events
         const discoverSnap = await getDocs(collection(db, 'site_discover_events'));
         if (!discoverSnap.empty) {
           const eventsList: any[] = [];
@@ -82,6 +90,18 @@ export default function DiscoverPage() {
           });
           if (eventsList.length > 0) {
             setDiscoverEvents(eventsList);
+          }
+        }
+
+        // Fetch Partners & Sponsors from Cloud (Linked with Admin Dashboard)
+        const partnersSnap = await getDocs(collection(db, 'site_partners'));
+        if (!partnersSnap.empty) {
+          const partnersList: any[] = [];
+          partnersSnap.forEach((d) => {
+            partnersList.push({ id: d.id, ...d.data() });
+          });
+          if (partnersList.length > 0) {
+            setPartners(partnersList);
           }
         }
       } catch (err) {
@@ -311,24 +331,40 @@ export default function DiscoverPage() {
         </div>
       )}
 
+      {/* قسم شركاء النجاح والرعاة (مرتبط سحابياً بلوحة التحكم) */}
       <section className="py-16 border-t border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-10">
           <div className="space-y-3">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-              شركاء النجاح
+              شركاء النجاح والرعاة
             </h2>
             <p className="text-slate-600 text-sm font-medium">
               نعتز بشراكاتنا الدائمة لدعم فعاليات وأنشطة نادي التمريض
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-16">
-            <div className="p-4 rounded-3xl bg-slate-50 border border-slate-200 shadow-md flex items-center justify-center w-48 h-40 hover:border-[#630517] hover:scale-105 transition-all overflow-hidden">
-              <img src="/wabal.png" alt="وبل" className="w-full h-full object-cover rounded-2xl shadow-inner" />
-            </div>
-            <div className="p-4 rounded-3xl bg-slate-50 border border-slate-200 shadow-md flex items-center justify-center w-48 h-40 hover:border-[#630517] hover:scale-105 transition-all overflow-hidden">
-              <img src="/ghaa.png" alt="كوفي غاء" className="w-full h-full object-cover rounded-2xl shadow-inner" />
-            </div>
+          <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
+            {partners.map((partner) => (
+              <div 
+                key={partner.id || partner.name} 
+                className="p-5 rounded-3xl bg-slate-50 border border-slate-200 shadow-md flex flex-col items-center justify-center w-52 h-44 hover:border-[#630517] hover:scale-105 transition-all overflow-hidden space-y-2 group"
+              >
+                <div className="w-20 h-20 bg-white rounded-2xl p-2 shadow-inner flex items-center justify-center overflow-hidden border border-slate-100">
+                  <img 
+                    src={partner.logo && partner.logo.trim() !== '' ? partner.logo : '/logo.png'} 
+                    alt={partner.name} 
+                    className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/logo.png';
+                    }}
+                  />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-xs truncate max-w-[160px]">{partner.name}</h4>
+                  <span className="text-[10px] text-[#630517] font-bold">{partner.category || 'شريك إستراتيجي'}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
