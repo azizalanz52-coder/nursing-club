@@ -83,7 +83,6 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions'>('users-manager');
 
-  // State لإدارة إظهار وإخفاء كلمات المرور لكل مستخدم عبر الـ phone مفتاحاً
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
   const togglePasswordVisibility = (phone: string) => {
@@ -151,8 +150,8 @@ export default function AdminDashboard() {
   const [acceptedCommittee, setAcceptedCommittee] = useState<string>('لجنة التصميم');
   const [whatsappLink, setWhatsappLink] = useState<string>('');
 
-  // فلاتر طلبات الانضمام
-  const [requestSubTab, setRequestSubTab] = useState<'all' | 'accepted' | 'by-preference'>('all');
+  // فلاتر طلبات الانضمام والتحكم بالرغبات
+  const [requestSubTab, setRequestSubTab] = useState<'all' | 'accepted' | 'pref-1' | 'pref-2' | 'pref-3'>('all');
   const [selectedCommitteeFilter, setSelectedCommitteeFilter] = useState<string>('لجنة التصميم');
 
   const [committees, setCommittees] = useState<Committee[]>([
@@ -364,7 +363,6 @@ export default function AdminDashboard() {
         let addedCount = 0;
         let skippedCount = 0;
 
-        // جلب الموجودين حالياً بالسحابة لضمان عدم التكرار
         const existingDocsSnap = await getDocs(collection(db, 'applications'));
         const existingPhones = new Set();
         const existingUnivIds = new Set();
@@ -388,7 +386,6 @@ export default function AdminDashboard() {
 
           if (!fullName || fullName === '..' || fullName === '.' || fullName.length < 3) continue;
 
-          // التحقق من التكرار (إذا الرقم الجامعي أو الجوال مكرر، يتم تخطيه لتفادي التكرار)
           if ((universityId && existingUnivIds.has(universityId)) || (phone && existingPhones.has(phone))) {
             skippedCount++;
             continue;
@@ -749,6 +746,35 @@ export default function AdminDashboard() {
     }
   };
 
+  // دالة لتبديل أو تدوير الرغبات (نقل المتقدم من رغبة للتي تليها)
+  const handleShiftPreference = async (req: Record<string, any>) => {
+    const f1 = req.firstChoice || '';
+    const f2 = req.secondChoice || '';
+    const f3 = req.thirdChoice || '';
+
+    // تدوير الرغبات: الأولى تصبح الثانية، الثانية تصبح الثالثة، والثالثة تصبح الأولى
+    const updatedObj = {
+      ...req,
+      firstChoice: f2 || f3 || f1,
+      secondChoice: f3 || f1 || f2,
+      thirdChoice: f1 || f2 || f3
+    };
+
+    try {
+      const docRef = doc(db, 'applications', req.id);
+      await updateDoc(docRef, {
+        firstChoice: updatedObj.firstChoice,
+        secondChoice: updatedObj.secondChoice,
+        thirdChoice: updatedObj.thirdChoice
+      });
+      setRequests(requests.map(r => r.id === req.id ? updatedObj : r));
+      alert('تم نقل رغبات المتقدم وتحديثها سحابياً بنجاح! 🔄');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تحديث الرغبات.');
+    }
+  };
+
   const handleDeleteRequest = async (id: string) => {
     if(confirm('هل أنت متأكد من الحذف النهائي للطلب؟')) {
       try {
@@ -812,18 +838,23 @@ export default function AdminDashboard() {
     }
   };
 
-  // إحصائيات المتقدمين لكل لجنة بناءً على الرغبة الأولى
   const committeeNamesList = ['لجنة التصميم', 'اللجنة الإعلامية', 'لجنة تنظيم الفعاليات', 'لجنة الموارد البشرية', 'لجنة العلاقات العامة', 'لجنة المحتوى العلمي', 'لجنة الجودة والتطوير'];
   
   const getCountByPreference = (commName: string, prefKey: 'firstChoice' | 'secondChoice' | 'thirdChoice') => {
     return requests.filter(r => r[prefKey]?.includes(commName.replace('لجنة ', '')) || r[prefKey] === commName).length;
   };
 
-  // فلترة الطلبات حسب التبويب النشط
+  // فلترة الطلبات حسب الرغبة الأولى، الثانية، الثالثة أو المقبولين
   const filteredRequests = requests.filter(req => {
     if (requestSubTab === 'accepted') return req.status === 'مقبول';
-    if (requestSubTab === 'by-preference') {
+    if (requestSubTab === 'pref-1') {
       return req.firstChoice?.includes(selectedCommitteeFilter.replace('لجنة ', '')) || req.firstChoice === selectedCommitteeFilter;
+    }
+    if (requestSubTab === 'pref-2') {
+      return req.secondChoice?.includes(selectedCommitteeFilter.replace('لجنة ', '')) || req.secondChoice === selectedCommitteeFilter;
+    }
+    if (requestSubTab === 'pref-3') {
+      return req.thirdChoice?.includes(selectedCommitteeFilter.replace('لجنة ', '')) || req.thirdChoice === selectedCommitteeFilter;
     }
     return true; // الكل
   });
@@ -1687,7 +1718,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* فلاتر لعرض الكل، المقبولين، أو الفرز حسب الرغبة */}
+            {/* فلاتر لعرض الكل، المقبولين، أو الفرز حسب الرغبة 1، 2، 3 */}
             <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex flex-wrap gap-2">
                 <button
@@ -1706,14 +1737,28 @@ export default function AdminDashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setRequestSubTab('by-preference')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'by-preference' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                  onClick={() => setRequestSubTab('pref-1')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'pref-1' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                 >
-                  🎯 فرز حسب الرغبة الأولى
+                  🎯 الرغبة الأولى
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRequestSubTab('pref-2')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'pref-2' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                >
+                  🥈 الرغبة الثانية
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRequestSubTab('pref-3')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'pref-3' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                >
+                  🥉 الرغبة الثالثة
                 </button>
               </div>
 
-              {requestSubTab === 'by-preference' && (
+              {(requestSubTab === 'pref-1' || requestSubTab === 'pref-2' || requestSubTab === 'pref-3') && (
                 <select
                   value={selectedCommitteeFilter}
                   onChange={(e) => setSelectedCommitteeFilter(e.target.value)}
@@ -1738,7 +1783,7 @@ export default function AdminDashboard() {
                       <th className="pb-3">الرقم الجامعي / المستوى</th>
                       <th className="pb-3">الرغبات الثلاث</th>
                       <th className="pb-3">الحالة واللجنة</th>
-                      <th className="pb-3 text-left pl-2">الإجراءات</th>
+                      <th className="pb-3 text-left pl-2">الإجراءات والتحويل</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1778,6 +1823,14 @@ export default function AdminDashboard() {
                             )}
                           </td>
                           <td className="py-4 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleShiftPreference(req)}
+                              className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
+                              title="تدوير أو نقل الرغبة (تمرير للرغبة التالية)"
+                            >
+                              🔄 تحويل رغبة
+                            </button>
                             <button
                               type="button"
                               onClick={() => openAcceptModal(req.id)}
