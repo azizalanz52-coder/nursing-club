@@ -347,9 +347,10 @@ export default function DiscoverPage() {
             {partners.map((partner) => (
               <div 
                 key={partner.id || partner.name} 
-                className="p-5 rounded-3xl bg-slate-50 border border-slate-200 shadow-md flex flex-col items-center justify-center w-52 h-44 hover:border-[#630517] hover:scale-105 transition-all overflow-hidden space-y-2 group"
+                className="p-6 rounded-3xl bg-slate-50 border border-slate-200 shadow-md flex flex-col items-center justify-center w-60 h-52 hover:border-[#630517] hover:scale-105 transition-all overflow-hidden space-y-3 group"
               >
-                <div className="w-20 h-20 bg-white rounded-2xl p-2 shadow-inner flex items-center justify-center overflow-hidden border border-slate-100">
+                {/* تم تكبير الحاوية من w-20 h-20 إلى w-28 h-28 لتظهر الصورة بحجم أكبر وأوضح */}
+                <div className="w-28 h-28 bg-white rounded-2xl p-2.5 shadow-inner flex items-center justify-center overflow-hidden border border-slate-100">
                   <img 
                     src={partner.logo && partner.logo.trim() !== '' ? partner.logo : '/logo.png'} 
                     alt={partner.name} 
@@ -360,8 +361,8 @@ export default function DiscoverPage() {
                   />
                 </div>
                 <div>
-                  <h4 className="font-extrabold text-slate-900 text-xs truncate max-w-[160px]">{partner.name}</h4>
-                  <span className="text-[10px] text-[#630517] font-bold">{partner.category || 'شريك إستراتيجي'}</span>
+                  <h4 className="font-extrabold text-slate-900 text-sm truncate max-w-[180px]">{partner.name}</h4>
+                  <span className="text-xs text-[#630517] font-bold">{partner.category || 'شريك إستراتيجي'}</span>
                 </div>
               </div>
             ))}
