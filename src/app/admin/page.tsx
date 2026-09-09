@@ -633,12 +633,12 @@ export default function AdminDashboard() {
     }
   };
 
-  // زر الرفض: يغير حالة الطلب إلى 'مرفوض' ولا يحذفه
+  // زر الرفض: تم تصحيح الحالة لتصبح 'مرفوض' بالعربي السليم
   const handleRejectRequest = async (id: string) => {
     if(confirm('هل أنت متأكد من رفض هذا الطلب؟ (سيتمكن المتقدم من معرفة حالة رفضه عند الاستعلام).')) {
       try {
         const docRef = doc(db, 'applications', id);
-        await updateDoc(docRef, { status: 'mرفوض' }); // تم تصحيح الحالة لتطابق صفحة الاستعلام
+        await updateDoc(docRef, { status: 'مرفوض' });
         setRequests(requests.map((req) => req.id === id ? { ...req, status: 'مرفوض' } : req));
         alert('تم تحديث حالة الطلب إلى (مرفوض) بنجاح.');
       } catch (err) {
