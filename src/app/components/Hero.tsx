@@ -8,7 +8,7 @@ export default function Hero() {
   const [banners, setBanners] = useState([
     {
       id: 'main',
-      tag: 'اللهم صل وسلم على نبينا محمد',
+      tag: 'مرحباً بكم في نادي التمريض',
       title: 'نادي التمريض ',
       description: 'مجتمع طلابي يهدف إلى تطوير المعرفة، وبناء المهارات القيادية، وصناعة أثر في مجال التمريض بجامعة حفر الباطن.',
       image: '/header-banner.png',
@@ -45,7 +45,7 @@ export default function Hero() {
 
   return (
     <section 
-      className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-gradient-to-b from-[#630517] via-[#850E24] to-[#630517] px-4 sm:px-6 lg:px-8 text-white py-16"
+      className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-gradient-to-b from-[#630517] via-[#850E24] to-[#630517] px-4 sm:px-6 lg:px-8 text-white pt-32 pb-16"
       dir="rtl"
     >
       {/* تأثير شبكة خلفية ناعمة */}
