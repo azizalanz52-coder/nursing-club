@@ -104,6 +104,12 @@ export default function AdminDashboard() {
   const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
 
   const [requests, setRequests] = useState<Record<string, string>[]>([]);
+  
+  // --- Accept Request Modal States ---
+  const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+  const [acceptedCommittee, setAcceptedCommittee] = useState<string>('لجنة التصميم');
+  const [whatsappLink, setWhatsappLink] = useState<string>('');
 
   const [committees, setCommittees] = useState<Committee[]>([
     { 
@@ -490,25 +496,43 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAcceptRequest = async (id: string) => {
+  // --- Requests Handlers ---
+  const openAcceptModal = (reqId: string) => {
+    setSelectedRequestId(reqId);
+    setShowAcceptModal(true);
+  };
+
+  const handleConfirmAcceptRequest = async () => {
+    if (!selectedRequestId) return;
     try {
-      const docRef = doc(db, 'applications', id);
-      await updateDoc(docRef, { status: 'تم القبول ✓' });
-      setRequests(requests.map((req) => req.id === id ? { ...req, status: 'تم القبول ✓' } : req));
+      const docRef = doc(db, 'applications', selectedRequestId);
+      // إضافة معلومات القبول للسحابة لتظهر للعضو لاحقاً
+      await updateDoc(docRef, { 
+        status: 'مقبول',
+        acceptedCommittee: acceptedCommittee,
+        whatsappLink: whatsappLink 
+      });
+      setRequests(requests.map((req) => req.id === selectedRequestId ? { ...req, status: 'مقبول' } : req));
+      setShowAcceptModal(false);
+      setWhatsappLink('');
+      alert('تم قبول العضو بنجاح وإضافة رابط الواتساب!');
     } catch (err) {
       console.error(err);
     }
   };
 
   const handleDeleteRequest = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, 'applications', id));
-      setRequests(requests.filter((req) => req.id !== id));
-    } catch (err) {
-      console.error(err);
+    if(confirm('هل أنت متأكد من رفض وحذف هذا الطلب؟')) {
+      try {
+        await deleteDoc(doc(db, 'applications', id));
+        setRequests(requests.filter((req) => req.id !== id));
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
+  // --- Leaders & Members Handlers ---
   const handleSaveLeadersSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
@@ -568,6 +592,7 @@ export default function AdminDashboard() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       
+      {/* Navbar Admin */}
       <div className="bg-white border-b border-slate-200 py-4 px-6 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-3">
           <span className="w-10 h-10 rounded-xl bg-[#630517] text-[#F5D061] flex items-center justify-center font-black text-lg shadow">
@@ -589,6 +614,7 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
 
+        {/* Tabs */}
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {[
             { id: 'discover', label: '🖼️ إدارة معرض "اكتشف النادي" (سحابي)' },
@@ -613,6 +639,7 @@ export default function AdminDashboard() {
           ))}
         </div>
 
+        {/* Tabs Content */}
         {activeTab === 'discover' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
@@ -1215,24 +1242,24 @@ export default function AdminDashboard() {
                         <td className="py-4 text-slate-600">{req.universityId} - {req.major}</td>
                         <td className="py-4 text-slate-700 font-bold">{req.firstChoice}</td>
                         <td className="py-4">
-                          <span className="px-2.5 py-1 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          <span className={`px-2.5 py-1 rounded-full font-bold border ${req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                             {req.status || 'معلق'}
                           </span>
                         </td>
                         <td className="py-4 text-left pl-2 flex gap-2 justify-end">
                           <button
                             type="button"
-                            onClick={() => handleAcceptRequest(req.id)}
+                            onClick={() => openAcceptModal(req.id)}
                             className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
                           >
-                            قبول
+                            قبول ✅
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteRequest(req.id)}
                             className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                           >
-                            رفض
+                            رفض ✕
                           </button>
                         </td>
                       </tr>
@@ -1245,6 +1272,63 @@ export default function AdminDashboard() {
         )}
 
       </div>
+
+      {/* Accept Modal */}
+      {showAcceptModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-black text-slate-900 border-b border-slate-100 pb-3">إتمام قبول العضو</h3>
+            
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600">تم القبول في لجنة:</label>
+                <select
+                  value={acceptedCommittee}
+                  onChange={(e) => setAcceptedCommittee(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 bg-white"
+                >
+                  <option value="لجنة التصميم">لجنة التصميم</option>
+                  <option value="اللجنة الإعلامية">اللجنة الإعلامية</option>
+                  <option value="لجنة تنظيم الفعاليات">لجنة تنظيم الفعاليات</option>
+                  <option value="لجنة الموارد البشرية">لجنة الموارد البشرية</option>
+                  <option value="لجنة العلاقات العامة">لجنة العلاقات العامة</option>
+                  <option value="لجنة المحتوى العلمي">لجنة المحتوى العلمي</option>
+                  <option value="لجنة الجودة والتطوير">لجنة الجودة والتطوير</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600">رابط الانضمام لقروب اللجنة (واتساب):</label>
+                <input
+                  type="text"
+                  placeholder="https://chat.whatsapp.com/..."
+                  value={whatsappLink}
+                  onChange={(e) => setWhatsappLink(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-[#630517]"
+                  dir="ltr"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => setShowAcceptModal(false)}
+                className="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAcceptRequest}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black hover:bg-emerald-700 shadow-lg"
+              >
+                تأكيد القبول وإرسال الرابط
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
