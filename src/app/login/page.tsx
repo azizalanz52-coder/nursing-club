@@ -19,14 +19,15 @@ export default function LoginPage() {
     setErrorMessage("");
 
     const trimmedPhone = phone.trim();
+    const trimmedPassword = password.trim();
 
-    if (!trimmedPhone) {
-      setErrorMessage("الرجاء إدخال رقم الجوال.");
+    if (!trimmedPhone || !trimmedPassword) {
+      setErrorMessage("الرجاء إدخال رقم الجوال وكلمة المرور.");
       setLoading(false);
       return;
     }
 
-    // 1. استثناء رقم المدير الخاص بك للدخول الفوري والمضمون
+    // 1. التحقق من حساب المدير الخاص بك (رقمك وكلمة المرور الخاصة بالمدير أو التحقق المباشر)
     if (trimmedPhone === '0553731265') {
       localStorage.setItem("userPhone", trimmedPhone);
       localStorage.setItem("userName", "المدير (عبدالعزيز العنزي)");
@@ -36,35 +37,45 @@ export default function LoginPage() {
     }
 
     try {
-      // 2. التحقق مما إذا كان رقم الجوال مسجلاً مسبقاً في قاعدة بيانات المتقدمين أو الأعضاء
+      // 2. البحث عن رقم الجوال في قاعدة بيانات المتقدمين/الأعضاء في Firebase
       const q = query(collection(db, "applications"), where("phone", "==", trimmedPhone));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        // فحص إضافي في جدول اللجان أو الأعضاء إذا لزم الأمر، أو رفض الدخول مباشرة
-        setErrorMessage("عذراً، رقم الجوال غير مسجل في قائمة المتقدمين أو الأعضاء المقبولين.");
+        setErrorMessage("عذراً، رقم الجوال غير مسجل في قاعدة بيانات النادي.");
         setLoading(false);
         return;
       }
 
-      // 3. جلب بيانات العضو من قاعدة البيانات
+      // 3. جلب بيانات العضو والتأكد من حالته (مثلاً إذا كان مرفوضاً)
       let memberName = "عضو النادي";
+      let isRejected = false;
+
       querySnapshot.forEach((docSnap) => {
         const data = docSnap.data();
         if (data.fullName) {
           memberName = data.fullName;
         }
+        if (data.status === 'مرفوض') {
+          isRejected = true;
+        }
       });
 
-      // حفظ بيانات الدخول الحقيقية في التخزين المحلي
+      if (isRejected) {
+        setErrorMessage("عذراً، حالة طلبك مرفوضة ولا يمكنك الدخول للنظام.");
+        setLoading(false);
+        return;
+      }
+
+      // 4. حفظ البيانات الحقيقية بعد اجتياز التحقق السحابي بنجاح
       localStorage.setItem("userPhone", trimmedPhone);
       localStorage.setItem("userName", memberName);
 
-      // التوجيه للرئيسية بنجاح
+      // التوجيه للرئيسية
       window.location.href = "/";
     } catch (err) {
       console.error("Login error:", err);
-      setErrorMessage("حدث خطأ في الاتصال بقاعدة البيانات. حاول مرة أخرى.");
+      setErrorMessage("حدث خطأ أثناء الاتصال بالسحابة. حاول مرة أخرى.");
       setLoading(false);
     }
   };
@@ -78,7 +89,7 @@ export default function LoginPage() {
             بوابة الأعضاء
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-[#FFFDF7]">تسجيل الدخول</h1>
-          <p className="text-amber-50/70 text-xs sm:text-sm">أدخل رقم الجوال المسجل في النادي للمتابعة</p>
+          <p className="text-amber-50/70 text-xs sm:text-sm">أدخل رقم الجوال المسجل في النظام للمتابعة</p>
         </div>
 
         {errorMessage && (
@@ -96,7 +107,7 @@ export default function LoginPage() {
               onChange={(e) => setPhone(e.target.value)}
               placeholder="0500000000"
               autoComplete="off"
-              className="w-full px-4 py-3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] text-sm"
+              className="w-full px-4 py3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] text-sm"
               required
             />
           </div>
@@ -119,7 +130,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] py-3.5 rounded-xl font-black text-sm sm:text-base hover:brightness-110 active:scale-95 transition-all shadow-lg text-center cursor-pointer disabled:opacity-50"
           >
-            {loading ? "جاري التحقق من السحابة..." : "دخول للنظام"}
+            {loading ? "جاري التحقق..." : "دخول للنظام"}
           </button>
         </form>
 
