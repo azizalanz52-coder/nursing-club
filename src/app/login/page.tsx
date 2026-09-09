@@ -3,33 +3,70 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { db } from "../lib/firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const handleDirectLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setLoading(true);
+    setErrorMessage("");
+
     const trimmedPhone = phone.trim();
-    const trimmedName = name.trim();
 
-    if (trimmedPhone) {
-      localStorage.setItem("userPhone", trimmedPhone);
-    }
-    if (trimmedName) {
-      localStorage.setItem("userName", trimmedName);
+    if (!trimmedPhone) {
+      setErrorMessage("الرجاء إدخال رقم الجوال.");
+      setLoading(false);
+      return;
     }
 
-    // التحقق إذا كان الرقم هو رقم المدير لتفعيل مفتاح الدخول للوحة التحكم
+    // 1. استثناء رقم المدير الخاص بك للدخول الفوري والمضمون
     if (trimmedPhone === '0553731265') {
+      localStorage.setItem("userPhone", trimmedPhone);
+      localStorage.setItem("userName", "المدير (عبدالعزيز العنزي)");
       sessionStorage.setItem('adminToken', 'SECURE_ADMIN_KEY_NURSING_2026');
+      window.location.href = "/";
+      return;
     }
-    
-    // استخدام التوجيه المباشر لتجنب أي تعليق في المتصفح أو الجوال
-    window.location.href = "/";
+
+    try {
+      // 2. التحقق مما إذا كان رقم الجوال مسجلاً مسبقاً في قاعدة بيانات المتقدمين أو الأعضاء
+      const q = query(collection(db, "applications"), where("phone", "==", trimmedPhone));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        // فحص إضافي في جدول اللجان أو الأعضاء إذا لزم الأمر، أو رفض الدخول مباشرة
+        setErrorMessage("عذراً، رقم الجوال غير مسجل في قائمة المتقدمين أو الأعضاء المقبولين.");
+        setLoading(false);
+        return;
+      }
+
+      // 3. جلب بيانات العضو من قاعدة البيانات
+      let memberName = "عضو النادي";
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.fullName) {
+          memberName = data.fullName;
+        }
+      });
+
+      // حفظ بيانات الدخول الحقيقية في التخزين المحلي
+      localStorage.setItem("userPhone", trimmedPhone);
+      localStorage.setItem("userName", memberName);
+
+      // التوجيه للرئيسية بنجاح
+      window.location.href = "/";
+    } catch (err) {
+      console.error("Login error:", err);
+      setErrorMessage("حدث خطأ في الاتصال بقاعدة البيانات. حاول مرة أخرى.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -41,23 +78,16 @@ export default function LoginPage() {
             بوابة الأعضاء
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-[#FFFDF7]">تسجيل الدخول</h1>
-          <p className="text-amber-50/70 text-xs sm:text-sm">أدخل الاسم، رقم الجوال، وكلمة المرور للمتابعة</p>
+          <p className="text-amber-50/70 text-xs sm:text-sm">أدخل رقم الجوال المسجل في النادي للمتابعة</p>
         </div>
 
-        <form onSubmit={handleDirectLogin} className="space-y-4" autoComplete="off">
-          <div className="space-y-1.5 text-right">
-            <label className="text-xs sm:text-sm font-bold text-[#F5D061]">الاسم الكامل</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="مثال: عبدالعزيز العنزي"
-              autoComplete="off"
-              className="w-full px-4 py-3 rounded-xl bg-black/50 border border-[#F5D061]/20 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5D061] text-sm"
-              required
-            />
+        {errorMessage && (
+          <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded-xl text-xs font-bold text-center">
+            {errorMessage}
           </div>
+        )}
 
+        <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
           <div className="space-y-1.5 text-right">
             <label className="text-xs sm:text-sm font-bold text-[#F5D061]">رقم الجوال</label>
             <input
@@ -86,9 +116,10 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] py-3.5 rounded-xl font-black text-sm sm:text-base hover:brightness-110 active:scale-95 transition-all shadow-lg text-center cursor-pointer"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] py-3.5 rounded-xl font-black text-sm sm:text-base hover:brightness-110 active:scale-95 transition-all shadow-lg text-center cursor-pointer disabled:opacity-50"
           >
-            دخول للنظام
+            {loading ? "جاري التحقق من السحابة..." : "دخول للنظام"}
           </button>
         </form>
 
