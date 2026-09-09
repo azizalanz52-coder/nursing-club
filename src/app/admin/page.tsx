@@ -313,7 +313,6 @@ export default function AdminDashboard() {
   const handleRoleChange = async (phone: string, newRole: string) => {
     try {
       const userRef = doc(db, 'users', phone);
-      // تحديث الرتبة وإرسال إشعار ترحيب بالترقية يظهر للطالب بحسابه فوراً
       await updateDoc(userRef, { 
         role: newRole,
         latestNotification: `مبروك! تم ترقيتك إلى رتبة (${newRole}) بنجاح 🎉`
@@ -815,7 +814,7 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {[
-            { id: 'users-manager', label: '🔑 الحسابات والرتب' },
+            { id: 'users-manager', label: '🔑 الحسابات والرتب والصلاحيات' },
             { id: 'suggestions', label: '💡 آراء ومقترحات الطلاب' },
             { id: 'discover', label: '🖼️ معرض "اكتشف النادي"' },
             { id: 'passion', label: '✨ بطاقة "شغف وعطاء"' },
@@ -891,8 +890,8 @@ export default function AdminDashboard() {
         {activeTab === 'users-manager' && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
-              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب الإدارية 🔑</h3>
-              <p className="text-xs text-slate-500">كلمات المرور مخفية افتراضياً ويمكنك إظهارها عند الحاجة عبر النقر على علامة العين (👁️).</p>
+              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب والصلاحيات 🔑</h3>
+              <p className="text-xs text-slate-500">كلمات المرور مخفية افتراضياً ويمكنك إظهارها عند الحاجة عبر النقر على علامة العين (👁️)، مع تحديد صلاحيات ودور كل رتبة.</p>
             </div>
             
             <div className="overflow-x-auto">
@@ -925,10 +924,13 @@ export default function AdminDashboard() {
                         </button>
                       </div>
                     </td>
-                    <td className="py-4">
-                      <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-black text-[11px]" dir="ltr">
+                    <td className="py-4 space-y-1">
+                      <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-black text-[11px] inline-block" dir="ltr">
                         System Admin
                       </span>
+                      <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                        <strong>الصلاحيات:</strong> تحكم كامل بكافة إعدادات المنصة، السحابة، حذف وإضافة الفعاليات، التحكم بالرتب، وإدارة ملفات الأكسل وقبول الأعضاء.
+                      </p>
                     </td>
                   </tr>
 
@@ -952,18 +954,27 @@ export default function AdminDashboard() {
                           </button>
                         </div>
                       </td>
-                      <td className="py-4">
+                      <td className="py-4 space-y-2">
                         <select
                           value={usr.role || 'عضو أساسي'}
                           onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
                           className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
                         >
-                          <option value="System Admin">System Admin</option>
-                          <option value="General Supervisor">General Supervisor</option>
-                          <option value="رئيس لجنة / مشرف قسم">رئيس لجنة</option>
-                          <option value="عضو مميز / منسق">عضو مميز</option>
-                          <option value="عضو أساسي">عضو أساسي</option>
+                          <option value="System Admin">System Admin (مدير النظام)</option>
+                          <option value="General Supervisor">General Supervisor (مشرف عام)</option>
+                          <option value="رئيس لجنة / مشرف قسم">رئيس لجنة (إدارة اللجنة والأعضاء)</option>
+                          <option value="عضو مميز / منسق">عضو مميز (صلاحيات تفاعلية خاصة)</option>
+                          <option value="عضو أساسي">عضو أساسي (مشارك وفعال)</option>
                         </select>
+                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                          <strong>صلاحيات الرتبة الحالية:</strong> {
+                            (usr.role === 'System Admin') ? 'تحكم كامل بجميع خصائص الموقع والسحابة.' :
+                            (usr.role === 'General Supervisor') ? 'الإشراف على الأقسام والفعاليات ومتابعة اللجان.' :
+                            (usr.role === 'رئيس لجنة / مشرف قسم') ? 'إدارة أعضاء لجنته الخاصة ومتابعة المهام.' :
+                            (usr.role === 'عضو مميز / منسق') ? 'المشاركة الفعالة في تنظيم وإدارة الأنشطة والفعاليات.' :
+                            'الوصول للمحتوى العام ومتابعة إشعارات الحساب.'
+                          }
+                        </p>
                       </td>
                     </tr>
                   ))}
