@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { db } from "../../lib/firebase";
+import { db } from "./../lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 
 export default function LoginPage() {
