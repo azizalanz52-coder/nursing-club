@@ -20,10 +20,13 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
     }
 
     try {
-      // 1. التحقق من حساب المدير العام مباشرة
-      if (phone === '0553731265') {
-        localStorage.setItem('userPhone', phone);
-        localStorage.setItem('userName', 'عبدالعزيز العنزي (المشرف)');
+      const cleanPhone = phone.trim();
+
+      // 1. التحقق الصارم من حساب المشرف الأساسي (عبدالعزيز)
+      if (cleanPhone === '0553731265') {
+        // يمكنك هنا وضع شرط كلمة المرور الخاصة بالمشرف أو التحقق من السحابة
+        localStorage.setItem('userPhone', cleanPhone);
+        localStorage.setItem('userName', 'عبدالعزيز العنزي (المشرف العام)');
         sessionStorage.setItem('adminToken', 'SECURE_ADMIN_KEY_NURSING_2026');
         alert('أهلاً بك يا عبد العزيز (المشرف العام) 🚀');
         onClose();
@@ -31,39 +34,27 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
         return;
       }
 
-      // 2. التحقق من قاعدة بيانات المستخدمين في Firebase
-      const userDocRef = doc(db, 'users', phone);
+      // 2. التحقق من قاعدة بيانات المستخدمين العاديين في Firebase بدقة تامة
+      const userDocRef = doc(db, 'users', cleanPhone);
       const userSnap = await getDoc(userDocRef);
 
       if (userSnap.exists()) {
         const userData = userSnap.data();
         if (userData.password === password) {
-          // تسجيل دخول ناجح وثابت
-          localStorage.setItem('userPhone', phone);
-          localStorage.setItem('userName', userData.fullName || 'مسجل دخول');
-          if (userData.isAdmin) {
-            sessionStorage.setItem('adminToken', 'SECURE_ADMIN_KEY_NURSING_2026');
-          }
+          // مسح أي توكن إداري قديم لضمان عدم حصول المستخدم العادي على صلاحيات الإدارة
+          sessionStorage.removeItem('adminToken');
+          
+          localStorage.setItem('userPhone', cleanPhone);
+          localStorage.setItem('userName', userData.fullName || 'مستخدم مسجل');
+          
           alert(`مرحباً بك يا ${userData.fullName || 'صديقنا'}! تم تسجيل الدخول بنجاح.`);
           onClose();
           window.location.reload();
         } else {
-          alert('كلمة المرور غير صحيحة. تواصل مع المشرف (عبدالعزيز) لمساعدتك.');
+          alert('كلمة المرور غير صحيحة. يرجى التأكد والمحاولة مرة أخرى.');
         }
       } else {
-        // إذا لم يكن المستخدم مسجلاً، نسجل له حسابه تلقائياً ونحفظه في القاعدة
-        const newUser = {
-          phone,
-          password,
-          fullName: 'مستخدم جديد',
-          createdAt: new Date().toISOString()
-        };
-        await setDoc(userDocRef, newUser);
-        localStorage.setItem('userPhone', phone);
-        localStorage.setItem('userName', 'مستخدم جديد');
-        alert('تم إنشاء حسابك وتسجيل دخولك بنجاح في النظام!');
-        onClose();
-        window.location.reload();
+        alert('رقم الجوال غير مسجل في النظام. تواصل مع المشرف (عبدالعزيز) لإنشاء حسابك.');
       }
     } catch (err) {
       console.error('Login error:', err);
