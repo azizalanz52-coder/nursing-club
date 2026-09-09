@@ -771,7 +771,7 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
 
-        {/* Tabs (All in Arabic) */}
+        {/* Tabs */}
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {[
             { id: 'users-manager', label: '🔑 إدارة الحسابات وكلمات السر والرتب' },
@@ -801,7 +801,7 @@ export default function AdminDashboard() {
         {activeTab === 'users-manager' && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
-              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب الإدارية الخمس 🔑</h3>
+              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب الإدارية 🔑</h3>
               <p className="text-xs text-slate-500">من هنا يمكنك استعراض جميع المشتركين وأرقامهم وكلمات سرهم وتحديد رتبهم بدقة.</p>
             </div>
             
@@ -821,8 +821,8 @@ export default function AdminDashboard() {
                     <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
                     <td className="py-4 text-[#630517] font-mono font-bold bg-slate-100 px-2 rounded w-fit">qwer8901as</td>
                     <td className="py-4">
-                      <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-black text-[11px]">
-                        1. مدير النظام (أدمن مطلق)
+                      <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-black text-[11px]" dir="ltr">
+                        System Admin
                       </span>
                     </td>
                   </tr>
@@ -843,11 +843,11 @@ export default function AdminDashboard() {
                             onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
                             className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
                           >
-                            <option value="مدير النظام">1. مدير النظام (أدمن)</option>
-                            <option value="نائب المدير / مشرف عام">2. نائب المدير / مشرف عام</option>
-                            <option value="رئيس لجنة / مشرف قسم">3. رئيس لجنة / مشرف قسم</option>
-                            <option value="عضو مميز / منسق">4. عضو مميز / منسق</option>
-                            <option value="عضو أساسي">5. عضو أساسي</option>
+                            <option value="System Admin">System Admin</option>
+                            <option value="General Supervisor">General Supervisor</option>
+                            <option value="رئيس لجنة / مشرف قسم">رئيس لجنة / مشرف قسم</option>
+                            <option value="عضو مميز / منسق">عضو مميز / منسق</option>
+                            <option value="عضو أساسي">عضو أساسي</option>
                           </select>
                         </td>
                       </tr>
