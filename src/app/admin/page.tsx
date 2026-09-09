@@ -962,9 +962,9 @@ export default function AdminDashboard() {
                         >
                           <option value="System Admin">System Admin (مدير النظام)</option>
                           <option value="General Supervisor">General Supervisor (مشرف عام)</option>
-                          <option value="رئيس لجنة / مشرف قسم">رئيس لجنة (إدارة اللجنة والأعضاء)</option>
-                          <option value="عضو مميز / منسق">عضو مميز (صلاحيات تفاعلية خاصة)</option>
-                          <option value="عضو أساسي">عضو أساسي (مشارك وفعال)</option>
+                          <option value="رئيس لجنة / مشرف قسم">رئيس لجنة </option>
+                          <option value="عضو مميز">عضو مميز</option>
+                          <option value="عضو أساسي">عضو أساسي</option>
                         </select>
                         <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
                           <strong>صلاحيات الرتبة الحالية:</strong> {
