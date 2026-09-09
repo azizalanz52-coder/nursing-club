@@ -271,17 +271,28 @@ export default function AdminDashboard() {
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
 
+        if (data.length < 2) {
+          alert('الملف فارغ أو لا يحتوي على بيانات.');
+          return;
+        }
+
+        const rows = data.slice(1);
         let count = 0;
-        for (const row of data) {
-          const fullName = row['الأسم الثلاثي ( باللغة العربية )'] || row['الاسم'] || 'متقدم';
-          const phone = String(row['رقم  الهاتف مبدوء ب 05 ؟'] || row['الجوال'] || '');
-          const universityId = String(row['الرقم الجامعي'] || '');
-          const major = String(row['المستوى الدراسي'] || 'تمريض');
-          const firstChoice = String(row['الرغبة الاولى'] || 'غير متوفر');
-          const secondChoice = String(row['الرغبة الثانية'] || 'غير متوفر');
-          const thirdChoice = String(row['الرغبة الثالثة'] || 'غير متوفر');
+
+        for (const row of rows) {
+          if (!row || row.length === 0) continue;
+
+          const fullName = String(row[1] || row[0] || 'متقدم');
+          const phone = String(row[2] || '');
+          const universityId = String(row[3] || '');
+          const major = String(row[4] || 'تمريض');
+          const firstChoice = String(row[5] || 'غير متوفر');
+          const secondChoice = String(row[6] || 'غير متوفر');
+          const thirdChoice = String(row[7] || 'غير متوفر');
+
+          if (!fullName || fullName === 'متقدم') continue;
 
           const reqId = universityId.trim() !== '' ? universityId : `req_${Date.now()}_${Math.random()}`;
 
@@ -301,11 +312,11 @@ export default function AdminDashboard() {
           count++;
         }
 
-        alert(`تم استيراد ${count} متقدماً مع رغباتهم الثلاث بنجاح إلى السحابة!`);
+        alert(`تم استيراد ${count} متقدماً بنجاح إلى السحابة!`);
         window.location.reload();
       } catch (err) {
         console.error('Error importing excel:', err);
-        alert('حدث خطأ أثناء قراءة ملف الأكسل، تأكد من صحة الأعمدة.');
+        alert('حدث خطأ أثناء قراءة ملف الأكسل.');
       }
     };
     reader.readAsBinaryString(file);
@@ -1316,7 +1327,7 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-4 text-slate-700">
                             <div className="space-y-0.5 text-[11px]">
-                              <p><strong className="text-[#630517]">1:</strong> {req.firstChoice || req.firstChoice || '-'}</p>
+                              <p><strong className="text-[#630517]">1:</strong> {req.firstChoice || '-'}</p>
                               <p><strong className="text-slate-400">2:</strong> {req.secondChoice || '-'}</p>
                               <p><strong className="text-slate-400">3:</strong> {req.thirdChoice || '-'}</p>
                             </div>
