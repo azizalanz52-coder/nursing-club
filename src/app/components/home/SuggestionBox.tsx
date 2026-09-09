@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { db } from '../lib/firebase';
+import { db } from '../../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
 export default function SuggestionBox() {
