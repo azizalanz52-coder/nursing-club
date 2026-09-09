@@ -18,6 +18,13 @@ export default function Navbar() {
     const phone = localStorage.getItem('userPhone');
     if (name) setUserName(name);
     if (phone) setUserPhone(phone);
+
+    // إضافة مسافة علوية تلقائية للجسم لمنع النافبار من تغطية المحتوى في أي صفحة
+    document.body.style.paddingTop = '80px';
+
+    return () => {
+      document.body.style.paddingTop = '0px';
+    };
   }, []);
 
   // دالة إخفاء وإظهار النافبار عند التمرير
@@ -212,7 +219,7 @@ export default function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="block text-center w-full py-3 rounded-2xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition-colors"
               >
-                 تسجيل الدخول
+                تسجيل الدخول
               </Link>
             )}
           </div>
