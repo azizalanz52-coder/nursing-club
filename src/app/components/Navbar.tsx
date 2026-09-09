@@ -79,7 +79,7 @@ export default function Navbar() {
         {/* روابط سطح المكتب */}
         <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-700">
           <Link href="/" className="hover:text-rose-900 transition-colors">الرئيسية</Link>
-          <Link href="/#about" className="hover:text-rose-900 transition-colors">من نحن</Link>
+          <Link href="/check-status" className="hover:text-rose-900 transition-colors text-[#630517] font-black">🔍 استعلام عن القبول</Link>
           <Link href="/events" className="hover:text-rose-900 transition-colors">الفعاليات</Link>
           <Link href="/team" className="hover:text-rose-900 transition-colors">أعضاء النادي</Link>
         </nav>
@@ -165,11 +165,11 @@ export default function Navbar() {
               الرئيسية
             </Link>
             <Link 
-              href="/#about" 
+              href="/check-status" 
               onClick={() => setMobileMenuOpen(false)}
-              className="hover:text-rose-900 transition-colors py-1"
+              className="text-[#630517] font-black transition-colors py-1"
             >
-              من نحن
+              🔍 استعلام عن القبول
             </Link>
             <Link 
               href="/events" 
