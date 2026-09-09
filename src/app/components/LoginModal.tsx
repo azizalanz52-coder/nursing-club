@@ -54,7 +54,7 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
           onClose();
           window.location.reload();
         } else {
-          alert('كلمة المرور غير صحيحة. يرجى التأكد والمحاولة مرة أخرى.');
+          alert('كلمة المرور غير صحيحة. يرجى التأكد والمحاولة مرة أخرى أو استخدام خيار "نسيت كلمة المرور".');
         }
       } else {
         alert('رقم الجوال غير مسجل في النظام. يمكنك الضغط على "إنشاء حساب جديد" بالأسفل.');
@@ -65,7 +65,7 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
     }
   };
 
-  // --- دالة إنشاء حساب جديد تلقائياً (بدون تدخل منك) ---
+  // --- دالة إنشاء حساب جديد تلقائياً ---
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone || !password || !fullName.trim()) {
@@ -106,13 +106,19 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
       localStorage.setItem('userPhone', cleanPhone);
       localStorage.setItem('userName', fullName.trim());
 
-      alert(`مرحباً بك يا ${fullName.trim()}! تم إنشـاء حسابك وتسجيل دخولك بنجاح 🎉`);
+      alert(`مرحباً بك يا ${fullName.trim()}! تم إنشاء حسابك وتسجيل دخولك بنجاح 🎉`);
       onClose();
       window.location.reload();
     } catch (err) {
       console.error('Registration error:', err);
       alert('حدث خطأ أثناء إنشاء الحساب. حاول مرة أخرى.');
     }
+  };
+
+  // --- دالة نسيت كلمة المرور (التوجيه للواتساب الخاص بك) ---
+  const handleForgotPassword = () => {
+    const whatsappUrl = `https://wa.me/966553731265?text=${encodeURIComponent('السلام عليكم يا عبد العزيز، نسيت كلمة المرور الخاصة بحسابي في نادي التمريض، وأرغب بمساعدتك في استرجاعها.')}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   return (
@@ -144,7 +150,16 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700">كلمة المرور</label>
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-700">كلمة المرور</label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-[11px] font-bold text-[#630517] hover:underline"
+                >
+                  نسيت كلمة المرور؟ 🔑
+                </button>
+              </div>
               <input
                 type="password"
                 placeholder="••••••••"
