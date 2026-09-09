@@ -2,11 +2,11 @@ export default function Statistics() {
 
   const stats = [
     {
-      number: "100+",
+      number: "200+",
       title: "عضو"
     },
     {
-      number: "20+",
+      number: "15+",
       title: "فعالية"
     },
     {
