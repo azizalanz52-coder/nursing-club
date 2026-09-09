@@ -27,6 +27,17 @@ export default function RootLayout({
 
   return (
     <html lang="ar" className={`${kufam.variable} h-full antialiased`}>
+      <head>
+        <title>نادي التمريض - جامعة حفر الباطن</title>
+        <meta name="application-name" content="نادي التمريض" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="نادي التمريض" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="theme-color" content="#630517" />
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" />
+      </head>
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-800">
         {isLoading ? (
           <main className="min-h-screen bg-[#4A030F] flex items-center justify-center px-4 relative overflow-hidden fixed inset-0 z-50" dir="rtl">
