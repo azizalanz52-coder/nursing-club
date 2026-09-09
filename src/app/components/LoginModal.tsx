@@ -117,7 +117,7 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
   // --- دالة نسيت كلمة المرور (التوجيه للواتساب الخاص بك) ---
   const handleForgotPassword = () => {
-    const whatsappUrl = `https://wa.me/966553731265?text=${encodeURIComponent('السلام عليكم يا عبد العزيز، نسيت كلمة المرور الخاصة بحسابي في نادي التمريض، وأرغب بمساعدتك في استرجاعها.')}`;
+    const whatsappUrl = `https://wa.me/966553731265?text=${encodeURIComponent('السلام عليكم ، نسيت كلمة المرور الخاصة بحسابي')}`;
     window.open(whatsappUrl, '_blank');
   };
 
