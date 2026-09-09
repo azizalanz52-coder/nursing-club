@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Image from "next/image";
 import Link from "next/link";
+import { db } from '../../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 export default function Hero() {
   const [banners, setBanners] = useState([
@@ -26,6 +28,9 @@ export default function Hero() {
     },
   ]);
 
+  const [acceptedData, setAcceptedData] = useState<{ committee: string; whatsapp: string } | null>(null);
+  const [showModal, setShowModal] = useState(false);
+
   useEffect(() => {
     const savedBanners = localStorage.getItem('UHB_BANNERS');
     if (savedBanners) {
@@ -37,6 +42,38 @@ export default function Hero() {
       } catch (e) {
         console.error(e);
       }
+    }
+
+    // التحقق من حالة العضو السحابية إذا كان مسجلاً دخولاً
+    const userPhone = localStorage.getItem('userPhone');
+    const userName = localStorage.getItem('userName');
+
+    if (userPhone || userName) {
+      const checkAcceptance = async () => {
+        try {
+          const querySnapshot = await getDocs(collection(db, 'applications'));
+          querySnapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            // مطابقة برقم الجوال أو الاسم المسجل
+            if (
+              (userPhone && data.phone === userPhone) ||
+              (userName && data.fullName === userName)
+            ) {
+              if (data.status === 'مقبول') {
+                setAcceptedData({
+                  committee: data.acceptedCommittee || data.firstChoice || 'اللجنة',
+                  whatsapp: data.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
+                });
+                setShowModal(true);
+              }
+            }
+          });
+        } catch (err) {
+          console.error('Error checking user acceptance:', err);
+        }
+      };
+
+      checkAcceptance();
     }
   }, []);
 
@@ -115,6 +152,40 @@ export default function Hero() {
         )}
 
       </div>
+
+      {/* نافذة التهنئة بالقبول ورابط الواتساب */}
+      {showModal && acceptedData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-300">
+          <div className="bg-gradient-to-b from-slate-900 to-[#630517] border-2 border-[#F5D061] rounded-3xl p-8 max-w-lg w-full shadow-2xl text-center space-y-6 text-white relative">
+            <span className="text-5xl animate-bounce inline-block">🎉</span>
+            <div className="space-y-2">
+              <h3 className="text-2xl sm:text-3xl font-black text-[#F5D061]">مبروك تم قبولك!</h3>
+              <p className="text-sm sm:text-base text-slate-200 leading-relaxed">
+                يسعدنا انضمامك إلى <span className="font-extrabold text-[#F5D061]">{acceptedData.committee}</span> في نادي التمريض بجامعة حفر الباطن.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <a
+                href={acceptedData.whatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 px-6 rounded-2xl shadow-xl transition-all text-base"
+              >
+                <span>💬</span>
+                <span>الانضمام إلى قروب اللجنة عبر واتساب</span>
+              </a>
+            </div>
+
+            <button
+              onClick={() => setShowModal(false)}
+              className="text-xs text-slate-300 hover:text-white underline pt-2 cursor-pointer"
+            >
+              إغلاق النافذة
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
