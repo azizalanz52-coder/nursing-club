@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import * as XLSX from 'xlsx';
 
 interface PassionSlide {
   id: string;
@@ -103,7 +104,7 @@ export default function AdminDashboard() {
   const [bannerTitle, setBannerTitle] = useState<string>('');
   const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
 
-  const [requests, setRequests] = useState<Record<string, string>[]>([]);
+  const [requests, setRequests] = useState<Record<string, any>[]>([]);
   
   // --- Accept Request Modal States ---
   const [showAcceptModal, setShowAcceptModal] = useState(false);
@@ -238,7 +239,7 @@ export default function AdminDashboard() {
         const fetchedRequests = querySnapshot.docs.map((docSnap) => ({
           id: docSnap.id,
           ...docSnap.data()
-        })) as Record<string, string>[];
+        })) as Record<string, any>[];
         if (fetchedRequests.length > 0) {
           setRequests(fetchedRequests);
         }
@@ -257,6 +258,58 @@ export default function AdminDashboard() {
 
     fetchCloudData();
   }, []);
+
+  // --- Excel Import Handler ---
+  const handleExcelImport = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        let count = 0;
+        for (const row of data) {
+          const fullName = row['الأسم الثلاثي ( باللغة العربية )'] || row['الاسم'] || 'متقدم';
+          const phone = String(row['رقم  الهاتف مبدوء ب 05 ؟'] || row['الجوال'] || '');
+          const universityId = String(row['الرقم الجامعي'] || '');
+          const major = String(row['المستوى الدراسي'] || 'تمريض');
+          const firstChoice = String(row['الرغبة الاولى'] || 'غير متوفر');
+          const secondChoice = String(row['الرغبة الثانية'] || 'غير متوفر');
+          const thirdChoice = String(row['الرغبة الثالثة'] || 'غير متوفر');
+
+          const reqId = universityId.trim() !== '' ? universityId : `req_${Date.now()}_${Math.random()}`;
+
+          const reqObj = {
+            fullName,
+            phone,
+            universityId,
+            major,
+            firstChoice,
+            secondChoice,
+            thirdChoice,
+            status: 'معلق',
+            importedAt: new Date().toISOString()
+          };
+
+          await setDoc(doc(db, 'applications', reqId), reqObj, { merge: true });
+          count++;
+        }
+
+        alert(`تم استيراد ${count} متقدماً مع رغباتهم الثلاث بنجاح إلى السحابة!`);
+        window.location.reload();
+      } catch (err) {
+        console.error('Error importing excel:', err);
+        alert('حدث خطأ أثناء قراءة ملف الأكسل، تأكد من صحة الأعمدة.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   // --- Passion Slides Cloud Handlers ---
   const handleAddPassionSlide = async (e: FormEvent) => {
@@ -506,13 +559,12 @@ export default function AdminDashboard() {
     if (!selectedRequestId) return;
     try {
       const docRef = doc(db, 'applications', selectedRequestId);
-      // إضافة معلومات القبول للسحابة لتظهر للعضو لاحقاً
       await updateDoc(docRef, { 
         status: 'مقبول',
         acceptedCommittee: acceptedCommittee,
         whatsappLink: whatsappLink 
       });
-      setRequests(requests.map((req) => req.id === selectedRequestId ? { ...req, status: 'مقبول' } : req));
+      setRequests(requests.map((req) => req.id === selectedRequestId ? { ...req, status: 'مقبول', acceptedCommittee, whatsappLink } : req));
       setShowAcceptModal(false);
       setWhatsappLink('');
       alert('تم قبول العضو بنجاح وإضافة رابط الواتساب!');
@@ -622,7 +674,7 @@ export default function AdminDashboard() {
             { id: 'events', label: '📅 إدارة الفعاليات والبوسترات (سحابي)' },
             { id: 'banners', label: '🖼️ إدارة البانرات (سحابي)' },
             { id: 'team', label: '👥 إدارة القادة والأعضاء' },
-            { id: 'requests', label: '📥 طلبات الانضمام (Firebase)' },
+            { id: 'requests', label: '📥 طلبات الانضمام مع استيراد الأكسل (Firebase)' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1217,56 +1269,90 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === 'requests' && (
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-            <h3 className="text-xl font-black text-slate-900">طلبات انضمام الأعضاء</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                    <th className="pb-3 pr-2">اسم المتقدم</th>
-                    <th className="pb-3">الرقم الجامعي / التخصص</th>
-                    <th className="pb-3">اللجنة الأولى</th>
-                    <th className="pb-3">الحالة</th>
-                    <th className="pb-3 text-left pl-2">الإجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {requests.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات انضمام مسجلة حتى الآن.</td>
+          <div className="space-y-6">
+            
+            {/* Excel Import Card */}
+            <div className="bg-emerald-50 border-2 border-emerald-300 p-6 rounded-3xl flex items-center justify-between flex-wrap gap-4 shadow-sm">
+              <div className="space-y-1">
+                <h4 className="font-black text-emerald-900 text-base">📥 استيراد بيانات المتقدمين من ملف الأكسل</h4>
+                <p className="text-xs text-emerald-700">ارفع ملف الردود لجلب جميع الطلاب مع رغباتهم الثلاث مباشرة إلى سحابة Firebase بضغطة زر!</p>
+              </div>
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleExcelImport}
+                className="file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer text-xs bg-white border border-emerald-200 rounded-xl p-1"
+              />
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+              <h3 className="text-xl font-black text-slate-900">طلبات انضمام الأعضاء ({requests.length})</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                      <th className="pb-3 pr-2">اسم المتقدم</th>
+                      <th className="pb-3">الرقم الجامعي / المستوى</th>
+                      <th className="pb-3">الرغبات الثلاث</th>
+                      <th className="pb-3">الحالة واللجنة</th>
+                      <th className="pb-3 text-left pl-2">الإجراءات</th>
                     </tr>
-                  ) : (
-                    requests.map((req) => (
-                      <tr key={req.id} className="hover:bg-slate-50">
-                        <td className="py-4 pr-2 font-bold text-slate-900">{req.fullName}</td>
-                        <td className="py-4 text-slate-600">{req.universityId} - {req.major}</td>
-                        <td className="py-4 text-slate-700 font-bold">{req.firstChoice}</td>
-                        <td className="py-4">
-                          <span className={`px-2.5 py-1 rounded-full font-bold border ${req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                            {req.status || 'معلق'}
-                          </span>
-                        </td>
-                        <td className="py-4 text-left pl-2 flex gap-2 justify-end">
-                          <button
-                            type="button"
-                            onClick={() => openAcceptModal(req.id)}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
-                          >
-                            قبول ✅
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteRequest(req.id)}
-                            className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
-                          >
-                            رفض ✕
-                          </button>
-                        </td>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {requests.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات انضمام. قم برفع ملف الأكسل بالأعلى لإضافتهم!</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      requests.map((req) => (
+                        <tr key={req.id} className="hover:bg-slate-50">
+                          <td className="py-4 pr-2 font-bold text-slate-900">
+                            {req.fullName}
+                            <div className="text-[10px] text-slate-500 font-normal">📞 {req.phone}</div>
+                          </td>
+                          <td className="py-4 text-slate-600">
+                            {req.universityId || '-'} <br />
+                            <span className="text-[10px] text-slate-400">{req.major}</span>
+                          </td>
+                          <td className="py-4 text-slate-700">
+                            <div className="space-y-0.5 text-[11px]">
+                              <p><strong className="text-[#630517]">1:</strong> {req.firstChoice || req.firstChoice || '-'}</p>
+                              <p><strong className="text-slate-400">2:</strong> {req.secondChoice || '-'}</p>
+                              <p><strong className="text-slate-400">3:</strong> {req.thirdChoice || '-'}</p>
+                            </div>
+                          </td>
+                          <td className="py-4">
+                            <span className={`px-2.5 py-1 rounded-full font-bold border block w-fit mb-1 ${req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                              {req.status || 'معلق'}
+                            </span>
+                            {req.acceptedCommittee && (
+                              <span className="text-[10px] font-bold text-[#630517] bg-[#630517]/10 px-2 py-0.5 rounded-md">
+                                مقبول في: {req.acceptedCommittee}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-4 text-left pl-2 flex gap-2 justify-end">
+                            <button
+                              type="button"
+                              onClick={() => openAcceptModal(req.id)}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
+                            >
+                              قبول ✅
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRequest(req.id)}
+                              className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                            >
+                              رفض ✕
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -1321,7 +1407,7 @@ export default function AdminDashboard() {
               <button
                 type="button"
                 onClick={handleConfirmAcceptRequest}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black hover:bg-emerald-700 shadow-lg"
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black hover:bg-emerald-700 shadow-lg cursor-pointer"
               >
                 تأكيد القبول وإرسال الرابط
               </button>
