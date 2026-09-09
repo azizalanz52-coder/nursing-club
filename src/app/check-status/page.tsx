@@ -40,6 +40,13 @@ export default function CheckStatusPage() {
     }
   };
 
+  // دالة لإخفاء أجزاء من الرقم الجامعي للحفاظ على الخصوصية والأمان
+  const maskUniversityId = (id: string) => {
+    if (!id || id.length < 4) return '••••••••';
+    const visiblePart = id.slice(-4); // إظهار آخر 4 أرقام فقط
+    return '••••••' + visiblePart;
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 py-16 px-4" dir="rtl">
       <div className="max-w-md mx-auto space-y-8">
@@ -84,7 +91,9 @@ export default function CheckStatusPage() {
                       </div>
                       <div>
                         <h3 className="font-black text-slate-900 text-base">{result.fullName}</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">الرقم الجامعي: {result.universityId || 'غير متوفر'}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          الرقم الجامعي: <span className="font-mono">{result.universityId ? maskUniversityId(result.universityId) : 'غير متوفر'}</span>
+                        </p>
                       </div>
 
                       <div className="py-2 px-4 rounded-xl bg-white border border-slate-200/80 inline-block">
@@ -120,7 +129,9 @@ export default function CheckStatusPage() {
                       </div>
                       <div>
                         <h3 className="font-black text-slate-900 text-base">{result.fullName}</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">الرقم الجامعي: {result.universityId || 'غير متوفر'}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          الرقم الجامعي: <span className="font-mono">{result.universityId ? maskUniversityId(result.universityId) : 'غير متوفر'}</span>
+                        </p>
                       </div>
 
                       <div className="py-2 px-4 rounded-xl bg-white border border-slate-200/80 inline-block">
@@ -142,7 +153,9 @@ export default function CheckStatusPage() {
                       </div>
                       <div>
                         <h3 className="font-black text-slate-900 text-base">{result.fullName}</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">الرقم الجامعي: {result.universityId || 'غير متوفر'}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          الرقم الجامعي: <span className="font-mono">{result.universityId ? maskUniversityId(result.universityId) : 'غير متوفر'}</span>
+                        </p>
                       </div>
 
                       <div className="py-2 px-4 rounded-xl bg-white border border-slate-200/80 inline-block">
