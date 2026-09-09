@@ -55,7 +55,7 @@ interface Committee {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners' | 'discover' | 'passion'>('discover');
+  const [activeTab, setActiveTab] = useState<'events' | 'team' | 'requests' | 'banners' | 'discover' | 'passion'>('events');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -88,19 +88,9 @@ export default function AdminDashboard() {
   const [newDiscDesc, setNewDiscDesc] = useState<string>('');
   const [newDiscImages, setNewDiscImages] = useState<string[]>([]);
 
-  // Other States
-  const [events, setEvents] = useState<EventItem[]>([
-    {
-      id: '1',
-      title: 'ملتقى التمريض التفاعلي 2026',
-      date: '25 سبتمبر 2026',
-      location: 'مسرح جامعة حفر الباطن',
-      status: 'upcoming',
-      poster: '/header-banner.png',
-      description: 'ملتقى يهدف إلى استعراض أحدث الممارسات في التمريض وورش عمل تفاعلية.'
-    }
-  ]);
-
+  // Events & Banners Cloud States + Editing State
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState<string>('');
   const [newDate, setNewDate] = useState<string>('');
   const [newLocation, setNewLocation] = useState<string>('');
@@ -108,17 +98,7 @@ export default function AdminDashboard() {
   const [newPoster, setNewPoster] = useState<string>('/header-banner.png');
   const [newDesc, setNewDesc] = useState<string>('');
 
-  const [banners, setBanners] = useState<BannerItem[]>([
-    {
-      id: '1',
-      tag: 'نادي التمريض • جامعة حفر الباطن',
-      title: 'نادي التمريض',
-      image: '/header-banner.png',
-      buttonText: 'اكتشف النادي',
-      buttonLink: '/discover'
-    }
-  ]);
-
+  const [banners, setBanners] = useState<BannerItem[]>([]);
   const [bannerTag, setBannerTag] = useState<string>('');
   const [bannerTitle, setBannerTitle] = useState<string>('');
   const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
@@ -151,36 +131,55 @@ export default function AdminDashboard() {
   const [newMemberName, setNewMemberName] = useState<string>('');
   const [newMemberRole, setNewMemberRole] = useState<string>('');
 
-  // Fetch Cloud & Local Data on Mount
+  // Fetch Cloud Data on Mount
   useEffect(() => {
-    // Local storage items with safe typing
-    const savedEvents = localStorage.getItem('UHB_EVENTS');
-    if (savedEvents) {
-      try {
-        const parsed = JSON.parse(savedEvents);
-        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          setEvents(parsed as EventItem[]);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    const savedBanners = localStorage.getItem('UHB_BANNERS');
-    if (savedBanners) {
-      try {
-        const parsed = JSON.parse(savedBanners);
-        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          setBanners(parsed as BannerItem[]);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    // Cloud Firebase Fetching
     const fetchCloudData = async () => {
       try {
+        // Events Cloud
+        const eventsSnap = await getDocs(collection(db, 'site_events'));
+        if (!eventsSnap.empty) {
+          const eventsList: EventItem[] = [];
+          eventsSnap.forEach((d) => {
+            eventsList.push({ id: d.id, ...d.data() } as EventItem);
+          });
+          setEvents(eventsList);
+        } else {
+          const defaultEvents: EventItem[] = [
+            {
+              id: '1',
+              title: 'ملتقى التمريض التفاعلي 2026',
+              date: '25 سبتمبر 2026',
+              location: 'مسرح جامعة حفر الباطن',
+              status: 'upcoming',
+              poster: '/header-banner.png',
+              description: 'ملتقى يهدف إلى استعراض أحدث الممارسات في التمريض وورش عمل تفاعلية.'
+            }
+          ];
+          setEvents(defaultEvents);
+        }
+
+        // Banners Cloud
+        const bannersSnap = await getDocs(collection(db, 'site_banners'));
+        if (!bannersSnap.empty) {
+          const bannersList: BannerItem[] = [];
+          bannersSnap.forEach((d) => {
+            bannersList.push({ id: d.id, ...d.data() } as BannerItem);
+          });
+          setBanners(bannersList);
+        } else {
+          const defaultBanners: BannerItem[] = [
+            {
+              id: '1',
+              tag: 'نادي التمريض • جامعة حفر الباطن',
+              title: 'نادي التمريض',
+              image: '/header-banner.png',
+              buttonText: 'اكتشف النادي',
+              buttonLink: '/discover'
+            }
+          ];
+          setBanners(defaultBanners);
+        }
+
         // Passion Slides Cloud
         const passionSnap = await getDocs(collection(db, 'site_passion_slides'));
         if (!passionSnap.empty) {
@@ -389,15 +388,16 @@ export default function AdminDashboard() {
 
   const currentEditedEvent = discoverEvents.find((ev) => ev.id === selectedEventId) || discoverEvents[0];
 
-  // --- Other Handlers ---
-  const handleAddEvent = (e: FormEvent) => {
+  // --- Events Cloud Handlers & Editing ---
+  const handleSaveEventSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
       alert('يرجى كتابة عنوان الفعالية.');
       return;
     }
-    const newEvent: EventItem = {
-      id: Date.now().toString(),
+    const eventId = editingEventId ? editingEventId : Date.now().toString();
+    const eventObj: EventItem = {
+      id: eventId,
       title: newTitle,
       date: newDate || 'قريباً',
       location: newLocation || 'جامعة حفر الباطن',
@@ -405,50 +405,89 @@ export default function AdminDashboard() {
       poster: newPoster,
       description: newDesc || 'فعالية تابعة لنادي التمريض.'
     };
-    const updatedEvents = [newEvent, ...events];
-    setEvents(updatedEvents);
-    localStorage.setItem('UHB_EVENTS', JSON.stringify(updatedEvents));
-    setNewTitle('');
-    setNewDate('');
-    setNewLocation('');
-    setNewPoster('/header-banner.png');
-    setNewDesc('');
-    alert('تم نشر الفعالية وحفظها بنجاح!');
+
+    try {
+      await setDoc(doc(db, 'site_events', eventId), eventObj);
+      if (editingEventId) {
+        setEvents(events.map((ev) => ev.id === eventId ? eventObj : ev));
+        alert('تم تعديل وتحديث الفعالية سحابياً بنجاح!');
+      } else {
+        setEvents([eventObj, ...events]);
+        alert('تم نشر الفعالية وحفظها سحابياً بنجاح!');
+      }
+      setEditingEventId(null);
+      setNewTitle('');
+      setNewDate('');
+      setNewLocation('');
+      setNewPoster('/header-banner.png');
+      setNewDesc('');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء الحفظ السحابي.');
+    }
   };
 
-  const handleDeleteEvent = (id: string) => {
-    const updatedEvents = events.filter((ev) => ev.id !== id);
-    setEvents(updatedEvents);
-    localStorage.setItem('UHB_EVENTS', JSON.stringify(updatedEvents));
+  const handleEditEventClick = (ev: EventItem) => {
+    setEditingEventId(ev.id);
+    setNewTitle(ev.title);
+    setNewDate(ev.date);
+    setNewLocation(ev.location);
+    setNewStatus(ev.status);
+    setNewPoster(ev.poster);
+    setNewDesc(ev.description);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleAddBanner = (e: FormEvent) => {
+  const handleDeleteEvent = async (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذه الفعالية من السحابة؟')) {
+      try {
+        await deleteDoc(doc(db, 'site_events', id));
+        setEvents(events.filter((ev) => ev.id !== id));
+        alert('تم الحذف سحابياً بنجاح.');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  // --- Banners Cloud Handlers ---
+  const handleAddBanner = async (e: FormEvent) => {
     e.preventDefault();
     if (!bannerTitle.trim()) {
       alert('يرجى كتابة عنوان البانر.');
       return;
     }
+    const bannerId = Date.now().toString();
     const newBanner: BannerItem = {
-      id: Date.now().toString(),
+      id: bannerId,
       tag: bannerTag || 'مناسبة خاصة',
       title: bannerTitle,
       image: bannerImage,
       buttonText: 'اكتشف النادي',
       buttonLink: '/discover'
     };
-    const updatedBanners = [newBanner, ...banners];
-    setBanners(updatedBanners);
-    localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
-    setBannerTag('');
-    setBannerTitle('');
-    setBannerImage('/header-banner.png');
-    alert('تم إضافة وتفعيل البانر بنجاح في الواجهة الرئيسية!');
+
+    try {
+      await setDoc(doc(db, 'site_banners', bannerId), newBanner);
+      setBanners([newBanner, ...banners]);
+      setBannerTag('');
+      setBannerTitle('');
+      setBannerImage('/header-banner.png');
+      alert('تم إضافة وتفعيل البانر سحابياً بنجاح في الواجهة الرئيسية!');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء الحفظ السحابي.');
+    }
   };
 
-  const handleDeleteBanner = (id: string) => {
-    const updatedBanners = banners.filter((b) => b.id !== id);
-    setBanners(updatedBanners);
-    localStorage.setItem('UHB_BANNERS', JSON.stringify(updatedBanners));
+  const handleDeleteBanner = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'site_banners', id));
+      setBanners(banners.filter((b) => b.id !== id));
+      alert('تم حذف البانر سحابياً.');
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleAcceptRequest = async (id: string) => {
@@ -554,8 +593,8 @@ export default function AdminDashboard() {
           {[
             { id: 'discover', label: '🖼️ إدارة معرض "اكتشف النادي" (سحابي)' },
             { id: 'passion', label: '✨ إدارة بطاقة "شغف وعطاء" (سحابي)' },
-            { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
-            { id: 'banners', label: '🖼️ إدارة البانرات (الهيدر)' },
+            { id: 'events', label: '📅 إدارة الفعاليات والبوسترات (سحابي)' },
+            { id: 'banners', label: '🖼️ إدارة البانرات (سحابي)' },
             { id: 'team', label: '👥 إدارة القادة والأعضاء' },
             { id: 'requests', label: '📥 طلبات الانضمام (Firebase)' },
           ].map((tab) => (
@@ -576,10 +615,8 @@ export default function AdminDashboard() {
 
         {activeTab === 'discover' && (
           <div className="space-y-8">
-            
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة مع معرض صور سحابي</h3>
-              
               <form onSubmit={handleCreateNewDiscoverEvent} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">عنوان الفعالية الجديدة</label>
@@ -591,7 +628,6 @@ export default function AdminDashboard() {
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
-
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">التصنيف</label>
                   <input
@@ -602,7 +638,6 @@ export default function AdminDashboard() {
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
-
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700">وصف الفعالية</label>
                   <textarea
@@ -613,7 +648,6 @@ export default function AdminDashboard() {
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
-
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700">اختر صور المعرض (متعددة 📁)</label>
                   <input
@@ -623,19 +657,7 @@ export default function AdminDashboard() {
                     onChange={handleSelectMultipleImagesForNewEvent}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
-                  <p className="text-xs text-emerald-700 font-bold mt-1">تم اختيار {newDiscImages.length} صور للفعالية الجديدة جاهزة للرفع السحابي.</p>
                 </div>
-
-                {newDiscImages.length > 0 && (
-                  <div className="sm:col-span-2 grid grid-cols-4 sm:grid-cols-6 gap-3 pt-2">
-                    {newDiscImages.map((img, idx) => (
-                      <div key={idx} className="h-20 rounded-xl overflow-hidden border border-slate-200 relative bg-slate-100">
-                        <img src={img} alt="معاينة" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
                 <div className="sm:col-span-2 pt-2">
                   <button
                     type="submit"
@@ -649,7 +671,6 @@ export default function AdminDashboard() {
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h3 className="text-xl font-black text-slate-900">إدارة الصور وإضافتها للفعاليات القائمة (سحابي)</h3>
-              
               <div className="flex flex-wrap gap-3">
                 {discoverEvents.map((ev) => (
                   <button
@@ -679,7 +700,6 @@ export default function AdminDashboard() {
                       حذف هذه الفعالية بالكامل من السحابة ✕
                     </button>
                   </div>
-
                   <input
                     type="file"
                     accept="image/*"
@@ -710,7 +730,6 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
-
           </div>
         )}
 
@@ -718,7 +737,6 @@ export default function AdminDashboard() {
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h3 className="text-xl font-black text-slate-900">إدارة صور وعبارات بطاقة "شغف، عطاء، واحترافية" (سحابي)</h3>
-              
               <form onSubmit={handleAddPassionSlide} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700">اختر صورة الشريحة من جهازك</label>
@@ -781,9 +799,29 @@ export default function AdminDashboard() {
         {activeTab === 'events' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">إضافة فعالية جديدة مع البوستر</h3>
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-black text-slate-900">
+                  {editingEventId ? '✏️ تعديل الفعالية الحالية (سحابي)' : '➕ إضافة فعالية جديدة مع البوستر (سحابي)'}
+                </h3>
+                {editingEventId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingEventId(null);
+                      setNewTitle('');
+                      setNewDate('');
+                      setNewLocation('');
+                      setNewPoster('/header-banner.png');
+                      setNewDesc('');
+                    }}
+                    className="text-xs text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-xl hover:bg-red-100"
+                  >
+                    إلغاء التعديل ✕
+                  </button>
+                )}
+              </div>
               
-              <form onSubmit={handleAddEvent} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <form onSubmit={handleSaveEventSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600">عنوان الفعالية</label>
                   <input
@@ -830,6 +868,17 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-600">وصف الفعالية</label>
+                  <textarea
+                    rows={2}
+                    placeholder="تفاصيل الفعالية..."
+                    value={newDesc}
+                    onChange={(e) => setNewDesc(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-600">اختر بوستر الفعالية من جهازك أو أدخل رابطه</label>
                   <input
                     type="file"
@@ -856,14 +905,14 @@ export default function AdminDashboard() {
                     type="submit"
                     className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 transition-all cursor-pointer"
                   >
-                    + نشر الفعالية في الموقع
+                    {editingEventId ? '💾 حفظ التعديلات سحابياً' : '+ نشر الفعالية في السحابة'}
                   </button>
                 </div>
               </form>
             </div>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-xl font-black text-slate-900">الفعاليات الحالية ({events.length})</h3>
+              <h3 className="text-xl font-black text-slate-900">الفعاليات الحالية بالسحابة ({events.length})</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs">
                   <thead>
@@ -871,7 +920,7 @@ export default function AdminDashboard() {
                       <th className="pb-3 pr-2">الفعالية</th>
                       <th className="pb-3">التاريخ والمكان</th>
                       <th className="pb-3">الحالة</th>
-                      <th className="pb-3 text-left pl-2">الإجراء</th>
+                      <th className="pb-3 text-left pl-2">الإجراءات</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -884,13 +933,20 @@ export default function AdminDashboard() {
                             {ev.status === 'upcoming' ? 'قريباً' : 'انتهت'}
                           </span>
                         </td>
-                        <td className="py-4 text-left pl-2">
+                        <td className="py-4 text-left pl-2 flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleEditEventClick(ev)}
+                            className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer"
+                          >
+                            تعديل ✏️
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteEvent(ev.id)}
-                            className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                            className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                           >
-                            حذف
+                            حذف ✕
                           </button>
                         </td>
                       </tr>
@@ -905,7 +961,7 @@ export default function AdminDashboard() {
         {activeTab === 'banners' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">إضافة بانر رئيسي جديد</h3>
+              <h3 className="text-xl font-black text-slate-900">إضافة بانر رئيسي جديد (سحابي)</h3>
               
               <form onSubmit={handleAddBanner} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -957,21 +1013,20 @@ export default function AdminDashboard() {
                     type="submit"
                     className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 transition-all cursor-pointer"
                   >
-                    + إضافة وتفعيل البانر في الواجهة
+                    + إضافة وتفعيل البانر سحابياً
                   </button>
                 </div>
               </form>
             </div>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-xl font-black text-slate-900">البانرات النشطة ({banners.length})</h3>
+              <h3 className="text-xl font-black text-slate-900">البانرات النشطة سحابياً ({banners.length})</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 text-slate-400 font-bold">
                       <th className="pb-3 pr-2">الشارة</th>
                       <th className="pb-3">العنوان</th>
-                      <th className="pb-3">مسار الصورة</th>
                       <th className="pb-3 text-left pl-2">الإجراء</th>
                     </tr>
                   </thead>
@@ -980,14 +1035,13 @@ export default function AdminDashboard() {
                       <tr key={ban.id} className="hover:bg-slate-50">
                         <td className="py-4 pr-2 font-bold text-[#630517]">{ban.tag}</td>
                         <td className="py-4 text-slate-900 font-extrabold">{ban.title}</td>
-                        <td className="py-4 text-slate-500 truncate max-w-xs">{ban.image}</td>
                         <td className="py-4 text-left pl-2">
                           <button
                             type="button"
                             onClick={() => handleDeleteBanner(ban.id)}
-                            className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                            className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                           >
-                            حذف
+                            حذف ✕
                           </button>
                         </td>
                       </tr>
@@ -1132,7 +1186,6 @@ export default function AdminDashboard() {
                 </button>
               </form>
             </div>
-
           </div>
         )}
 
