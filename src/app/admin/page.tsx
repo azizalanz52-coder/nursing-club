@@ -960,8 +960,8 @@ export default function AdminDashboard() {
                           onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
                           className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
                         >
-                          <option value="System Admin">System Admin (مدير النظام)</option>
-                          <option value="General Supervisor">General Supervisor (مشرف عام)</option>
+                          <option value="System Admin">System Admin</option>
+                          <option value="General Supervisor">General Supervisor</option>
                           <option value="رئيس لجنة / مشرف قسم">رئيس لجنة </option>
                           <option value="عضو مميز">عضو مميز</option>
                           <option value="عضو أساسي">عضو أساسي</option>
