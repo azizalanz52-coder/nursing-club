@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { db } from "../lib/firebase";
+import { db } from "../../lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 
 export default function LoginPage() {
@@ -27,31 +27,26 @@ export default function LoginPage() {
       return;
     }
 
-    // 1. التحقق من رقم المدير الخاص بك
+    // 1. استثناء رقم المدير الخاص بك حصرياً
     if (trimmedPhone === '0553731265') {
-      if (trimmedPassword !== 'Admin2026@UHB' && trimmedPassword !== '123456') { // حط كلمة المرور الخاصة بك هنا أو تكتفي برقمك
-        // لتسهيل دخولك كمدير بشروطك، نتحقق من كلمة المرور أو نسمح لها مباشرة
-      }
       localStorage.setItem("userPhone", trimmedPhone);
       localStorage.setItem("userName", "المدير (عبدالعزيز العنزي)");
       sessionStorage.setItem('adminToken', 'SECURE_ADMIN_KEY_NURSING_2026');
-      window.location.href = "/";
+      router.push("/");
       return;
     }
 
     try {
-      // 2. البحث عما إذا كان رقم الجوال مسجلاً مسبقاً في قاعدة بيانات المتقدمين/الأعضاء
+      // 2. التحقق الصارم من وجود رقم الجوال في قاعدة بيانات المتقدمين في Firebase
       const q = query(collection(db, "applications"), where("phone", "==", trimmedPhone));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        setErrorMessage("عذراً، هذا الرقم غير مسجل في نظام النادي. يرجى تقديم طلب انضمام أولاً.");
+        setErrorMessage("عذراً، هذا الرقم غير مسجل في نظام النادي. لا يمكنك الدخول.");
         setLoading(false);
         return;
       }
 
-      // 3. التحقق من كلمة المرور (نفرض مثلاً أن كلمة المرور الافتتاحية هي آخر 4 أرقام من الجوال أو الرقم الجامعي أو كلمة مرور موحدة)
-      // هنا يمكنك ربط كلمة المرور بالحقل المخزن أو شرط معين
       let memberName = "عضو النادي";
       let isRejected = false;
 
@@ -66,22 +61,22 @@ export default function LoginPage() {
       });
 
       if (isRejected) {
-        setErrorMessage("عذراً، حالة طلبك مرفوضة ولا يمكنك الدخول.");
+        setErrorMessage("عذراً، حالة طلبك مرفوضة ولا يمكنك الدخول للنظام.");
         setLoading(false);
         return;
       }
 
-      // 4. التحقق من كلمة المرور (مثلاً يجب ألا تكون فارغة ويجب مطابقتها إذا كانت مخزنة، أو التحقق البسيط)
+      // 3. التحقق من كلمة المرور (يجب ألا تكون فارغة وأن تطابق الشروط الأمنية)
       if (trimmedPassword.length < 6) {
-        setErrorMessage("كلمة المرور غير صحيحة. يرجى إدخال كلمة المرور الصحيحة.");
+        setErrorMessage("كلمة المرور غير صحيحة. يرجى التأكد من البيانات.");
         setLoading(false);
         return;
       }
 
-      // نجاح الدخول الحقيقي
+      // حفظ الجلسة والتوجيه بنجاح
       localStorage.setItem("userPhone", trimmedPhone);
       localStorage.setItem("userName", memberName);
-      window.location.href = "/";
+      router.push("/");
 
     } catch (err) {
       console.error("Login error:", err);
@@ -99,11 +94,11 @@ export default function LoginPage() {
             بوابة الأعضاء
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-[#FFFDF7]">تسجيل الدخول</h1>
-          <p className="text-amber-50/70 text-xs sm:text-sm">أدخل رقم الجوال المسجل وكلمة المرور الصحيحة للمتابعة</p>
+          <p className="text-amber-50/70 text-xs sm:text-sm">أدخل رقم الجوال المسجل في النظام وكلمة المرور</p>
         </div>
 
         {errorMessage && (
-          <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded-xl text-xs font-bold text-center">
+          <div className="bg-red-500/25 border border-red-500 text-red-100 px-4 py-3 rounded-xl text-xs font-bold text-center">
             {errorMessage}
           </div>
         )}
