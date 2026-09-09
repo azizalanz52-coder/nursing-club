@@ -40,6 +40,13 @@ interface BannerItem {
   buttonLink: string;
 }
 
+interface PartnerItem {
+  id: string;
+  name: string;
+  category: string;
+  logo: string;
+}
+
 interface CommitteeMember {
   name: string;
   role: string;
@@ -65,7 +72,7 @@ interface UserAccount {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests'>('users-manager');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners'>('users-manager');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -113,6 +120,12 @@ export default function AdminDashboard() {
   const [bannerTag, setBannerTag] = useState<string>('');
   const [bannerTitle, setBannerTitle] = useState<string>('');
   const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
+
+  // Partners Cloud States
+  const [partners, setPartners] = useState<PartnerItem[]>([]);
+  const [partnerName, setPartnerName] = useState<string>('');
+  const [partnerCategory, setPartnerCategory] = useState<string>('شريك إستراتيجي');
+  const [partnerLogo, setPartnerLogo] = useState<string>('/logo.png');
 
   const [requests, setRequests] = useState<Record<string, any>[]>([]);
   const [usersList, setUsersList] = useState<UserAccount[]>([]);
@@ -198,6 +211,21 @@ export default function AdminDashboard() {
           setBanners(defaultBanners);
         }
 
+        // Partners Cloud
+        const partnersSnap = await getDocs(collection(db, 'site_partners'));
+        if (!partnersSnap.empty) {
+          const partnersList: PartnerItem[] = [];
+          partnersSnap.forEach((d) => {
+            partnersList.push({ id: d.id, ...d.data() } as PartnerItem);
+          });
+          setPartners(partnersList);
+        } else {
+          const defaultPartners: PartnerItem[] = [
+            { id: '1', name: 'جامعة حفر الباطن', category: 'شريك إستراتيجي', logo: '/logo.png' }
+          ];
+          setPartners(defaultPartners);
+        }
+
         // Passion Slides Cloud
         const passionSnap = await getDocs(collection(db, 'site_passion_slides'));
         if (!passionSnap.empty) {
@@ -278,33 +306,13 @@ export default function AdminDashboard() {
     fetchCloudData();
   }, []);
 
-  // --- Update User Role Handler (مع حفظ الصلاحيات وإعلام العضو) ---
+  // --- Update User Role Handler ---
   const handleRoleChange = async (phone: string, newRole: string) => {
     try {
       const userRef = doc(db, 'users', phone);
-      
-      // تحديد الصلاحيات بناءً على الرتبة المختارَة لتظهر له تلقائياً
-      let permissionsDesc = '';
-      if (newRole === 'System Admin') {
-        permissionsDesc = 'الصلاحيات المطلقة على النظام (التحكم الكامل بجميع الأقسام، حذف ونشر الفعاليات، تعديل وإدارة رتب جميع الأعضاء، استيراد وتصدير بيانات الأكسل).';
-      } else if (newRole === 'General Supervisor') {
-        permissionsDesc = 'صلاحيات الإشراف العام على الأنشطة والفعاليات ومتابعة سير العمل في لجان النادي ومراجعة طلبات الأعضاء.';
-      } else if (newRole === 'رئيس لجنة / مشرف قسم') {
-        permissionsDesc = 'إدارة أعضاء اللجنة الخاصة به، متابعة المهام المسندة للجنة، ورفع التقارير والمقترحات.';
-      } else if (newRole === 'عضو مميز / منسق') {
-        permissionsDesc = 'المشاركة الفعالة في تنظيم المبادرات والأنشطة، التنسيق بين الأعضاء، وصلاحيات مساعدة في إدارة بعض المهام.';
-      } else {
-        permissionsDesc = 'المشاركة في فعاليات النادي، الانضمام للجان والقروبات، والتقديم على الأنشطة والبرامج.';
-      }
-
-      await updateDoc(userRef, { 
-        role: newRole,
-        pendingCongratulation: true,
-        assignedPermissions: permissionsDesc
-      });
-
+      await updateDoc(userRef, { role: newRole });
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, role: newRole } : u));
-      alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح وإرسال بطاقة التهنئة والصلاحيات له! 🎉`);
+      alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح!`);
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء تحديث الرتبة.');
@@ -612,6 +620,46 @@ export default function AdminDashboard() {
     }
   };
 
+  // --- Partners Cloud Handlers ---
+  const handleAddPartner = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!partnerName.trim()) {
+      alert('يرجى كتابة اسم الشريك أو الراعي.');
+      return;
+    }
+    const partnerId = Date.now().toString();
+    const newPartner: PartnerItem = {
+      id: partnerId,
+      name: partnerName.trim(),
+      category: partnerCategory,
+      logo: partnerLogo
+    };
+
+    try {
+      await setDoc(doc(db, 'site_partners', partnerId), newPartner);
+      setPartners([newPartner, ...partners]);
+      setPartnerName('');
+      setPartnerCategory('شريك إستراتيجي');
+      setPartnerLogo('/logo.png');
+      alert('تم إضافة شريك النجاح وحفظه سحابياً بنجاح للجميع! 🤝');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء الحفظ السحابي.');
+    }
+  };
+
+  const handleDeletePartner = async (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا الشريك من السحابة؟')) {
+      try {
+        await deleteDoc(doc(db, 'site_partners', id));
+        setPartners(partners.filter((p) => p.id !== id));
+        alert('تم حذف الشريك سحابياً بنجاح.');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
   // --- Requests Handlers ---
   const openAcceptModal = (reqId: string) => {
     setSelectedRequestId(reqId);
@@ -799,6 +847,7 @@ export default function AdminDashboard() {
             { id: 'passion', label: '✨ إدارة بطاقة "شغف وعطاء"' },
             { id: 'events', label: '📅 إدارة الفعاليات والبوسترات' },
             { id: 'banners', label: '🖼️ إدارة البانرات الرئيسية' },
+            { id: 'partners', label: '🤝 إدارة شركاء النجاح والرعاة' },
             { id: 'team', label: '👥 إدارة القادة والأعضاء' },
             { id: 'requests', label: '📥 طلبات الانضمام والأكسل' },
           ].map((tab) => (
@@ -1300,6 +1349,89 @@ export default function AdminDashboard() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- تبويب شركاء النجاح والرعاة المضاف حديثاً --- */}
+        {activeTab === 'partners' && (
+          <div className="space-y-8">
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+              <h3 className="text-xl font-black text-slate-900">🤝 إضافة شريك نجاح أو راعي جديد (سحابي)</h3>
+              
+              <form onSubmit={handleAddPartner} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600">اسم الجهة أو الشريك</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: مستشفى الملك فهد التخصصي"
+                    value={partnerName}
+                    onChange={(e) => setPartnerName(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600">نوع الشراكة / التصنيف</label>
+                  <select
+                    value={partnerCategory}
+                    onChange={(e) => setPartnerCategory(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
+                  >
+                    <option value="شريك إستراتيجي">شريك إستراتيجي</option>
+                    <option value="راعي ذهبي">راعي ذهبي</option>
+                    <option value="راعي فضي">راعي فضي</option>
+                    <option value="جهة داعمة">جهة داعمة</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-600">اختر شعار الشريك من جهازك</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const fileUrl = await convertFileToBase64(e.target.files[0]);
+                        setPartnerLogo(fileUrl);
+                      }
+                    }}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] hover:file:brightness-110 cursor-pointer"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <button
+                    type="submit"
+                    className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 transition-all cursor-pointer"
+                  >
+                    + حفظ ونشر الشريك سحابياً
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-4">
+              <h3 className="text-xl font-black text-slate-900">الشركاء والرعاة الحاليون بالسحابة ({partners.length})</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {partners.map((p) => (
+                  <div key={p.id} className="p-4 rounded-2xl border border-slate-200 flex flex-col items-center text-center space-y-3 bg-slate-50 relative group">
+                    <img src={p.logo} alt={p.name} className="w-16 h-16 object-contain rounded-xl bg-white p-2 shadow-sm" />
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-xs">{p.name}</h4>
+                      <span className="text-[10px] text-[#630517] font-bold bg-[#630517]/10 px-2 py-0.5 rounded-md mt-1 inline-block">{p.category}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePartner(p.id)}
+                      className="absolute top-2 left-2 bg-red-600 text-white w-6 h-6 rounded-full text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
