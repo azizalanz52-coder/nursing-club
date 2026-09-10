@@ -75,7 +75,7 @@ interface UserAccount {
   password?: string;
   fullName?: string;
   role?: string;
-  assignedCommittee?: string; // اللجنة المعينة من قبل المشرف الأساسي لرئيس اللجنة
+  assignedCommittee?: string;
   createdAt?: string;
   latestNotification?: string;
 }
@@ -93,7 +93,7 @@ export default function AdminDashboard() {
     }));
   };
 
-  // حماية اللوحة والتحقق من رتبة المستخدم وصلاحياته بشكل ذكي
+  // حماية اللوحة والتحقق من صلاحيات المدير أو رئيس/رئيسة النادي
   useEffect(() => {
     const checkAdminAuth = async () => {
       const phone = localStorage.getItem('userPhone');
@@ -105,12 +105,10 @@ export default function AdminDashboard() {
         return;
       }
 
-      // إذا كان هو المشرف الأساسي أو لديه مفتاح الجلسة الأمنية
       if (phone === '0553731265' || adminAuth) {
         return;
       }
 
-      // التحقق من قاعدة البيانات للرتب الأخرى
       try {
         const userRef = doc(db, 'users', phone as string);
         const userSnap = await getDoc(userRef);
@@ -119,12 +117,12 @@ export default function AdminDashboard() {
           const userData = userSnap.data();
           const userRole = userData.role || 'عضو أساسي';
 
-          // إذا لم يكن مديراً للنظام، يتم إعادة توجيهه للوحة المناسبة لصلاحيته المحدودة
-          if (userRole !== 'System Admin' && userRole !== 'General Supervisor') {
+          // السماح لمدير النظام، المشرف العام، ورئيس/رئيسة النادي بالدخول
+          if (userRole !== 'System Admin' && userRole !== 'General Supervisor' && !userRole.includes('رئيس النادي') && !userRole.includes('رئيسة النادي')) {
             if (userRole.includes('رئيس لجنة') || userRole.includes('مشرف')) {
               router.push('/committee-dashboard');
             } else {
-              alert('عذراً، هذه الصفحة مخصصة لمديري النظام فقط.');
+              alert('عذراً، هذه الصفحة مخصصة للإدارة العليا ورؤساء النادي فقط.');
               router.push('/');
             }
           }
@@ -340,7 +338,7 @@ export default function AdminDashboard() {
         if (!commSnapshot.empty) {
           const cloudMap: Record<string, Partial<Committee>> = {};
           commSnapshot.forEach((d) => { cloudMap[d.id] = d.data() as Partial<Committee>; });
-          setCommittees((prev) => prev.map((c) => cloudMap[c.id] ? { ...c, ...cloudMap[c.id] } : c));
+          setCommittees((prev) => prev.map((c) => cloudMap[d.id] ? { ...c, ...cloudMap[c.id] } : c));
         }
       } catch (err) {
         console.error('Error fetching cloud data:', err);
@@ -350,7 +348,6 @@ export default function AdminDashboard() {
     fetchCloudData();
   }, []);
 
-  // دالة تحديث رتبة المستخدم
   const handleRoleChange = async (phone: string, newRole: string) => {
     try {
       const userRef = doc(db, 'users', phone);
@@ -366,7 +363,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // دالة تعيين اللجنة لرئيس اللجنة من قبلك حصرياً
   const handleAssignedCommitteeChange = async (phone: string, commName: string) => {
     try {
       const userRef = doc(db, 'users', phone);
@@ -375,7 +371,7 @@ export default function AdminDashboard() {
         latestNotification: `تم تعيينك من قبل الإدارة رئيساً لـ (${commName}) 🛡️`
       });
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, assignedCommittee: commName } : u));
-      alert(`تم تعيين اللجنة (${commName}) لهذا العضو بنجاح ليتمكن من إدارتها في لوحته الخاصة!`);
+      alert(`تم تعيين اللجنة (${commName}) لهذا العضو بنجاح!`);
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء تعيين اللجنة.');
@@ -799,6 +795,7 @@ export default function AdminDashboard() {
     }
   };
 
+  // دالة تحويل رغبة الطالب (لرؤساء اللجان وللإدارة)
   const handleShiftPreference = async (req: Record<string, any>) => {
     const f1 = req.firstChoice || '';
     const f2 = req.secondChoice || '';
@@ -819,10 +816,10 @@ export default function AdminDashboard() {
         thirdChoice: updatedObj.thirdChoice
       });
       setRequests(requests.map(r => r.id === req.id ? updatedObj : r));
-      alert('تم نقل رغبات المتقدم وتحديثها سحابياً بنجاح! 🔄');
+      alert('تم تحويل الطالب إلى رغبته التالية (الثانية أو الثالثة) بنجاح! 🔄');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء تحديث الرغبات.');
+      alert('حدث خطأ أثناء تحويل رغبة الطالب.');
     }
   };
 
@@ -1029,7 +1026,7 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
               <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب واللجان المعينة 🔑</h3>
-              <p className="text-xs text-slate-500">يمكنك هنا ترقية أي مستخدم وتعيين لجنته الخاصة مباشرة ليتمكن من دراسة وقبول المتقدمين عليها في لوحة قادة اللجان.</p>
+              <p className="text-xs text-slate-500">يمكنك هنا تعيين رتبة (رئيس النادي / رئيسة النادي) أو (رئيس لجنة) وتحديد اللجان المعينة لهم بدقة.</p>
             </div>
             
             <div className="overflow-x-auto">
@@ -1095,6 +1092,8 @@ export default function AdminDashboard() {
                         >
                           <option value="System Admin">System Admin (مدير النظام)</option>
                           <option value="General Supervisor">General Supervisor (مشرف عام)</option>
+                          <option value="رئيس النادي">رئيس النادي (صلاحيات كاملة على كل اللجان والأنشطة)</option>
+                          <option value="رئيسة النادي">رئيسة النادي (صلاحيات كاملة على كل اللجان والأنشطة)</option>
                           <option value="رئيس لجنة / مشرف قسم">رئيس لجنة (إدارة اللجنة والأعضاء)</option>
                           <option value="عضو مميز / منسق">عضو مميز (صلاحيات تفاعلية خاصة)</option>
                           <option value="عضو أساسي">عضو أساسي (مشارك وفعال)</option>
@@ -1116,7 +1115,7 @@ export default function AdminDashboard() {
                             <option value="لجنة الجودة والتطوير">لجنة الجودة والتطوير</option>
                           </select>
                         ) : (
-                          <span className="text-slate-400 text-[11px]">غير مخصص (رتبة عادية)</span>
+                          <span className="text-slate-400 text-[11px]">غير مخصص</span>
                         )}
                       </td>
                     </tr>
@@ -1911,9 +1910,9 @@ export default function AdminDashboard() {
                               type="button"
                               onClick={() => handleShiftPreference(req)}
                               className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
-                              title="تدوير أو نقل الرغبة (تمرير للرغبة التالية)"
+                              title="تحويل الطالب للرغبة التالية (الثانية أو الثالثة) عند اكتفاء العدد"
                             >
-                              🔄 تحويل رغبة
+                              🔄 تحويل لرغبة أخرى
                             </button>
                             <button
                               type="button"
