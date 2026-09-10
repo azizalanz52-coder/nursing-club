@@ -93,23 +93,21 @@ export default function AdminDashboard() {
     }));
   };
 
-  // حماية اللوحة والتحقق من صلاحيات المدير أو رئيس/رئيسة النادي
   useEffect(() => {
     const checkAdminAuth = async () => {
-      const phone = localStorage.getItem('userPhone');
-      const adminAuth = sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026';
-      
-      if (!phone && !adminAuth) {
-        alert('عذراً، يجب تسجيل الدخول للوصول لهذه الصفحة.');
-        router.push('/login');
-        return;
-      }
-
-      if (phone === '0553731265' || adminAuth) {
-        return;
-      }
-
       try {
+        const phone = localStorage.getItem('userPhone');
+        const adminAuth = sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026';
+        
+        if (!phone && !adminAuth) {
+          router.push('/login');
+          return;
+        }
+
+        if (phone === '0553731265' || adminAuth) {
+          return;
+        }
+
         const userRef = doc(db, 'users', phone as string);
         const userSnap = await getDoc(userRef);
         
@@ -117,12 +115,10 @@ export default function AdminDashboard() {
           const userData = userSnap.data();
           const userRole = userData.role || 'عضو أساسي';
 
-          // السماح لمدير النظام، المشرف العام، ورئيس/رئيسة النادي بالدخول
           if (userRole !== 'System Admin' && userRole !== 'General Supervisor' && !userRole.includes('رئيس النادي') && !userRole.includes('رئيسة النادي')) {
             if (userRole.includes('رئيس لجنة') || userRole.includes('مشرف')) {
               router.push('/committee-dashboard');
             } else {
-              alert('عذراً، هذه الصفحة مخصصة للإدارة العليا ورؤساء النادي فقط.');
               router.push('/');
             }
           }
@@ -131,7 +127,6 @@ export default function AdminDashboard() {
         }
       } catch (err) {
         console.error('Auth check error:', err);
-        router.push('/');
       }
     };
 
@@ -195,11 +190,7 @@ export default function AdminDashboard() {
       name: 'التصميم', 
       maleLeader: 'عبدالعزيز العنزي', 
       femaleLeader: 'شجون الحربي', 
-      members: [
-        { name: 'سارة محمد', role: 'مصممة جرافيك', status: 'نشط' },
-        { name: 'عمر خالد', role: 'مصمم موشن جرافيك', status: 'نشط' },
-        { name: 'فاطمة أحمد', role: 'مسؤولة الهوية البصرية', status: 'نشط' }
-      ] 
+      members: [] 
     },
     { id: 'media', name: 'لجنة الاعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
     { id: 'events-org', name: 'تنظيم الفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', members: [] },
@@ -225,18 +216,6 @@ export default function AdminDashboard() {
             eventsList.push({ id: d.id, ...d.data() } as EventItem);
           });
           setEvents(eventsList);
-        } else {
-          setEvents([
-            {
-              id: '1',
-              title: 'ملتقى التمريض التفاعلي 2026',
-              date: '25 سبتمبر 2026',
-              location: 'مسرح جامعة حفر الباطن',
-              status: 'upcoming',
-              poster: '/header-banner.png',
-              description: 'ملتقى يهدف إلى استعراض أحدث الممارسات في التمريض وورش عمل تفاعلية.'
-            }
-          ]);
         }
 
         const bannersSnap = await getDocs(collection(db, 'site_banners'));
@@ -246,17 +225,6 @@ export default function AdminDashboard() {
             bannersList.push({ id: d.id, ...d.data() } as BannerItem);
           });
           setBanners(bannersList);
-        } else {
-          setBanners([
-            {
-              id: '1',
-              tag: 'نادي التمريض • جامعة حفر الباطن',
-              title: 'نادي التمريض',
-              image: '/header-banner.png',
-              buttonText: 'اكتشف النادي',
-              buttonLink: '/discover'
-            }
-          ]);
         }
 
         const partnersSnap = await getDocs(collection(db, 'site_partners'));
@@ -266,10 +234,6 @@ export default function AdminDashboard() {
             partnersList.push({ id: d.id, ...d.data() } as PartnerItem);
           });
           setPartners(partnersList);
-        } else {
-          setPartners([
-            { id: '1', name: 'جامعة حفر الباطن', category: 'شريك إستراتيجي', logo: '/logo.png' }
-          ]);
         }
 
         const suggestionsSnap = await getDocs(collection(db, 'suggestions'));
@@ -288,12 +252,6 @@ export default function AdminDashboard() {
             slides.push({ id: d.id, ...d.data() } as PassionSlide);
           });
           setPassionSlides(slides);
-        } else {
-          setPassionSlides([
-            { id: '1', image: '/header-banner.png', quote: '«التمريض ليس مجرد مهنة، بل هو فن وعِلم يلامس حياة الإنسان في أصعب لحظاته.»' },
-            { id: '2', image: '/logo.png', quote: '«بالعطاء المستمر والعمل الجماعي نصنع أثراً يخلده الزمن في قلوب المجتمع.»' },
-            { id: '3', image: '/header-banner.png', quote: '«نطمح لأن نكون المنارة التي تضيء دروب التميز لكل ممرض وممرضة في جامعة حفر الباطن.»' }
-          ]);
         }
 
         const discoverSnap = await getDocs(collection(db, 'site_discover_events'));
@@ -304,18 +262,6 @@ export default function AdminDashboard() {
           });
           setDiscoverEvents(eventsList);
           setSelectedEventId(eventsList[0]?.id || '');
-        } else {
-          const defaultEvents: DiscoverEvent[] = [
-            {
-              id: '1',
-              title: 'حفل تدشين نادي كلية التمريض',
-              category: 'أنشطة كبرى',
-              description: 'دشن وكيل الجامعة للشؤون الأكاديمية أ.د. محمد بن عتيق العنزي، وبحضور عميد كلية التمريض د. جلال نعيم الحربي، نادي كلية التمريض - شطر الطلاب لحظة فخر في مسيرة الكلية',
-              images: ['/logo.png', '/header-banner.png']
-            }
-          ];
-          setDiscoverEvents(defaultEvents);
-          setSelectedEventId('1');
         }
 
         const querySnapshot = await getDocs(collection(db, 'applications'));
@@ -338,7 +284,7 @@ export default function AdminDashboard() {
         if (!commSnapshot.empty) {
           const cloudMap: Record<string, Partial<Committee>> = {};
           commSnapshot.forEach((d) => { cloudMap[d.id] = d.data() as Partial<Committee>; });
-          setCommittees((prev) => prev.map((c) => cloudMap[d.id] ? { ...c, ...cloudMap[c.id] } : c));
+          setCommittees((prev) => prev.map((c) => cloudMap[c.id] ? { ...c, ...cloudMap[c.id] } : c));
         }
       } catch (err) {
         console.error('Error fetching cloud data:', err);
@@ -353,7 +299,7 @@ export default function AdminDashboard() {
       const userRef = doc(db, 'users', phone);
       await updateDoc(userRef, { 
         role: newRole,
-        latestNotification: `مبروك! تم تحديث رتبتك إلى (${newRole}) بنجاح 🎉`
+        latestNotification: `مبروك! تم ترقيتك وتعيين رتبتك إلى (${newRole}) بنجاح 🎉`
       });
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, role: newRole } : u));
       alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح!`);
@@ -549,7 +495,7 @@ export default function AdminDashboard() {
       const targetEvent = discoverEvents.find((ev) => ev.id === selectedEventId);
       if (!targetEvent) return;
 
-      const updatedImages = [...targetEvent.images, ...base64Images];
+      const updatedImages = [...(targetEvent.images || []), ...base64Images];
       const updatedEventObj = { ...targetEvent, images: updatedImages };
 
       try {
@@ -566,7 +512,7 @@ export default function AdminDashboard() {
     const targetEvent = discoverEvents.find((ev) => ev.id === selectedEventId);
     if (!targetEvent) return;
 
-    const filteredImages = targetEvent.images.filter((_, idx) => idx !== imgIndex);
+    const filteredImages = (targetEvent.images || []).filter((_, idx) => idx !== imgIndex);
     const updatedImages = filteredImages.length > 0 ? filteredImages : ['/logo.png'];
     const updatedEventObj = { ...targetEvent, images: updatedImages };
 
@@ -795,7 +741,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // دالة تحويل رغبة الطالب (لرؤساء اللجان وللإدارة)
   const handleShiftPreference = async (req: Record<string, any>) => {
     const f1 = req.firstChoice || '';
     const f2 = req.secondChoice || '';
@@ -946,6 +891,32 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
 
+        {/* لوحة إنجاز حماسية */}
+        <div className="bg-gradient-to-r from-[#630517] to-[#80071D] rounded-3xl p-6 text-white shadow-xl flex flex-wrap justify-between items-center gap-6">
+          <div className="space-y-1">
+            <span className="bg-[#F5D061] text-[#630517] font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider">
+              نظام القيادة الماسية 🏆
+            </span>
+            <h2 className="text-xl font-black">غرفة عمليات القيادة ونبض النادي</h2>
+            <p className="text-xs text-white/80">أنت تدير المنصة بكامل الصلاحيات. تابع أداء اللجان ووزع المتميزين بحماس.</p>
+          </div>
+
+          <div className="flex gap-4">
+            <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 text-center">
+              <span className="block text-2xl font-black text-[#F5D061]">{requests.length}</span>
+              <span className="text-[10px] font-bold text-white/90">إجمالي طلبات النادي</span>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 text-center">
+              <span className="block text-2xl font-black text-emerald-400">{requests.filter(r => r.status === 'مقبول').length}</span>
+              <span className="text-[10px] font-bold text-white/90">الأعضاء المقبولون</span>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 text-center">
+              <span className="block text-2xl font-black text-sky-400">{events.length}</span>
+              <span className="text-[10px] font-bold text-white/90">الأنشطة والفعاليات</span>
+            </div>
+          </div>
+        </div>
+
         {/* Tabs */}
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {[
@@ -1026,7 +997,7 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
               <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب واللجان المعينة 🔑</h3>
-              <p className="text-xs text-slate-500">يمكنك هنا تعيين رتبة (رئيس النادي / رئيسة النادي) أو (رئيس لجنة) وتحديد اللجان المعينة لهم بدقة.</p>
+              <p className="text-xs text-slate-500">عين رتبة (رئيس النادي / رئيسة النادي) لتمكينهم من إدارة كل اللجان والفعاليات بحرية تامة.</p>
             </div>
             
             <div className="overflow-x-auto">
@@ -1677,7 +1648,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-500">قائد الطلاب</label>
                   <input
                     type="text"
-                    value={currentCommittee.maleLeader}
+                    value={currentCommittee.maleLeader || ''}
                     onChange={(e) => {
                       const val = e.target.value;
                       setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, maleLeader: val } : c));
@@ -1689,7 +1660,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-500">قائدة الطالبات</label>
                   <input
                     type="text"
-                    value={currentCommittee.femaleLeader}
+                    value={currentCommittee.femaleLeader || ''}
                     onChange={(e) => {
                       const val = e.target.value;
                       setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, femaleLeader: val } : c));
@@ -1785,7 +1756,7 @@ export default function AdminDashboard() {
               />
             </div>
 
-            {/* إحصائيات أعداد المتقدمين لكل لجنة مع مطابقة مرنة */}
+            {/* إحصائيات أعداد المتقدمين لكل لجنة */}
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
               <h4 className="font-black text-slate-900 text-sm">📊 إحصائيات المتقدمين لكل لجنة (حسب الرغبة الأولى)</h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -1801,7 +1772,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* فلاتر لعرض الكل، المقبولين، أو الفرز حسب الرغبة 1، 2، 3 */}
+            {/* فلاتر الفرز */}
             <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex flex-wrap gap-2">
                 <button
