@@ -11,6 +11,7 @@ export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
   const [userPhone, setUserPhone] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null); // حالة حفظ رتبة العضو
+  const [assignedCommittee, setAssignedCommittee] = useState<string | null>(null); // لجنة العضو المعينة
   const [adminAuth, setAdminAuth] = useState<boolean>(false);
   const [mounted, setMounted] = useState(false);
   const [showNavbar, setShowNavbar] = useState(true);
@@ -78,6 +79,10 @@ export default function Navbar() {
           setUserRole('عضو أساسي');
         }
 
+        if (data.assignedCommittee) {
+          setAssignedCommittee(data.assignedCommittee);
+        }
+
         if (data.latestNotification) {
           setNotification(data.latestNotification);
           setShowNotificationModal(true);
@@ -137,6 +142,7 @@ export default function Navbar() {
     setUserName(null);
     setUserPhone(null);
     setUserRole(null);
+    setAssignedCommittee(null);
     setAdminAuth(false);
     window.location.href = '/';
   };
@@ -146,8 +152,11 @@ export default function Navbar() {
   // التحقق الأمني المباشر للمشرف أو رئيس/رئيسة النادي لتظهر لهم لوحة التحكم بالكامل
   const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026') || (userRole === 'System Admin') || (userRole === 'رئيس النادي') || (userRole === 'رئيسة النادي');
 
-  // تحقق ما إذا كان المستخدم رئيس لجنة أو مشرف قسم لتظهر له لوحة التحكم المحدودة
+  // تحقق ما إذا كان المستخدم رئيس لجنة أو مشرف قسم
   const isCommitteeLeader = userRole && (userRole.includes('رئيس لجنة') || userRole.includes('مشرف') || userRole.includes('General Supervisor'));
+
+  // التحقق إذا كانت لجنة المستخدم هي لجنة الجودة والتطوير (غرفة العمليات المركزية المرعبة)
+  const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || userRole === 'System Admin' || userRole === 'رئيس النادي' || userRole === 'رئيسة النادي';
 
   return (
     <>
@@ -245,14 +254,18 @@ export default function Navbar() {
                   </Link>
                 )}
 
-                {/* زر لوحة تحكم اللجنة لرؤساء اللجان والمشرفين */}
+                {/* زر غرفة العمليات المركزية للجنة الجودة أو لوحة اللجنة العامة */}
                 {isCommitteeLeader && !isAdmin && (
                   <Link 
                     href="/committee-dashboard"
-                    className="bg-amber-600 text-white px-3.5 py-2 rounded-xl text-xs font-black shadow hover:bg-amber-700 transition-all flex items-center gap-1.5"
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black shadow transition-all flex items-center gap-1.5 ${
+                      isQualityOperationsRoom 
+                        ? 'bg-rose-950 text-[#F5D061] border border-amber-400 animate-pulse' 
+                        : 'bg-amber-600 text-white hover:bg-amber-700'
+                    }`}
                   >
-                    <span>🛠️</span>
-                    <span>لوحة اللجنة</span>
+                    <span>{isQualityOperationsRoom ? '⚡' : '🛠️'}</span>
+                    <span>{isQualityOperationsRoom ? 'غرفة العمليات المركزية' : 'لوحة اللجنة'}</span>
                   </Link>
                 )}
 
@@ -376,10 +389,14 @@ export default function Navbar() {
                     <Link 
                       href="/committee-dashboard"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="w-full bg-amber-600 text-white py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2"
+                      className={`w-full py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2 ${
+                        isQualityOperationsRoom 
+                          ? 'bg-rose-950 text-[#F5D061] border border-amber-400' 
+                          : 'bg-amber-600 text-white'
+                      }`}
                     >
-                      <span>🛠️</span>
-                      <span>لوحة تحكم اللجنة</span>
+                      <span>{isQualityOperationsRoom ? '⚡' : '🛠️'}</span>
+                      <span>{isQualityOperationsRoom ? 'غرفة العمليات المركزية' : 'لوحة تحكم اللجنة'}</span>
                     </Link>
                   )}
                 </div>
