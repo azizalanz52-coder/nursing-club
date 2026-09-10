@@ -22,7 +22,7 @@ export default function CommitteeLeaderDashboard() {
   const [committeeMembers, setCommitteeMembers] = useState<CommitteeMember[]>([]);
   const [whatsappLink, setWhatsappLink] = useState('');
 
-  // حالة لتحديد اللجنة المدارة حالياً من قبل القائد
+  // اللجنة المحددة والمخصصة لهذا القائد (يتم جلبها من حسابه الذي عينته أنت له)
   const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('لجنة الاعلام');
 
   // Modal القبول
@@ -59,8 +59,10 @@ export default function CommitteeLeaderDashboard() {
         return;
       }
 
-      // إذا كان مخزناً لديه لجنة معينة في حسابه
-      if (uData.committee) {
+      // تحديد اللجنة المعينة له من قبلك تلقائياً بناءً على ملفه في قاعدة البيانات
+      if (uData.assignedCommittee) {
+        setSelectedManagedCommittee(uData.assignedCommittee);
+      } else if (uData.committee) {
         setSelectedManagedCommittee(uData.committee);
       }
 
@@ -76,7 +78,7 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // دالة مطابقة ذكية ودقيقة للجنة المختارة
+  // دالة مطابقة دقيقة للجنة المعينة
   const matchesTargetCommittee = (choiceStr: string, targetComm: string) => {
     if (!choiceStr) return false;
     const cleanChoice = choiceStr.replace(/الـ/g, '').replace(/إ/g, 'ا').replace(/أ/g, 'ا').replace(/آ/g, 'ا').trim();
@@ -93,7 +95,7 @@ export default function CommitteeLeaderDashboard() {
     return choiceStr.includes(targetComm) || targetComm.includes(choiceStr);
   };
 
-  // تصفية الطلبات الخاصة باللجنة المختارة فقط (رغبة 1، 2، 3 أو مقبول فيها)
+  // تصفية الطلبات الخاصة باللجنة المعينة له حصرياً
   const filteredRequests = requests.filter(req => {
     const f1 = req.firstChoice || '';
     const f2 = req.secondChoice || '';
@@ -147,48 +149,21 @@ export default function CommitteeLeaderDashboard() {
         
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h1 className="text-xl font-black text-slate-900">لوحة تحكم رئيس اللجنة والصلاحيات 🛡️</h1>
-            <p className="text-xs text-slate-500 mt-1">أهلاً بك، {userData?.fullName} ({userData?.role})</p>
+            <h1 className="text-xl font-black text-slate-900">لوحة تحكم رئيس اللجنة المعين 🛡️</h1>
+            <p className="text-xs text-slate-500 mt-1">
+              أهلاً بك، {userData?.fullName} ({userData?.role}) • اللجنة المعينة لك: <strong className="text-[#630517]">{selectedManagedCommittee}</strong>
+            </p>
           </div>
           <Link href="/" className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-200">
             الرئيسية ←
           </Link>
         </div>
 
-        {/* شريط اختيار أو تصفية اللجنة لدراسة المتقدمين عليها */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-3">
-          <label className="text-xs font-bold text-slate-700">اختر اللجنة لاستعراض ودراسة المتقدمين عليها فقط:</label>
-          <div className="flex flex-wrap gap-2">
-            {[
-              'لجنة الاعلام', 
-              'لجنة التصميم', 
-              'لجنة تنظيم الفعاليات', 
-              'لجنة الموارد البشرية', 
-              'لجنة العلاقات العامة', 
-              'لجنة المحتوى العلمي', 
-              'لجنة الجودة والتطوير'
-            ].map((comm) => (
-              <button
-                key={comm}
-                type="button"
-                onClick={() => setSelectedManagedCommittee(comm)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedManagedCommittee === comm
-                    ? 'bg-[#630517] text-[#F5D061] shadow'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                {comm}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-2">
             <div>
               <h3 className="text-lg font-black text-slate-900">متقدمو وقبولو ({selectedManagedCommittee})</h3>
-              <p className="text-xs text-slate-500">هنا يمكنك متابعة المتقدمين الذين اختاروا هذه اللجنة تحديداً لدراستهم وقبولهم.</p>
+              <p className="text-xs text-slate-500">هنا تظهر لك الطلبات الموجهة إلى لجنتك التي عينك المشرف عليها لتدرسها وتقبلها.</p>
             </div>
             <span className="px-3 py-1 rounded-full bg-[#630517]/10 text-[#630517] font-bold text-xs">
               النتائج المطابقة: {filteredRequests.length}
