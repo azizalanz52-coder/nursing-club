@@ -89,6 +89,12 @@ export default function AdminDashboard() {
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
+  // حالات النوافذ المنبثقة المخصصة (بدل الـ alert والـ prompt القديمة)
+  const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password'>('none');
+  const [modalMessage, setModalMessage] = useState<string>('');
+  const [activeUserPhoneForAction, setActiveUserPhoneForAction] = useState<string>('');
+  const [modalInputVal, setModalInputVal] = useState<string>('');
+
   const togglePasswordVisibility = (phone: string) => {
     setShowPasswords((prev) => ({
       ...prev,
@@ -289,10 +295,12 @@ export default function AdminDashboard() {
         latestNotification: `مبروك! تم ترقيتك وتعيين رتبتك إلى (${newRole}) بنجاح 🎉`
       });
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, role: newRole } : u));
-      alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح!`);
+      setModalMessage(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح سحابياً! 🚀`);
+      setModalType('success');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء تحديث الرتبة.');
+      setModalMessage('حدث خطأ أثناء تحديث الرتبة.');
+      setModalType('success');
     }
   };
 
@@ -305,41 +313,60 @@ export default function AdminDashboard() {
         latestNotification: `تم تعيينك من قبل الإدارة رئيساً لـ (${commName}) 🛡️`
       });
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, assignedCommittee: commName } : u));
-      alert(`تم تعيين اللجنة (${commName}) لهذا العضو بنجاح!`);
+      setModalMessage(`تم تعيين اللجنة (${commName}) لهذا العضو بنجاح! 🚀`);
+      setModalType('success');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء تعيين اللجنة.');
+      setModalMessage('حدث خطأ أثناء تعيين اللجنة.');
+      setModalType('success');
     }
   };
 
-  // دالة لتعديل كلمة المرور
-  const handleUpdatePassword = async (phone: string) => {
-    const newPass = prompt('أدخل كلمة المرور الجديدة للعضو:');
-    if (!newPass || !newPass.trim()) return;
+  // فتح نافذة تعديل كلمة المرور المخصصة
+  const openPasswordModal = (phone: string) => {
+    setActiveUserPhoneForAction(phone);
+    setModalInputVal('');
+    setModalType('password');
+  };
+
+  const submitUpdatePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!modalInputVal.trim()) return;
 
     try {
-      const userRef = doc(db, 'users', phone);
-      await updateDoc(userRef, { password: newPass.trim() });
-      setUsersList(usersList.map(u => u.phone === phone ? { ...u, password: newPass.trim() } : u));
-      alert('تم تحديث كلمة المرور بنجاح! 🔒');
+      const userRef = doc(db, 'users', activeUserPhoneForAction);
+      await updateDoc(userRef, { password: modalInputVal.trim() });
+      setUsersList(usersList.map(u => u.phone === activeUserPhoneForAction ? { ...u, password: modalInputVal.trim() } : u));
+      setModalType('none');
+      setModalMessage('تم تحديث كلمة المرور بنجاح سحابياً! 🔒');
+      setModalType('success');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء تحديث كلمة المرور.');
+      setModalMessage('حدث خطأ أثناء تحديث كلمة المرور.');
+      setModalType('success');
     }
   };
 
-  // دالة لتعديل رقم الجوال
-  const handleUpdatePhone = async (oldPhone: string) => {
-    const newPhone = prompt('أدخل رقم الجوال الجديد (اسم الدخول الجديد):', oldPhone);
-    if (!newPhone || !newPhone.trim() || newPhone.trim() === oldPhone) return;
+  // فتح نافذة تعديل رقم الجوال المخصصة
+  const openPhoneModal = (oldPhone: string) => {
+    setActiveUserPhoneForAction(oldPhone);
+    setModalInputVal(oldPhone);
+    setModalType('phone');
+  };
+
+  const submitUpdatePhone = async (e: FormEvent) => {
+    e.preventDefault();
+    const trimmedNewPhone = modalInputVal.trim();
+    if (!trimmedNewPhone || trimmedNewPhone === activeUserPhoneForAction) return;
 
     try {
-      const trimmedNewPhone = newPhone.trim();
-      const oldUserRef = doc(db, 'users', oldPhone);
+      const oldUserRef = doc(db, 'users', activeUserPhoneForAction);
       const oldUserSnap = await getDoc(oldUserRef);
 
       if (!oldUserSnap.exists()) {
-        alert('لم يتم العثور على بيانات المستخدم.');
+        setModalType('none');
+        setModalMessage('لم يتم العثور على بيانات المستخدم.');
+        setModalType('success');
         return;
       }
 
@@ -354,11 +381,15 @@ export default function AdminDashboard() {
 
       await deleteDoc(oldUserRef);
 
-      setUsersList(usersList.map(u => u.phone === oldPhone ? { ...u, phone: trimmedNewPhone } : u));
-      alert('تم تحديث رقم جوال المستخدم بنجاح! 🚀');
+      setUsersList(usersList.map(u => u.phone === activeUserPhoneForAction ? { ...u, phone: trimmedNewPhone } : u));
+      setModalType('none');
+      setModalMessage('تم تحديث رقم جوال المستخدم بنجاح وتحديثه سحابياً! 🚀');
+      setModalType('success');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء تحديث رقم الجوال.');
+      setModalType('none');
+      setModalMessage('حدث خطأ أثناء تحديث رقم الجوال.');
+      setModalType('success');
     }
   };
 
@@ -367,7 +398,8 @@ export default function AdminDashboard() {
       try {
         await deleteDoc(doc(db, 'suggestions', id));
         setSuggestions(suggestions.filter((s) => s.id !== id));
-        alert('تم حذف المقترح بنجاح.');
+        setModalMessage('تم حذف المقترح بنجاح.');
+        setModalType('success');
       } catch (err) {
         console.error(err);
       }
@@ -388,7 +420,8 @@ export default function AdminDashboard() {
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
 
         if (!data || data.length < 2) {
-          alert('الملف فارغ أو لا يحتوي على البيانات المطلوبة.');
+          setModalMessage('الملف فارغ أو لا يحتوي على البيانات المطلوبة.');
+          setModalType('success');
           return;
         }
 
@@ -444,11 +477,12 @@ export default function AdminDashboard() {
           addedCount++;
         }
 
-        alert(`تمت العملية بنجاح! 🚀\n- أُضيف جديد: ${addedCount}\n- تم تخطي المكرر: ${skippedCount}`);
-        window.location.reload();
+        setModalMessage(`تمت العملية بنجاح! 🚀\n- أُضيف جديد: ${addedCount}\n- تم تخطي المكرر: ${skippedCount}`);
+        setModalType('success');
       } catch (err) {
         console.error('Error importing excel:', err);
-        alert('حدث خطأ أثناء قراءة ملف الأكسل.');
+        setModalMessage('حدث خطأ أثناء قراءة ملف الأكسل.');
+        setModalType('success');
       }
     };
     reader.readAsArrayBuffer(file);
@@ -468,7 +502,8 @@ export default function AdminDashboard() {
       setPassionSlides([...passionSlides, newSlide]);
       setNewPassionQuote('');
       setNewPassionImage('/header-banner.png');
-      alert('تم إضافة الشريحة وحفظها سحابياً بنجاح!');
+      setModalMessage('تم إضافة الشريحة وحفظها سحابياً بنجاح! ✨');
+      setModalType('success');
     } catch (err) {
       console.error(err);
     }
@@ -478,7 +513,8 @@ export default function AdminDashboard() {
     try {
       await deleteDoc(doc(db, 'site_passion_slides', id));
       setPassionSlides(passionSlides.filter((s) => s.id !== id));
-      alert('تم حذف الشريحة بنجاح.');
+      setModalMessage('تم حذف الشريحة بنجاح.');
+      setModalType('success');
     } catch (err) {
       console.error(err);
     }
@@ -515,7 +551,8 @@ export default function AdminDashboard() {
       setNewDiscTitle('');
       setNewDiscDesc('');
       setNewDiscImages([]);
-      alert('تم إنشاء الفعالية ونشر الصور سحابياً للجميع!');
+      setModalMessage('تم إنشاء الفعالية ونشر الصور سحابياً للجميع! 🖼️');
+      setModalType('success');
     } catch (err) {
       console.error(err);
     }
@@ -539,7 +576,8 @@ export default function AdminDashboard() {
       try {
         await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
         setDiscoverEvents(discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev)));
-        alert('تم رفع وإضافة الصور سحابياً بنجاح!');
+        setModalMessage('تم رفع وإضافة الصور سحابياً بنجاح! 🚀');
+        setModalType('success');
       } catch (err) {
         console.error(err);
       }
@@ -569,7 +607,8 @@ export default function AdminDashboard() {
         const updated = discoverEvents.filter((ev) => ev.id !== id);
         setDiscoverEvents(updated);
         if (updated.length > 0) setSelectedEventId(updated[0].id);
-        alert('تم الحذف بنجاح.');
+        setModalMessage('تم الحذف بنجاح.');
+        setModalType('success');
       } catch (err) {
         console.error(err);
       }
@@ -596,10 +635,12 @@ export default function AdminDashboard() {
       await setDoc(doc(db, 'site_events', eventId), eventObj);
       if (editingEventId) {
         setEvents(events.map((ev) => ev.id === eventId ? eventObj : ev));
-        alert('تم تعديل الفعالية بنجاح!');
+        setModalMessage('تم تعديل الفعالية بنجاح! 📅');
+        setModalType('success');
       } else {
         setEvents([eventObj, ...events]);
-        alert('تم نشر الفعالية بنجاح!');
+        setModalMessage('تم نشر الفعالية بنجاح سحابياً! 📅');
+        setModalType('success');
       }
       setEditingEventId(null);
       setNewTitle('');
@@ -653,7 +694,8 @@ export default function AdminDashboard() {
       setBannerTag('');
       setBannerTitle('');
       setBannerImage('/header-banner.png');
-      alert('تم إضافة وتفعيل البانر بنجاح!');
+      setModalMessage('تم إضافة وتفعيل البانر بنجاح سحابياً! 🖼️');
+      setModalType('success');
     } catch (err) {
       console.error(err);
     }
@@ -685,7 +727,8 @@ export default function AdminDashboard() {
       setPartnerName('');
       setPartnerCategory('شريك إستراتيجي');
       setPartnerLogo('/logo.png');
-      alert('تم إضافة شريك النجاح بنجاح! 🤝');
+      setModalMessage('تم إضافة شريك النجاح بنجاح سحابياً! 🤝');
+      setModalType('success');
     } catch (err) {
       console.error(err);
     }
@@ -761,7 +804,8 @@ export default function AdminDashboard() {
       setRequests(requests.map((req) => req.id === selectedRequestId ? { ...req, status: 'مقبول', acceptedCommittee, whatsappLink } : req));
       setShowAcceptModal(false);
       setWhatsappLink('');
-      alert(`تم قبول العضو وإضافته تلقائياً إلى (${acceptedCommittee}) بنجاح! 🚀`);
+      setModalMessage(`تم قبول العضو وإضافته تلقائياً إلى (${acceptedCommittee}) بنجاح سحابياً! 🚀`);
+      setModalType('success');
     } catch (err) {
       console.error(err);
     }
@@ -799,10 +843,12 @@ export default function AdminDashboard() {
         thirdChoice: updatedObj.thirdChoice
       });
       setRequests(requests.map(r => r.id === req.id ? updatedObj : r));
-      alert('تم تحويل الطالب إلى رغبته التالية (الثانية أو الثالثة) بنجاح! 🔄');
+      setModalMessage('تم تحويل الطالب إلى رغبته التالية بنجاح سحابياً! 🔄');
+      setModalType('success');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء تحويل رغبة الطالب.');
+      setModalMessage('حدث خطأ أثناء تحويل رغبة الطالب.');
+      setModalType('success');
     }
   };
 
@@ -825,7 +871,8 @@ export default function AdminDashboard() {
         femaleLeader: currentCommittee.femaleLeader,
         members: currentCommittee.members || []
       }, { merge: true });
-      alert(`تم حفظ وتحديث قادة "${currentCommittee.name}" بنجاح!`);
+      setModalMessage(`تم حفظ وتحديث قادة "${currentCommittee.name}" بنجاح سحابياً! ✨`);
+      setModalType('success');
     } catch (err) {
       console.error(err);
     }
@@ -846,7 +893,8 @@ export default function AdminDashboard() {
         femaleLeader: currentCommittee.femaleLeader,
         members: updatedMembers
       }, { merge: true });
-      alert('تم إضافة العضو بنجاح!');
+      setModalMessage('تم إضافة العضو بنجاح سحابياً! 👥');
+      setModalType('success');
     } catch (err) {
       console.error(err);
     }
@@ -996,7 +1044,7 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
               <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب (خاص بالمشرف الأساسي 🛡️)</h3>
-              <p className="text-xs text-slate-500">هنا يمكنك متابعة حالة الاتصال للأعضاء وتعديل أرقام الجوال أو كلمات المرور أو الرتب بكل سهولة.</p>
+              <p className="text-xs text-slate-500">هنا يمكنك متابعة حالة الاتصال للأعضاء وتعديل أرقام الجوال أو كلمات المرور أو الرتب بكل سهولة وسحابة فورية.</p>
             </div>
             
             <div className="overflow-x-auto">
@@ -1055,8 +1103,8 @@ export default function AdminDashboard() {
                             <span>{usr.phone}</span>
                             <button
                               type="button"
-                              onClick={() => handleUpdatePhone(usr.phone)}
-                              className="text-[10px] bg-sky-50 text-sky-700 px-2 py-1 rounded-lg font-bold hover:bg-sky-100 cursor-pointer"
+                              onClick={() => openPhoneModal(usr.phone)}
+                              className="text-[10px] bg-sky-50 text-sky-700 px-2.5 py-1 rounded-lg font-bold hover:bg-sky-100 cursor-pointer shadow-sm transition-all"
                               title="تعديل رقم الجوال"
                             >
                               ✏️ تعديل الرقم
@@ -1077,8 +1125,8 @@ export default function AdminDashboard() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleUpdatePassword(usr.phone)}
-                              className="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded-lg font-bold hover:bg-amber-100 cursor-pointer"
+                              onClick={() => openPasswordModal(usr.phone)}
+                              className="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-lg font-bold hover:bg-amber-100 cursor-pointer shadow-sm transition-all"
                               title="تعديل كلمة المرور"
                             >
                               ✏️ تعديل
@@ -1954,7 +2002,7 @@ export default function AdminDashboard() {
                               type="button"
                               onClick={() => handleShiftPreference(req)}
                               className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
-                              title="تحويل الطالب للرغبة التالية (الثانية أو الثالثة) عند اكتفاء العدد"
+                              title="تحويل الطالب لرغبته التالية"
                             >
                               🔄 تحويل لرغبة أخرى
                             </button>
@@ -1992,6 +2040,105 @@ export default function AdminDashboard() {
 
       </div>
 
+      {/* نافذة رسائل النجاح أو التنبيهات المخصصة بهوية الموقع */}
+      {modalType === 'success' && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061]">
+            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              ✨
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-900">تنبيه النظام</h3>
+              <p className="text-xs text-slate-600 font-medium whitespace-pre-line leading-relaxed">{modalMessage}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setModalType('none')}
+              className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer transition-all"
+            >
+              حسنًا 🚀
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة تعديل رقم الجوال المخصصة بهوية الموقع */}
+      {modalType === 'phone' && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <form onSubmit={submitUpdatePhone} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
+            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              📱
+            </div>
+            <div className="space-y-2 text-center">
+              <h3 className="text-xl font-black text-slate-900">تعديل رقم الجوال (اسم الدخول)</h3>
+              <p className="text-xs text-slate-500">أدخل رقم الجوال الجديد بالصيغة الصحيحة:</p>
+            </div>
+            <input
+              type="text"
+              value={modalInputVal}
+              onChange={(e) => setModalInputVal(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-mono font-bold text-center text-slate-900 focus:outline-none focus:border-[#630517]"
+              dir="ltr"
+              required
+            />
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalType('none')}
+                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
+              >
+                Submit 🚀
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* نافذة تعديل كلمة المرور المخصصة بهوية الموقع */}
+      {modalType === 'password' && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <form onSubmit={submitUpdatePassword} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
+            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              🔒
+            </div>
+            <div className="space-y-2 text-center">
+              <h3 className="text-xl font-black text-slate-900">تعديل كلمة المرور</h3>
+              <p className="text-xs text-slate-500">أدخل كلمة المرور الجديدة للعضو:</p>
+            </div>
+            <input
+              type="text"
+              placeholder="كلمة المرور الجديدة..."
+              value={modalInputVal}
+              onChange={(e) => setModalInputVal(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-mono font-bold text-center text-slate-900 focus:outline-none focus:border-[#630517]"
+              required
+            />
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalType('none')}
+                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
+              >
+                Submit 🚀
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* نافذة القبول الأصلية */}
       {showAcceptModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
