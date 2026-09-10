@@ -45,7 +45,7 @@ export default function CommitteeLeaderDashboard() {
       const uData = userSnap.data();
       setUserData(uData);
 
-      // إذا كان المشرف الأساسي أو رئيس النادي، نوجهه للوحة الشاملة الرئيسية
+      // إذا كان المشرف الأساسي أو رئيس النادي، نوجهه للوحة الشاملة الرئيسية أو نسمح له بالتحكم
       if (phone === '0553731265' || uData.role === 'System Admin' || uData.role === 'رئيس النادي' || uData.role === 'رئيسة النادي') {
         router.push('/admin');
         return;
@@ -160,7 +160,7 @@ export default function CommitteeLeaderDashboard() {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center font-bold text-slate-600">جاري تحميل لوحة تحكم اللجنة...</div>;
+    return <div className="min-h-screen flex items-center justify-center font-bold text-slate-600 bg-slate-50">جاري تحميل لوحة تحكم اللجنة...</div>;
   }
 
   return (
