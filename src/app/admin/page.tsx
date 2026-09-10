@@ -92,14 +92,51 @@ export default function AdminDashboard() {
     }));
   };
 
+  // حماية اللوحة والتحقق من رتبة المستخدم وصلاحياته بشكل ذكي
   useEffect(() => {
-    const phone = localStorage.getItem('userPhone');
-    const adminAuth = sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026';
-    
-    if (phone !== '0553731265' && !adminAuth) {
-      alert('عذراً، هذه الصفحة مخصصة للمدير الموثق فقط.');
-      router.push('/');
-    }
+    const checkAdminAuth = async () => {
+      const phone = localStorage.getItem('userPhone');
+      const adminAuth = sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026';
+      
+      if (!phone && !adminAuth) {
+        alert('عذراً، يجب تسجيل الدخول للوصول لهذه الصفحة.');
+        router.push('/login');
+        return;
+      }
+
+      // إذا كان هو المشرف الأساسي أو لديه مفتاح الجلسة الأمنية
+      if (phone === '0553731265' || adminAuth) {
+        return;
+      }
+
+      // التحقق من قاعدة البيانات للرتب الأخرى
+      try {
+        const userRef = doc(db, 'users', phone as string);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          const userRole = userData.role || 'عضو أساسي';
+
+          // إذا لم يكن مديراً للنظام، يتم إعادة توجيهه للوحة المناسبة لصلاحيته المحدودة
+          if (userRole !== 'System Admin' && userRole !== 'General Supervisor') {
+            if (userRole.includes('رئيس لجنة') || userRole.includes('مشرف')) {
+              router.push('/committee-dashboard');
+            } else {
+              alert('عذراً، هذه الصفحة مخصصة لمديري النظام فقط.');
+              router.push('/');
+            }
+          }
+        } else {
+          router.push('/');
+        }
+      } catch (err) {
+        console.error('Auth check error:', err);
+        router.push('/');
+      }
+    };
+
+    checkAdminAuth();
   }, [router]);
 
   const convertFileToBase64 = (file: File): Promise<string> => {
@@ -165,7 +202,7 @@ export default function AdminDashboard() {
         { name: 'فاطمة أحمد', role: 'مسؤولة الهوية البصرية', status: 'نشط' }
       ] 
     },
-    { id: 'media', name: 'الاعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
+    { id: 'media', name: 'لجنة الاعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
     { id: 'events-org', name: 'تنظيم الفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', members: [] },
     { id: 'hr', name: 'الموارد البشرية', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي', members: [] },
     { id: 'pr', name: 'العلاقات العامة', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي', members: [] },
@@ -836,7 +873,6 @@ export default function AdminDashboard() {
 
   const committeeNamesList = ['لجنة التصميم', 'لجنة الاعلام', 'لجنة تنظيم الفعاليات', 'لجنة الموارد البشرية', 'لجنة العلاقات العامة', 'لجنة المحتوى العلمي', 'لجنة الجودة والتطوير'];
   
-  // دالة مطابقة مرنة للجان لتتعرف على "لجنة الاعلام" و "اللجنة الإعلامية" بدون أي مشاكل
   const matchesCommittee = (choiceStr: string, targetCommName: string) => {
     if (!choiceStr) return false;
     const cleanChoice = choiceStr.replace(/الـ/g, '').replace(/إ/g, 'ا').replace(/أ/g, 'ا').replace(/آ/g, 'ا').trim();
@@ -1570,7 +1606,7 @@ export default function AdminDashboard() {
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'design', name: 'التصميم' },
-                  { id: 'media', name: 'الاعلام' },
+                  { id: 'media', name: 'لجنة الاعلام' },
                   { id: 'events-org', name: 'تنظيم الفعاليات' },
                   { id: 'hr', name: 'الموارد البشرية' },
                   { id: 'pr', name: 'العلاقات العامة' },
