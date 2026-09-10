@@ -351,7 +351,6 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // إرسال الإنذار أو التصعيد مع إرسال الإشعار الفوري لكل أعضاء اللجنة المستهدفة
   const handleExecuteWarningOrEscalation = async () => {
     if (!warningReason.trim()) {
       alert('الرجاء كتابة تفاصيل الإنذار أو التقصير بوضوح.');
@@ -407,7 +406,6 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // دالة إرسال رد القائد المنذَر على الإنذار
   const handleSubmitLeaderReply = async () => {
     if (!leaderDefenseReply.trim() || !activeReportToReply) {
       alert('الرجاء كتابة نص التبرير أو الرد أولاً.');
@@ -421,9 +419,9 @@ export default function CommitteeDashboard() {
         status: `💬 تم استلام رد وتبرير اللجنة (بانتظار اعتماد الجودة)`
       });
 
-      alert('تم إرسال ردك وتبريرك للجنة الجودة بنجاح! 🎯');
+      alert('تم إرسال ردك وتبريرك لجنتة الجودة بنجاح! 🎯');
       setShowReplyModal(false);
-      setLeaderDefenseReply(false);
+      setLeaderDefenseReply('');
       setActiveReportToReply(null);
       fetchEscalatedReports();
     } catch (err) {
@@ -432,7 +430,6 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // حذف البلاغ التجريبي
   const handleDeleteReport = async (reportId: string) => {
     if (confirm('هل أنت متأكد من حذف هذا البلاغ التجريبي؟')) {
       try {
@@ -475,8 +472,14 @@ export default function CommitteeDashboard() {
 
   const displayedTasks = committeeTasks.filter(t => t.committee === currentActiveComm);
 
-  // العثور على الإنذارات الموجهة للجنة الحالية ليتمكن القائد من الرد عليها
-  const committeeReports = escalatedReports.filter(r => matchesTargetCommittee(r.targetCommittee, currentActiveComm));
+  // فلترة البلاغات والإنذارات الخاصة باللجنة الحالية بحيث تعرض الفريدة فقط بدون تكرار مزعج
+  const committeeReports = Array.from(
+    new Map(
+      escalatedReports
+        .filter(r => matchesTargetCommittee(r.targetCommittee, currentActiveComm))
+        .map(item => [item.reason + '-' + item.status, item])
+    ).values()
+  );
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 p-6 md:p-10 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
@@ -533,7 +536,7 @@ export default function CommitteeDashboard() {
             </div>
 
             <div className="space-y-3">
-              {committeeReports.map((rep) => (
+              {committeeReports.map((rep: any) => (
                 <div key={rep.id} className="bg-white border border-amber-200 rounded-2xl p-4 space-y-3 shadow-sm">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold text-slate-500">المرسل: {rep.reporter}</span>
