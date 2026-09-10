@@ -185,13 +185,7 @@ export default function AdminDashboard() {
   const [selectedCommitteeFilter, setSelectedCommitteeFilter] = useState<string>('لجنة التصميم');
 
   const [committees, setCommittees] = useState<Committee[]>([
-    { 
-      id: 'design', 
-      name: 'التصميم', 
-      maleLeader: 'عبدالعزيز العنزي', 
-      femaleLeader: 'شجون الحربي', 
-      members: [] 
-    },
+    { id: 'design', name: 'التصميم', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي', members: [] },
     { id: 'media', name: 'لجنة الاعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
     { id: 'events-org', name: 'تنظيم الفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', members: [] },
     { id: 'hr', name: 'الموارد البشرية', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي', members: [] },
@@ -301,7 +295,7 @@ export default function AdminDashboard() {
         role: newRole,
         latestNotification: `مبروك! تم ترقيتك وتعيين رتبتك إلى (${newRole}) بنجاح 🎉`
       });
-      setUsersList(usersList.map((u) => u.phone === phone ? { ...u, role: newRole } : u));
+      setUsersList((usersList || []).map((u) => u.phone === phone ? { ...u, role: newRole } : u));
       alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح!`);
     } catch (err) {
       console.error(err);
@@ -316,7 +310,7 @@ export default function AdminDashboard() {
         assignedCommittee: commName,
         latestNotification: `تم تعيينك من قبل الإدارة رئيساً لـ (${commName}) 🛡️`
       });
-      setUsersList(usersList.map((u) => u.phone === phone ? { ...u, assignedCommittee: commName } : u));
+      setUsersList((usersList || []).map((u) => u.phone === phone ? { ...u, assignedCommittee: commName } : u));
       alert(`تم تعيين اللجنة (${commName}) لهذا العضو بنجاح!`);
     } catch (err) {
       console.error(err);
@@ -328,7 +322,7 @@ export default function AdminDashboard() {
     if (confirm('هل أنت متأكد من حذف هذا المقترح من السحابة؟')) {
       try {
         await deleteDoc(doc(db, 'suggestions', id));
-        setSuggestions(suggestions.filter((s) => s.id !== id));
+        setSuggestions((suggestions || []).filter((s) => s.id !== id));
         alert('تم حذف المقترح بنجاح.');
       } catch (err) {
         console.error(err);
@@ -427,7 +421,7 @@ export default function AdminDashboard() {
 
     try {
       await setDoc(doc(db, 'site_passion_slides', slideId), newSlide);
-      setPassionSlides([...passionSlides, newSlide]);
+      setPassionSlides([...(passionSlides || []), newSlide]);
       setNewPassionQuote('');
       setNewPassionImage('/header-banner.png');
       alert('تم إضافة الشريحة وحفظها سحابياً بنجاح!');
@@ -439,7 +433,7 @@ export default function AdminDashboard() {
   const handleDeletePassionSlide = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'site_passion_slides', id));
-      setPassionSlides(passionSlides.filter((s) => s.id !== id));
+      setPassionSlides((passionSlides || []).filter((s) => s.id !== id));
       alert('تم حذف الشريحة بنجاح.');
     } catch (err) {
       console.error(err);
@@ -454,7 +448,7 @@ export default function AdminDashboard() {
         const base64 = await convertFileToBase64(file);
         base64Images.push(base64);
       }
-      setNewDiscImages((prev) => [...prev, ...base64Images]);
+      setNewDiscImages((prev) => [...(prev || []), ...base64Images]);
     }
   };
 
@@ -467,12 +461,12 @@ export default function AdminDashboard() {
       title: newDiscTitle,
       category: newDiscCategory,
       description: newDiscDesc || 'فعالية تابعة لنادي التمريض.',
-      images: newDiscImages.length > 0 ? newDiscImages : ['/logo.png']
+      images: newDiscImages && newDiscImages.length > 0 ? newDiscImages : ['/logo.png']
     };
 
     try {
       await setDoc(doc(db, 'site_discover_events', eventId), newEventObj);
-      setDiscoverEvents([newEventObj, ...discoverEvents]);
+      setDiscoverEvents([newEventObj, ...(discoverEvents || [])]);
       setSelectedEventId(eventId);
       setNewDiscTitle('');
       setNewDiscDesc('');
@@ -492,7 +486,7 @@ export default function AdminDashboard() {
         base64Images.push(base64);
       }
 
-      const targetEvent = discoverEvents.find((ev) => ev.id === selectedEventId);
+      const targetEvent = (discoverEvents || []).find((ev) => ev.id === selectedEventId);
       if (!targetEvent) return;
 
       const updatedImages = [...(targetEvent.images || []), ...base64Images];
@@ -500,7 +494,7 @@ export default function AdminDashboard() {
 
       try {
         await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
-        setDiscoverEvents(discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev)));
+        setDiscoverEvents((discoverEvents || []).map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev)));
         alert('تم رفع وإضافة الصور سحابياً بنجاح!');
       } catch (err) {
         console.error(err);
@@ -509,7 +503,7 @@ export default function AdminDashboard() {
   };
 
   const handleRemoveImageFromEvent = async (imgIndex: number) => {
-    const targetEvent = discoverEvents.find((ev) => ev.id === selectedEventId);
+    const targetEvent = (discoverEvents || []).find((ev) => ev.id === selectedEventId);
     if (!targetEvent) return;
 
     const filteredImages = (targetEvent.images || []).filter((_, idx) => idx !== imgIndex);
@@ -518,27 +512,13 @@ export default function AdminDashboard() {
 
     try {
       await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
-      setDiscoverEvents(discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev)));
+      setDiscoverEvents((discoverEvents || []).map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev)));
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleDeleteEntireDiscoverEvent = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذه الفعالية بالكامل؟')) {
-      try {
-        await deleteDoc(doc(db, 'site_discover_events', id));
-        const updated = discoverEvents.filter((ev) => ev.id !== id);
-        setDiscoverEvents(updated);
-        if (updated.length > 0) setSelectedEventId(updated[0].id);
-        alert('تم الحذف بنجاح.');
-      } catch (err) {
-        console.error(err);
-      }
-    }
-  };
-
-  const currentEditedEvent = discoverEvents.find((ev) => ev.id === selectedEventId) || discoverEvents[0];
+  const currentEditedEvent = (discoverEvents || []).find((ev) => ev.id === selectedEventId) || discoverEvents[0];
 
   const handleSaveEventSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -557,10 +537,10 @@ export default function AdminDashboard() {
     try {
       await setDoc(doc(db, 'site_events', eventId), eventObj);
       if (editingEventId) {
-        setEvents(events.map((ev) => ev.id === eventId ? eventObj : ev));
+        setEvents((events || []).map((ev) => ev.id === eventId ? eventObj : ev));
         alert('تم تعديل الفعالية بنجاح!');
       } else {
-        setEvents([eventObj, ...events]);
+        setEvents([eventObj, ...(events || [])]);
         alert('تم نشر الفعالية بنجاح!');
       }
       setEditingEventId(null);
@@ -589,7 +569,7 @@ export default function AdminDashboard() {
     if (confirm('هل أنت متأكد من الحذف؟')) {
       try {
         await deleteDoc(doc(db, 'site_events', id));
-        setEvents(events.filter((ev) => ev.id !== id));
+        setEvents((events || []).filter((ev) => ev.id !== id));
       } catch (err) {
         console.error(err);
       }
@@ -611,7 +591,7 @@ export default function AdminDashboard() {
 
     try {
       await setDoc(doc(db, 'site_banners', bannerId), newBanner);
-      setBanners([newBanner, ...banners]);
+      setBanners([newBanner, ...(banners || [])]);
       setBannerTag('');
       setBannerTitle('');
       setBannerImage('/header-banner.png');
@@ -624,7 +604,7 @@ export default function AdminDashboard() {
   const handleDeleteBanner = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'site_banners', id));
-      setBanners(banners.filter((b) => b.id !== id));
+      setBanners((banners || []).filter((b) => b.id !== id));
     } catch (err) {
       console.error(err);
     }
@@ -643,7 +623,7 @@ export default function AdminDashboard() {
 
     try {
       await setDoc(doc(db, 'site_partners', partnerId), newPartner);
-      setPartners([newPartner, ...partners]);
+      setPartners([newPartner, ...(partners || [])]);
       setPartnerName('');
       setPartnerCategory('شريك إستراتيجي');
       setPartnerLogo('/logo.png');
@@ -657,7 +637,7 @@ export default function AdminDashboard() {
     if (confirm('هل أنت متأكد من الحذف؟')) {
       try {
         await deleteDoc(doc(db, 'site_partners', id));
-        setPartners(partners.filter((p) => p.id !== id));
+        setPartners((partners || []).filter((p) => p.id !== id));
       } catch (err) {
         console.error(err);
       }
@@ -672,7 +652,7 @@ export default function AdminDashboard() {
   const handleConfirmAcceptRequest = async () => {
     if (!selectedRequestId) return;
     try {
-      const targetRequest = requests.find((req) => req.id === selectedRequestId);
+      const targetRequest = (requests || []).find((req) => req.id === selectedRequestId);
       if (!targetRequest) return;
 
       const docRef = doc(db, 'applications', selectedRequestId);
@@ -712,7 +692,7 @@ export default function AdminDashboard() {
         phone: targetRequest.phone || ''
       };
 
-      const updatedMembers = [...existingMembers, newMemberObj];
+      const updatedMembers = [...(existingMembers || []), newMemberObj];
 
       await setDoc(commDocRef, {
         maleLeader,
@@ -720,7 +700,7 @@ export default function AdminDashboard() {
         members: updatedMembers
       }, { merge: true });
 
-      setRequests(requests.map((req) => req.id === selectedRequestId ? { ...req, status: 'مقبول', acceptedCommittee, whatsappLink } : req));
+      setRequests((requests || []).map((req) => req.id === selectedRequestId ? { ...req, status: 'مقبول', acceptedCommittee, whatsappLink } : req));
       setShowAcceptModal(false);
       setWhatsappLink('');
       alert(`تم قبول العضو وإضافته تلقائياً إلى (${acceptedCommittee}) بنجاح! 🚀`);
@@ -734,7 +714,7 @@ export default function AdminDashboard() {
       try {
         const docRef = doc(db, 'applications', id);
         await updateDoc(docRef, { status: 'مرفوض' });
-        setRequests(requests.map((req) => req.id === id ? { ...req, status: 'مرفوض' } : req));
+        setRequests((requests || []).map((req) => req.id === id ? { ...req, status: 'مرفوض' } : req));
       } catch (err) {
         console.error(err);
       }
@@ -760,7 +740,7 @@ export default function AdminDashboard() {
         secondChoice: updatedObj.secondChoice,
         thirdChoice: updatedObj.thirdChoice
       });
-      setRequests(requests.map(r => r.id === req.id ? updatedObj : r));
+      setRequests((requests || []).map(r => r.id === req.id ? updatedObj : r));
       alert('تم تحويل الطالب إلى رغبته التالية (الثانية أو الثالثة) بنجاح! 🔄');
     } catch (err) {
       console.error(err);
@@ -772,7 +752,7 @@ export default function AdminDashboard() {
     if(confirm('هل أنت متأكد من الحذف النهائي للطلب؟')) {
       try {
         await deleteDoc(doc(db, 'applications', id));
-        setRequests(requests.filter((req) => req.id !== id));
+        setRequests((requests || []).filter((req) => req.id !== id));
       } catch (err) {
         console.error(err);
       }
@@ -798,7 +778,7 @@ export default function AdminDashboard() {
     if (!newMemberName.trim()) return;
 
     const updatedMembers = [...(currentCommittee.members || []), { name: newMemberName, role: newMemberRole || 'عضو', status: 'نشط' }];
-    setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c));
+    setCommittees((committees || []).map((c) => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c));
     setNewMemberName('');
     setNewMemberRole('');
 
@@ -818,7 +798,7 @@ export default function AdminDashboard() {
     const updatedMembers = [...(currentCommittee.members || [])];
     updatedMembers.splice(index, 1);
 
-    setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c));
+    setCommittees((committees || []).map((c) => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c));
 
     try {
       await setDoc(doc(db, 'committees', selectedCommitteeId), {
@@ -850,10 +830,10 @@ export default function AdminDashboard() {
   };
 
   const getCountByPreference = (commName: string, prefKey: 'firstChoice' | 'secondChoice' | 'thirdChoice') => {
-    return requests.filter(r => matchesCommittee(r[prefKey], commName)).length;
+    return (requests || []).filter(r => matchesCommittee(r[prefKey], commName)).length;
   };
 
-  const filteredRequests = requests.filter(req => {
+  const filteredRequests = (requests || []).filter(req => {
     if (requestSubTab === 'accepted') return req.status === 'مقبول';
     if (requestSubTab === 'pref-1') {
       return matchesCommittee(req.firstChoice, selectedCommitteeFilter);
@@ -903,15 +883,15 @@ export default function AdminDashboard() {
 
           <div className="flex gap-4">
             <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 text-center">
-              <span className="block text-2xl font-black text-[#F5D061]">{requests.length}</span>
+              <span className="block text-2xl font-black text-[#F5D061]">{(requests || []).length}</span>
               <span className="text-[10px] font-bold text-white/90">إجمالي طلبات النادي</span>
             </div>
             <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 text-center">
-              <span className="block text-2xl font-black text-emerald-400">{requests.filter(r => r.status === 'مقبول').length}</span>
+              <span className="block text-2xl font-black text-emerald-400">{(requests || []).filter(r => r.status === 'مقبول').length}</span>
               <span className="text-[10px] font-bold text-white/90">الأعضاء المقبولون</span>
             </div>
             <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 text-center">
-              <span className="block text-2xl font-black text-sky-400">{events.length}</span>
+              <span className="block text-2xl font-black text-sky-400">{(events || []).length}</span>
               <span className="text-[10px] font-bold text-white/90">الأنشطة والفعاليات</span>
             </div>
           </div>
@@ -953,11 +933,11 @@ export default function AdminDashboard() {
                 <p className="text-xs text-slate-500">هنا تظهر كافة المقترحات والأفكار التي يكتبها الزوار في الصفحة الرئيسية مباشرة.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-[#630517]/10 text-[#630517] font-bold text-xs">
-                إجمالي المقترحات: {suggestions.length}
+                إجمالي المقترحات: {(suggestions || []).length}
               </span>
             </div>
 
-            {suggestions.length === 0 ? (
+            {(!suggestions || suggestions.length === 0) ? (
               <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                 <p className="text-sm font-bold">لا توجد مقترحات أو آراء مرسلة حتى الآن.</p>
               </div>
@@ -1037,7 +1017,7 @@ export default function AdminDashboard() {
                     <td className="py-4 text-slate-400 font-bold">إدارة كاملة للمنصة</td>
                   </tr>
 
-                  {usersList.map((usr, idx) => (
+                  {(usersList || []).map((usr, idx) => (
                     <tr key={idx} className="hover:bg-slate-50">
                       <td className="py-4 pr-2 font-bold text-slate-900">{usr.fullName || 'مستخدم مسجل'}</td>
                       <td className="py-4 text-slate-600 font-mono" dir="ltr">{usr.phone}</td>
@@ -1156,7 +1136,7 @@ export default function AdminDashboard() {
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h3 className="text-xl font-black text-slate-900">إدارة الصور وإضافتها للفعاليات القائمة (سحابي)</h3>
               <div className="flex flex-wrap gap-3">
-                {discoverEvents.map((ev) => (
+                {(discoverEvents || []).map((ev) => (
                   <button
                     key={ev.id}
                     type="button"
@@ -1178,7 +1158,16 @@ export default function AdminDashboard() {
                     <h4 className="font-extrabold text-slate-900 text-sm">إضافة صور جديدة لـ: {currentEditedEvent.title}</h4>
                     <button
                       type="button"
-                      onClick={() => handleDeleteEntireDiscoverEvent(currentEditedEvent.id)}
+                      onClick={() => {
+                        if (confirm('هل أنت متأكد من حذف هذه الفعالية بالكامل؟')) {
+                          deleteDoc(doc(db, 'site_discover_events', currentEditedEvent.id)).then(() => {
+                            const updated = (discoverEvents || []).filter((ev) => ev.id !== currentEditedEvent.id);
+                            setDiscoverEvents(updated);
+                            if (updated.length > 0) setSelectedEventId(updated[0].id);
+                            alert('تم الحذف بنجاح.');
+                          });
+                        }
+                      }}
                       className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 cursor-pointer"
                     >
                       حذف هذه الفعالية بالكامل من السحابة ✕
@@ -1198,7 +1187,7 @@ export default function AdminDashboard() {
                 <div className="space-y-4">
                   <h4 className="font-extrabold text-slate-900 text-sm">الصور الحالية بالسحابة للفعالية ({currentEditedEvent.images?.length || 0})</h4>
                   <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                    {currentEditedEvent.images?.map((img, idx) => (
+                    {(currentEditedEvent.images || []).map((img, idx) => (
                       <div key={idx} className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 group bg-slate-100 shadow-sm">
                         <img src={img} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
                         <button
@@ -1257,9 +1246,9 @@ export default function AdminDashboard() {
               </form>
 
               <div className="space-y-4">
-                <h4 className="font-extrabold text-slate-900 text-sm">الشرائح السحابية الحالية ({passionSlides.length})</h4>
+                <h4 className="font-extrabold text-slate-900 text-sm">الشرائح السحابية الحالية ({(passionSlides || []).length})</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {passionSlides.map((slide) => (
+                  {(passionSlides || []).map((slide) => (
                     <div key={slide.id} className="relative h-44 rounded-2xl overflow-hidden border border-slate-200 group shadow-sm bg-slate-900">
                       <img src={slide.image} alt="شريحة" className="w-full h-full object-cover opacity-50" />
                       <div className="absolute inset-0 p-4 flex flex-col justify-between z-10 text-white text-xs">
@@ -1389,7 +1378,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-xl font-black text-slate-900">الفعاليات الحالية بالسحابة ({events.length})</h3>
+              <h3 className="text-xl font-black text-slate-900">الفعاليات الحالية بالسحابة ({(events || []).length})</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs">
                   <thead>
@@ -1401,7 +1390,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {events.map((ev) => (
+                    {(events || []).map((ev) => (
                       <tr key={ev.id} className="hover:bg-slate-50">
                         <td className="py-4 pr-2 font-bold text-slate-900">{ev.title}</td>
                         <td className="py-4 text-slate-600">{ev.date} | 📍 {ev.location}</td>
@@ -1490,7 +1479,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-xl font-black text-slate-900">البانرات النشطة سحابياً ({banners.length})</h3>
+              <h3 className="text-xl font-black text-slate-900">البانرات النشطة سحابياً ({(banners || []).length})</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs">
                   <thead>
@@ -1501,7 +1490,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {banners.map((ban) => (
+                    {(banners || []).map((ban) => (
                       <tr key={ban.id} className="hover:bg-slate-50">
                         <td className="py-4 pr-2 font-bold text-[#630517]">{ban.tag}</td>
                         <td className="py-4 text-slate-900 font-extrabold">{ban.title}</td>
@@ -1582,9 +1571,9 @@ export default function AdminDashboard() {
             </div>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-xl font-black text-slate-900">الشركاء والرعاة الحاليون بالسحابة ({partners.length})</h3>
+              <h3 className="text-xl font-black text-slate-900">الشركاء والرعاة الحاليون بالسحابة ({(partners || []).length})</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {partners.map((p) => (
+                {(partners || []).map((p) => (
                   <div key={p.id} className="p-4 rounded-2xl border border-slate-200 flex flex-col items-center text-center space-y-3 bg-slate-50 relative group">
                     <img src={p.logo} alt={p.name} className="w-16 h-16 object-contain rounded-xl bg-white p-2 shadow-sm" />
                     <div>
@@ -1637,9 +1626,9 @@ export default function AdminDashboard() {
 
             <form onSubmit={handleSaveLeadersSubmit} className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                <h3 className="text-xl font-black text-slate-900">إدارة قادة {currentCommittee.name}</h3>
+                <h3 className="text-xl font-black text-slate-900">إدارة قادة {currentCommittee?.name}</h3>
                 <span className="text-xs bg-[#630517]/10 text-[#630517] font-bold px-3 py-1 rounded-full">
-                  {(currentCommittee.members || []).length} أعضاء
+                  {(currentCommittee?.members || []).length} أعضاء
                 </span>
               </div>
 
@@ -1648,10 +1637,10 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-500">قائد الطلاب</label>
                   <input
                     type="text"
-                    value={currentCommittee.maleLeader || ''}
+                    value={currentCommittee?.maleLeader || ''}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, maleLeader: val } : c));
+                      setCommittees((committees || []).map((c) => c.id === selectedCommitteeId ? { ...c, maleLeader: val } : c));
                     }}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
@@ -1660,10 +1649,10 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-500">قائدة الطالبات</label>
                   <input
                     type="text"
-                    value={currentCommittee.femaleLeader || ''}
+                    value={currentCommittee?.femaleLeader || ''}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, femaleLeader: val } : c));
+                      setCommittees((committees || []).map((c) => c.id === selectedCommitteeId ? { ...c, femaleLeader: val } : c));
                     }}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
@@ -1682,7 +1671,7 @@ export default function AdminDashboard() {
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة</h4>
-              {(!currentCommittee.members || currentCommittee.members.length === 0) ? (
+              {(!currentCommittee?.members || currentCommittee.members.length === 0) ? (
                 <p className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-2xl">لا يوجد أعضاء حالياً.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -1780,14 +1769,14 @@ export default function AdminDashboard() {
                   onClick={() => setRequestSubTab('all')}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'all' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                 >
-                  📋 كل الطلبات ({requests.length})
+                  📋 كل الطلبات ({(requests || []).length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setRequestSubTab('accepted')}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'accepted' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                 >
-                  ✅ قائمة المقبولين ({requests.filter(r => r.status === 'مقبول').length})
+                  ✅ قائمة المقبولين ({(requests || []).filter(r => r.status === 'مقبول').length})
                 </button>
                 <button
                   type="button"
@@ -1827,7 +1816,7 @@ export default function AdminDashboard() {
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h3 className="text-xl font-black text-slate-900">
-                {requestSubTab === 'accepted' ? 'قائمة الأعضاء المقبولين وإدارتهم' : 'طلبات انضمام الأعضاء'} ({filteredRequests.length})
+                {requestSubTab === 'accepted' ? 'قائمة الأعضاء المقبولين وإدارتهم' : 'طلبات انضمام الأعضاء'} ({(filteredRequests || []).length})
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs">
@@ -1841,7 +1830,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredRequests.length === 0 ? (
+                    {(!filteredRequests || filteredRequests.length === 0) ? (
                       <tr>
                         <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات تطابق هذا الفرز حالياً.</td>
                       </tr>
