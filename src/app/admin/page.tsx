@@ -92,7 +92,7 @@ export default function AdminDashboard() {
   // حالات التقارير المرفوعة والشكاوى من لجنة الجودة
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
 
-  // حالات النوافذ المنبثقة المخصصة بهوية الموقع (بدل الـ alert والـ prompt والـ confirm)
+  // حالات النوافذ المنبثقة المخصصة بهوية الموقع
   const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'confirm'>('none');
   const [modalMessage, setModalMessage] = useState<string>('');
   const [activeUserPhoneForAction, setActiveUserPhoneForAction] = useState<string>('');
@@ -232,6 +232,12 @@ export default function AdminDashboard() {
   const [newMemberName, setNewMemberName] = useState<string>('');
   const [newMemberRole, setNewMemberRole] = useState<string>('');
 
+  // حالات نظام الإنذار المدرج لقائد وقائدة اللجنة قبل التصعيد للرؤساء
+  const [showWarningModal, setShowWarningModal] = useState<boolean>(false);
+  const [warningTargetReportId, setWarningTargetReportId] = useState<string>('');
+  const [warningTargetCommittee, setWarningTargetCommittee] = useState<string>('');
+  const [warningMessageText, setWarningMessageText] = useState<string>('');
+
   useEffect(() => {
     const fetchCloudData = async () => {
       try {
@@ -311,7 +317,7 @@ export default function AdminDashboard() {
         latestNotification: `مبروك! تم ترقيتك وتعيين رتبتك إلى (${newRole}) بنجاح 🎉`
       });
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, role: newRole } : u));
-      setModalMessage(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح سحابياً! 🚀\n(سيصل التنبيه للعضو فوراً خلال ثوانٍ معدودة)`);
+      setModalMessage(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح سحابياً! 🚀`);
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -407,6 +413,66 @@ export default function AdminDashboard() {
     setModalMessage(message);
     setConfirmActionCallback(() => callback);
     setModalType('confirm');
+  };
+
+  // فتح نافذة إرسال الإنذار لقائد وقائدة اللجنة
+  const handleOpenWarningModal = (rep: any) => {
+    setWarningTargetReportId(rep.id);
+    setWarningTargetCommittee(rep.targetCommittee);
+    setWarningMessageText(`عاجل لقائد وقائدة (${rep.targetCommittee}): تم رصد تقصير في المهام لديكم (${rep.reason}). نرجو تدارك الأمر وتصحيحه خلال 24 ساعة، وإلا سيتم رفع بلاغ رسمي وإحالتكم فوراً لرئيس ورئيسة النادي لاتخاذ الإجراءات التأديبية ⚠️.`);
+    setShowWarningModal(true);
+  };
+
+  // إرسال الإنذار (تحديث حالة التقرير سحابياً إلى "تم إنذار القادة")
+  const handleSendWarningToLeaders = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!warningTargetReportId) return;
+
+    try {
+      const repRef = doc(db, 'escalated_reports', warningTargetReportId);
+      await updateDoc(repRef, {
+        status: 'تم إرسال إنذار للقادة (بانتظار الرد)',
+        warningText: warningMessageText,
+        warningSentAt: new Date().toISOString()
+      });
+
+      setEscalatedReports(escalatedReports.map(r => r.id === warningTargetReportId ? {
+        ...r,
+        status: 'تم إرسال إنذار للقادة (بانتظار الرد)',
+        warningText: warningMessageText
+      } : r));
+
+      setShowWarningModal(false);
+      setModalMessage('تم إرسال الإنذار التحذيري لقائد وقائدة اللجنة بنجاح! 📨\n(سيتم منحهم المهلة المحددة قبل التصعيد النهائي للرؤساء)');
+      setModalType('success');
+    } catch (err) {
+      console.error(err);
+      setModalMessage('حدث خطأ أثناء إرسال الإنذار.');
+      setModalType('success');
+    }
+  };
+
+  // تصعيد البلاغ نهائياً للرئيس ورئيسة النادي لعدم التجاوب
+  const handleEscalateToPresidentsFinal = async (repId: string, committeeName: string) => {
+    triggerConfirmModal(`هل أنت متأكد من عدم تجاوب قائد وقائدة (${committeeName}) وترغب في رفع البلاغ وإحالته رسمياً للرئيس ورئيسة النادي الآن؟`, async () => {
+      try {
+        const repRef = doc(db, 'escalated_reports', repId);
+        await updateDoc(repRef, {
+          status: 'مُحال رسمياً للرئيس ورئيسة النادي (لعدم التجاوب 🚨)',
+          escalatedToPresidentsAt: new Date().toISOString()
+        });
+
+        setEscalatedReports(escalatedReports.map(r => r.id === repId ? {
+          ...r,
+          status: 'مُحال رسمياً للرئيس ورئيسة النادي (لعدم التجاوب 🚨)'
+        } : r));
+
+        setModalMessage('تم رفع البلاغ وإحالته رسمياً للرئيس ورئيسة النادي بنجاح تام! ⚖️');
+        setModalType('success');
+      } catch (err) {
+        console.error(err);
+      }
+    });
   };
 
   const handleDeleteSuggestion = (id: string) => {
@@ -1060,7 +1126,7 @@ export default function AdminDashboard() {
             </button>
           )}
 
-          {/* زر مركز التقارير والشكاوى المرفوعة من لجنة الجودة */}
+          {/* زر مركز التقارير والشكاوى المرفوعة مع تدرج الإنذار */}
           <button
             type="button"
             onClick={() => setActiveTab('escalated-reports')}
@@ -1068,7 +1134,7 @@ export default function AdminDashboard() {
               activeTab === 'escalated-reports' ? 'bg-red-600 text-white shadow-md scale-105' : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
             }`}
           >
-            🚨 تقارير وشكاوى الجودة ({escalatedReports.length})
+            🚨 تقارير وإنذارات الجودة ({escalatedReports.length})
           </button>
 
           {[
@@ -1096,13 +1162,13 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* نافذة مركز التقارير والشكاوى المرفوعة */}
+        {/* نافذة مركز التقارير والشكاوى المرفوعة مع التدرج في الإنذار والتصعيد */}
         {activeTab === 'escalated-reports' && (
           <div className="bg-white rounded-3xl p-8 border border-red-300 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900">🚨 مركز التقارير والشكاوى المرفوعة من لجنة الجودة</h3>
-                <p className="text-xs text-slate-500">هنا يتم رصد بلاغات التقصير والإنذارات الموجهة للجان للمتابعة الفورية واتخاذ القرار الحازم.</p>
+                <h3 className="text-xl font-black text-slate-900">🚨 مركز تقارير الجودة (نظام الإنذار والتصعيد للرؤساء)</h3>
+                <p className="text-xs text-slate-500">أرسل إنذاراً تحذيرياً أولاً لقائد وقائدة اللجنة، وإذا لم يتجاوبوا قم بإحالة البلاغ رسمياً للرئيس ورئيسة النادي.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 font-bold text-xs">
                 إجمالي البلاغات: {escalatedReports.length}
@@ -1118,20 +1184,49 @@ export default function AdminDashboard() {
                 {escalatedReports.map((rep) => (
                   <div key={rep.id} className="p-6 rounded-2xl border border-red-200 bg-red-50/40 shadow-sm flex flex-col justify-between space-y-4">
                     <div className="space-y-2">
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center flex-wrap gap-2">
                         <span className="font-black text-red-800 text-sm">اللجنة المعنية: {rep.targetCommittee}</span>
                         <span className="text-[10px] bg-red-200 text-red-900 font-mono px-2 py-0.5 rounded font-bold">
                           {rep.createdAt ? new Date(rep.createdAt).toLocaleDateString('ar-SA') : ''}
                         </span>
                       </div>
+                      
                       <p className="text-slate-800 text-xs sm:text-sm font-semibold leading-relaxed bg-white p-4 rounded-xl border border-red-100 shadow-inner">
                         <strong>التفاصيل والتقصير المرصود:</strong> {rep.reason}
                       </p>
+
+                      {rep.warningText && (
+                        <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 space-y-1">
+                          <strong>⚠️ الإنذار المرسل للقادة:</strong>
+                          <p>{rep.warningText}</p>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex justify-between items-center pt-2 border-t border-red-200 text-[11px]">
-                      <span className="text-slate-500">الرافع: {rep.reporter}</span>
-                      <span className="font-bold text-red-700 bg-red-100 px-3 py-1 rounded-lg">{rep.status}</span>
+                    <div className="space-y-3 pt-2 border-t border-red-200">
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-500">الرافع: {rep.reporter}</span>
+                        <span className="font-bold text-red-700 bg-red-100 px-3 py-1 rounded-lg">{rep.status || 'معلق'}</span>
+                      </div>
+
+                      {/* أزرار اتخاذ القرار المتدرج */}
+                      <div className="flex gap-2 pt-1 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenWarningModal(rep)}
+                          className="flex-1 py-2 px-3 rounded-xl bg-amber-600 text-white font-bold text-xs shadow hover:bg-amber-700 cursor-pointer transition-all"
+                        >
+                          ⚠️ إنذار قائد وقائدة اللجنة
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleEscalateToPresidentsFinal(rep.id, rep.targetCommittee)}
+                          className="flex-1 py-2 px-3 rounded-xl bg-red-600 text-white font-black text-xs shadow hover:bg-red-700 cursor-pointer transition-all"
+                        >
+                          🚨 تصعيد البلاغ للرؤساء فوراً
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -2140,6 +2235,43 @@ export default function AdminDashboard() {
 
       </div>
 
+      {/* نافذة كتابة وإرسال الإنذار لقائد وقائدة اللجنة */}
+      {showWarningModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <form onSubmit={handleSendWarningToLeaders} className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 border-2 border-amber-400">
+            <div className="w-16 h-16 bg-amber-500 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              ⚠️
+            </div>
+            <div className="space-y-2 text-center">
+              <h3 className="text-xl font-black text-slate-900">إرسال إنذار تحذيري لقادة ({warningTargetCommittee})</h3>
+              <p className="text-xs text-slate-500">نص الإنذار الذي سيصل للجنة مع مهلة التصحيح:</p>
+            </div>
+            <textarea
+              rows={4}
+              value={warningMessageText}
+              onChange={(e) => setWarningMessageText(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 focus:outline-none focus:border-amber-500 leading-relaxed"
+              required
+            />
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowWarningModal(false)}
+                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                className="w-1/2 py-3 rounded-xl bg-amber-600 text-white font-black text-xs shadow hover:bg-amber-700 cursor-pointer"
+              >
+                إرسال الإنذار رسمياً 📨
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* نافذة رسائل النجاح أو التنبيهات المخصصة بهوية الموقع */}
       {modalType === 'success' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -2162,15 +2294,15 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* نافذة التأكيد (بدل الـ confirm القديمة) */}
+      {/* نافذة التأكيد */}
       {modalType === 'confirm' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061]">
-            <div className="w-16 h-16 bg-amber-500 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
-              ⚠️
+            <div className="w-16 h-16 bg-red-600 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              🚨
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black text-slate-900">تأكيد الإجراء</h3>
+              <h3 className="text-xl font-black text-slate-900">تأكيد التصعيد للرؤساء</h3>
               <p className="text-xs text-slate-600 font-medium leading-relaxed">{modalMessage}</p>
             </div>
             <div className="flex gap-3 pt-2">
@@ -2189,14 +2321,14 @@ export default function AdminDashboard() {
                 }}
                 className="w-1/2 py-3 rounded-xl bg-red-600 text-white font-black text-xs shadow hover:bg-red-700 cursor-pointer"
               >
-                تأكيد الحذف 🗑️
+                تأكيد التصعيد رسمياً ⚖️
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* نافذة تعديل رقم الجوال المخصصة بهوية الموقع */}
+      {/* نافذة تعديل رقم الجوال */}
       {modalType === 'phone' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={submitUpdatePhone} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
@@ -2234,7 +2366,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* نافذة تعديل كلمة المرور المخصصة بهوية الموقع */}
+      {/* نافذة تعديل كلمة المرور */}
       {modalType === 'password' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={submitUpdatePassword} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
