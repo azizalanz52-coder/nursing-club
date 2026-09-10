@@ -31,6 +31,9 @@ export default function Navbar() {
         return 'الصلاحيات المطلقة على النظام (التحكم الكامل بجميع الأقسام، حذف ونشر الفعاليات، تعديل وإدارة رتب جميع الأعضاء، استيراد وتصدير بيانات الأكسل، والتحكم بالبانرات والشرائح).';
       case 'General Supervisor':
         return 'صلاحيات الإشراف العام على الأنشطة والفعاليات ومتابعة سير العمل في لجان النادي ومراجعة طلبات الأعضاء.';
+      case 'رئيس النادي':
+      case 'رئيسة النادي':
+        return 'إدارة شاملة لجميع لجان النادي، متابعة الفعاليات، واعتماد وقبول الأعضاء بكامل الصلاحيات القيادية.';
       case 'رئيس لجنة / مشرف قسم':
         return 'إدارة أعضاء اللجنة الخاصة به، متابعة المهام المسندة للجنة، ورفع التقارير والمقترحات.';
       case 'عضو مميز / منسق':
@@ -127,8 +130,8 @@ export default function Navbar() {
 
   if (!mounted) return null;
 
-  // التحقق الأمني المباشر للمشرف (رقم جوالك + التوكن المخزن أو مطابقة سريعة)
-  const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026') || (userRole === 'System Admin');
+  // التحقق الأمني المباشر للمشرف أو رئيس/رئيسة النادي لتظهر لهم لوحة التحكم بالكامل
+  const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026') || (userRole === 'System Admin') || (userRole === 'رئيس النادي') || (userRole === 'رئيسة النادي');
 
   // تحقق ما إذا كان المستخدم رئيس لجنة أو مشرف قسم لتظهر له لوحة التحكم المحدودة
   const isCommitteeLeader = userRole && (userRole.includes('رئيس لجنة') || userRole.includes('مشرف') || userRole.includes('General Supervisor'));
@@ -162,7 +165,7 @@ export default function Navbar() {
             {/* مربع عرض الصلاحيات المهنية */}
             <div className="bg-amber-50/30 border border-amber-200/50 rounded-2xl p-4 space-y-1.5 text-right shadow-sm">
               <span className="text-[11px] font-bold text-amber-900 block flex items-center gap-1">
-                <span>📜</span> صلا حياتك ومهامك القيادية المعتمدة:
+                <span>📜</span> صلاحياتك ومهامك القيادية المعتمدة:
               </span>
               <p className="text-xs text-slate-700 font-semibold leading-relaxed">
                 {getRolePermissions(userRole || 'عضو أساسي')}
@@ -307,7 +310,7 @@ export default function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="text-[#630517] font-black transition-colors py-1"
               >
-                 استعلام عن القبول
+                🔍 استعلام عن القبول
               </Link>
               <Link 
                 href="/events" 
