@@ -17,7 +17,6 @@ export default function CommitteeLeaderDashboard() {
 
   // هل المستخدم من لجنة الجودة والتطوير؟
   const [isQualityTeam, setIsQualityTeam] = useState(false);
-  const [qualitySubTab, setQualitySubTab] = useState<'radar' | 'tasks-manager' | 'escalations'>('radar');
 
   const [allCommitteesList] = useState<string[]>([
     'لجنة التصميم',
@@ -32,8 +31,9 @@ export default function CommitteeLeaderDashboard() {
   const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('لجنة تنظيم الفعاليات');
   const [preferenceFilterTab, setPreferenceFilterTab] = useState<'pref-1' | 'pref-2' | 'pref-3'>('pref-1');
 
-  // الإشعارات والتعاميم
+  // الإشعارات والتعاميم والأليرت بار القيادي
   const [announcementText, setAnnouncementText] = useState('');
+  const [leaderCustomAlert, setLeaderCustomAlert] = useState('⚠️ تنبيه غرفة العمليات: يُرجى إنجاز كافة المهام المعلقة بالفعاليات بدقة ومراعاة المواعيد النهائية.');
   
   // نظام المهام المتعددة (Checklist متعدد المهام لكل لجنة)
   const [eventTitle, setEventTitle] = useState(''); 
@@ -81,6 +81,9 @@ export default function CommitteeLeaderDashboard() {
 
       const uData = userSnap.data();
       setUserData(uData);
+      if (uData.latestNotification) {
+        setLeaderCustomAlert(uData.latestNotification);
+      }
 
       if (phone === '0553731265' || uData.role === 'System Admin' || uData.role === 'General Supervisor') {
         router.push('/admin');
@@ -248,7 +251,6 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // إضافة مهمة للقائمة المؤقتة قبل رفعها
   const handleAddTaskToBuffer = () => {
     if (!taskInputText.trim()) return;
     setTasksListBuffer([...tasksListBuffer, taskInputText.trim()]);
@@ -259,7 +261,6 @@ export default function CommitteeLeaderDashboard() {
     setTasksListBuffer(tasksListBuffer.filter((_, idx) => idx !== index));
   };
 
-  // رفع قائمة المهام المتعددة معاً للجنة المخصصة
   const handlePublishTasksList = async (e: FormEvent) => {
     e.preventDefault();
     if (!eventTitle.trim() || tasksListBuffer.length === 0) {
@@ -269,7 +270,6 @@ export default function CommitteeLeaderDashboard() {
 
     try {
       const targetComm = isQualityTeam ? targetCommitteeForTask : currentActiveComm;
-      // تحويل كل مهمة إلى عنصر يحمل حالة (completed: false)
       const formattedSubTasks = tasksListBuffer.map(taskText => ({
         text: taskText,
         completed: false
@@ -286,7 +286,6 @@ export default function CommitteeLeaderDashboard() {
       const docRef = await addDoc(collection(db, 'committee_tasks'), newTaskObj);
       setCommitteeTasks([{ id: docRef.id, ...newTaskObj }, ...committeeTasks]);
 
-      // إرسال إشعار فوري لأعضاء اللجنة
       const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm || r.status === 'مقبول');
       for (const mem of acceptedList) {
         if (mem.phone) {
@@ -307,7 +306,6 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // تبديل حالة إنجاز المهمة (صح / خطأ) مع تحديث نسبة الإنجاز فوراً
   const handleToggleSubTask = async (taskId: string, subTaskIdx: number) => {
     try {
       const taskItem = committeeTasks.find(t => t.id === taskId);
@@ -402,7 +400,6 @@ export default function CommitteeLeaderDashboard() {
     return <div className="min-h-screen flex items-center justify-center font-bold text-slate-600 bg-slate-50">جاري تحميل لوحة تحكم اللجنة التفاعلية...</div>;
   }
 
-  // فلترة المهام الخاصة باللجنة الحالية
   const displayedTasks = committeeTasks.filter(t => t.committee === currentActiveComm);
 
   return (
@@ -437,18 +434,16 @@ export default function CommitteeLeaderDashboard() {
           </div>
         </div>
 
-        {/* صندوق التنبيهات والإنذارات الواردة للقائد (حل مشكلة عدم وصول الرسالة) */}
-        {userData?.latestNotification && (
-          <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between flex-wrap gap-4 animate-in fade-in duration-300">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🔔</span>
-              <div>
-                <h4 className="font-black text-sm">أحدث تنبيه أو بلاغ موجه إليك:</h4>
-                <p className="text-xs text-white/90 font-medium mt-0.5">{userData.latestNotification}</p>
-              </div>
+        {/* الأليرت بار القيادي (ضمان ظهوره دائماً بأعلى الشاشة كشريط إنذار وتنبيه بارز) */}
+        <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between flex-wrap gap-4 border border-amber-400">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl animate-pulse">🚨</span>
+            <div>
+              <h4 className="font-black text-sm text-yellow-100">شريط التنبيهات والبلاغات القيادية العاجلة:</h4>
+              <p className="text-xs font-bold mt-0.5">{leaderCustomAlert}</p>
             </div>
           </div>
-        )}
+        </div>
 
         {/* إذا كان المستخدم من لجنة الجودة، نعرض له رادار اللجان السبع */}
         {isQualityTeam && (
@@ -600,7 +595,6 @@ export default function CommitteeLeaderDashboard() {
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
               />
 
-              {/* إضافة مهمة للقائمة */}
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -618,7 +612,6 @@ export default function CommitteeLeaderDashboard() {
                 </button>
               </div>
 
-              {/* عرض المهام المضافة للقائمة قبل نشرها */}
               {tasksListBuffer.length > 0 && (
                 <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 space-y-1 max-h-24 overflow-y-auto">
                   {tasksListBuffer.map((t, idx) => (
@@ -703,7 +696,6 @@ export default function CommitteeLeaderDashboard() {
                       </button>
                     </div>
 
-                    {/* شريط التقدم وعداد النسبة */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs font-black">
                         <span className={isFinished ? 'text-emerald-600' : 'text-slate-700'}>
@@ -719,7 +711,6 @@ export default function CommitteeLeaderDashboard() {
                       </div>
                     </div>
 
-                    {/* قائمة المهام الفرعية (Checklist) */}
                     <div className="space-y-2 pt-2 border-t border-slate-200">
                       {subTasks.map((st: any, idx: number) => (
                         <div 
