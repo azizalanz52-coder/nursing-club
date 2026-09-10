@@ -7,10 +7,15 @@ export default function Footer() {
           جميع الحقوق محفوظة • نادي التمريض بجامعة حفر الباطن © 2026
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center gap-4 text-xs font-bold">
-          <span className="text-[#F5D061]">
-            صنع بواسطة: عبدالعزيز سليمان العنزي
-          </span>
+        <div className="flex flex-col sm:flex-row items-center gap-2 text-xs font-bold text-center sm:text-left">
+          <span className="text-[#F5D061]">صنع بواسطة:</span>
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-x-2 gap-y-1 text-white/90">
+            <span>عبدالعزيز سليمان العنزي</span>
+            <span className="text-[#F5D061]">•</span>
+            <span>عبدالله هجاج المطيري</span>
+            <span className="text-[#F5D061]">•</span>
+            <span>عبدالله سعدون الشمري</span>
+          </div>
 
           {/* روابط التواصل الاجتماعي مرتبة باتجاه إنجليزي صحيح */}
           <div className="flex items-center gap-2">
