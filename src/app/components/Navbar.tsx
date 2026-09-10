@@ -22,7 +22,7 @@ export default function Navbar() {
   const [notification, setNotification] = useState<string | null>(null);
   const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
   
-  // حالة الأليرت بار القيادي العلوي لقادة اللجان
+  // حالة الأليرت بار القيادي العلوي قادة اللجان
   const [leaderAlertMsg, setLeaderAlertMsg] = useState<string | null>(null);
   const [showLeaderAlertBar, setShowLeaderAlertBar] = useState(true);
   
@@ -277,7 +277,7 @@ export default function Navbar() {
                   </Link>
                 )}
 
-                {/* زر غرفة العمليات المركزية للجنة الجودة أو لوحة اللجنة العامة */}
+                {/* زر غرفة العمليات المركزية أو لوحة التحكم المصححة بمسار committee-dashboard */}
                 {isCommitteeLeader && !isAdmin && (
                   <Link 
                     href="/committee-dashboard"
