@@ -7,7 +7,7 @@ import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, getDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 
-export default function CommitteeLeaderDashboard() {
+export default function CommitteeDashboard() {
   const router = useRouter();
   const [userPhone, setUserPhone] = useState<string | null>(null);
   const [userData, setUserData] = useState<any>(null);
