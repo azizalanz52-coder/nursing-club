@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import LoginModal from './LoginModal'; // استيراد نافذة تسجيل الدخول المنبثقة
 import { db } from '../lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
@@ -52,7 +52,6 @@ export default function Navbar() {
     if (name) setUserName(name);
     if (phone) {
       setUserPhone(phone);
-      fetchUserData(phone);
       updateUserPresence(phone); // تحديث حالة النشاط فور التحميل
     }
     setAdminAuth(isAuthAdmin);
@@ -65,21 +64,12 @@ export default function Navbar() {
     };
   }, []);
 
-  // دالة تحديث وقت آخر نشاط للمستخدم في قاعدة البيانات
-  const updateUserPresence = async (phone: string) => {
-    try {
-      const userRef = doc(db, 'users', phone);
-      await updateDoc(userRef, { lastActive: Date.now() });
-    } catch (err) {
-      console.error('Error updating presence:', err);
-    }
-  };
+  // الاستماع اللحظي السحابي (onSnapshot) لبيانات المستخدم ورتبته والإشعارات
+  useEffect(() => {
+    if (!userPhone) return;
 
-  // دالة جلب بيانات المستخدم ورتبته والإشعارات من سحابة Firestore
-  const fetchUserData = async (phone: string) => {
-    try {
-      const userRef = doc(db, 'users', phone);
-      const userSnap = await getDoc(userRef);
+    const userRef = doc(db, 'users', userPhone);
+    const unsubscribe = onSnapshot(userRef, (userSnap) => {
       if (userSnap.exists()) {
         const data = userSnap.data();
         if (data.role) {
@@ -93,8 +83,20 @@ export default function Navbar() {
           setShowNotificationModal(true);
         }
       }
+    }, (err) => {
+      console.error('Error listening to user changes:', err);
+    });
+
+    return () => unsubscribe();
+  }, [userPhone]);
+
+  // دالة تحديث وقت آخر نشاط للمستخدم في قاعدة البيانات
+  const updateUserPresence = async (phone: string) => {
+    try {
+      const userRef = doc(db, 'users', phone);
+      await updateDoc(userRef, { lastActive: Date.now() });
     } catch (err) {
-      console.error('Error fetching user data:', err);
+      console.error('Error updating presence:', err);
     }
   };
 
