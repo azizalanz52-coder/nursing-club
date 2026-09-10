@@ -82,7 +82,10 @@ interface UserAccount {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions'>('users-manager');
+  
+  // التحقق هل المستخدم هو المشرف المطلق (System Admin) أم رئيس نادي
+  const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions'>('requests');
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
@@ -105,6 +108,7 @@ export default function AdminDashboard() {
         }
 
         if (phone === '0553731265' || adminAuth) {
+          setIsSystemAdminUser(true);
           return;
         }
 
@@ -115,16 +119,17 @@ export default function AdminDashboard() {
           const userData = userSnap.data();
           const userRole = userData.role || 'عضو أساسي';
 
-          // السماح للآدمن، المشرف العام، ورئيس/رئيسة النادي بالدخول للوحة التحكم الكاملة
-          if (
-            userRole !== 'System Admin' && 
-            userRole !== 'General Supervisor' && 
-            userRole !== 'رئيس النادي' && 
-            userRole !== 'رئيسة النادي'
-          ) {
-            if (userRole.includes('رئيس لجنة') || userRole.includes('مشرف')) {
-              router.push('/committee-dashboard');
-            } else {
+          if (phone === '0553731265' || userRole === 'System Admin') {
+            setIsSystemAdminUser(true);
+          } else {
+            setIsSystemAdminUser(false);
+            // إذا كان رئيس نادي أو مشرف، نسمح له بالدخول ولكن نبقي تبويب الحسابات مخفياً عنه
+            if (
+              userRole !== 'رئيس النادي' && 
+              userRole !== 'رئيسة النادي' && 
+              !userRole.includes('رئيس لجنة') && 
+              !userRole.includes('مشرف')
+            ) {
               router.push('/');
             }
           }
@@ -191,13 +196,7 @@ export default function AdminDashboard() {
   const [selectedCommitteeFilter, setSelectedCommitteeFilter] = useState<string>('لجنة التصميم');
 
   const [committees, setCommittees] = useState<Committee[]>([
-    { 
-      id: 'design', 
-      name: 'التصميم', 
-      maleLeader: 'عبدالعزيز العنزي', 
-      femaleLeader: 'شجون الحربي', 
-      members: [] 
-    },
+    { id: 'design', name: 'التصميم', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي', members: [] },
     { id: 'media', name: 'لجنة الاعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
     { id: 'events-org', name: 'تنظيم الفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', members: [] },
     { id: 'hr', name: 'الموارد البشرية', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي', members: [] },
@@ -218,72 +217,54 @@ export default function AdminDashboard() {
         const eventsSnap = await getDocs(collection(db, 'site_events'));
         if (!eventsSnap.empty) {
           const eventsList: EventItem[] = [];
-          eventsSnap.forEach((d) => {
-            eventsList.push({ id: d.id, ...d.data() } as EventItem);
-          });
+          eventsSnap.forEach((d) => { eventsList.push({ id: d.id, ...d.data() } as EventItem); });
           setEvents(eventsList);
         }
 
         const bannersSnap = await getDocs(collection(db, 'site_banners'));
         if (!bannersSnap.empty) {
           const bannersList: BannerItem[] = [];
-          bannersSnap.forEach((d) => {
-            bannersList.push({ id: d.id, ...d.data() } as BannerItem);
-          });
+          bannersSnap.forEach((d) => { bannersList.push({ id: d.id, ...d.data() } as BannerItem); });
           setBanners(bannersList);
         }
 
         const partnersSnap = await getDocs(collection(db, 'site_partners'));
         if (!partnersSnap.empty) {
           const partnersList: PartnerItem[] = [];
-          partnersSnap.forEach((d) => {
-            partnersList.push({ id: d.id, ...d.data() } as PartnerItem);
-          });
+          partnersSnap.forEach((d) => { partnersList.push({ id: d.id, ...d.data() } as PartnerItem); });
           setPartners(partnersList);
         }
 
         const suggestionsSnap = await getDocs(collection(db, 'suggestions'));
         if (!suggestionsSnap.empty) {
           const suggestionsList: SuggestionItem[] = [];
-          suggestionsSnap.forEach((d) => {
-            suggestionsList.push({ id: d.id, ...d.data() } as SuggestionItem);
-          });
+          suggestionsSnap.forEach((d) => { suggestionsList.push({ id: d.id, ...d.data() } as SuggestionItem); });
           setSuggestions(suggestionsList);
         }
 
         const passionSnap = await getDocs(collection(db, 'site_passion_slides'));
         if (!passionSnap.empty) {
           const slides: PassionSlide[] = [];
-          passionSnap.forEach((d) => {
-            slides.push({ id: d.id, ...d.data() } as PassionSlide);
-          });
+          passionSnap.forEach((d) => { slides.push({ id: d.id, ...d.data() } as PassionSlide); });
           setPassionSlides(slides);
         }
 
         const discoverSnap = await getDocs(collection(db, 'site_discover_events'));
         if (!discoverSnap.empty) {
           const eventsList: DiscoverEvent[] = [];
-          discoverSnap.forEach((d) => {
-            eventsList.push({ id: d.id, ...d.data() } as DiscoverEvent);
-          });
+          discoverSnap.forEach((d) => { eventsList.push({ id: d.id, ...d.data() } as DiscoverEvent); });
           setDiscoverEvents(eventsList);
           setSelectedEventId(eventsList[0]?.id || '');
         }
 
         const querySnapshot = await getDocs(collection(db, 'applications'));
-        const fetchedRequests = querySnapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data()
-        })) as Record<string, any>[];
+        const fetchedRequests = querySnapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) as Record<string, any>[];
         if (fetchedRequests.length > 0) {
           setRequests(fetchedRequests);
         }
 
         const usersSnap = await getDocs(collection(db, 'users'));
-        const fetchedUsers = usersSnap.docs.map((docSnap) => ({
-          phone: docSnap.id,
-          ...docSnap.data()
-        })) as UserAccount[];
+        const fetchedUsers = usersSnap.docs.map((docSnap) => ({ phone: docSnap.id, ...docSnap.data() })) as UserAccount[];
         setUsersList(fetchedUsers);
 
         const commSnapshot = await getDocs(collection(db, 'committees'));
@@ -301,6 +282,7 @@ export default function AdminDashboard() {
   }, []);
 
   const handleRoleChange = async (phone: string, newRole: string) => {
+    if (!isSystemAdminUser) return; // حماية إضافية
     try {
       const userRef = doc(db, 'users', phone);
       await updateDoc(userRef, { 
@@ -316,6 +298,7 @@ export default function AdminDashboard() {
   };
 
   const handleAssignedCommitteeChange = async (phone: string, commName: string) => {
+    if (!isSystemAdminUser) return; // حماية إضافية
     try {
       const userRef = doc(db, 'users', phone);
       await updateDoc(userRef, { 
@@ -855,7 +838,6 @@ export default function AdminDashboard() {
     return choiceStr.includes(targetCommName) || targetCommName.includes(choiceStr);
   };
 
-  // تعديل الإحصائيات لتشمل الرغبات الثلاث بشكل دقيق لضمان عدم التضخم الخاطئ
   const getCountByPreference = (commName: string, prefKey: 'firstChoice' | 'secondChoice' | 'thirdChoice') => {
     return requests.filter(r => matchesCommittee(r[prefKey], commName)).length;
   };
@@ -884,7 +866,7 @@ export default function AdminDashboard() {
           </span>
           <div>
             <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (سحابي متكامل ☁️)</h1>
-            <p className="text-xs text-slate-500">إدارة الرتب والمقترحات والفعاليات سحابياً</p>
+            <p className="text-xs text-slate-500">إدارة اللجان والفعاليات والطلبات سحابياً</p>
           </div>
         </div>
 
@@ -905,7 +887,7 @@ export default function AdminDashboard() {
               نظام القيادة الماسية 🏆
             </span>
             <h2 className="text-xl font-black">غرفة عمليات القيادة ونبض النادي</h2>
-            <p className="text-xs text-white/80">أنت تدير المنصة بكامل الصلاحيات. تابع أداء اللجان ووزع المتميزين بحماس.</p>
+            <p className="text-xs text-white/80">تابع أداء اللجان، ادرس طلبات الانضمام، وانشر الفعاليات بحماس.</p>
           </div>
 
           <div className="flex gap-4">
@@ -924,10 +906,22 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs - تم إخفاء تبويب الحسابات والرتب عن غير المشرف الأساسي لزيادة الأمان */}
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
+          {isSystemAdminUser && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('users-manager')}
+              className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+                activeTab === 'users-manager' ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              🔑 الحسابات والرتب والصلاحيات
+            </button>
+          )}
+
           {[
-            { id: 'users-manager', label: '🔑 الحسابات والرتب والصلاحيات' },
+            { id: 'requests', label: '📥 طلبات الانضمام والأكسل' },
             { id: 'suggestions', label: '💡 آراء ومقترحات الطلاب' },
             { id: 'discover', label: '🖼️ معرض "اكتشف النادي"' },
             { id: 'passion', label: '✨ بطاقة "شغف وعطاء"' },
@@ -935,7 +929,6 @@ export default function AdminDashboard() {
             { id: 'banners', label: '🖼️ البانرات الرئيسية' },
             { id: 'partners', label: '🤝 شركاء النجاح والرعاة' },
             { id: 'team', label: '👥 القادة والأعضاء' },
-            { id: 'requests', label: '📥 طلبات الانضمام والأكسل' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -951,6 +944,110 @@ export default function AdminDashboard() {
             </button>
           ))}
         </div>
+
+        {activeTab === 'users-manager' && isSystemAdminUser && (
+          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4">
+              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب (خاص بالمشرف الأساسي 🛡️)</h3>
+              <p className="text-xs text-slate-500">هنا فقط يمكنك التحكم بالصلاحيات المطلقة ورتب النظام.</p>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                    <th className="pb-3 pr-2">اسم المستخدم</th>
+                    <th className="pb-3">رقم الجوال (اسم الدخول)</th>
+                    <th className="pb-3">كلمة المرور</th>
+                    <th className="pb-3">الرتبة والصلاحيات</th>
+                    <th className="pb-3">اللجنة المعينة ( لرئيس اللجنة )</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  <tr className="hover:bg-slate-50 bg-rose-50/20">
+                    <td className="py-4 pr-2 font-black text-[#630517]">عبدالعزيز العنزي (المشرف الأساسي)</td>
+                    <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
+                    <td className="py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#630517] font-mono font-bold bg-slate-100 px-2.5 py-1 rounded w-fit">
+                          {showPasswords['0553731265'] ? 'qwer8901as' : '••••••••'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => togglePasswordVisibility('0553731265')}
+                          className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
+                        >
+                          {showPasswords['0553731265'] ? '👁️‍🗨️' : '👁️'}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-4">
+                      <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-black text-[11px] inline-block" dir="ltr">
+                        System Admin
+                      </span>
+                    </td>
+                    <td className="py-4 text-slate-400 font-bold">إدارة كاملة للمنصة</td>
+                  </tr>
+
+                  {usersList.map((usr, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50">
+                      <td className="py-4 pr-2 font-bold text-slate-900">{usr.fullName || 'مستخدم مسجل'}</td>
+                      <td className="py-4 text-slate-600 font-mono" dir="ltr">{usr.phone}</td>
+                      <td className="py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#630517] font-mono font-bold bg-slate-100 px-2.5 py-1 rounded w-fit">
+                            {showPasswords[usr.phone] ? (usr.password || 'غير متوفرة') : '••••••••'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility(usr.phone)}
+                            className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
+                          >
+                            {showPasswords[usr.phone] ? '👁️‍🗨️' : '👁️'}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-4">
+                        <select
+                          value={usr.role || 'عضو أساسي'}
+                          onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
+                        >
+                          <option value="System Admin">System Admin (مدير النظام)</option>
+                          <option value="General Supervisor">General Supervisor (مشرف عام)</option>
+                          <option value="رئيس النادي">رئيس النادي</option>
+                          <option value="رئيسة النادي">رئيسة النادي</option>
+                          <option value="رئيس لجنة / مشرف قسم">رئيس لجنة</option>
+                          <option value="عضو مميز / منسق">عضو مميز</option>
+                          <option value="عضو أساسي">عضو أساسي</option>
+                        </select>
+                      </td>
+                      <td className="py-4">
+                        {(usr.role?.includes('رئيس لجنة') || usr.role?.includes('مشرف')) ? (
+                          <select
+                            value={usr.assignedCommittee || 'لجنة الاعلام'}
+                            onChange={(e) => handleAssignedCommitteeChange(usr.phone, e.target.value)}
+                            className="px-3 py-1.5 rounded-xl border border-[#630517]/30 text-xs font-black text-[#630517] bg-[#630517]/5 shadow-sm focus:outline-none"
+                          >
+                            <option value="لجنة الاعلام">لجنة الاعلام</option>
+                            <option value="لجنة التصميم">لجنة التصميم</option>
+                            <option value="لجنة تنظيم الفعاليات">لجنة تنظيم الفعاليات</option>
+                            <option value="لجنة الموارد البشرية">لجنة الموارد البشرية</option>
+                            <option value="لجنة العلاقات العامة">لجنة العلاقات العامة</option>
+                            <option value="لجنة المحتوى العلمي">لجنة المحتوى العلمي</option>
+                            <option value="لجنة الجودة والتطوير">لجنة الجودة والتطوير</option>
+                          </select>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">غير مخصص</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {activeTab === 'suggestions' && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
@@ -997,110 +1094,6 @@ export default function AdminDashboard() {
                 ))}
               </div>
             )}
-          </div>
-        )}
-
-        {activeTab === 'users-manager' && (
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-            <div className="border-b border-slate-100 pb-4">
-              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب واللجان المعينة 🔑</h3>
-              <p className="text-xs text-slate-500">عين رتبة (رئيس النادي / رئيسة النادي) لتمكينهم من إدارة كل اللجان والفعاليات بحرية تامة.</p>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                    <th className="pb-3 pr-2">اسم المستخدم</th>
-                    <th className="pb-3">رقم الجوال (اسم الدخول)</th>
-                    <th className="pb-3">كلمة المرور</th>
-                    <th className="pb-3">الرتبة والصلاحيات</th>
-                    <th className="pb-3">اللجنة المعينة ( لرئيس اللجنة )</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  <tr className="hover:bg-slate-50 bg-rose-50/20">
-                    <td className="py-4 pr-2 font-black text-[#630517]">عبدالعزيز العنزي (المشرف الأساسي)</td>
-                    <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[#630517] font-mono font-bold bg-slate-100 px-2.5 py-1 rounded w-fit">
-                          {showPasswords['0553731265'] ? 'qwer8901as' : '••••••••'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => togglePasswordVisibility('0553731265')}
-                          className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
-                        >
-                          {showPasswords['0553731265'] ? '👁️‍🗨️' : '👁️'}
-                        </button>
-                      </div>
-                    </td>
-                    <td className="py-4 space-y-1">
-                      <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-black text-[11px] inline-block" dir="ltr">
-                        System Admin
-                      </span>
-                    </td>
-                    <td className="py-4 text-slate-400 font-bold">إدارة كاملة للمنصة</td>
-                  </tr>
-
-                  {usersList.map((usr, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="py-4 pr-2 font-bold text-slate-900">{usr.fullName || 'مستخدم مسجل'}</td>
-                      <td className="py-4 text-slate-600 font-mono" dir="ltr">{usr.phone}</td>
-                      <td className="py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#630517] font-mono font-bold bg-slate-100 px-2.5 py-1 rounded w-fit">
-                            {showPasswords[usr.phone] ? (usr.password || 'غير متوفرة') : '••••••••'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => togglePasswordVisibility(usr.phone)}
-                            className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
-                          >
-                            {showPasswords[usr.phone] ? '👁️‍🗨️' : '👁️'}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-4 space-y-2">
-                        <select
-                          value={usr.role || 'عضو أساسي'}
-                          onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
-                          className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
-                        >
-                          <option value="System Admin">System Admin (مدير النظام)</option>
-                          <option value="General Supervisor">General Supervisor (مشرف عام)</option>
-                          <option value="رئيس النادي">رئيس النادي (صلاحيات كاملة على كل اللجان والأنشطة)</option>
-                          <option value="رئيسة النادي">رئيسة النادي (صلاحيات كاملة على كل اللجان والأنشطة)</option>
-                          <option value="رئيس لجنة / مشرف قسم">رئيس لجنة (إدارة اللجنة والأعضاء)</option>
-                          <option value="عضو مميز / منسق">عضو مميز (صلاحيات تفاعلية خاصة)</option>
-                          <option value="عضو أساسي">عضو أساسي (مشارك وفعال)</option>
-                        </select>
-                      </td>
-                      <td className="py-4">
-                        {(usr.role?.includes('رئيس لجنة') || usr.role?.includes('مشرف')) ? (
-                          <select
-                            value={usr.assignedCommittee || 'لجنة الاعلام'}
-                            onChange={(e) => handleAssignedCommitteeChange(usr.phone, e.target.value)}
-                            className="px-3 py-1.5 rounded-xl border border-[#630517]/30 text-xs font-black text-[#630517] bg-[#630517]/5 shadow-sm focus:outline-none"
-                          >
-                            <option value="لجنة الاعلام">لجنة الاعلام</option>
-                            <option value="لجنة التصميم">لجنة التصميم</option>
-                            <option value="لجنة تنظيم الفعاليات">لجنة تنظيم الفعاليات</option>
-                            <option value="لجنة الموارد البشرية">لجنة الموارد البشرية</option>
-                            <option value="لجنة العلاقات العامة">لجنة العلاقات العامة</option>
-                            <option value="لجنة المحتوى العلمي">لجنة المحتوى العلمي</option>
-                            <option value="لجنة الجودة والتطوير">لجنة الجودة والتطوير</option>
-                          </select>
-                        ) : (
-                          <span className="text-slate-400 text-[11px]">غير مخصص</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </div>
         )}
 
@@ -1169,9 +1162,7 @@ export default function AdminDashboard() {
                     type="button"
                     onClick={() => setSelectedEventId(ev.id)}
                     className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-                      selectedEventId === ev.id
-                        ? 'bg-[#630517] text-[#F5D061] shadow'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      selectedEventId === ev.id ? 'bg-[#630517] text-[#F5D061] shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     {ev.title} ({ev.images?.length || 0} صور)
@@ -1631,9 +1622,7 @@ export default function AdminDashboard() {
                     type="button"
                     onClick={() => setSelectedCommitteeId(com.id)}
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      selectedCommitteeId === com.id
-                        ? 'bg-[#630517] text-[#F5D061] shadow'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      selectedCommitteeId === com.id ? 'bg-[#630517] text-[#F5D061] shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     {com.name}
@@ -1926,7 +1915,6 @@ export default function AdminDashboard() {
 
       </div>
 
-      {/* Accept Modal */}
       {showAcceptModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
