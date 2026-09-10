@@ -150,7 +150,6 @@ export default function AdminDashboard() {
   const [acceptedCommittee, setAcceptedCommittee] = useState<string>('لجنة التصميم');
   const [whatsappLink, setWhatsappLink] = useState<string>('');
 
-  // فلاتر طلبات الانضمام والتحكم بالرغبات
   const [requestSubTab, setRequestSubTab] = useState<'all' | 'accepted' | 'pref-1' | 'pref-2' | 'pref-3'>('all');
   const [selectedCommitteeFilter, setSelectedCommitteeFilter] = useState<string>('لجنة التصميم');
 
@@ -340,7 +339,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // استيراد الأكسل مع منع التكرار تماماً بناءً على الرقم الجامعي أو رقم الجوال
   const handleExcelImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -355,7 +353,7 @@ export default function AdminDashboard() {
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
 
         if (!data || data.length < 2) {
-          alert('الملف فارغ أو لا يحتوي على بيانات.');
+          alert('الملف فارغ أو لا يحتوي على البيانات المطلوبة.');
           return;
         }
 
@@ -689,7 +687,7 @@ export default function AdminDashboard() {
 
       let targetCommitteeId = 'design';
       if (acceptedCommittee.includes('تصميم')) targetCommitteeId = 'design';
-      else if (acceptedCommittee.includes('إعلام')) targetCommitteeId = 'media';
+      else if (acceptedCommittee.includes('إعلام') || acceptedCommittee.includes('الاعلام')) targetCommitteeId = 'media';
       else if (acceptedCommittee.includes('فعاليات')) targetCommitteeId = 'events-org';
       else if (acceptedCommittee.includes('الموارد')) targetCommitteeId = 'hr';
       else if (acceptedCommittee.includes('العلاقات')) targetCommitteeId = 'pr';
@@ -746,13 +744,11 @@ export default function AdminDashboard() {
     }
   };
 
-  // دالة لتبديل أو تدوير الرغبات (نقل المتقدم من رغبة للتي تليها)
   const handleShiftPreference = async (req: Record<string, any>) => {
     const f1 = req.firstChoice || '';
     const f2 = req.secondChoice || '';
     const f3 = req.thirdChoice || '';
 
-    // تدوير الرغبات: الأولى تصبح الثانية، الثانية تصبح الثالثة، والثالثة تصبح الأولى
     const updatedObj = {
       ...req,
       firstChoice: f2 || f3 || f1,
@@ -838,25 +834,41 @@ export default function AdminDashboard() {
     }
   };
 
-  const committeeNamesList = ['لجنة التصميم', 'اللجنة الإعلامية', 'لجنة تنظيم الفعاليات', 'لجنة الموارد البشرية', 'لجنة العلاقات العامة', 'لجنة المحتوى العلمي', 'لجنة الجودة والتطوير'];
+  const committeeNamesList = ['لجنة التصميم', 'لجنة الاعلام', 'لجنة تنظيم الفعاليات', 'لجنة الموارد البشرية', 'لجنة العلاقات العامة', 'لجنة المحتوى العلمي', 'لجنة الجودة والتطوير'];
   
-  const getCountByPreference = (commName: string, prefKey: 'firstChoice' | 'secondChoice' | 'thirdChoice') => {
-    return requests.filter(r => r[prefKey]?.includes(commName.replace('لجنة ', '')) || r[prefKey] === commName).length;
+  // دالة مطابقة مرنة للجان لتتعرف على "لجنة الاعلام" و "اللجنة الإعلامية" بدون أي مشاكل
+  const matchesCommittee = (choiceStr: string, targetCommName: string) => {
+    if (!choiceStr) return false;
+    const cleanChoice = choiceStr.replace(/الـ/g, '').replace(/إ/g, 'ا').replace(/أ/g, 'ا').replace(/آ/g, 'ا').trim();
+    const cleanTarget = targetCommName.replace(/الـ/g, '').replace(/إ/g, 'ا').replace(/أ/g, 'ا').replace(/آ/g, 'ا').trim();
+    
+    if (cleanChoice.includes('اعلام') && cleanTarget.includes('اعلام')) return true;
+    if (cleanChoice.includes('تصميم') && cleanTarget.includes('تصميم')) return true;
+    if (cleanChoice.includes('فعاليات') && cleanTarget.includes('فعاليات')) return true;
+    if (cleanChoice.includes('موارد') && cleanTarget.includes('موارد')) return true;
+    if (cleanChoice.includes('علاقات') && cleanTarget.includes('علاقات')) return true;
+    if (cleanChoice.includes('علمي') && cleanTarget.includes('علمي')) return true;
+    if (cleanChoice.includes('جودة') && cleanTarget.includes('جودة')) return true;
+
+    return choiceStr.includes(targetCommName) || targetCommName.includes(choiceStr);
   };
 
-  // فلترة الطلبات حسب الرغبة الأولى، الثانية، الثالثة أو المقبولين
+  const getCountByPreference = (commName: string, prefKey: 'firstChoice' | 'secondChoice' | 'thirdChoice') => {
+    return requests.filter(r => matchesCommittee(r[prefKey], commName)).length;
+  };
+
   const filteredRequests = requests.filter(req => {
     if (requestSubTab === 'accepted') return req.status === 'مقبول';
     if (requestSubTab === 'pref-1') {
-      return req.firstChoice?.includes(selectedCommitteeFilter.replace('لجنة ', '')) || req.firstChoice === selectedCommitteeFilter;
+      return matchesCommittee(req.firstChoice, selectedCommitteeFilter);
     }
     if (requestSubTab === 'pref-2') {
-      return req.secondChoice?.includes(selectedCommitteeFilter.replace('لجنة ', '')) || req.secondChoice === selectedCommitteeFilter;
+      return matchesCommittee(req.secondChoice, selectedCommitteeFilter);
     }
     if (requestSubTab === 'pref-3') {
-      return req.thirdChoice?.includes(selectedCommitteeFilter.replace('لجنة ', '')) || req.thirdChoice === selectedCommitteeFilter;
+      return matchesCommittee(req.thirdChoice, selectedCommitteeFilter);
     }
-    return true; // الكل
+    return true; 
   });
 
   return (
@@ -1702,7 +1714,7 @@ export default function AdminDashboard() {
               />
             </div>
 
-            {/* إحصائيات أعداد المتقدمين لكل لجنة حسب الرغبة الأولى */}
+            {/* إحصائيات أعداد المتقدمين لكل لجنة مع مطابقة مرنة */}
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
               <h4 className="font-black text-slate-900 text-sm">📊 إحصائيات المتقدمين لكل لجنة (حسب الرغبة الأولى)</h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -1880,7 +1892,7 @@ export default function AdminDashboard() {
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 bg-white"
                 >
                   <option value="لجنة التصميم">لجنة التصميم</option>
-                  <option value="اللجنة الإعلامية">اللجنة الإعلامية</option>
+                  <option value="لجنة الاعلام">لجنة الاعلام</option>
                   <option value="لجنة تنظيم الفعاليات">لجنة تنظيم الفعاليات</option>
                   <option value="لجنة الموارد البشرية">لجنة الموارد البشرية</option>
                   <option value="لجنة العلاقات العامة">لجنة العلاقات العامة</option>
