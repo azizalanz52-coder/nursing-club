@@ -89,11 +89,12 @@ export default function AdminDashboard() {
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
-  // حالات النوافذ المنبثقة المخصصة (بدل الـ alert والـ prompt القديمة)
-  const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password'>('none');
+  // حالات النوافذ المنبثقة المخصصة بهوية الموقع (بدل الـ alert والـ prompt والـ confirm)
+  const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'confirm'>('none');
   const [modalMessage, setModalMessage] = useState<string>('');
   const [activeUserPhoneForAction, setActiveUserPhoneForAction] = useState<string>('');
   const [modalInputVal, setModalInputVal] = useState<string>('');
+  const [confirmActionCallback, setConfirmActionCallback] = useState<(() => void) | null>(null);
 
   const togglePasswordVisibility = (phone: string) => {
     setShowPasswords((prev) => ({
@@ -295,7 +296,7 @@ export default function AdminDashboard() {
         latestNotification: `مبروك! تم ترقيتك وتعيين رتبتك إلى (${newRole}) بنجاح 🎉`
       });
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, role: newRole } : u));
-      setModalMessage(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح سحابياً! 🚀`);
+      setModalMessage(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح سحابياً! 🚀\n(سيصل التنبيه للعضو فوراً خلال ثوانٍ معدودة)`);
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -313,7 +314,7 @@ export default function AdminDashboard() {
         latestNotification: `تم تعيينك من قبل الإدارة رئيساً لـ (${commName}) 🛡️`
       });
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, assignedCommittee: commName } : u));
-      setModalMessage(`تم تعيين اللجنة (${commName}) لهذا العضو بنجاح! 🚀`);
+      setModalMessage(`تم تعيين اللجنة (${commName}) لهذا العضو بنجاح سحابياً! 🚀`);
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -322,7 +323,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // فتح نافذة تعديل كلمة المرور المخصصة
   const openPasswordModal = (phone: string) => {
     setActiveUserPhoneForAction(phone);
     setModalInputVal('');
@@ -337,7 +337,6 @@ export default function AdminDashboard() {
       const userRef = doc(db, 'users', activeUserPhoneForAction);
       await updateDoc(userRef, { password: modalInputVal.trim() });
       setUsersList(usersList.map(u => u.phone === activeUserPhoneForAction ? { ...u, password: modalInputVal.trim() } : u));
-      setModalType('none');
       setModalMessage('تم تحديث كلمة المرور بنجاح سحابياً! 🔒');
       setModalType('success');
     } catch (err) {
@@ -347,7 +346,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // فتح نافذة تعديل رقم الجوال المخصصة
   const openPhoneModal = (oldPhone: string) => {
     setActiveUserPhoneForAction(oldPhone);
     setModalInputVal(oldPhone);
@@ -364,7 +362,6 @@ export default function AdminDashboard() {
       const oldUserSnap = await getDoc(oldUserRef);
 
       if (!oldUserSnap.exists()) {
-        setModalType('none');
         setModalMessage('لم يتم العثور على بيانات المستخدم.');
         setModalType('success');
         return;
@@ -382,19 +379,23 @@ export default function AdminDashboard() {
       await deleteDoc(oldUserRef);
 
       setUsersList(usersList.map(u => u.phone === activeUserPhoneForAction ? { ...u, phone: trimmedNewPhone } : u));
-      setModalType('none');
       setModalMessage('تم تحديث رقم جوال المستخدم بنجاح وتحديثه سحابياً! 🚀');
       setModalType('success');
     } catch (err) {
       console.error(err);
-      setModalType('none');
       setModalMessage('حدث خطأ أثناء تحديث رقم الجوال.');
       setModalType('success');
     }
   };
 
-  const handleDeleteSuggestion = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا المقترح من السحابة؟')) {
+  const triggerConfirmModal = (message: string, callback: () => void) => {
+    setModalMessage(message);
+    setConfirmActionCallback(() => callback);
+    setModalType('confirm');
+  };
+
+  const handleDeleteSuggestion = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من حذف هذا المقترح من السحابة؟', async () => {
       try {
         await deleteDoc(doc(db, 'suggestions', id));
         setSuggestions(suggestions.filter((s) => s.id !== id));
@@ -403,7 +404,7 @@ export default function AdminDashboard() {
       } catch (err) {
         console.error(err);
       }
-    }
+    });
   };
 
   const handleExcelImport = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -600,8 +601,8 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteEntireDiscoverEvent = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذه الفعالية بالكامل؟')) {
+  const handleDeleteEntireDiscoverEvent = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من حذف هذه الفعالية بالكامل؟', async () => {
       try {
         await deleteDoc(doc(db, 'site_discover_events', id));
         const updated = discoverEvents.filter((ev) => ev.id !== id);
@@ -612,7 +613,7 @@ export default function AdminDashboard() {
       } catch (err) {
         console.error(err);
       }
-    }
+    });
   };
 
   const currentEditedEvent = discoverEvents.find((ev) => ev.id === selectedEventId) || discoverEvents[0];
@@ -664,15 +665,17 @@ export default function AdminDashboard() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDeleteEvent = async (id: string) => {
-    if (confirm('هل أنت متأكد من الحذف؟')) {
+  const handleDeleteEvent = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من حذف هذه الفعالية؟', async () => {
       try {
         await deleteDoc(doc(db, 'site_events', id));
         setEvents(events.filter((ev) => ev.id !== id));
+        setModalMessage('تم الحذف بنجاح.');
+        setModalType('success');
       } catch (err) {
         console.error(err);
       }
-    }
+    });
   };
 
   const handleAddBanner = async (e: FormEvent) => {
@@ -701,13 +704,17 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteBanner = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, 'site_banners', id));
-      setBanners(banners.filter((b) => b.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+  const handleDeleteBanner = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من حذف هذا البانر؟', async () => {
+      try {
+        await deleteDoc(doc(db, 'site_banners', id));
+        setBanners(banners.filter((b) => b.id !== id));
+        setModalMessage('تم الحذف بنجاح.');
+        setModalType('success');
+      } catch (err) {
+        console.error(err);
+      }
+    });
   };
 
   const handleAddPartner = async (e: FormEvent) => {
@@ -734,15 +741,17 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeletePartner = async (id: string) => {
-    if (confirm('هل أنت متأكد من الحذف؟')) {
+  const handleDeletePartner = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من حذف هذا الشريك؟', async () => {
       try {
         await deleteDoc(doc(db, 'site_partners', id));
         setPartners(partners.filter((p) => p.id !== id));
+        setModalMessage('تم الحذف بنجاح.');
+        setModalType('success');
       } catch (err) {
         console.error(err);
       }
-    }
+    });
   };
 
   const openAcceptModal = (reqId: string) => {
@@ -760,8 +769,18 @@ export default function AdminDashboard() {
       await updateDoc(docRef, { 
         status: 'مقبول',
         acceptedCommittee: acceptedCommittee,
-        whatsappLink: whatsappLink 
+        whatsappLink: whatsappLink,
+        latestNotification: `مبروك! تم قبولك رسمياً في (${acceptedCommittee}) 🎉. انضم لقروب الواتساب: ${whatsappLink}`
       });
+
+      if (targetRequest.phone) {
+        try {
+          const userDocRef = doc(db, 'users', targetRequest.phone);
+          await updateDoc(userDocRef, {
+            latestNotification: `🎉 مبارك القبول النهائي في (${acceptedCommittee})!`
+          });
+        } catch (e) { console.error(e); }
+      }
 
       let targetCommitteeId = 'design';
       if (acceptedCommittee.includes('تصميم')) targetCommitteeId = 'design';
@@ -811,16 +830,21 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleRejectRequest = async (id: string) => {
-    if(confirm('هل أنت متأكد من رفض الطلب؟')) {
+  const handleRejectRequest = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من رفض هذا الطلب؟', async () => {
       try {
         const docRef = doc(db, 'applications', id);
-        await updateDoc(docRef, { status: 'مرفوض' });
+        await updateDoc(docRef, { 
+          status: 'مرفوض',
+          latestNotification: 'عذراً، لم يتم قبول طلبك في النادي هذه المرة. نتمنى لك التوفيق!'
+        });
         setRequests(requests.map((req) => req.id === id ? { ...req, status: 'مرفوض' } : req));
+        setModalMessage('تم رفض الطلب وإرسال التنبيه للعضو.');
+        setModalType('success');
       } catch (err) {
         console.error(err);
       }
-    }
+    });
   };
 
   const handleShiftPreference = async (req: Record<string, any>) => {
@@ -852,15 +876,17 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteRequest = async (id: string) => {
-    if(confirm('هل أنت متأكد من الحذف النهائي للطلب؟')) {
+  const handleDeleteRequest = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من الحذف النهائي للطلب من السحابة؟', async () => {
       try {
         await deleteDoc(doc(db, 'applications', id));
         setRequests(requests.filter((req) => req.id !== id));
+        setModalMessage('تم الحذف النهائي بنجاح.');
+        setModalType('success');
       } catch (err) {
         console.error(err);
       }
-    }
+    });
   };
 
   const handleSaveLeadersSubmit = async (e: FormEvent) => {
@@ -900,21 +926,25 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteMember = async (index: number) => {
-    const updatedMembers = [...(currentCommittee.members || [])];
-    updatedMembers.splice(index, 1);
+  const handleDeleteMember = (index: number) => {
+    triggerConfirmModal('هل أنت متأكد من حذف هذا العضو من اللجنة؟', async () => {
+      const updatedMembers = [...(currentCommittee.members || [])];
+      updatedMembers.splice(index, 1);
 
-    setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c));
+      setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c));
 
-    try {
-      await setDoc(doc(db, 'committees', selectedCommitteeId), {
-        maleLeader: currentCommittee.maleLeader,
-        femaleLeader: currentCommittee.femaleLeader,
-        members: updatedMembers
-      }, { merge: true });
-    } catch (err) {
-      console.error(err);
-    }
+      try {
+        await setDoc(doc(db, 'committees', selectedCommitteeId), {
+          maleLeader: currentCommittee.maleLeader,
+          femaleLeader: currentCommittee.femaleLeader,
+          members: updatedMembers
+        }, { merge: true });
+        setModalMessage('تم الحذف بنجاح.');
+        setModalType('success');
+      } catch (err) {
+        console.error(err);
+      }
+    });
   };
 
   const committeeNamesList = ['لجنة التصميم', 'لجنة الاعلام', 'لجنة تنظيم الفعاليات', 'لجنة الموارد البشرية', 'لجنة العلاقات العامة', 'لجنة المحتوى العلمي', 'لجنة الجودة والتطوير'];
@@ -1044,7 +1074,7 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
               <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب (خاص بالمشرف الأساسي 🛡️)</h3>
-              <p className="text-xs text-slate-500">هنا يمكنك متابعة حالة الاتصال للأعضاء وتعديل أرقام الجوال أو كلمات المرور أو الرتب بكل سهولة وسحابة فورية.</p>
+              <p className="text-xs text-slate-500">عند تغيير رتبة أي عضو سيصله التنبيه في نفس اللحظة عبر السحابة.</p>
             </div>
             
             <div className="overflow-x-auto">
@@ -2058,6 +2088,40 @@ export default function AdminDashboard() {
             >
               حسنًا 🚀
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة التأكيد (بدل الـ confirm القديمة) */}
+      {modalType === 'confirm' && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061]">
+            <div className="w-16 h-16 bg-amber-500 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              ⚠️
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-900">تأكيد الإجراء</h3>
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">{modalMessage}</p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalType('none')}
+                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalType('none');
+                  if (confirmActionCallback) confirmActionCallback();
+                }}
+                className="w-1/2 py-3 rounded-xl bg-red-600 text-white font-black text-xs shadow hover:bg-red-700 cursor-pointer"
+              >
+                تأكيد الحذف 🗑️
+              </button>
+            </div>
           </div>
         </div>
       )}
