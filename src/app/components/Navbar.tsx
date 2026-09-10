@@ -53,6 +53,7 @@ export default function Navbar() {
     if (phone) {
       setUserPhone(phone);
       fetchUserData(phone);
+      updateUserPresence(phone); // تحديث حالة النشاط فور التحميل
     }
     setAdminAuth(isAuthAdmin);
 
@@ -63,6 +64,16 @@ export default function Navbar() {
       document.body.style.paddingTop = '0px';
     };
   }, []);
+
+  // دالة تحديث وقت آخر نشاط للمستخدم في قاعدة البيانات
+  const updateUserPresence = async (phone: string) => {
+    try {
+      const userRef = doc(db, 'users', phone);
+      await updateDoc(userRef, { lastActive: Date.now() });
+    } catch (err) {
+      console.error('Error updating presence:', err);
+    }
+  };
 
   // دالة جلب بيانات المستخدم ورتبته والإشعارات من سحابة Firestore
   const fetchUserData = async (phone: string) => {
@@ -359,7 +370,6 @@ export default function Navbar() {
                     </Link>
                   )}
 
-                  {/* لوحة تحكم اللجنة في قائمة الجوال */}
                   {isCommitteeLeader && !isAdmin && (
                     <Link 
                       href="/committee-dashboard"
@@ -388,7 +398,7 @@ export default function Navbar() {
         )}
       </header>
 
-      {/* استدعاء نافذة تسجيل الدخول المنبثقة لتظهر بشكل صحيح وبدون صفحات سادة */}
+      {/* استدعاء نافذة تسجيل الدخول المنبثقة */}
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </>
   );
