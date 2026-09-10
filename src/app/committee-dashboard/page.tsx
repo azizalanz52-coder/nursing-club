@@ -180,7 +180,7 @@ export default function CommitteeLeaderDashboard() {
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
-              <h3 className="text-lg font-black text-slate-900">متقدمو وقبولو ({selectedManagedCommittee})</h3>
+              <h3 className="text-lg font-black text-slate-900">المتقدمين({selectedManagedCommittee})</h3>
               <p className="text-xs text-slate-500">اختر الرغبة لعرض المتقدمين بدقة دون تداخل الأرقام:</p>
             </div>
             
