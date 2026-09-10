@@ -4,7 +4,7 @@ import React, { useState, useEffect, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, getDoc, addDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 
 export default function CommitteeLeaderDashboard() {
@@ -35,17 +35,18 @@ export default function CommitteeLeaderDashboard() {
   // حالات الإشعارات والمهام المرتبطة بالفعاليات والتنبيهات
   const [announcementText, setAnnouncementText] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
-  const [eventTitle, setEventTitle] = useState(''); // عنوان الفعالية المرتبطة بالمهمة
+  const [eventTitle, setEventTitle] = useState(''); 
   const [taskDueDate, setTaskDueDate] = useState('');
 
   // نافذة مركز التقارير والشكاوى المرفوعة
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
   const [showReportsModal, setShowReportsModal] = useState(false);
 
-  // ميزات غرفة العمليات الإضافية (فرض الرقابة، الإنذارات الصارمة، وتصعيد المقصرين لرئيس النادي)
+  // نظام الإنذار المتدرج والتحذير قبل التصعيد للرؤساء
   const [warningReason, setWarningReason] = useState('');
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [targetCommitteeForWarning, setTargetCommitteeForWarning] = useState('');
+  const [warningStepType, setWarningStepType] = useState<'warn-leaders' | 'escalate-presidents'>('warn-leaders');
 
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
@@ -101,7 +102,6 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // جلب تقارير الشكاوى المرفوعة من قاعدة البيانات
   const fetchEscalatedReports = async () => {
     try {
       const snap = await getDocs(collection(db, 'escalated_reports'));
@@ -230,7 +230,6 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // رفع المهمة مع ربطها بعنوان الفعالية بصرامة تامة
   const handleAssignTask = async (e: FormEvent) => {
     e.preventDefault();
     if (!taskTitle.trim() || !eventTitle.trim()) {
@@ -242,7 +241,6 @@ export default function CommitteeLeaderDashboard() {
       const targetComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
       const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm || r.status === 'مقبول');
       
-      // حفظ المهمة في قاعدة البيانات مركزياً لكي يتابعها الأعضاء وتراقبها الجودة
       await addDoc(collection(db, 'committee_tasks'), {
         committee: targetComm,
         eventTitle: eventTitle,
@@ -270,22 +268,38 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // دالة غرفة العمليات: رفع تقرير تصعيد وتوثيق شكوى بحق قائد اللجنة المتقاعس إلى رئيس النادي
-  const handleEscalateToPresident = async () => {
+  // معالجة إرسال الإنذار أولاً للقادة أو التصعيد النهائي للرؤساء
+  const handleExecuteWarningOrEscalation = async () => {
     if (!warningReason.trim()) {
-      alert('الرجاء كتابة سبب التقصير أو الشكوى بوضوح.');
+      alert('الرجاء كتابة تفاصيل الإنذار أو التقصير بوضوح.');
       return;
     }
-    try {
-      await addDoc(collection(db, 'escalated_reports'), {
-        targetCommittee: targetCommitteeForWarning,
-        reporter: userData?.fullName || 'لجنة الجودة والتطوير',
-        reason: warningReason,
-        status: 'قيد الإجراء الحازم من رئيس النادي',
-        createdAt: Date.now()
-      });
 
-      alert(`🚨 [تم توثيق البلاغ وإحالته برتبة "سري للغاية"]: تم رفع الشكوى ضد (${targetCommitteeForWarning}) إلى مكتب رئيس النادي فوراً بحزم.`);
+    try {
+      if (warningStepType === 'warn-leaders') {
+        // الخطوة الأولى: إرسال إنذار داخلي لقائد وقائدة اللجنة مع مهلة
+        await addDoc(collection(db, 'escalated_reports'), {
+          targetCommittee: targetCommitteeForWarning,
+          reporter: userData?.fullName || 'لجنة الجودة والتطوير',
+          reason: warningReason,
+          status: '⚠️ تم إرسال إنذار للقادة (بانتظار الرد خلال 24 ساعة)',
+          warningSentAt: Date.now(),
+          createdAt: Date.now()
+        });
+        alert(`📨 [تم إرسال الإنذار الداخلي]: تم توجيه إنذار تحذيري رسمي لقائد وقائدة (${targetCommitteeForWarning}) مع مهلة تصحيح.`);
+      } else {
+        // الخطوة الثانية: عدم التجاوب والتصعيد النهائي للرئيس ورئيسة النادي
+        await addDoc(collection(db, 'escalated_reports'), {
+          targetCommittee: targetCommitteeForWarning,
+          reporter: userData?.fullName || 'لجنة الجودة والتطوير',
+          reason: `[عدم تجاوب مع الإنذار السابق]: ${warningReason}`,
+          status: '🚨 مُحال رسمياً للرئيس ورئيسة النادي (لعدم التجاوب والتأديب)',
+          escalatedAt: Date.now(),
+          createdAt: Date.now()
+        });
+        alert(`⚖️ [تم التصعيد النهائي للرؤساء]: لعدم التجاوب، تم إحالة البلاغ رسمياً لمكتب رئيس ورئيسة النادي لاتخاذ الإجراء الحازم.`);
+      }
+
       setShowWarningModal(false);
       setWarningReason('');
       fetchEscalatedReports();
@@ -334,7 +348,7 @@ export default function CommitteeLeaderDashboard() {
               {isQualityTeam ? '⚡ غرفة عمليات لجنة الجودة والتطوير (العقل المدبر والمركز المرعب)' : 'لوحة تحكم رئيس اللجنة القيادية 🛡️'}
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة ورصد وإحالة كافة اللجان السبع برتبة عسكرية صارمة' : `اللجنة المعينة لك: ${selectedManagedCommittee}`}
+              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة ورصد وإنذار وإحالة اللجان السبع للرؤساء برتبة عسكرية صارمة' : `اللجنة المعينة لك: ${selectedManagedCommittee}`}
             </p>
           </div>
           
@@ -343,7 +357,7 @@ export default function CommitteeLeaderDashboard() {
               <button
                 type="button"
                 onClick={() => setShowReportsModal(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5"
+                className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5 cursor-pointer"
               >
                 <span>🚨</span>
                 <span>مركز الشكاوى والتقارير المرفوعة ({escalatedReports.length})</span>
@@ -355,13 +369,13 @@ export default function CommitteeLeaderDashboard() {
           </div>
         </div>
 
-        {/* إذا كان المستخدم من لجنة الجودة، نعرض له رادار اللجان السبع للمتابعة الصارمة */}
+        {/* إذا كان المستخدم من لجنة الجودة، نعرض له رادار اللجان السبع مع خيار الإنذار والتصعيد المتدرج */}
         {isQualityTeam && (
           <div className="space-y-4">
             <div className="flex justify-between items-center flex-wrap gap-3">
-              <h3 className="font-black text-slate-900 text-sm">رادار مراقبة ورصد إنجازات اللجان السبع (بدون أعذار أو تسويف):</h3>
+              <h3 className="font-black text-slate-900 text-sm">رادار مراقبة ورصد إنجازات اللجان السبع (التدرج: إنذار القادة أولاً ثم التصعيد للرؤساء):</h3>
               <span className="text-[11px] bg-red-100 text-red-700 font-bold px-3 py-1 rounded-xl">
-                ⚠️ ممنوع التواصل بالواتساب إلا بحالة الطوارئ القصوى وبإذن مباشر من رئيس النادي
+                ⚠️ النظام النظامي: إنذار القادة بمهلة 24 ساعة، وإذا لم يتجاوبوا يتم رفع البلاغ للرؤساء
               </span>
             </div>
             
@@ -387,12 +401,30 @@ export default function CommitteeLeaderDashboard() {
                     </div>
                     <h4 className="font-extrabold text-sm">{commName}</h4>
 
-                    <div className="pt-2 flex gap-1.5 border-t border-white/10 mt-2">
+                    <div className="pt-2 flex flex-col gap-1.5 border-t border-white/10 mt-2">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setTargetCommitteeForWarning(commName);
+                          setWarningStepType('warn-leaders');
+                          setShowWarningModal(true);
+                        }}
+                        className={`w-full py-1.5 rounded-xl text-[10px] font-bold transition-all ${
+                          selectedManagedCommittee === commName 
+                            ? 'bg-amber-500 text-white hover:bg-amber-600' 
+                            : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                        }`}
+                      >
+                        ⚠️ إنذار قائد وقائدة اللجنة
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTargetCommitteeForWarning(commName);
+                          setWarningStepType('escalate-presidents');
                           setShowWarningModal(true);
                         }}
                         className={`w-full py-1.5 rounded-xl text-[10px] font-black transition-all ${
@@ -401,7 +433,7 @@ export default function CommitteeLeaderDashboard() {
                             : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
                         }`}
                       >
-                        🚨 تصعيد تقصير للرئيس
+                        🚨 تصعيد البلاغ للرئيس ورئيسة النادي
                       </button>
                     </div>
                   </div>
@@ -434,7 +466,7 @@ export default function CommitteeLeaderDashboard() {
           </div>
         </div>
 
-        {/* الأدوات القيادية المرعبة (إشعار جماعي، ربط المهام بعنوان الفعالية، وتصدير أكسل) */}
+        {/* الأدوات القيادية (إشعار جماعي، ربط المهام بعنوان الفعالية، وتصدير أكسل) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
@@ -459,7 +491,6 @@ export default function CommitteeLeaderDashboard() {
             </form>
           </div>
 
-          {/* خانة رفع المهام المرتبطة بعنوان الفعالية بدقة */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-2">
               <h3 className="text-sm font-black text-slate-900">🎯 رفع المهام المرتبطة بالفعالية</h3>
@@ -681,7 +712,7 @@ export default function CommitteeLeaderDashboard() {
                   <div key={rep.id} className="bg-red-50/60 border border-red-200 rounded-2xl p-4 space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black text-red-700">اللجنة المعنية: {rep.targetCommittee}</span>
-                      <span className="text-[10px] bg-red-200 text-red-900 font-bold px-2 py-0.5 rounded">بلاغ رسمي عاجل</span>
+                      <span className="text-[10px] bg-red-200 text-red-900 font-bold px-2 py-0.5 rounded">بلاغ رسمي</span>
                     </div>
                     <p className="text-xs text-slate-800 font-semibold">السبب والتقصير المرصود: {rep.reason}</p>
                     <div className="text-[10px] text-slate-500 flex justify-between pt-2 border-t border-red-200/50">
@@ -696,25 +727,31 @@ export default function CommitteeLeaderDashboard() {
         </div>
       )}
 
-      {/* نافذة بلاغ التقصير الصارم لرئيس النادي (غرفة العمليات المرعبة) */}
+      {/* نافذة إنذار القادة أو التصعيد النهائي للرؤساء */}
       {showWarningModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
-          <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-red-500">
-            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold">
-              🚨
+          <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-500">
+            <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold text-white ${warningStepType === 'warn-leaders' ? 'bg-amber-500' : 'bg-red-600'}`}>
+              {warningStepType === 'warn-leaders' ? '⚠️' : '🚨'}
             </div>
             <div className="text-center space-y-1">
-              <h3 className="text-xl font-black text-slate-900">إنذار وتصعيد رسمي للرئيس</h3>
-              <p className="text-xs text-slate-500">أنت على وشك رفع تقرير تقصير صارم ضد ({targetCommitteeForWarning})</p>
+              <h3 className="text-xl font-black text-slate-900">
+                {warningStepType === 'warn-leaders' ? 'إنذار داخلي لقائد وقائدة اللجنة' : 'تصعيد وإحالة البلاغ للرئيس ورئيسة النادي'}
+              </h3>
+              <p className="text-xs text-slate-500">
+                {warningStepType === 'warn-leaders' 
+                  ? `توجيه إنذار تحذيري مع مهلة 24 ساعة لـ (${targetCommitteeForWarning})` 
+                  : `تصعيد نهائي لعدم التجاوب ضد (${targetCommitteeForWarning})`}
+              </p>
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">سبب الإنذار / التسويف المرصود:</label>
+              <label className="text-xs font-bold text-slate-700 block">التفاصيل أو التقصير المرصود:</label>
               <textarea
                 rows={3}
-                placeholder="اكتب تفاصيل التأخير أو التقصير ليرفع رسمياً إلى رئيس النادي..."
+                placeholder={warningStepType === 'warn-leaders' ? "اكتب سبب الإنذار ومنحه المهلة..." : "اكتب سبب عدم تجاوبهم للإحالة الفورية للرئيس..."}
                 value={warningReason}
                 onChange={(e) => setWarningReason(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
               />
             </div>
             <div className="flex gap-3">
@@ -727,10 +764,12 @@ export default function CommitteeLeaderDashboard() {
               </button>
               <button
                 type="button"
-                onClick={handleEscalateToPresident}
-                className="w-1/2 py-3 rounded-2xl bg-red-600 text-white font-black text-xs shadow-lg hover:bg-red-700 cursor-pointer"
+                onClick={handleExecuteWarningOrEscalation}
+                className={`w-1/2 py-3 rounded-2xl text-white font-black text-xs shadow-lg cursor-pointer ${
+                  warningStepType === 'warn-leaders' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'
+                }`}
               >
-                إرسال البلاغ فوراً ⚡
+                {warningStepType === 'warn-leaders' ? 'إرسال الإنذار للقادة 📨' : 'تصعيد رسمي للرؤساء ⚖️'}
               </button>
             </div>
           </div>
