@@ -130,6 +130,9 @@ export default function Navbar() {
   // التحقق الأمني المباشر للمشرف (رقم جوالك + التوكن المخزن أو مطابقة سريعة)
   const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026') || (userRole === 'System Admin');
 
+  // تحقق ما إذا كان المستخدم رئيس لجنة أو مشرف قسم لتظهر له لوحة التحكم المحدودة
+  const isCommitteeLeader = userRole && (userRole.includes('رئيس لجنة') || userRole.includes('مشرف') || userRole.includes('General Supervisor'));
+
   return (
     <>
       {/* نافذة الإشعار الفوري (بتصميم الصورة المطابق تماماً) */}
@@ -223,6 +226,17 @@ export default function Navbar() {
                   >
                     <span>⚙️</span>
                     <span>لوحة التحكم</span>
+                  </Link>
+                )}
+
+                {/* زر لوحة تحكم اللجنة لرؤساء اللجان والمشرفين */}
+                {isCommitteeLeader && !isAdmin && (
+                  <Link 
+                    href="/committee-dashboard"
+                    className="bg-amber-600 text-white px-3.5 py-2 rounded-xl text-xs font-black shadow hover:bg-amber-700 transition-all flex items-center gap-1.5"
+                  >
+                    <span>🛠️</span>
+                    <span>لوحة اللجنة</span>
                   </Link>
                 )}
 
@@ -339,6 +353,18 @@ export default function Navbar() {
                     >
                       <span>⚙️</span>
                       <span>لوحة التحكم</span>
+                    </Link>
+                  )}
+
+                  {/* لوحة تحكم اللجنة في قائمة الجوال */}
+                  {isCommitteeLeader && !isAdmin && (
+                    <Link 
+                      href="/committee-dashboard"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full bg-amber-600 text-white py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2"
+                    >
+                      <span>🛠️</span>
+                      <span>لوحة تحكم اللجنة</span>
                     </Link>
                   )}
                 </div>
