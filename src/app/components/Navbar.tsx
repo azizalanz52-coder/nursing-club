@@ -3,33 +3,31 @@
 import { useState, useEffect } from "react";
 import Link from 'next/link';
 import Image from 'next/image';
-import LoginModal from './LoginModal'; // استيراد نافذة تسجيل الدخول المنبثقة
+import LoginModal from './LoginModal';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
   const [userPhone, setUserPhone] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null); // حالة حفظ رتبة العضو
-  const [assignedCommittee, setAssignedCommittee] = useState<string | null>(null); // لجنة العضو المعينة
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [assignedCommittee, setAssignedCommittee] = useState<string | null>(null);
   const [adminAuth, setAdminAuth] = useState<boolean>(false);
   const [mounted, setMounted] = useState(false);
   const [showNavbar, setShowNavbar] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // حالات الإشعارات الفورية (الترقية والإنذارات)
-  const [notification, setNotification] = useState<string | null>(null);
-  const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
+  // حالات نافذة الترقية والمباركة الاحتفالية المنفصلة
+  const [promotionMessage, setPromotionMessage] = useState<string | null>(null);
+  const [showPromotionModal, setShowPromotionModal] = useState<boolean>(false);
   
-  // حالة الأليرت بار القيادي العلوي لقادة اللجان
+  // حالة الأليرت بار القيادي (الإنذارات تحت النافبار)
   const [leaderAlertMsg, setLeaderAlertMsg] = useState<string | null>(null);
   const [showLeaderAlertBar, setShowLeaderAlertBar] = useState(true);
   
-  // حالة فتح وإغلاق نافذة تسجيل الدخول المنبثقة لمنع ظهور الشاشة السوداء السادة
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
-  // دالة تحديد الصلاحيات بناءً على رتبة المستخدم لتظهر مثل الصورة تماماً
   const getRolePermissions = (roleName: string) => {
     switch (roleName) {
       case 'System Admin':
@@ -57,19 +55,17 @@ export default function Navbar() {
     if (name) setUserName(name);
     if (phone) {
       setUserPhone(phone);
-      updateUserPresence(phone); // تحديث حالة النشاط فور التحميل
+      updateUserPresence(phone);
     }
     setAdminAuth(isAuthAdmin);
 
-    // إضافة مسافة علوية تلقائية للجسم لمنع النافبار من تغطية المحتوى في أي صفحة
-    document.body.style.paddingTop = '80px';
+    document.body.style.paddingTop = '85px';
 
     return () => {
       document.body.style.paddingTop = '0px';
     };
   }, []);
 
-  // الاستماع اللحظي السحابي (onSnapshot) لبيانات المستخدم ورتبته والإشعارات
   useEffect(() => {
     if (!userPhone) return;
 
@@ -77,22 +73,25 @@ export default function Navbar() {
     const unsubscribe = onSnapshot(userRef, (userSnap) => {
       if (userSnap.exists()) {
         const data = userSnap.data();
-        if (data.role) {
-          setUserRole(data.role);
-        } else {
-          setUserRole('عضو أساسي');
-        }
+        const currentRole = data.role || 'عضو أساسي';
+        setUserRole(currentRole);
 
         if (data.assignedCommittee) {
           setAssignedCommittee(data.assignedCommittee);
         }
 
         if (data.latestNotification) {
-          setNotification(data.latestNotification);
-          setShowNotificationModal(true);
-          // تفعيل شريط الإنذار العلوي أيضاً لقادة اللجان
-          setLeaderAlertMsg(data.latestNotification);
-          setShowLeaderAlertBar(true);
+          const notifText = data.latestNotification;
+          
+          // إذا كان الإشعار عبارة عن إنذار أو تنبيه إداري، يظهر في الشريط القيادي تحت النافبار
+          if (notifText.includes('إنذار') || notifText.includes('تنبيه') || notifText.includes('تصعيد')) {
+            setLeaderAlertMsg(notifText);
+            setShowLeaderAlertBar(true);
+          } else {
+            // وإذا كان ترقية أو مباركة، يظهر في نافذة المباركة الاحتفالية
+            setPromotionMessage(notifText);
+            setShowPromotionModal(true);
+          }
         }
       }
     }, (err) => {
@@ -102,7 +101,6 @@ export default function Navbar() {
     return () => unsubscribe();
   }, [userPhone]);
 
-  // دالة تحديث وقت آخر نشاط للمستخدم في قاعدة البيانات
   const updateUserPresence = async (phone: string) => {
     try {
       const userRef = doc(db, 'users', phone);
@@ -112,28 +110,26 @@ export default function Navbar() {
     }
   };
 
-  const handleDismissNotification = async () => {
+  const handleDismissPromotion = async () => {
     if (!userPhone) return;
     try {
-      // إزالة الإشعار من السحابة حتى لا يتكرر الظهور
-      const userRef = doc(db, 'users', phone);
+      const userRef = doc(db, 'users', userPhone);
       await updateDoc(userRef, { latestNotification: null });
-      setShowNotificationModal(false);
-      setNotification(null);
+      setShowPromotionModal(false);
+      setPromotionMessage(null);
     } catch (err) {
       console.error(err);
     }
   };
 
-  // دالة إخفاء وإظهار النافبار عند التمرير
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
       if (currentScrollY > lastScrollY && currentScrollY > 80) {
-        setShowNavbar(false); // انزل لتحت -> تختفي
-        setMobileMenuOpen(false); // إغلاق القائمة عند النزول
+        setShowNavbar(false);
+        setMobileMenuOpen(false);
       } else {
-        setShowNavbar(true); // اصعد لفوق -> تظهر
+        setShowNavbar(true);
       }
       setLastScrollY(currentScrollY);
     };
@@ -156,84 +152,55 @@ export default function Navbar() {
 
   if (!mounted) return null;
 
-  // التحقق الأمني المباشر للمشرف أو رئيس/رئيسة النادي لتظهر لهم لوحة التحكم بالكامل
   const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026') || (userRole === 'System Admin') || (userRole === 'رئيس النادي') || (userRole === 'رئيسة النادي');
-
-  // تحقق ما إذا كان المستخدم رئيس لجنة أو مشرف قسم
   const isCommitteeLeader = userRole && (userRole.includes('رئيس لجنة') || userRole.includes('مشرف') || userRole.includes('General Supervisor'));
-
-  // التحقق إذا كانت لجنة المستخدم هي لجنة الجودة والتطوير (غرفة العمليات المركزية المرعبة)
   const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || userRole === 'System Admin' || userRole === 'رئيس النادي' || userRole === 'رئيسة النادي';
 
-  // شرط ظهور الأليرت بار القيادي في النافبار (فقط لقادة اللجان وفريق الجودة عند وجود تنبيه نشط)
   const showLeaderAlertInNavbar = (isCommitteeLeader || isQualityOperationsRoom || isAdmin) && leaderAlertMsg && showLeaderAlertBar;
 
   return (
     <>
-      {/* نافذة الإشعار الفوري (تظهر بطلب التحديث أو عند وجود إشعار جديد) */}
-      {showNotificationModal && notification && (
+      {/* نافذة مباركة الترقية والاحتفال (مخصصة للتهنئة فقط) */}
+      {showPromotionModal && promotionMessage && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
           <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative">
-            
             <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl border-4 border-white -mt-14">
               🎉
             </div>
-
             <div className="space-y-1.5">
-              <h3 className="text-xl font-black text-slate-900">إشعار نظام النادي</h3>
-              <p className="text-xs text-slate-500 font-medium">نادي كلية التمريض - جامعة حفر الباطن</p>
+              <h3 className="text-xl font-black text-slate-900">مبارك لك الثقة القيادية!</h3>
+              <p className="text-xs text-slate-500 font-medium">{promotionMessage}</p>
             </div>
-
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-1.5 text-right shadow-inner">
-              <span className="text-[11px] font-bold text-slate-400 block">تفاصيل الإشعار / الرتبة:</span>
+              <span className="text-[11px] font-bold text-slate-400 block">رتبتك القيادية الحالية:</span>
               <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl py-2 px-4 text-center">
-                <span className="text-sm font-black text-[#630517]">{notification}</span>
+                <span className="text-base font-black text-[#630517]">{userRole || 'عضو أساسي'}</span>
               </div>
             </div>
-
             <div className="bg-amber-50/30 border border-amber-200/50 rounded-2xl p-4 space-y-1.5 text-right shadow-sm">
               <span className="text-[11px] font-bold text-amber-900 block flex items-center gap-1">
-                <span>📜</span> صلاحياتك ومهامك المعتمدة:
+                <span>📜</span> صلاحياتك ومهامك القيادية المعتمدة:
               </span>
               <p className="text-xs text-slate-700 font-semibold leading-relaxed">
                 {getRolePermissions(userRole || 'عضو أساسي')}
               </p>
             </div>
-
             <button
               type="button"
-              onClick={handleDismissNotification}
+              onClick={handleDismissPromotion}
               className="w-full py-3.5 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-sm shadow-lg hover:brightness-110 cursor-pointer transition-all flex items-center justify-center gap-2"
             >
-              <span>متابعة العمل القيادي 🚀</span>
+              <span>بدء مهام العمل القيادي 🚀</span>
             </button>
-
           </div>
         </div>
       )}
 
       <header className={`w-full bg-white border-b border-slate-100 fixed top-0 z-50 transition-transform duration-300 ${showNavbar ? 'translate-y-0' : '-translate-y-full'}`}>
         
-        {/* 🚨 الأليرت بار القيادي العلوي (يظهر حصرياً لقادة اللجان وفريق الجودة داخل النافبار) */}
-        {showLeaderAlertInNavbar && (
-          <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white px-4 py-2 shadow-inner flex items-center justify-between text-xs font-black" dir="rtl">
-            <div className="flex items-center gap-2 mx-auto">
-              <span className="text-sm animate-pulse">🚨</span>
-              <span>[تنبيه غرفة العمليات لقادة اللجان]: {leaderAlertMsg}</span>
-            </div>
-            <button
-              onClick={() => setShowLeaderAlertBar(false)}
-              className="text-yellow-100 hover:text-white px-2 py-0.5 bg-black/10 rounded-lg text-[10px] cursor-pointer"
-              title="إخفاء التنبيه"
-            >
-              ✕ إخفاء
-            </button>
-          </div>
-        )}
-
+        {/* المحتوى الرئيسي للنافبار */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between" dir="rtl">
           
-          {/* الشعار */}
           <Link href="/" className="flex items-center gap-2.5 shrink-0" onClick={() => setMobileMenuOpen(false)}>
             <Image
               src="/logo.png"
@@ -248,7 +215,6 @@ export default function Navbar() {
             </div>
           </Link>
 
-          {/* روابط سطح المكتب */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-700">
             <Link href="/" className="hover:text-rose-900 transition-colors">الرئيسية</Link>
             <Link href="/check-status" className="hover:text-rose-900 transition-colors text-[#630517] font-black">🔍 استعلام عن القبول</Link>
@@ -256,7 +222,6 @@ export default function Navbar() {
             <Link href="/team" className="hover:text-rose-900 transition-colors">أعضاء النادي</Link>
           </nav>
 
-          {/* أزرار الحساب والإجراءات لسطح المكتب */}
           <div className="hidden md:flex items-center gap-3">
             <Link 
               href="/join" 
@@ -277,7 +242,6 @@ export default function Navbar() {
                   </Link>
                 )}
 
-                {/* زر غرفة العمليات المركزية أو لوحة التحكم المصححة بمسار committee-dashboard */}
                 {isCommitteeLeader && !isAdmin && (
                   <Link 
                     href="/committee-dashboard"
@@ -292,7 +256,6 @@ export default function Navbar() {
                   </Link>
                 )}
 
-                {/* عرض الاسم والرتبة المحدثة بوضوح */}
                 <div className="flex flex-col text-right bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 max-w-[140px]">
                   <span className="text-xs font-bold text-rose-950 truncate">{userName}</span>
                   <span className="text-[10px] font-black text-[#630517] truncate">{userRole || 'عضو أساسي'}</span>
@@ -317,13 +280,12 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* زر القائمة (Hamburger Menu) للجوال */}
           <div className="flex md:hidden items-center gap-2">
             <Link 
               href="/join" 
               className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#F5D061] to-[#C99C21] text-[#630517] font-black text-[11px] shadow"
             >
-              تقديم الانضمام للنادي
+              تقديم الانضمام
             </Link>
 
             <button
@@ -343,38 +305,31 @@ export default function Navbar() {
 
         </div>
 
-        {/* قائمة الجوال المنسدلة (Mobile Dropdown Menu) */}
+        {/* 🚨 شريط الإنذار والبار القيادي (تحت الشعار داخل النافبار) */}
+        {showLeaderAlertInNavbar && (
+          <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white px-4 py-1.5 shadow-inner flex items-center justify-between text-xs font-black border-t border-amber-400/30" dir="rtl">
+            <div className="flex items-center gap-2 mx-auto">
+              <span className="text-sm animate-pulse">🚨</span>
+              <span>[تنبيه غرفة العمليات لقادة اللجان]: {leaderAlertMsg}</span>
+            </div>
+            <button
+              onClick={() => setShowLeaderAlertBar(false)}
+              className="text-yellow-100 hover:text-white px-2 py-0.5 bg-black/10 rounded-lg text-[10px] cursor-pointer"
+              title="إخفاء التنبيه"
+            >
+              ✕ إخفاء
+            </button>
+          </div>
+        )}
+
+        {/* قائمة الجوال المنسدلة */}
         {mobileMenuOpen && (
-          <div className="md:hidden absolute top-20 right-0 left-0 bg-white border-b border-slate-200 shadow-2xl p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-200" dir="rtl">
+          <div className="md:hidden absolute top-full right-0 left-0 bg-white border-b border-slate-200 shadow-2xl p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-200" dir="rtl">
             <nav className="flex flex-col space-y-3 text-sm font-bold text-slate-700 pb-4 border-b border-slate-100">
-              <Link 
-                href="/" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-rose-900 transition-colors py-1"
-              >
-                الرئيسية
-              </Link>
-              <Link 
-                href="/check-status" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-[#630517] font-black transition-colors py-1"
-              >
-                🔍 استعلام عن القبول
-              </Link>
-              <Link 
-                href="/events" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-rose-900 transition-colors py-1"
-              >
-                الفعاليات
-              </Link>
-              <Link 
-                href="/team" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="hover:text-rose-900 transition-colors py-1"
-              >
-                أعضاء النادي
-              </Link>
+              <Link href="/" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الرئيسية</Link>
+              <Link href="/check-status" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">🔍 استعلام عن القبول</Link>
+              <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الفعاليات</Link>
+              <Link href="/team" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">أعضاء النادي</Link>
             </nav>
 
             <div className="space-y-3 pt-1">
@@ -382,42 +337,20 @@ export default function Navbar() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between bg-rose-50 p-3 rounded-2xl border border-rose-100">
                     <div>
-                      <span className="text-xs font-bold text-rose-950 block truncate max-w-[180px]">
-                        👤 {userName}
-                      </span>
-                      <span className="text-[10px] font-black text-[#630517] block">
-                        {userRole || 'عضو أساسي'}
-                      </span>
+                      <span className="text-xs font-bold text-rose-950 block truncate max-w-[180px]">👤 {userName}</span>
+                      <span className="text-[10px] font-black text-[#630517] block">{userRole || 'عضو أساسي'}</span>
                     </div>
-                    <button 
-                      onClick={handleLogout}
-                      className="text-xs text-red-600 hover:text-red-800 font-bold px-2 py-1"
-                    >
-                      تسجيل خروج
-                    </button>
+                    <button onClick={handleLogout} className="text-xs text-red-600 hover:text-red-800 font-bold px-2 py-1">تسجيل خروج</button>
                   </div>
 
                   {isAdmin && (
-                    <Link 
-                      href="/admin"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="w-full bg-[#630517] text-[#F5D061] py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2"
-                    >
-                      <span>⚙️</span>
-                      <span>لوحة التحكم</span>
+                    <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="w-full bg-[#630517] text-[#F5D061] py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2">
+                      <span>⚙️</span><span>لوحة التحكم</span>
                     </Link>
                   )}
 
                   {isCommitteeLeader && !isAdmin && (
-                    <Link 
-                      href="/committee-dashboard"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`w-full py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2 ${
-                        isQualityOperationsRoom 
-                          ? 'bg-rose-950 text-[#F5D061] border border-amber-400' 
-                          : 'bg-amber-600 text-white'
-                      }`}
-                    >
+                    <Link href="/committee-dashboard" onClick={() => setMobileMenuOpen(false)} className={`w-full py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2 ${isQualityOperationsRoom ? 'bg-rose-950 text-[#F5D061] border border-amber-400' : 'bg-amber-600 text-white'}`}>
                       <span>{isQualityOperationsRoom ? '⚡' : '🛠️'}</span>
                       <span>{isQualityOperationsRoom ? 'غرفة العمليات المركزية' : 'لوحة تحكم اللجنة'}</span>
                     </Link>
@@ -440,7 +373,6 @@ export default function Navbar() {
         )}
       </header>
 
-      {/* استدعاء نافذة تسجيل الدخول المنبثقة */}
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </>
   );
