@@ -115,7 +115,13 @@ export default function AdminDashboard() {
           const userData = userSnap.data();
           const userRole = userData.role || 'عضو أساسي';
 
-          if (userRole !== 'System Admin' && userRole !== 'General Supervisor' && !userRole.includes('رئيس النادي') && !userRole.includes('رئيسة النادي')) {
+          // السماح للآدمن، المشرف العام، ورئيس/رئيسة النادي بالدخول للوحة التحكم الكاملة
+          if (
+            userRole !== 'System Admin' && 
+            userRole !== 'General Supervisor' && 
+            userRole !== 'رئيس النادي' && 
+            userRole !== 'رئيسة النادي'
+          ) {
             if (userRole.includes('رئيس لجنة') || userRole.includes('مشرف')) {
               router.push('/committee-dashboard');
             } else {
@@ -849,6 +855,7 @@ export default function AdminDashboard() {
     return choiceStr.includes(targetCommName) || targetCommName.includes(choiceStr);
   };
 
+  // تعديل الإحصائيات لتشمل الرغبات الثلاث بشكل دقيق لضمان عدم التضخم الخاطئ
   const getCountByPreference = (commName: string, prefKey: 'firstChoice' | 'secondChoice' | 'thirdChoice') => {
     return requests.filter(r => matchesCommittee(r[prefKey], commName)).length;
   };
@@ -1710,35 +1717,35 @@ export default function AdminDashboard() {
                           </td>
                         </tr>
                       ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-            <form onSubmit={handleAddMemberSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
-              <input
-                type="text"
-                placeholder="اسم العضو الجديد"
-                value={newMemberName}
-                onChange={(e) => setNewMemberName(e.target.value)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
-              />
-              <input
-                type="text"
-                placeholder="الدور أو المهمة"
-                value={newMemberRole}
-                onChange={(e) => setNewMemberRole(e.target.value)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
-              />
-              <button
-                type="submit"
-                className="bg-[#630517] text-[#F5D061] py-2.5 rounded-xl font-bold text-xs shadow hover:brightness-110 cursor-pointer"
-              >
-                + إضافة عضو وحفظه سحابياً
-              </button>
-            </form>
+              <form onSubmit={handleAddMemberSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
+                <input
+                  type="text"
+                  placeholder="اسم العضو الجديد"
+                  value={newMemberName}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                />
+                <input
+                  type="text"
+                  placeholder="الدور أو المهمة"
+                  value={newMemberRole}
+                  onChange={(e) => setNewMemberRole(e.target.value)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                />
+                <button
+                  type="submit"
+                  className="bg-[#630517] text-[#F5D061] py-2.5 rounded-xl font-bold text-xs shadow hover:brightness-110 cursor-pointer"
+                >
+                  + إضافة عضو وحفظه سحابياً
+                </button>
+              </form>
+            </div>
           </div>
-        </div>
         )}
 
         {activeTab === 'requests' && (
@@ -1756,7 +1763,7 @@ export default function AdminDashboard() {
               />
             </div>
 
-            {/* إحصائيات أعداد المتقدمين لكل لجنة */}
+            {/* إحصائيات أعداد المتقدمين لكل لجنة (محدّثة حسب الرغبة الأولى) */}
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
               <h4 className="font-black text-slate-900 text-sm">📊 إحصائيات المتقدمين لكل لجنة (حسب الرغبة الأولى)</h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -1810,112 +1817,112 @@ export default function AdminDashboard() {
                 >
                   🥉 الرغبة الثالثة
                 </button>
+              </div>
+
+              {(requestSubTab === 'pref-1' || requestSubTab === 'pref-2' || requestSubTab === 'pref-3') && (
+                <select
+                  value={selectedCommitteeFilter}
+                  onChange={(e) => setSelectedCommitteeFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-900"
+                >
+                  {committeeNamesList.map((c, i) => (
+                    <option key={i} value={c}>{c}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
-            {(requestSubTab === 'pref-1' || requestSubTab === 'pref-2' || requestSubTab === 'pref-3') && (
-              <select
-                value={selectedCommitteeFilter}
-                onChange={(e) => setSelectedCommitteeFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-900"
-              >
-                {committeeNamesList.map((c, i) => (
-                  <option key={i} value={c}>{c}</option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-            <h3 className="text-xl font-black text-slate-900">
-              {requestSubTab === 'accepted' ? 'قائمة الأعضاء المقبولين وإدارتهم' : 'طلبات انضمام الأعضاء'} ({filteredRequests.length})
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                    <th className="pb-3 pr-2">اسم المتقدم</th>
-                    <th className="pb-3">الرقم الجامعي / المستوى</th>
-                    <th className="pb-3">الرغبات الثلاث</th>
-                    <th className="pb-3">الحالة واللجنة</th>
-                    <th className="pb-3 text-left pl-2">الإجراءات والتحويل</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredRequests.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات تطابق هذا الفرز حالياً.</td>
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+              <h3 className="text-xl font-black text-slate-900">
+                {requestSubTab === 'accepted' ? 'قائمة الأعضاء المقبولين وإدارتهم' : 'طلبات انضمام الأعضاء'} ({filteredRequests.length})
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                      <th className="pb-3 pr-2">اسم المتقدم</th>
+                      <th className="pb-3">الرقم الجامعي / المستوى</th>
+                      <th className="pb-3">الرغبات الثلاث</th>
+                      <th className="pb-3">الحالة واللجنة</th>
+                      <th className="pb-3 text-left pl-2">الإجراءات والتحويل</th>
                     </tr>
-                  ) : (
-                    filteredRequests.map((req) => (
-                      <tr key={req.id} className="hover:bg-slate-50">
-                        <td className="py-4 pr-2 font-bold text-slate-900">
-                          {req.fullName}
-                          <div className="text-[10px] text-slate-500 font-normal">📞 {req.phone}</div>
-                        </td>
-                        <td className="py-4 text-slate-600">
-                          {req.universityId || '-'} <br />
-                          <span className="text-[10px] text-slate-400">{req.major}</span>
-                        </td>
-                        <td className="py-4 text-slate-700">
-                          <div className="space-y-0.5 text-[11px]">
-                            <p><strong className="text-[#630517]">1:</strong> {req.firstChoice || '-'}</p>
-                            <p><strong className="text-slate-400">2:</strong> {req.secondChoice || '-'}</p>
-                            <p><strong className="text-slate-400">3:</strong> {req.thirdChoice || '-'}</p>
-                          </div>
-                        </td>
-                        <td className="py-4">
-                          <span className={`px-2.5 py-1 rounded-full font-bold border block w-fit mb-1 ${
-                            req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
-                            req.status === 'مرفوض' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>
-                            {req.status || 'معلق'}
-                          </span>
-                          {req.acceptedCommittee && (
-                            <span className="text-[10px] font-bold text-[#630517] bg-[#630517]/10 px-2 py-0.5 rounded-md">
-                              مقبول في: {req.acceptedCommittee}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-4 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => handleShiftPreference(req)}
-                            className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
-                            title="تحويل الطالب للرغبة التالية (الثانية أو الثالثة) عند اكتفاء العدد"
-                          >
-                            🔄 تحويل لرغبة أخرى
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openAcceptModal(req.id)}
-                            className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
-                          >
-                            قبول ✅
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRejectRequest(req.id)}
-                            className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer"
-                          >
-                            رفض ✕
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteRequest(req.id)}
-                            className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
-                          >
-                            {req.status === 'مقبول' ? 'إزالة (طرد) 🗑️' : 'حذف نهائي 🗑️'}
-                          </button>
-                        </td>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRequests.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات تطابق هذا الفرز حالياً.</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      filteredRequests.map((req) => (
+                        <tr key={req.id} className="hover:bg-slate-50">
+                          <td className="py-4 pr-2 font-bold text-slate-900">
+                            {req.fullName}
+                            <div className="text-[10px] text-slate-500 font-normal">📞 {req.phone}</div>
+                          </td>
+                          <td className="py-4 text-slate-600">
+                            {req.universityId || '-'} <br />
+                            <span className="text-[10px] text-slate-400">{req.major}</span>
+                          </td>
+                          <td className="py-4 text-slate-700">
+                            <div className="space-y-0.5 text-[11px]">
+                              <p><strong className="text-[#630517]">1:</strong> {req.firstChoice || '-'}</p>
+                              <p><strong className="text-slate-400">2:</strong> {req.secondChoice || '-'}</p>
+                              <p><strong className="text-slate-400">3:</strong> {req.thirdChoice || '-'}</p>
+                            </div>
+                          </td>
+                          <td className="py-4">
+                            <span className={`px-2.5 py-1 rounded-full font-bold border block w-fit mb-1 ${
+                              req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                              req.status === 'مرفوض' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
+                              {req.status || 'معلق'}
+                            </span>
+                            {req.acceptedCommittee && (
+                              <span className="text-[10px] font-bold text-[#630517] bg-[#630517]/10 px-2 py-0.5 rounded-md">
+                                مقبول في: {req.acceptedCommittee}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-4 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleShiftPreference(req)}
+                              className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
+                              title="تحويل الطالب للرغبة التالية (الثانية أو الثالثة) عند اكتفاء العدد"
+                            >
+                              🔄 تحويل لرغبة أخرى
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openAcceptModal(req.id)}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
+                            >
+                              قبول ✅
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectRequest(req.id)}
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer"
+                            >
+                              رفض ✕
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRequest(req.id)}
+                              className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                            >
+                              {req.status === 'مقبول' ? 'إزالة (طرد) 🗑️' : 'حذف نهائي 🗑️'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       </div>
 
@@ -1975,6 +1982,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-  </main>
+    </main>
   );
 }
