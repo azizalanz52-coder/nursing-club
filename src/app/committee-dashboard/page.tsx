@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 
 interface CommitteeMember {
   name: string;
@@ -19,7 +19,6 @@ export default function CommitteeLeaderDashboard() {
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<any[]>([]);
-  const [committeeMembers, setCommitteeMembers] = useState<CommitteeMember[]>([]);
   const [whatsappLink, setWhatsappLink] = useState('');
 
   // اللجنة المحددة والمخصصة لهذا القائد (يتم جلبها من حسابه الذي عينته أنت له)
@@ -144,7 +143,7 @@ export default function CommitteeLeaderDashboard() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800 p-6 md:p-10" dir="rtl">
+    <main className="min-h-screen bg-slate-50 text-slate-800 p-6 md:p-10 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       <div className="max-w-6xl mx-auto space-y-8">
         
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
@@ -168,6 +167,7 @@ export default function CommitteeLeaderDashboard() {
             <span className="px-3 py-1 rounded-full bg-[#630517]/10 text-[#630517] font-bold text-xs">
               النتائج المطابقة: {filteredRequests.length}
             </span>
+
           </div>
 
           <div className="overflow-x-auto">
