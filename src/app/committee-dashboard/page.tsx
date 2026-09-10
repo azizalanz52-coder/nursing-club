@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 
 export default function CommitteeLeaderDashboard() {
@@ -13,13 +13,26 @@ export default function CommitteeLeaderDashboard() {
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<any[]>([]);
-  const [committeeMembers, setCommitteeMembers] = useState<any[]>([]);
   const [whatsappLink, setWhatsappLink] = useState('');
 
+  // هل المستخدم من لجنة الجودة والتطوير؟
+  const [isQualityTeam, setIsQualityTeam] = useState(false);
+  const [allCommitteesList] = useState<string[]>([
+    'لجنة التصميم',
+    'لجنة الاعلام',
+    'لجنة تنظيم الفعاليات',
+    'لجنة الموارد البشرية',
+    'لجنة العلاقات العامة',
+    'لجنة المحتوى العلمي',
+    'لجنة الجودة والتطوير'
+  ]);
+  const [selectedMonitoredCommittee, setSelectedMonitoredCommittee] = useState<string>('لجنة التصميم');
+
+  // إذا لم يكن من الجودة، تكون لجنته الخاصة
   const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('لجنة تنظيم الفعاليات');
   const [preferenceFilterTab, setPreferenceFilterTab] = useState<'pref-1' | 'pref-2' | 'pref-3'>('pref-1');
 
-  // حالات المميزات القيادية الجديدة
+  // حالات الإشعارات والمهام والتنبيهات
   const [announcementText, setAnnouncementText] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
@@ -56,33 +69,21 @@ export default function CommitteeLeaderDashboard() {
         return;
       }
 
-      let targetComm = 'لجنة تنظيم الفعاليات';
-      if (uData.assignedCommittee) {
-        targetComm = uData.assignedCommittee;
-      } else if (uData.committee) {
-        targetComm = uData.committee;
-      }
-      setSelectedManagedCommittee(targetComm);
+      const assigned = uData.assignedCommittee || uData.committee || '';
+      const roleStr = uData.role || '';
 
-      // جلب الطلبات
+      // التحقق هل هو من لجنة الجودة والتطوير؟
+      if (roleStr.includes('جودة') || assigned.includes('جودة') || assigned.includes('الجودة')) {
+        setIsQualityTeam(true);
+      } else {
+        setIsQualityTeam(false);
+        setSelectedManagedCommittee(assigned || 'لجنة تنظيم الفعاليات');
+      }
+
+      // جلب جميع الطلبات
       const reqSnap = await getDocs(collection(db, 'applications'));
       const allReqs = reqSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setRequests(allReqs);
-
-      // جلب أعضاء اللجنة من مستندات الـ committees
-      let targetCommId = 'events-org';
-      if (targetComm.includes('تصميم')) targetCommId = 'design';
-      else if (targetComm.includes('اعلام')) targetCommId = 'media';
-      else if (targetComm.includes('موارد')) targetCommId = 'hr';
-      else if (targetComm.includes('علاقات')) targetCommId = 'pr';
-      else if (targetComm.includes('علمي')) targetCommId = 'scientific';
-      else if (targetComm.includes('جودة')) targetCommId = 'quality';
-
-      const commDocRef = doc(db, 'committees', targetCommId);
-      const commSnap = await getDoc(commDocRef);
-      if (commSnap.exists()) {
-        setCommitteeMembers(commSnap.data().members || []);
-      }
 
       setLoading(false);
     } catch (err) {
@@ -128,7 +129,6 @@ export default function CommitteeLeaderDashboard() {
         latestNotification: `مبروك! تم قبولك رسمياً في (${selectedManagedCommittee}) 🎉. انضم لقروب الواتساب: ${whatsappLink}`
       });
 
-      // تحديث حساب المستخدم لتنبيهه فوراً
       if (targetReq?.phone) {
         try {
           const userDocRef = doc(db, 'users', targetReq.phone);
@@ -187,22 +187,22 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // 2. إرسال إشعار جماعي لأعضاء اللجنة المقبولين
   const handleSendBroadcastAnnouncement = async (e: FormEvent) => {
     e.preventDefault();
     if (!announcementText.trim()) return;
 
     try {
-      const acceptedList = requests.filter(r => r.acceptedCommittee === selectedManagedCommittee || r.status === 'مقبول');
+      const targetComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
+      const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm || r.status === 'مقبول');
       for (const mem of acceptedList) {
         if (mem.phone) {
           const uRef = doc(db, 'users', mem.phone);
           await updateDoc(uRef, {
-            latestNotification: `📢 تعميم من رئيس ${selectedManagedCommittee}: ${announcementText}`
+            latestNotification: `📢 تعميم من رئيس ${targetComm}: ${announcementText}`
           });
         }
       }
-      alert('تم إرسال التعميم والإشعار لجميع أعضاء لجنتك المقبولين بنجاح! 🚀');
+      alert('تم إرسال التعميم والإشعار لجميع أعضاء اللجنة بنجاح! 🚀');
       setAnnouncementText('');
     } catch (err) {
       console.error(err);
@@ -210,18 +210,18 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // 3. رفع مهام وتكليفات لأعضاء اللجنة
   const handleAssignTask = async (e: FormEvent) => {
     e.preventDefault();
     if (!taskTitle.trim()) return;
 
     try {
-      const acceptedList = requests.filter(r => r.acceptedCommittee === selectedManagedCommittee || r.status === 'مقبول');
+      const targetComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
+      const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm || r.status === 'مقبول');
       for (const mem of acceptedList) {
         if (mem.phone) {
           const uRef = doc(db, 'users', mem.phone);
           await updateDoc(uRef, {
-            latestNotification: `📋 تكليف جديد من لجنتك (${selectedManagedCommittee}): ${taskTitle} (موعد الاستحقاق: ${taskDueDate || 'قريباً'})`
+            latestNotification: `📋 تكليف جديد من لجنتك (${targetComm}): ${taskTitle} (موعد الاستحقاق: ${taskDueDate || 'قريباً'})`
           });
         }
       }
@@ -234,9 +234,9 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // 4. تصدير قائمة أعضاء اللجنة بملف Excel
   const handleExportCommitteeExcel = () => {
-    const acceptedList = requests.filter(r => r.acceptedCommittee === selectedManagedCommittee || r.status === 'مقبول');
+    const targetComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
+    const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm || r.status === 'مقبول');
     if (acceptedList.length === 0) {
       alert('لا توجد بيانات لأعضاء مقبولين للتصدير حالياً.');
       return;
@@ -248,13 +248,13 @@ export default function CommitteeLeaderDashboard() {
       'رقم الجوال': m.phone,
       'الرقم الجامعي': m.universityId || '-',
       'التخصص': m.major || 'تمريض',
-      'اللجنة المقبول بها': m.acceptedCommittee || selectedManagedCommittee
+      'اللجنة المقبول بها': m.acceptedCommittee || targetComm
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'أعضاء اللجنة');
-    XLSX.writeFile(workbook, `Committee_${selectedManagedCommittee}_Members.xlsx`);
+    XLSX.writeFile(workbook, `Committee_${targetComm}_Members.xlsx`);
     alert('تم تصدير ملف الأكسل بنجاح وجاهز لرفعه للآدمن! 📊');
   };
 
@@ -269,9 +269,11 @@ export default function CommitteeLeaderDashboard() {
         {/* الشريط العلوي */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h1 className="text-xl font-black text-slate-900">لوحة تحكم رئيس اللجنة القيادية 🛡️</h1>
+            <h1 className="text-xl font-black text-slate-900">
+              {isQualityTeam ? '⚡ غرفة عمليات لجنة الجودة والتطوير (الإشراف والمتابعة العليا)' : 'لوحة تحكم رئيس اللجنة القيادية 🛡️'}
+            </h1>
             <p className="text-xs text-slate-500 mt-1">
-              أهلاً بك، {userData?.fullName} • اللجنة المعينة لك: <strong className="text-[#630517]">{selectedManagedCommittee}</strong>
+              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة كافة اللجان السبع' : `اللجنة المعينة لك: ${selectedManagedCommittee}`}
             </p>
           </div>
           <Link href="/" className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-200">
@@ -279,7 +281,39 @@ export default function CommitteeLeaderDashboard() {
           </Link>
         </div>
 
-        {/* 1. إحصائيات فورية خاصة بلجنته */}
+        {/* إذا كان المستخدم من لجنة الجودة، نعرض له رادار اللجان السبع للمتابعة */}
+        {isQualityTeam && (
+          <div className="space-y-4">
+            <h3 className="font-black text-slate-900 text-sm">رادار متابعة اللجان السبع (اضغط على أي لجنة لمتابعتها):</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {allCommitteesList.map((commName, idx) => {
+                const count = requests.filter(r => r.acceptedCommittee === commName).length;
+                return (
+                  <div 
+                    key={idx} 
+                    onClick={() => {
+                      setSelectedMonitoredCommittee(commName);
+                      setSelectedManagedCommittee(commName);
+                    }}
+                    className={`p-5 rounded-2xl border transition-all cursor-pointer shadow-sm flex flex-col justify-between space-y-3 ${
+                      selectedManagedCommittee === commName ? 'bg-[#630517] text-white border-[#630517] shadow-md scale-[1.02]' : 'bg-white text-slate-800 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedManagedCommittee === commName ? 'bg-white/20 text-[#F5D061]' : 'bg-slate-100 text-slate-600'}`}>
+                        مراقبة عليا
+                      </span>
+                      <span className="text-lg font-black">{count} أعضاء</span>
+                    </div>
+                    <h4 className="font-extrabold text-sm">{commName}</h4>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* إحصائيات فورية خاصة باللجنة المختارة */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="bg-gradient-to-br from-[#630517] to-[#80071D] text-white p-6 rounded-3xl shadow-xl space-y-2">
             <span className="text-[11px] font-bold text-[#F5D061] uppercase tracking-wider">إجمالي المتقدمين للجنة</span>
@@ -302,19 +336,18 @@ export default function CommitteeLeaderDashboard() {
           </div>
         </div>
 
-        {/* 2, 3, 4. الأدوات القيادية الإضافية (إشعار جماعي، مهام، تصدير أكسل) */}
+        {/* الأدوات القيادية الإضافية (إشعار جماعي، مهام، تصدير أكسل) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* إشعار جماعي للأعضاء */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-2">
-              <h3 className="text-sm font-black text-slate-900">📢 إرسال إشعار جماعي لأعضاء لجنته</h3>
-              <p className="text-[11px] text-slate-500">اكتب رسالة وس تصل كإشعار فوري داخل لوحة تحكم كل عضو مقبول بلجنتك.</p>
+              <h3 className="text-sm font-black text-slate-900">📢 إرسال إشعار جماعي لأعضاء اللجنة</h3>
+              <p className="text-[11px] text-slate-500">اكتب رسالة ستصل كإشعار فوري داخل لوحة تحكم كل عضو مقبول بـ ({selectedManagedCommittee}).</p>
             </div>
             <form onSubmit={handleSendBroadcastAnnouncement} className="space-y-3 pt-2">
               <textarea
                 rows={2}
-                placeholder="اكتب نص التعميم هنا..."
+                placeholder="اكتب نص التعميم أو التنبيه هنا..."
                 value={announcementText}
                 onChange={(e) => setAnnouncementText(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
@@ -328,11 +361,10 @@ export default function CommitteeLeaderDashboard() {
             </form>
           </div>
 
-          {/* رفع مهام وتكليفات */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-2">
               <h3 className="text-sm font-black text-slate-900">📋 رفع مهام وتكليفات للأعضاء</h3>
-              <p className="text-[11px] text-slate-500">حدد المهمة وتاريخ الاستحقاق لتظهر لأعضاء لجنتك فوراً.</p>
+              <p className="text-[11px] text-slate-500">حدد المهمة وتاريخ الاستحقاق لتظهر لأعضاء اللجنة فوراً.</p>
             </div>
             <form onSubmit={handleAssignTask} className="space-y-2 pt-1">
               <input
@@ -358,11 +390,10 @@ export default function CommitteeLeaderDashboard() {
             </form>
           </div>
 
-          {/* تصدير أكسل */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-2">
               <h3 className="text-sm font-black text-slate-900">📊 تصدير أعضاء اللجنة (Excel)</h3>
-              <p className="text-[11px] text-slate-500">تصدير قائمة الأعضاء المقبولين بملف أكسل جاهز لرفعه للآدمن ومتابعته.</p>
+              <p className="text-[11px] text-slate-500">تصدير قائمة الأعضاء المقبولين بملف أكسل جاهز لرفعه للآدمن.</p>
             </div>
             <div className="pt-4">
               <button
@@ -377,12 +408,12 @@ export default function CommitteeLeaderDashboard() {
 
         </div>
 
-        {/* الجدول الخاص بالمرشحين والمتقدمين */}
+        {/* الجدول الخاص بالمرشحين والمتقدمين وقبولهم */}
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
               <h3 className="text-lg font-black text-slate-900">متقدمو وقبولو ({selectedManagedCommittee})</h3>
-              <p className="text-xs text-slate-500">اختر الرغبة لعرض المتقدمين بدقة دون تداخل الأرقام:</p>
+              <p className="text-xs text-slate-500">اختر الرغبة لعرض المتقدمين بدقة وقبولهم برابط قروب الواتساب:</p>
             </div>
             
             <div className="flex gap-2">
