@@ -18,9 +18,13 @@ export default function Navbar() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // حالات الإشعارات الفورية (الترقية)
+  // حالات الإشعارات الفورية (الترقية والإنذارات)
   const [notification, setNotification] = useState<string | null>(null);
   const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
+  
+  // حالة الأليرت بار القيادي العلوي لقادة اللجان
+  const [leaderAlertMsg, setLeaderAlertMsg] = useState<string | null>(null);
+  const [showLeaderAlertBar, setShowLeaderAlertBar] = useState(true);
   
   // حالة فتح وإغلاق نافذة تسجيل الدخول المنبثقة لمنع ظهور الشاشة السوداء السادة
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -86,6 +90,9 @@ export default function Navbar() {
         if (data.latestNotification) {
           setNotification(data.latestNotification);
           setShowNotificationModal(true);
+          // تفعيل شريط الإنذار العلوي أيضاً لقادة اللجان
+          setLeaderAlertMsg(data.latestNotification);
+          setShowLeaderAlertBar(true);
         }
       }
     }, (err) => {
@@ -158,25 +165,25 @@ export default function Navbar() {
   // التحقق إذا كانت لجنة المستخدم هي لجنة الجودة والتطوير (غرفة العمليات المركزية المرعبة)
   const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || userRole === 'System Admin' || userRole === 'رئيس النادي' || userRole === 'رئيسة النادي';
 
+  // شرط ظهور الأليرت بار القيادي في النافبار (فقط لقادة اللجان وفريق الجودة عند وجود تنبيه نشط)
+  const showLeaderAlertInNavbar = (isCommitteeLeader || isQualityOperationsRoom || isAdmin) && leaderAlertMsg && showLeaderAlertBar;
+
   return (
     <>
-      {/* نافذة الإشعار الفوري (بتصميم الصورة المطابق تماماً) */}
+      {/* نافذة الإشعار الفوري (بتصميم الاحتفال والترقية) */}
       {showNotificationModal && notification && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
           <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative">
             
-            {/* أيقونة القبعة أو الاحتفال العلوية */}
             <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl border-4 border-white -mt-14">
               🎉
             </div>
 
-            {/* العنوان والوصف */}
             <div className="space-y-1.5">
               <h3 className="text-xl font-black text-slate-900">مبارك لك الثقة القيادية!</h3>
               <p className="text-xs text-slate-500 font-medium">تم ترقيتك رسمياً في نادي كلية التمريض - جامعة حفر الباطن</p>
             </div>
 
-            {/* مربع عرض الرتبة الجديدة */}
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-1.5 text-right shadow-inner">
               <span className="text-[11px] font-bold text-slate-400 block">رتبتك القيادية الجديدة:</span>
               <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl py-2 px-4 text-center">
@@ -184,7 +191,6 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* مربع عرض الصلاحيات المهنية */}
             <div className="bg-amber-50/30 border border-amber-200/50 rounded-2xl p-4 space-y-1.5 text-right shadow-sm">
               <span className="text-[11px] font-bold text-amber-900 block flex items-center gap-1">
                 <span>📜</span> صلاحياتك ومهامك القيادية المعتمدة:
@@ -194,7 +200,6 @@ export default function Navbar() {
               </p>
             </div>
 
-            {/* زر بدء المهام */}
             <button
               type="button"
               onClick={handleDismissNotification}
@@ -208,6 +213,24 @@ export default function Navbar() {
       )}
 
       <header className={`w-full bg-white border-b border-slate-100 fixed top-0 z-50 transition-transform duration-300 ${showNavbar ? 'translate-y-0' : '-translate-y-full'}`}>
+        
+        {/* 🚨 الأليرت بار القيادي العلوي (يظهر حصرياً لقادة اللجان وفريق الجودة داخل النافبار) */}
+        {showLeaderAlertInNavbar && (
+          <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white px-4 py-2 shadow-inner flex items-center justify-between text-xs font-black" dir="rtl">
+            <div className="flex items-center gap-2 mx-auto">
+              <span className="text-sm animate-pulse">🚨</span>
+              <span>[تنبيه غرفة العمليات لقادة اللجان]: {leaderAlertMsg}</span>
+            </div>
+            <button
+              onClick={() => setShowLeaderAlertBar(false)}
+              className="text-yellow-100 hover:text-white px-2 py-0.5 bg-black/10 rounded-lg text-[10px] cursor-pointer"
+              title="إخفاء التنبيه"
+            >
+              ✕ إخفاء
+            </button>
+          </div>
+        )}
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between" dir="rtl">
           
           {/* الشعار */}
