@@ -14,6 +14,7 @@ export default function CommitteeLeaderDashboard() {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<any[]>([]);
   const [whatsappLink, setWhatsappLink] = useState('');
+  const [allUsersList, setAllUsersList] = useState<any[]>([]);
 
   // هل المستخدم من لجنة الجودة والتطوير؟
   const [isQualityTeam, setIsQualityTeam] = useState(false);
@@ -31,11 +32,11 @@ export default function CommitteeLeaderDashboard() {
   const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('لجنة تنظيم الفعاليات');
   const [preferenceFilterTab, setPreferenceFilterTab] = useState<'pref-1' | 'pref-2' | 'pref-3'>('pref-1');
 
-  // الإشعارات والتعاميم والأليرت بار القيادي
+  // الإشعارات والتعاميم
   const [announcementText, setAnnouncementText] = useState('');
   const [leaderCustomAlert, setLeaderCustomAlert] = useState('⚠️ تنبيه غرفة العمليات: يُرجى إنجاز كافة المهام المعلقة بالفعاليات بدقة ومراعاة المواعيد النهائية.');
   
-  // نظام المهام المتعددة (Checklist متعدد المهام لكل لجنة)
+  // نظام المهام المتعددة (Checklist)
   const [eventTitle, setEventTitle] = useState(''); 
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskInputText, setTaskInputText] = useState('');
@@ -67,6 +68,7 @@ export default function CommitteeLeaderDashboard() {
     fetchLeaderData(phone);
     fetchEscalatedReports();
     fetchCommitteeTasks();
+    fetchAllUsers();
   }, [router]);
 
   const fetchLeaderData = async (phone: string) => {
@@ -109,6 +111,16 @@ export default function CommitteeLeaderDashboard() {
     } catch (err) {
       console.error(err);
       setLoading(false);
+    }
+  };
+
+  const fetchAllUsers = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setAllUsersList(users);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -334,6 +346,7 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
+  // إرسال الإنذار أو التصعيد مع إرسال الإشعار الفوري لكل أعضاء اللجنة المستهدفة
   const handleExecuteWarningOrEscalation = async () => {
     if (!warningReason.trim()) {
       alert('الرجاء كتابة تفاصيل الإنذار أو التقصير بوضوح.');
@@ -341,6 +354,22 @@ export default function CommitteeLeaderDashboard() {
     }
 
     try {
+      const alertMsg = warningStepType === 'warn-leaders' 
+        ? `⚠️ [إنذار رسمي من الجودة للجنة ${targetCommitteeForWarning}]: ${warningReason}`
+        : `🚨 [تصعيد عاجل للرؤساء ضد لجنة ${targetCommitteeForWarning}]: ${warningReason}`;
+
+      // إرسال الإشعار لكل مستخدمين اللجنة المستهدفة في قاعدة البيانات
+      for (const usr of allUsersList) {
+        const commStr = usr.assignedCommittee || usr.committee || '';
+        if (matchesTargetCommittee(commStr, targetCommitteeForWarning) || usr.role?.includes('رئيس')) {
+          try {
+            await updateDoc(doc(db, 'users', usr.id), {
+              latestNotification: alertMsg
+            });
+          } catch (er) { console.error(er); }
+        }
+      }
+
       if (warningStepType === 'warn-leaders') {
         await addDoc(collection(db, 'escalated_reports'), {
           targetCommittee: targetCommitteeForWarning,
@@ -350,7 +379,7 @@ export default function CommitteeLeaderDashboard() {
           warningSentAt: Date.now(),
           createdAt: Date.now()
         });
-        alert(`📨 [تم إرسال الإنذار الداخلي]: تم توجيه إنذار تحذيري رسمي لقائد وقائدة (${targetCommitteeForWarning}) مع مهلة تصحيح.`);
+        alert(`📨 [تم إرسال الإنذار وتنبيه اللجنة]: تم توجيه إنذار تحذيري رسمي لقائد وقائدة (${targetCommitteeForWarning}) وإرسال الإشعار لحساباتهم.`);
       } else {
         await addDoc(collection(db, 'escalated_reports'), {
           targetCommittee: targetCommitteeForWarning,
@@ -360,7 +389,7 @@ export default function CommitteeLeaderDashboard() {
           escalatedAt: Date.now(),
           createdAt: Date.now()
         });
-        alert(`⚖️ [تم التصعيد النهائي للرؤساء]: لعدم التجاوب، تم إحالة البلاغ رسمياً لمكتب رئيس ورئيسة النادي لاتخاذ الإجراء الحازم.`);
+        alert(`⚖️ [تم التصعيد النهائي للرؤساء وتنبيههم]: تم إحالة البلاغ رسمياً لمكتب رئيس ورئيسة النادي.`);
       }
 
       setShowWarningModal(false);
@@ -369,6 +398,19 @@ export default function CommitteeLeaderDashboard() {
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء إرسال البلاغ.');
+    }
+  };
+
+  // حذف البلاغ التجريبي
+  const handleDeleteReport = async (reportId: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا البلاغ التجريبي؟')) {
+      try {
+        await deleteDoc(doc(db, 'escalated_reports', reportId));
+        setEscalatedReports(escalatedReports.filter(r => r.id !== reportId));
+        alert('تم حذف البلاغ بنجاح 🗑️');
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
@@ -434,7 +476,7 @@ export default function CommitteeLeaderDashboard() {
           </div>
         </div>
 
-        {/* الأليرت بار القيادي (ضمان ظهوره دائماً بأعلى الشاشة كشريط إنذار وتنبيه بارز) */}
+        {/* الأليرت بار القيادي */}
         <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between flex-wrap gap-4 border border-amber-400">
           <div className="flex items-center gap-3">
             <span className="text-3xl animate-pulse">🚨</span>
@@ -519,7 +561,7 @@ export default function CommitteeLeaderDashboard() {
           </div>
         )}
 
-        {/* إحصائيات فورية خاصة باللجنة المختارة */}
+        {/* إحصائيات فورية */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="bg-gradient-to-br from-[#630517] to-[#80071D] text-white p-6 rounded-3xl shadow-xl space-y-2">
             <span className="text-[11px] font-bold text-[#F5D061] uppercase tracking-wider">إجمالي المتقدمين للجنة ({currentActiveComm})</span>
@@ -542,7 +584,7 @@ export default function CommitteeLeaderDashboard() {
           </div>
         </div>
 
-        {/* الأدوات القيادية (إشعار جماعي، رفع مهام قائمة متعددة، وتصدير أكسل) */}
+        {/* الأدوات القيادية */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
@@ -567,7 +609,6 @@ export default function CommitteeLeaderDashboard() {
             </form>
           </div>
 
-          {/* خانة رفع مهام (قائمة متعددة) مخصصة للجنة */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-2">
               <h3 className="text-sm font-black text-slate-900">🎯 رفع مهام (قائمة متعددة Checklist)</h3>
@@ -658,7 +699,7 @@ export default function CommitteeLeaderDashboard() {
 
         </div>
 
-        {/* قسم قائمة المهام المتعددة وتتبع عداد نسبة الإنجاز لكل لجنة */}
+        {/* قائمة المهام المتعددة وتتبع العداد الديناميكي */}
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
@@ -736,7 +777,7 @@ export default function CommitteeLeaderDashboard() {
           )}
         </div>
 
-        {/* الجدول الخاص بالمرشحين والمتقدمين وقبولهم */}
+        {/* الجدول الخاص بالمرشحين */}
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
@@ -886,7 +927,7 @@ export default function CommitteeLeaderDashboard() {
         </div>
       )}
 
-      {/* نافذة مركز الشكاوى والتقارير المرفوعة للرئيس والآدمن */}
+      {/* نافذة مركز الشكاوى والتقارير المرفوعة (مع زر حذف البلاغات التجريبية) */}
       {showReportsModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-red-500">
@@ -900,10 +941,19 @@ export default function CommitteeLeaderDashboard() {
                 <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير تقصير أو شكاوى مرفوعة حتى الآن. الوضع مستقر وتحت السيطرة.</p>
               ) : (
                 escalatedReports.map((rep) => (
-                  <div key={rep.id} className="bg-red-50/60 border border-red-200 rounded-2xl p-4 space-y-2">
+                  <div key={rep.id} className="bg-red-50/60 border border-red-200 rounded-2xl p-4 space-y-2 relative">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black text-red-700">اللجنة المعنية: {rep.targetCommittee}</span>
-                      <span className="text-[10px] bg-red-200 text-red-900 font-bold px-2 py-0.5 rounded">بلاغ رسمي</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] bg-red-200 text-red-900 font-bold px-2 py-0.5 rounded">بلاغ رسمي</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteReport(rep.id)}
+                          className="px-2 py-0.5 bg-red-600 text-white rounded-md text-[10px] font-black hover:bg-red-700 cursor-pointer"
+                        >
+                          حذف البلاغ 🗑️
+                        </button>
+                      </div>
                     </div>
                     <p className="text-xs text-slate-800 font-semibold">السبب والتقصير المرصود: {rep.reason}</p>
                     <div className="text-[10px] text-slate-500 flex justify-between pt-2 border-t border-red-200/50">
@@ -918,7 +968,7 @@ export default function CommitteeLeaderDashboard() {
         </div>
       )}
 
-      {/* نافذة إنذار القادة أو التصعيد النهائي للرؤساء */}
+      {/* نافذة إنذار القادة أو التصعيد النهائي */}
       {showWarningModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-500">
@@ -931,8 +981,8 @@ export default function CommitteeLeaderDashboard() {
               </h3>
               <p className="text-xs text-slate-500">
                 {warningStepType === 'warn-leaders' 
-                  ? `توجيه إنذار تحذيري مع مهلة 24 ساعة لـ (${targetCommitteeForWarning})` 
-                  : `تصعيد نهائي لعدم التجاوب ضد (${targetCommitteeForWarning})`}
+                  ? `توجيه إنذار تحذيري وإشعار فوري لـ (${targetCommitteeForWarning})` 
+                  : `تصعيد نهائي وإشعار الأعضاء ضد (${targetCommitteeForWarning})`}
               </p>
             </div>
             <div className="space-y-2">
@@ -960,7 +1010,7 @@ export default function CommitteeLeaderDashboard() {
                   warningStepType === 'warn-leaders' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
-                {warningStepType === 'warn-leaders' ? 'إرسال الإنذار للقادة 📨' : 'تصعيد رسمي للرؤساء ⚖️'}
+                {warningStepType === 'warn-leaders' ? 'إرسال الإنذار وإشعارهم 📨' : 'تصعيد وإشعارهم فوراً ⚖️'}
               </button>
             </div>
           </div>
