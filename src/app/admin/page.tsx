@@ -75,6 +75,7 @@ interface UserAccount {
   password?: string;
   fullName?: string;
   role?: string;
+  assignedCommittee?: string; // اللجنة المعينة من قبل المشرف الأساسي لرئيس اللجنة
   createdAt?: string;
   latestNotification?: string;
 }
@@ -349,18 +350,35 @@ export default function AdminDashboard() {
     fetchCloudData();
   }, []);
 
+  // دالة تحديث رتبة المستخدم
   const handleRoleChange = async (phone: string, newRole: string) => {
     try {
       const userRef = doc(db, 'users', phone);
       await updateDoc(userRef, { 
         role: newRole,
-        latestNotification: `مبروك! تم ترقيتك إلى رتبة (${newRole}) بنجاح 🎉`
+        latestNotification: `مبروك! تم تحديث رتبتك إلى (${newRole}) بنجاح 🎉`
       });
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, role: newRole } : u));
-      alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح وإرسال إشعار الترقية له!`);
+      alert(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح!`);
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء تحديث الرتبة.');
+    }
+  };
+
+  // دالة تعيين اللجنة لرئيس اللجنة من قبلك حصرياً
+  const handleAssignedCommitteeChange = async (phone: string, commName: string) => {
+    try {
+      const userRef = doc(db, 'users', phone);
+      await updateDoc(userRef, { 
+        assignedCommittee: commName,
+        latestNotification: `تم تعيينك من قبل الإدارة رئيساً لـ (${commName}) 🛡️`
+      });
+      setUsersList(usersList.map((u) => u.phone === phone ? { ...u, assignedCommittee: commName } : u));
+      alert(`تم تعيين اللجنة (${commName}) لهذا العضو بنجاح ليتمكن من إدارتها في لوحته الخاصة!`);
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تعيين اللجنة.');
     }
   };
 
@@ -1010,8 +1028,8 @@ export default function AdminDashboard() {
         {activeTab === 'users-manager' && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
-              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب والصلاحيات 🔑</h3>
-              <p className="text-xs text-slate-500">كلمات المرور مخفية افتراضياً ويمكنك إظهارها عند الحاجة عبر النقر على علامة العين (👁️)، مع تحديد صلاحيات ودور كل رتبة.</p>
+              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب واللجان المعينة 🔑</h3>
+              <p className="text-xs text-slate-500">يمكنك هنا ترقية أي مستخدم وتعيين لجنته الخاصة مباشرة ليتمكن من دراسة وقبول المتقدمين عليها في لوحة قادة اللجان.</p>
             </div>
             
             <div className="overflow-x-auto">
@@ -1022,6 +1040,7 @@ export default function AdminDashboard() {
                     <th className="pb-3">رقم الجوال (اسم الدخول)</th>
                     <th className="pb-3">كلمة المرور</th>
                     <th className="pb-3">الرتبة والصلاحيات</th>
+                    <th className="pb-3">اللجنة المعينة ( لرئيس اللجنة )</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1046,10 +1065,8 @@ export default function AdminDashboard() {
                       <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-black text-[11px] inline-block" dir="ltr">
                         System Admin
                       </span>
-                      <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                        <strong>الصلاحيات:</strong> تحكم كامل بكافة إعدادات المنصة، السحابة، حذف وإضافة الفعاليات، التحكم بالرتب، وإدارة ملفات الأكسل وقبول الأعضاء.
-                      </p>
                     </td>
+                    <td className="py-4 text-slate-400 font-bold">إدارة كاملة للمنصة</td>
                   </tr>
 
                   {usersList.map((usr, idx) => (
@@ -1082,6 +1099,25 @@ export default function AdminDashboard() {
                           <option value="عضو مميز / منسق">عضو مميز (صلاحيات تفاعلية خاصة)</option>
                           <option value="عضو أساسي">عضو أساسي (مشارك وفعال)</option>
                         </select>
+                      </td>
+                      <td className="py-4">
+                        {(usr.role?.includes('رئيس لجنة') || usr.role?.includes('مشرف')) ? (
+                          <select
+                            value={usr.assignedCommittee || 'لجنة الاعلام'}
+                            onChange={(e) => handleAssignedCommitteeChange(usr.phone, e.target.value)}
+                            className="px-3 py-1.5 rounded-xl border border-[#630517]/30 text-xs font-black text-[#630517] bg-[#630517]/5 shadow-sm focus:outline-none"
+                          >
+                            <option value="لجنة الاعلام">لجنة الاعلام</option>
+                            <option value="لجنة التصميم">لجنة التصميم</option>
+                            <option value="لجنة تنظيم الفعاليات">لجنة تنظيم الفعاليات</option>
+                            <option value="لجنة الموارد البشرية">لجنة الموارد البشرية</option>
+                            <option value="لجنة العلاقات العامة">لجنة العلاقات العامة</option>
+                            <option value="لجنة المحتوى العلمي">لجنة المحتوى العلمي</option>
+                            <option value="لجنة الجودة والتطوير">لجنة الجودة والتطوير</option>
+                          </select>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">غير مخصص (رتبة عادية)</span>
+                        )}
                       </td>
                     </tr>
                   ))}
