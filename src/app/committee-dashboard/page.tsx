@@ -6,13 +6,6 @@ import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 
-interface CommitteeMember {
-  name: string;
-  role: string;
-  status: string;
-  phone?: string;
-}
-
 export default function CommitteeLeaderDashboard() {
   const router = useRouter();
   const [userPhone, setUserPhone] = useState<string | null>(null);
@@ -21,7 +14,7 @@ export default function CommitteeLeaderDashboard() {
   const [requests, setRequests] = useState<any[]>([]);
   const [whatsappLink, setWhatsappLink] = useState('');
 
-  // اللجنة المحددة والمخصصة لهذا القائد (يتم جلبها من حسابه الذي عينته أنت له)
+  // اللجنة المحددة والمخصصة لهذا القائد (يتم جلبها من حسابه)
   const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('لجنة الاعلام');
 
   // Modal القبول
@@ -52,20 +45,20 @@ export default function CommitteeLeaderDashboard() {
       const uData = userSnap.data();
       setUserData(uData);
 
-      // إذا كان المشرف الأساسي، نوجهه للوحة الشاملة الرئيسية
-      if (phone === '0553731265' || uData.role === 'System Admin') {
+      // إذا كان المشرف الأساسي أو رئيس النادي، نوجهه للوحة الشاملة الرئيسية
+      if (phone === '0553731265' || uData.role === 'System Admin' || uData.role === 'رئيس النادي' || uData.role === 'رئيسة النادي') {
         router.push('/admin');
         return;
       }
 
-      // تحديد اللجنة المعينة له من قبلك تلقائياً بناءً على ملفه في قاعدة البيانات
+      // تحديد اللجنة المعينة له تلقائياً
       if (uData.assignedCommittee) {
         setSelectedManagedCommittee(uData.assignedCommittee);
       } else if (uData.committee) {
         setSelectedManagedCommittee(uData.committee);
       }
 
-      // جلب طلبات الانضمام والأعضاء
+      // جلب طلبات الانضمام
       const reqSnap = await getDocs(collection(db, 'applications'));
       const allReqs = reqSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setRequests(allReqs);
@@ -95,7 +88,7 @@ export default function CommitteeLeaderDashboard() {
   };
 
   // تصفية الطلبات الخاصة باللجنة المعينة له حصرياً
-  const filteredRequests = requests.filter(req => {
+  const filteredRequests = (requests || []).filter(req => {
     const f1 = req.firstChoice || '';
     const f2 = req.secondChoice || '';
     const f3 = req.thirdChoice || '';
@@ -116,7 +109,7 @@ export default function CommitteeLeaderDashboard() {
         whatsappLink: whatsappLink
       });
 
-      setRequests(requests.map(r => r.id === selectedReqId ? { ...r, status: 'مقبول', acceptedCommittee: selectedManagedCommittee, whatsappLink } : r));
+      setRequests((requests || []).map(r => r.id === selectedReqId ? { ...r, status: 'مقبول', acceptedCommittee: selectedManagedCommittee, whatsappLink } : r));
       setShowAcceptModal(false);
       setWhatsappLink('');
       alert(`تم قبول المتقدم في (${selectedManagedCommittee}) بنجاح! 🎉`);
@@ -131,10 +124,38 @@ export default function CommitteeLeaderDashboard() {
       try {
         const docRef = doc(db, 'applications', id);
         await updateDoc(docRef, { status: 'مرفوض' });
-        setRequests(requests.map(r => r.id === id ? { ...r, status: 'مرفوض' } : r));
+        setRequests((requests || []).map(r => r.id === id ? { ...r, status: 'مرفوض' } : r));
       } catch (err) {
         console.error(err);
       }
+    }
+  };
+
+  // دالة تحويل رغبة الطالب من قبل رئيس اللجنة
+  const handleShiftPreference = async (req: Record<string, any>) => {
+    const f1 = req.firstChoice || '';
+    const f2 = req.secondChoice || '';
+    const f3 = req.thirdChoice || '';
+
+    const updatedObj = {
+      ...req,
+      firstChoice: f2 || f3 || f1,
+      secondChoice: f3 || f1 || f2,
+      thirdChoice: f1 || f2 || f3
+    };
+
+    try {
+      const docRef = doc(db, 'applications', req.id);
+      await updateDoc(docRef, {
+        firstChoice: updatedObj.firstChoice,
+        secondChoice: updatedObj.secondChoice,
+        thirdChoice: updatedObj.thirdChoice
+      });
+      setRequests((requests || []).map(r => r.id === req.id ? updatedObj : r));
+      alert('تم تحويل الطالب إلى رغبته التالية بنجاح! 🔄');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تحويل رغبة الطالب.');
     }
   };
 
@@ -162,12 +183,11 @@ export default function CommitteeLeaderDashboard() {
           <div className="flex justify-between items-center flex-wrap gap-2">
             <div>
               <h3 className="text-lg font-black text-slate-900">متقدمو وقبولو ({selectedManagedCommittee})</h3>
-              <p className="text-xs text-slate-500">هنا تظهر لك الطلبات الموجهة إلى لجنتك التي عينك المشرف عليها لتدرسها وتقبلها.</p>
+              <p className="text-xs text-slate-500">هنا تظهر لك الطلبات الموجهة إلى لجنتك لتدرسها وتقبلها أو تحول رغباتهم.</p>
             </div>
             <span className="px-3 py-1 rounded-full bg-[#630517]/10 text-[#630517] font-bold text-xs">
               النتائج المطابقة: {filteredRequests.length}
             </span>
-
           </div>
 
           <div className="overflow-x-auto">
@@ -211,7 +231,15 @@ export default function CommitteeLeaderDashboard() {
                           <div className="text-[10px] text-[#630517] font-bold mt-1">مقبول في: {req.acceptedCommittee}</div>
                         )}
                       </td>
-                      <td className="py-3 text-left pl-2 flex gap-1.5 justify-end">
+                      <td className="py-3 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => handleShiftPreference(req)}
+                          className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer text-xs"
+                          title="تحويل الطالب لرغبته التالية"
+                        >
+                          🔄 تحويل لرغبة أخرى
+                        </button>
                         <button
                           type="button"
                           onClick={() => {
@@ -220,7 +248,7 @@ export default function CommitteeLeaderDashboard() {
                           }}
                           className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 cursor-pointer text-xs"
                         >
-                          قبول في اللجنة ✅
+                          قبول ✅
                         </button>
                         <button
                           type="button"
