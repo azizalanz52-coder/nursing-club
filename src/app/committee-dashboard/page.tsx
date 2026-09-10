@@ -54,6 +54,11 @@ export default function CommitteeDashboard() {
   const [targetCommitteeForWarning, setTargetCommitteeForWarning] = useState('');
   const [warningStepType, setWarningStepType] = useState<'warn-leaders' | 'escalate-presidents'>('warn-leaders');
 
+  // حالات الرد والتبرير الخاصة بالقائد المنذَر
+  const [showReplyModal, setShowReplyModal] = useState(false);
+  const [activeReportToReply, setActiveReportToReply] = useState<any>(null);
+  const [leaderDefenseReply, setLeaderDefenseReply] = useState('');
+
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
 
@@ -355,10 +360,9 @@ export default function CommitteeDashboard() {
 
     try {
       const alertMsg = warningStepType === 'warn-leaders' 
-        ? `⚠️ [إنذار رسمي من الجودة للجنة ${targetCommitteeForWarning}]: ${warningReason}`
+        ? `⚠️ [إنذار رسمي من الجودة للجنة ${targetCommitteeForWarning}]: ${warningReason} (يُرجى إرسال الرد والتبرير خلال 24 ساعة)`
         : `🚨 [تصعيد عاجل للرؤساء ضد لجنة ${targetCommitteeForWarning}]: ${warningReason}`;
 
-      // إرسال الإشعار لكل مستخدمين اللجنة المستهدفة في قاعدة البيانات
       for (const usr of allUsersList) {
         const commStr = usr.assignedCommittee || usr.committee || '';
         if (matchesTargetCommittee(commStr, targetCommitteeForWarning) || usr.role?.includes('رئيس')) {
@@ -376,6 +380,7 @@ export default function CommitteeDashboard() {
           reporter: userData?.fullName || 'لجنة الجودة والتطوير',
           reason: warningReason,
           status: '⚠️ تم إرسال إنذار للقادة (بانتظار الرد خلال 24 ساعة)',
+          leaderDefenseReply: '',
           warningSentAt: Date.now(),
           createdAt: Date.now()
         });
@@ -386,6 +391,7 @@ export default function CommitteeDashboard() {
           reporter: userData?.fullName || 'لجنة الجودة والتطوير',
           reason: `[عدم تجاوب مع الإنذار السابق]: ${warningReason}`,
           status: '🚨 مُحال رسمياً للرئيس ورئيسة النادي (لعدم التجاوب والتأديب)',
+          leaderDefenseReply: '',
           escalatedAt: Date.now(),
           createdAt: Date.now()
         });
@@ -398,6 +404,31 @@ export default function CommitteeDashboard() {
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء إرسال البلاغ.');
+    }
+  };
+
+  // دالة إرسال رد القائد المنذَر على الإنذار
+  const handleSubmitLeaderReply = async () => {
+    if (!leaderDefenseReply.trim() || !activeReportToReply) {
+      alert('الرجاء كتابة نص التبرير أو الرد أولاً.');
+      return;
+    }
+
+    try {
+      const reportRef = doc(db, 'escalated_reports', activeReportToReply.id);
+      await updateDoc(reportRef, {
+        leaderDefenseReply: leaderDefenseReply,
+        status: `💬 تم استلام رد وتبرير اللجنة (بانتظار اعتماد الجودة)`
+      });
+
+      alert('تم إرسال ردك وتبريرك للجنة الجودة بنجاح! 🎯');
+      setShowReplyModal(false);
+      setLeaderDefenseReply(false);
+      setActiveReportToReply(null);
+      fetchEscalatedReports();
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء إرسال الرد.');
     }
   };
 
@@ -444,6 +475,9 @@ export default function CommitteeDashboard() {
 
   const displayedTasks = committeeTasks.filter(t => t.committee === currentActiveComm);
 
+  // العثور على الإنذارات الموجهة للجنة الحالية ليتمكن القائد من الرد عليها
+  const committeeReports = escalatedReports.filter(r => matchesTargetCommittee(r.targetCommittee, currentActiveComm));
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 p-6 md:p-10 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -452,10 +486,10 @@ export default function CommitteeDashboard() {
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-xl font-black text-slate-900">
-              {isQualityTeam ? '⚡ غرفة عمليات لجنة الجودة والتطوير (العقل المدبر والمركز المرعب)' : 'لوحة تحكم رئيس اللجنة القيادية 🛡️'}
+              {isQualityTeam ? '⚡ غرفة عمليات لجنة الجودة والتطوير (العقل المدبر والمركز المرعب)' : `لوحة تحكم رئيس لجنة (${currentActiveComm}) 🛡️`}
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة ورصد وإنذار وإحالة اللجان السبع برتبة عسكرية صارمة' : `اللجنة المعينة لك: ${selectedManagedCommittee}`}
+              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة ورصد وإنذار وإحالة اللجان السبع برتبة عسكرية صارمة' : `إدارة شؤون وأعضاء ومهام اللجنة المعينة لك`}
             </p>
           </div>
           
@@ -487,13 +521,57 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
+        {/* صندوق تنبيهات وإنذارات اللجنة الحالية (خاص بقادة اللجان لتقديم الرد خلال 24 ساعة) */}
+        {!isQualityTeam && committeeReports.length > 0 && (
+          <div className="bg-amber-50 border-2 border-amber-400 rounded-3xl p-6 space-y-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <h3 className="font-black text-amber-900 text-sm">تنبيهات وإنذارات رسمية مسجلة بحق لجنتك (مطلوبة الرد):</h3>
+                <p className="text-xs text-amber-700">لديك مهلة 24 ساعة لتقديم الرد أو التبرير لتفادي تصعيد البلاغ لمكتب الرؤساء.</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {committeeReports.map((rep) => (
+                <div key={rep.id} className="bg-white border border-amber-200 rounded-2xl p-4 space-y-3 shadow-sm">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-500">المرسل: {rep.reporter}</span>
+                    <span className="font-black text-amber-800">{rep.status}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-800">سبب الإنذار والتقصير المرصود: {rep.reason}</p>
+
+                  {rep.leaderDefenseReply ? (
+                    <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs space-y-1">
+                      <span className="font-bold text-emerald-800 block">💬 ردك وتبريرك المرسل:</span>
+                      <p className="text-slate-700">{rep.leaderDefenseReply}</p>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveReportToReply(rep);
+                        setShowReplyModal(true);
+                      }}
+                      className="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700 cursor-pointer transition-all flex items-center gap-1.5"
+                    >
+                      <span>✍️</span>
+                      <span>إرسال الرد والتبرير الرسمي (خلال 24 ساعة)</span>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* إذا كان المستخدم من لجنة الجودة، نعرض له رادار اللجان السبع */}
         {isQualityTeam && (
           <div className="space-y-4">
             <div className="flex justify-between items-center flex-wrap gap-3">
               <h3 className="font-black text-slate-900 text-sm">رادار مراقبة ورصد إنجازات اللجان السبع (إنذار القادة أولاً ثم التصعيد):</h3>
               <span className="text-[11px] bg-red-100 text-red-700 font-bold px-3 py-1 rounded-xl">
-                ⚠️ النظام النظامي: إنذار القادة بمهلة 24 ساعة، وإذا لم يتجاوبوا يتم رفع البلاغ للرؤساء
+                ⚠️ النظام النظامي: إنذار القادة بمهلة 24 ساعة للرد، وإذا لم يتجاوبوا يتم رفع البلاغ للرؤساء
               </span>
             </div>
             
@@ -927,21 +1005,68 @@ export default function CommitteeDashboard() {
         </div>
       )}
 
-      {/* نافذة مركز الشكاوى والتقارير المرفوعة (مع زر حذف البلاغات التجريبية) */}
+      {/* نافذة إرسال رد القائد المنذَر على الإنذار */}
+      {showReplyModal && activeReportToReply && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
+          <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-500">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500 mx-auto flex items-center justify-center text-3xl font-bold text-white">
+              ✍️
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-xl font-black text-slate-900">تقديم الرد والتبرير الرسمي</h3>
+              <p className="text-xs text-slate-500">الرد على الإنذار الوارد من لجنة الجودة والتطوير</p>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-2xl text-xs space-y-1 border border-slate-200">
+              <span className="font-bold text-slate-700 block">سبب الإنذار المرصود:</span>
+              <p className="text-slate-600">{activeReportToReply.reason}</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 block">اكتب تفاصيل التبرير أو خطة المعالجة:</label>
+              <textarea
+                rows={3}
+                placeholder="اكتب التبرير أو الإجراء الذي تم اتخاذه..."
+                value={leaderDefenseReply}
+                onChange={(e) => setLeaderDefenseReply(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowReplyModal(false)}
+                className="w-1/2 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitLeaderReply}
+                className="w-1/2 py-3 rounded-2xl bg-amber-600 text-white font-black text-xs shadow-lg hover:bg-amber-700 cursor-pointer"
+              >
+                إرسال التبرير للجودة 📨
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة مركز الشكاوى والتقارير المرفوعة (مع متابعة ردود القادة) */}
       {showReportsModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-red-500">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-              <h3 className="text-lg font-black text-slate-900">🚨 مركز التقارير والشكاوى المرفوعة بحق اللجان</h3>
+              <h3 className="text-lg font-black text-slate-900">🚨 مركز التقارير والشكاوى ومتابعة ردود القادة</h3>
               <button onClick={() => setShowReportsModal(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕ إغلاق</button>
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-4">
               {escalatedReports.length === 0 ? (
                 <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير تقصير أو شكاوى مرفوعة حتى الآن. الوضع مستقر وتحت السيطرة.</p>
               ) : (
                 escalatedReports.map((rep) => (
-                  <div key={rep.id} className="bg-red-50/60 border border-red-200 rounded-2xl p-4 space-y-2 relative">
+                  <div key={rep.id} className="bg-red-50/60 border border-red-200 rounded-2xl p-4 space-y-3 relative">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black text-red-700">اللجنة المعنية: {rep.targetCommittee}</span>
                       <div className="flex items-center gap-2">
@@ -956,6 +1081,14 @@ export default function CommitteeDashboard() {
                       </div>
                     </div>
                     <p className="text-xs text-slate-800 font-semibold">السبب والتقصير المرصود: {rep.reason}</p>
+
+                    {rep.leaderDefenseReply && (
+                      <div className="bg-white border border-emerald-300 p-3 rounded-xl text-xs space-y-1 shadow-inner">
+                        <span className="font-bold text-emerald-800 block">💬 رد وتبرير قائد اللجنة:</span>
+                        <p className="text-slate-700">{rep.leaderDefenseReply}</p>
+                      </div>
+                    )}
+
                     <div className="text-[10px] text-slate-500 flex justify-between pt-2 border-t border-red-200/50">
                       <span>الرافع: {rep.reporter}</span>
                       <span className="font-bold text-red-800">{rep.status}</span>
@@ -981,7 +1114,7 @@ export default function CommitteeDashboard() {
               </h3>
               <p className="text-xs text-slate-500">
                 {warningStepType === 'warn-leaders' 
-                  ? `توجيه إنذار تحذيري وإشعار فوري لـ (${targetCommitteeForWarning})` 
+                  ? `توجيه إنذار تحذيري وإشعار فوري لـ (${targetCommitteeForWarning}) مع مهلة رد 24 ساعة` 
                   : `تصعيد نهائي وإشعار الأعضاء ضد (${targetCommitteeForWarning})`}
               </p>
             </div>
@@ -989,7 +1122,7 @@ export default function CommitteeDashboard() {
               <label className="text-xs font-bold text-slate-700 block">التفاصيل أو التقصير المرصود:</label>
               <textarea
                 rows={3}
-                placeholder={warningStepType === 'warn-leaders' ? "اكتب سبب الإنذار ومنحه المهلة..." : "اكتب سبب عدم تجاوبهم للإحالة الفورية للرئيس..."}
+                placeholder={warningStepType === 'warn-leaders' ? "اكتب سبب الإنذار ومنح المهلة..." : "اكتب سبب عدم تجاوبهم للإحالة الفورية للرئيس..."}
                 value={warningReason}
                 onChange={(e) => setWarningReason(e.target.value)}
                 className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
