@@ -2,18 +2,19 @@
 
 import React, { useState } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 
 export default function CheckStatusPage() {
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any | null>(null);
   const [searched, setSearched] = useState(false);
 
   const handleCheck = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone.trim()) {
-      alert('الرجاء إدخال رقم الجوال.');
+    if (!phone.trim() || !password.trim()) {
+      alert('الرجاء إدخال رقم الجوال وكلمة المرور.');
       return;
     }
 
@@ -22,15 +23,56 @@ export default function CheckStatusPage() {
     setResult(null);
 
     try {
-      const q = query(collection(db, 'applications'), where('phone', '==', phone.trim()));
-      const querySnapshot = await getDocs(q);
+      const cleanPhone = phone.trim();
+      const cleanPass = password.trim();
+
+      // 1. التحقق من حساب المستخدم وكلمة المرور للخصوصية والأمان
+      const userRef = doc(db, 'users', cleanPhone);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        alert('رقم الجوال غير مسجل في النظام.');
+        setLoading(false);
+        setSearched(true);
+        return;
+      }
+
+      const userData = userSnap.data();
+      if (userData.password !== cleanPass) {
+        alert('كلمة المرور غير صحيحة.');
+        setLoading(false);
+        setSearched(true);
+        return;
+      }
+
+      // 2. البحث عن الطلب برقم الجوال أو الرقم الجامعي المرتبط بالحساب
+      const appsRef = collection(db, 'applications');
+      const q = query(appsRef, where('phone', '==', cleanPhone));
+      let querySnapshot = await getDocs(q);
+
+      let docData: any = null;
 
       if (!querySnapshot.empty) {
-        const docData = querySnapshot.docs[0].data();
+        docData = querySnapshot.docs[0].data();
+      } else if (userData.universityId) {
+        const qUniv = query(appsRef, where('universityId', '==', userData.universityId));
+        const univSnap = await getDocs(qUniv);
+        if (!univSnap.empty) {
+          docData = univSnap.docs[0].data();
+        }
+      }
+
+      if (docData) {
         setResult(docData);
       } else {
-        setResult(null);
+        // إذا كان له حساب لكنه لم يقدم طلب انضمام بعد
+        setResult({
+          fullName: userData.fullName,
+          universityId: userData.universityId,
+          status: 'معلق'
+        });
       }
+
       setSearched(true);
     } catch (err) {
       console.error('Error checking status:', err);
@@ -53,7 +95,7 @@ export default function CheckStatusPage() {
         
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-black text-slate-900">🔍 استعلام عن حالة القبول</h1>
-          <p className="text-xs text-slate-500">أدخل رقم الجوال المسجل في طلب الانضمام لمعرفة حالتك ولجنتك فوراً</p>
+          <p className="text-xs text-slate-500">أدخل رقم الجوال وكلمة المرور الخاصة بحسابك لمعرفة حالتك ولجنتك بكل خصوصية وأمان</p>
         </div>
 
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6">
@@ -67,14 +109,29 @@ export default function CheckStatusPage() {
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-[#630517]"
                 dir="ltr"
+                required
               />
             </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">كلمة المرور</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-[#630517]"
+                dir="ltr"
+                required
+              />
+            </div>
+
             <button
               type="submit"
               disabled={loading}
               className="w-full py-3.5 rounded-xl bg-[#630517] text-[#F5D061] font-black text-sm shadow hover:brightness-110 transition-all cursor-pointer disabled:opacity-50"
             >
-              {loading ? 'جاري البحث...' : 'استعلام الآن'}
+              {loading ? 'جاري التحقق والبحث...' : 'استعلام الآن 🔒'}
             </button>
           </form>
 
@@ -170,7 +227,7 @@ export default function CheckStatusPage() {
                 </div>
               ) : (
                 <div className="bg-red-50 text-red-700 p-4 rounded-2xl text-center text-xs font-bold border border-red-100">
-                  لم يتم العثور على أي طلب مسجل بهذا الرقم. تأكد من صحة الرقم المُدخل.
+                  لم يتم العثور على أي طلب مسجل بهذا الرقم. تأكد من صحة بيانات الدخول.
                 </div>
               )}
             </div>
