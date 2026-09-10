@@ -4,7 +4,7 @@ import React, { useState, useEffect, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, getDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 
 export default function CommitteeLeaderDashboard() {
@@ -17,6 +17,8 @@ export default function CommitteeLeaderDashboard() {
 
   // هل المستخدم من لجنة الجودة والتطوير؟
   const [isQualityTeam, setIsQualityTeam] = useState(false);
+  const [qualitySubTab, setQualitySubTab] = useState<'radar' | 'audit' | 'evaluations' | 'escalations'>('radar');
+
   const [allCommitteesList] = useState<string[]>([
     'لجنة التصميم',
     'لجنة الاعلام',
@@ -32,17 +34,18 @@ export default function CommitteeLeaderDashboard() {
   const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('لجنة تنظيم الفعاليات');
   const [preferenceFilterTab, setPreferenceFilterTab] = useState<'pref-1' | 'pref-2' | 'pref-3'>('pref-1');
 
-  // حالات الإشعارات والمهام المرتبطة بالفعاليات والتنبيهات
+  // المهام والتعاميم والتقارير
   const [announcementText, setAnnouncementText] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [eventTitle, setEventTitle] = useState(''); 
   const [taskDueDate, setTaskDueDate] = useState('');
+  const [committeeTasks, setCommitteeTasks] = useState<any[]>([]);
 
-  // نافذة مركز التقارير والشكاوى المرفوعة
+  // نافذة تقارير الشكاوى والإنذارات
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
   const [showReportsModal, setShowReportsModal] = useState(false);
 
-  // نظام الإنذار المتدرج والتحذير قبل التصعيد للرؤساء
+  // نظام الإنذار المتدرج
   const [warningReason, setWarningReason] = useState('');
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [targetCommitteeForWarning, setTargetCommitteeForWarning] = useState('');
@@ -61,6 +64,7 @@ export default function CommitteeLeaderDashboard() {
     setUserPhone(phone);
     fetchLeaderData(phone);
     fetchEscalatedReports();
+    fetchCommitteeTasks();
   }, [router]);
 
   const fetchLeaderData = async (phone: string) => {
@@ -107,6 +111,16 @@ export default function CommitteeLeaderDashboard() {
       const snap = await getDocs(collection(db, 'escalated_reports'));
       const reports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setEscalatedReports(reports);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchCommitteeTasks = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'committee_tasks'));
+      const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setCommitteeTasks(tasks);
     } catch (e) {
       console.error(e);
     }
@@ -241,14 +255,24 @@ export default function CommitteeLeaderDashboard() {
       const targetComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
       const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm || r.status === 'مقبول');
       
-      await addDoc(collection(db, 'committee_tasks'), {
+      const newTaskRef = await addDoc(collection(db, 'committee_tasks'), {
         committee: targetComm,
         eventTitle: eventTitle,
         taskTitle: taskTitle,
         dueDate: taskDueDate || 'محدد قريباً',
-        status: 'قيد التنفيذ',
+        status: 'قيد التنفيذ (بانتظار اعتماد الجودة)',
         createdAt: Date.now()
       });
+
+      setCommitteeTasks(prev => [{
+        id: newTaskRef.id,
+        committee: targetComm,
+        eventTitle,
+        taskTitle,
+        dueDate: taskDueDate || 'محدد قريباً',
+        status: 'قيد التنفيذ (بانتظار اعتماد الجودة)',
+        createdAt: Date.now()
+      }, ...prev]);
 
       for (const mem of acceptedList) {
         if (mem.phone) {
@@ -268,7 +292,30 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // معالجة إرسال الإنذار أولاً للقادة أو التصعيد النهائي للرؤساء
+  // اعتماد المهمة أو رفضها من قبل لجنة الجودة
+  const handleUpdateTaskStatus = async (taskId: string, newStatus: string) => {
+    try {
+      const taskRef = doc(db, 'committee_tasks', taskId);
+      await updateDoc(taskRef, { status: newStatus });
+      setCommitteeTasks(committeeTasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+      alert(`تم تحديث حالة المهمة بنجاح إلى: (${newStatus}) 🛡️`);
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تحديث حالة المهمة.');
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (confirm('هل أنت متأكد من حذف هذه المهمة من السحابة؟')) {
+      try {
+        await deleteDoc(doc(db, 'committee_tasks', taskId));
+        setCommitteeTasks(committeeTasks.filter(t => t.id !== taskId));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
   const handleExecuteWarningOrEscalation = async () => {
     if (!warningReason.trim()) {
       alert('الرجاء كتابة تفاصيل الإنذار أو التقصير بوضوح.');
@@ -277,7 +324,6 @@ export default function CommitteeLeaderDashboard() {
 
     try {
       if (warningStepType === 'warn-leaders') {
-        // الخطوة الأولى: إرسال إنذار داخلي لقائد وقائدة اللجنة مع مهلة
         await addDoc(collection(db, 'escalated_reports'), {
           targetCommittee: targetCommitteeForWarning,
           reporter: userData?.fullName || 'لجنة الجودة والتطوير',
@@ -288,7 +334,6 @@ export default function CommitteeLeaderDashboard() {
         });
         alert(`📨 [تم إرسال الإنذار الداخلي]: تم توجيه إنذار تحذيري رسمي لقائد وقائدة (${targetCommitteeForWarning}) مع مهلة تصحيح.`);
       } else {
-        // الخطوة الثانية: عدم التجاوب والتصعيد النهائي للرئيس ورئيسة النادي
         await addDoc(collection(db, 'escalated_reports'), {
           targetCommittee: targetCommitteeForWarning,
           reporter: userData?.fullName || 'لجنة الجودة والتطوير',
@@ -348,7 +393,7 @@ export default function CommitteeLeaderDashboard() {
               {isQualityTeam ? '⚡ غرفة عمليات لجنة الجودة والتطوير (العقل المدبر والمركز المرعب)' : 'لوحة تحكم رئيس اللجنة القيادية 🛡️'}
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة ورصد وإنذار وإحالة اللجان السبع للرؤساء برتبة عسكرية صارمة' : `اللجنة المعينة لك: ${selectedManagedCommittee}`}
+              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة ورصد وتقييم وإنذار كافة اللجان السبع برتبة عسكرية صارمة' : `اللجنة المعينة لك: ${selectedManagedCommittee}`}
             </p>
           </div>
           
@@ -357,10 +402,10 @@ export default function CommitteeLeaderDashboard() {
               <button
                 type="button"
                 onClick={() => setShowReportsModal(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5 cursor-pointer relative"
               >
                 <span>🚨</span>
-                <span>مركز الشكاوى والتقارير المرفوعة ({escalatedReports.length})</span>
+                <span>مركز الشكاوى والإنذارات ({escalatedReports.length})</span>
               </button>
             )}
             <Link href="/" className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-200">
@@ -369,77 +414,231 @@ export default function CommitteeLeaderDashboard() {
           </div>
         </div>
 
-        {/* إذا كان المستخدم من لجنة الجودة، نعرض له رادار اللجان السبع مع خيار الإنذار والتصعيد المتدرج */}
+        {/* إذا كان المستخدم من لجنة الجودة، نعرض له أقسام التوسعة الكبرى الجديدة */}
         {isQualityTeam && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center flex-wrap gap-3">
-              <h3 className="font-black text-slate-900 text-sm">رادار مراقبة ورصد إنجازات اللجان السبع (التدرج: إنذار القادة أولاً ثم التصعيد للرؤساء):</h3>
-              <span className="text-[11px] bg-red-100 text-red-700 font-bold px-3 py-1 rounded-xl">
-                ⚠️ النظام النظامي: إنذار القادة بمهلة 24 ساعة، وإذا لم يتجاوبوا يتم رفع البلاغ للرؤساء
-              </span>
+          <div className="space-y-6">
+            {/* تبويبات التوسعة الخاصة بلجنة الجودة */}
+            <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+              {[
+                { id: 'radar', label: '📊 رادار مراقبة اللجان (KPIs)' },
+                { id: 'evaluations', label: `🎯 تدقيق واعتماد المهام (${committeeTasks.length})` },
+                { id: 'escalations', label: `⚠️ سجل الإنذارات والتصعيد (${escalatedReports.length})` },
+                { id: 'audit', label: '🛡️ سجل التدقيق الإداري' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setQualitySubTab(tab.id as any)}
+                  className={`px-5 py-2.5 rounded-2xl font-bold text-xs transition-all shadow-sm ${
+                    qualitySubTab === tab.id ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {allCommitteesList.map((commName, idx) => {
-                const count = requests.filter(r => r.acceptedCommittee === commName).length;
-                return (
-                  <div 
-                    key={idx} 
-                    onClick={() => {
-                      setSelectedMonitoredCommittee(commName);
-                      setSelectedManagedCommittee(commName);
-                    }}
-                    className={`p-5 rounded-2xl border transition-all cursor-pointer shadow-sm flex flex-col justify-between space-y-3 relative overflow-hidden ${
-                      selectedManagedCommittee === commName ? 'bg-[#630517] text-white border-[#630517] shadow-lg scale-[1.02]' : 'bg-white text-slate-800 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedManagedCommittee === commName ? 'bg-white/20 text-[#F5D061]' : 'bg-slate-100 text-slate-600'}`}>
-                        مراقبة عليا
-                      </span>
-                      <span className="text-lg font-black">{count} أعضاء</span>
-                    </div>
-                    <h4 className="font-extrabold text-sm">{commName}</h4>
 
-                    <div className="pt-2 flex flex-col gap-1.5 border-t border-white/10 mt-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTargetCommitteeForWarning(commName);
-                          setWarningStepType('warn-leaders');
-                          setShowWarningModal(true);
+            {/* محتوى تبويب 1: رادار اللجان السبع */}
+            {qualitySubTab === 'radar' && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="flex justify-between items-center flex-wrap gap-3">
+                  <h3 className="font-black text-slate-900 text-sm">متابعة الأداء اللحظي للجان السبع (إنذار ثم تصعيد للرؤساء):</h3>
+                  <span className="text-[11px] bg-red-100 text-red-700 font-bold px-3 py-1 rounded-xl">
+                    ⚠️ النظام الصارم: إنذار القادة أولاً بمهلة 24 ساعة، وإذا لم يتجاوبوا يتم رفع البلاغ لمكتب الرئيس
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {allCommitteesList.map((commName, idx) => {
+                    const count = requests.filter(r => r.acceptedCommittee === commName).length;
+                    return (
+                      <div 
+                        key={idx} 
+                        onClick={() => {
+                          setSelectedMonitoredCommittee(commName);
+                          setSelectedManagedCommittee(commName);
                         }}
-                        className={`w-full py-1.5 rounded-xl text-[10px] font-bold transition-all ${
-                          selectedManagedCommittee === commName 
-                            ? 'bg-amber-500 text-white hover:bg-amber-600' 
-                            : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                        className={`p-5 rounded-2xl border transition-all cursor-pointer shadow-sm flex flex-col justify-between space-y-3 relative overflow-hidden ${
+                          selectedManagedCommittee === commName ? 'bg-[#630517] text-white border-[#630517] shadow-lg scale-[1.02]' : 'bg-white text-slate-800 border-slate-200 hover:border-slate-300'
                         }`}
                       >
-                        ⚠️ إنذار قائد وقائدة اللجنة
-                      </button>
+                        <div className="flex justify-between items-center">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedManagedCommittee === commName ? 'bg-white/20 text-[#F5D061]' : 'bg-slate-100 text-slate-600'}`}>
+                            مراقبة عليا
+                          </span>
+                          <span className="text-lg font-black">{count} أعضاء</span>
+                        </div>
+                        <h4 className="font-extrabold text-sm">{commName}</h4>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTargetCommitteeForWarning(commName);
-                          setWarningStepType('escalate-presidents');
-                          setShowWarningModal(true);
-                        }}
-                        className={`w-full py-1.5 rounded-xl text-[10px] font-black transition-all ${
-                          selectedManagedCommittee === commName 
-                            ? 'bg-red-600 text-white hover:bg-red-700' 
-                            : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
-                        }`}
-                      >
-                        🚨 تصعيد البلاغ للرئيس ورئيسة النادي
-                      </button>
-                    </div>
+                        <div className="pt-2 flex flex-col gap-1.5 border-t border-white/10 mt-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTargetCommitteeForWarning(commName);
+                              setWarningStepType('warn-leaders');
+                              setShowWarningModal(true);
+                            }}
+                            className={`w-full py-1.5 rounded-xl text-[10px] font-bold transition-all ${
+                              selectedManagedCommittee === commName 
+                                ? 'bg-amber-500 text-white hover:bg-amber-600' 
+                                : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                            }`}
+                          >
+                            ⚠️ إنذار قائد وقائدة اللجنة
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTargetCommitteeForWarning(commName);
+                              setWarningStepType('escalate-presidents');
+                              setShowWarningModal(true);
+                            }}
+                            className={`w-full py-1.5 rounded-xl text-[10px] font-black transition-all ${
+                              selectedManagedCommittee === commName 
+                                ? 'bg-red-600 text-white hover:bg-red-700' 
+                                : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+                            }`}
+                          >
+                            🚨 تصعيد البلاغ للرئيس ورئيسة النادي
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* محتوى تبويب 2: تدقيق واعتماد المهام */}
+            {qualitySubTab === 'evaluations' && (
+              <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6 animate-in fade-in duration-200">
+                <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">🎯 مركز تدقيق واعتماد مهام وفعاليات اللجان</h3>
+                    <p className="text-xs text-slate-500">لجنة الجودة هي صاحبة الصلاحية المطلقة في اعتماد أو رفض أو إعادة تقييم المهام.</p>
                   </div>
-                );
-              })}
-            </div>
+                  <span className="px-3 py-1 bg-[#630517]/10 text-[#630517] font-bold text-xs rounded-full">
+                    إجمالي المهام المسجلة: {committeeTasks.length}
+                  </span>
+                </div>
+
+                {committeeTasks.length === 0 ? (
+                  <p className="text-center py-12 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد مهام أو فعاليات مرفوعة حالياً من اللجان.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-right text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                          <th className="pb-3 pr-2">اللجنة المسؤولة</th>
+                          <th className="pb-3">عنوان الفعالية / المهمة</th>
+                          <th className="pb-3">الموعد النهائي</th>
+                          <th className="pb-3">حالة الجودة</th>
+                          <th className="pb-3 text-left pl-2">قرارات التدقيق الإداري</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {committeeTasks.map((t) => (
+                          <tr key={t.id} className="hover:bg-slate-50">
+                            <td className="py-4 pr-2 font-bold text-[#630517]">{t.committee}</td>
+                            <td className="py-4 text-slate-900 font-extrabold">
+                              {t.eventTitle}
+                              <div className="text-[10px] text-slate-500 font-normal">{t.taskTitle}</div>
+                            </td>
+                            <td className="py-4 text-slate-600 font-mono">{t.dueDate}</td>
+                            <td className="py-4">
+                              <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] ${
+                                t.status?.includes('معتمدة') ? 'bg-emerald-50 text-emerald-700' :
+                                t.status?.includes('مرفوضة') ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+                              }`}>
+                                {t.status || 'قيد التدقيق'}
+                              </span>
+                            </td>
+                            <td className="py-4 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateTaskStatus(t.id, '✅ معتمدة رسمياً من الجودة')}
+                                className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg font-bold text-[10px] hover:bg-emerald-700 cursor-pointer"
+                              >
+                                اعتماد ✅
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateTaskStatus(t.id, '❌ مرفوضة (تحتاج تعديل عاجل)')}
+                                className="px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg font-bold text-[10px] hover:bg-red-100 cursor-pointer"
+                              >
+                                رفض ✕
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTask(t.id)}
+                                className="px-2.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg font-bold text-[10px] hover:bg-slate-200 cursor-pointer"
+                              >
+                                حذف 🗑️
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* محتوى تبويب 3: سجل الإنذارات والتصعيد */}
+            {qualitySubTab === 'escalations' && (
+              <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6 animate-in fade-in duration-200">
+                <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">⚠️ سجل الإنذارات والبلاغات المرفوعة لمكتب الرئيس</h3>
+                    <p className="text-xs text-slate-500">جميع البلاغات الرسمية التي تم رصدها وإحالتها للإدارة العليا.</p>
+                  </div>
+                  <span className="px-3 py-1 bg-red-100 text-red-700 font-bold text-xs rounded-full">
+                    إجمالي البلاغات: {escalatedReports.length}
+                  </span>
+                </div>
+
+                {escalatedReports.length === 0 ? (
+                  <p className="text-center py-12 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد بلاغات تقصير مسجلة حتى الآن.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {escalatedReports.map((rep) => (
+                      <div key={rep.id} className="p-5 bg-red-50/50 border border-red-200 rounded-2xl space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-black text-red-800 text-xs">اللجنة المخالفة: {rep.targetCommittee}</span>
+                          <span className="text-[10px] bg-red-200 text-red-900 font-bold px-2.5 py-0.5 rounded">
+                            {rep.createdAt ? new Date(rep.createdAt).toLocaleDateString('ar-SA') : ''}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-800 font-semibold">التفاصيل: {rep.reason}</p>
+                        <div className="text-[10px] text-slate-500 flex justify-between pt-2 border-t border-red-200/50 font-bold">
+                          <span>بواسطة: {rep.reporter}</span>
+                          <span className="text-red-700">{rep.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* محتوى تبويب 4: سجل التدقيق الإداري */}
+            {qualitySubTab === 'audit' && (
+              <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6 animate-in fade-in duration-200">
+                <div className="border-b border-slate-100 pb-4">
+                  <h3 className="text-lg font-black text-slate-900">🛡️ سجل التدقيق الإداري والرقابة السحابية</h3>
+                  <p className="text-xs text-slate-500">سجل يثبت امتثال جميع اللجان للمعايير القياسية لنادي التمريض.</p>
+                </div>
+                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-center space-y-2">
+                  <span className="text-2xl">🟢</span>
+                  <h4 className="font-extrabold text-slate-900 text-sm">النظام يعمل بكفاءة ومثالية تامة</h4>
+                  <p className="text-xs text-slate-500">لا توجد ثغرات رقابية أو تأخير في رفع المهام من قادة اللجان حالياً.</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
