@@ -78,12 +78,12 @@ interface UserAccount {
   assignedCommittee?: string;
   createdAt?: string;
   latestNotification?: string;
+  lastActive?: number;
 }
 
 export default function AdminDashboard() {
   const router = useRouter();
   
-  // التحقق هل المستخدم هو المشرف المطلق (System Admin) أم رئيس نادي
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions'>('requests');
 
@@ -123,7 +123,6 @@ export default function AdminDashboard() {
             setIsSystemAdminUser(true);
           } else {
             setIsSystemAdminUser(false);
-            // إذا كان رئيس نادي أو مشرف، نسمح له بالدخول ولكن نبقي تبويب الحسابات مخفياً عنه
             if (
               userRole !== 'رئيس النادي' && 
               userRole !== 'رئيسة النادي' && 
@@ -282,7 +281,7 @@ export default function AdminDashboard() {
   }, []);
 
   const handleRoleChange = async (phone: string, newRole: string) => {
-    if (!isSystemAdminUser) return; // حماية إضافية
+    if (!isSystemAdminUser) return;
     try {
       const userRef = doc(db, 'users', phone);
       await updateDoc(userRef, { 
@@ -298,7 +297,7 @@ export default function AdminDashboard() {
   };
 
   const handleAssignedCommitteeChange = async (phone: string, commName: string) => {
-    if (!isSystemAdminUser) return; // حماية إضافية
+    if (!isSystemAdminUser) return;
     try {
       const userRef = doc(db, 'users', phone);
       await updateDoc(userRef, { 
@@ -310,6 +309,56 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء تعيين اللجنة.');
+    }
+  };
+
+  // دالة لتعديل كلمة المرور
+  const handleUpdatePassword = async (phone: string) => {
+    const newPass = prompt('أدخل كلمة المرور الجديدة للعضو:');
+    if (!newPass || !newPass.trim()) return;
+
+    try {
+      const userRef = doc(db, 'users', phone);
+      await updateDoc(userRef, { password: newPass.trim() });
+      setUsersList(usersList.map(u => u.phone === phone ? { ...u, password: newPass.trim() } : u));
+      alert('تم تحديث كلمة المرور بنجاح! 🔒');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تحديث كلمة المرور.');
+    }
+  };
+
+  // دالة لتعديل رقم الجوال
+  const handleUpdatePhone = async (oldPhone: string) => {
+    const newPhone = prompt('أدخل رقم الجوال الجديد (اسم الدخول الجديد):', oldPhone);
+    if (!newPhone || !newPhone.trim() || newPhone.trim() === oldPhone) return;
+
+    try {
+      const trimmedNewPhone = newPhone.trim();
+      const oldUserRef = doc(db, 'users', oldPhone);
+      const oldUserSnap = await getDoc(oldUserRef);
+
+      if (!oldUserSnap.exists()) {
+        alert('لم يتم العثور على بيانات المستخدم.');
+        return;
+      }
+
+      const userData = oldUserSnap.data();
+      const newUserRef = doc(db, 'users', trimmedNewPhone);
+      
+      await setDoc(newUserRef, {
+        ...userData,
+        phone: trimmedNewPhone,
+        latestNotification: 'تم تحديث رقم جوالك الإداري بنجاح 📱'
+      });
+
+      await deleteDoc(oldUserRef);
+
+      setUsersList(usersList.map(u => u.phone === oldPhone ? { ...u, phone: trimmedNewPhone } : u));
+      alert('تم تحديث رقم جوال المستخدم بنجاح! 🚀');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تحديث رقم الجوال.');
     }
   };
 
@@ -880,7 +929,6 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
 
-        {/* لوحة إنجاز حماسية */}
         <div className="bg-gradient-to-r from-[#630517] to-[#80071D] rounded-3xl p-6 text-white shadow-xl flex flex-wrap justify-between items-center gap-6">
           <div className="space-y-1">
             <span className="bg-[#F5D061] text-[#630517] font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider">
@@ -906,7 +954,6 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Tabs - تم إخفاء تبويب الحسابات والرتب عن غير المشرف الأساسي لزيادة الأمان */}
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           {isSystemAdminUser && (
             <button
@@ -949,14 +996,14 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
               <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب (خاص بالمشرف الأساسي 🛡️)</h3>
-              <p className="text-xs text-slate-500">هنا فقط يمكنك التحكم بالصلاحيات المطلقة ورتب النظام.</p>
+              <p className="text-xs text-slate-500">هنا يمكنك متابعة حالة الاتصال للأعضاء وتعديل أرقام الجوال أو كلمات المرور أو الرتب بكل سهولة.</p>
             </div>
             
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                    <th className="pb-3 pr-2">اسم المستخدم</th>
+                    <th className="pb-3 pr-2">اسم المستخدم وحالة الاتصال</th>
                     <th className="pb-3">رقم الجوال (اسم الدخول)</th>
                     <th className="pb-3">كلمة المرور</th>
                     <th className="pb-3">الرتبة والصلاحيات</th>
@@ -965,7 +1012,10 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   <tr className="hover:bg-slate-50 bg-rose-50/20">
-                    <td className="py-4 pr-2 font-black text-[#630517]">عبدالعزيز العنزي (المشرف الأساسي)</td>
+                    <td className="py-4 pr-2 font-black text-[#630517]">
+                      عبدالعزيز العنزي (المشرف الأساسي)
+                      <span className="block text-[10px] text-emerald-600 font-bold mt-0.5">🟢 متصل الآن</span>
+                    </td>
                     <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
                     <td className="py-4">
                       <div className="flex items-center gap-2">
@@ -989,60 +1039,89 @@ export default function AdminDashboard() {
                     <td className="py-4 text-slate-400 font-bold">إدارة كاملة للمنصة</td>
                   </tr>
 
-                  {usersList.map((usr, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="py-4 pr-2 font-bold text-slate-900">{usr.fullName || 'مستخدم مسجل'}</td>
-                      <td className="py-4 text-slate-600 font-mono" dir="ltr">{usr.phone}</td>
-                      <td className="py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#630517] font-mono font-bold bg-slate-100 px-2.5 py-1 rounded w-fit">
-                            {showPasswords[usr.phone] ? (usr.password || 'غير متوفرة') : '••••••••'}
+                  {usersList.map((usr, idx) => {
+                    const isOnline = usr.lastActive && (Date.now() - usr.lastActive < 4 * 60 * 1000);
+
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="py-4 pr-2 font-bold text-slate-900">
+                          {usr.fullName || 'مستخدم مسجل'}
+                          <span className={`block text-[10px] font-bold mt-0.5 ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
+                            {isOnline ? '🟢 نشط الآن في الموقع' : '⚪ غير متصل حالياً'}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => togglePasswordVisibility(usr.phone)}
-                            className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
-                          >
-                            {showPasswords[usr.phone] ? '👁️‍🗨️' : '👁️'}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-4">
-                        <select
-                          value={usr.role || 'عضو أساسي'}
-                          onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
-                          className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
-                        >
-                          <option value="System Admin">System Admin (مدير النظام)</option>
-                          <option value="General Supervisor">General Supervisor (مشرف عام)</option>
-                          <option value="رئيس النادي">رئيس النادي</option>
-                          <option value="رئيسة النادي">رئيسة النادي</option>
-                          <option value="رئيس لجنة / مشرف قسم">رئيس لجنة</option>
-                          <option value="عضو مميز / منسق">عضو مميز</option>
-                          <option value="عضو أساسي">عضو أساسي</option>
-                        </select>
-                      </td>
-                      <td className="py-4">
-                        {(usr.role?.includes('رئيس لجنة') || usr.role?.includes('مشرف')) ? (
+                        </td>
+                        <td className="py-4 text-slate-600 font-mono" dir="ltr">
+                          <div className="flex items-center gap-2">
+                            <span>{usr.phone}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdatePhone(usr.phone)}
+                              className="text-[10px] bg-sky-50 text-sky-700 px-2 py-1 rounded-lg font-bold hover:bg-sky-100 cursor-pointer"
+                              title="تعديل رقم الجوال"
+                            >
+                              ✏️ تعديل الرقم
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#630517] font-mono font-bold bg-slate-100 px-2.5 py-1 rounded w-fit">
+                              {showPasswords[usr.phone] ? (usr.password || 'غير متوفرة') : '••••••••'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => togglePasswordVisibility(usr.phone)}
+                              className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
+                            >
+                              {showPasswords[usr.phone] ? '👁️‍🗨️' : '👁️'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdatePassword(usr.phone)}
+                              className="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded-lg font-bold hover:bg-amber-100 cursor-pointer"
+                              title="تعديل كلمة المرور"
+                            >
+                              ✏️ تعديل
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-4">
                           <select
-                            value={usr.assignedCommittee || 'لجنة الاعلام'}
-                            onChange={(e) => handleAssignedCommitteeChange(usr.phone, e.target.value)}
-                            className="px-3 py-1.5 rounded-xl border border-[#630517]/30 text-xs font-black text-[#630517] bg-[#630517]/5 shadow-sm focus:outline-none"
+                            value={usr.role || 'عضو أساسي'}
+                            onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
+                            className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
                           >
-                            <option value="لجنة الاعلام">لجنة الاعلام</option>
-                            <option value="لجنة التصميم">لجنة التصميم</option>
-                            <option value="لجنة تنظيم الفعاليات">لجنة تنظيم الفعاليات</option>
-                            <option value="لجنة الموارد البشرية">لجنة الموارد البشرية</option>
-                            <option value="لجنة العلاقات العامة">لجنة العلاقات العامة</option>
-                            <option value="لجنة المحتوى العلمي">لجنة المحتوى العلمي</option>
-                            <option value="لجنة الجودة والتطوير">لجنة الجودة والتطوير</option>
+                            <option value="System Admin">System Admin (مدير النظام)</option>
+                            <option value="General Supervisor">General Supervisor (مشرف عام)</option>
+                            <option value="رئيس النادي">رئيس النادي</option>
+                            <option value="رئيسة النادي">رئيسة النادي</option>
+                            <option value="رئيس لجنة / مشرف قسم">رئيس لجنة</option>
+                            <option value="عضو مميز / منسق">عضو مميز</option>
+                            <option value="عضو أساسي">عضو أساسي</option>
                           </select>
-                        ) : (
-                          <span className="text-slate-400 text-[11px]">غير مخصص</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-4">
+                          {(usr.role?.includes('رئيس لجنة') || usr.role?.includes('مشرف')) ? (
+                            <select
+                              value={usr.assignedCommittee || 'لجنة الاعلام'}
+                              onChange={(e) => handleAssignedCommitteeChange(usr.phone, e.target.value)}
+                              className="px-3 py-1.5 rounded-xl border border-[#630517]/30 text-xs font-black text-[#630517] bg-[#630517]/5 shadow-sm focus:outline-none"
+                            >
+                              <option value="لجنة الاعلام">لجنة الاعلام</option>
+                              <option value="لجنة التصميم">لجنة التصميم</option>
+                              <option value="لجنة تنظيم الفعاليات">لجنة تنظيم الفعاليات</option>
+                              <option value="لجنة الموارد البشرية">لجنة الموارد البشرية</option>
+                              <option value="لجنة العلاقات العامة">لجنة العلاقات العامة</option>
+                              <option value="لجنة المحتوى العلمي">لجنة المحتوى العلمي</option>
+                              <option value="لجنة الجودة والتطوير">لجنة الجودة والتطوير</option>
+                            </select>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">غير مخصص</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1752,7 +1831,6 @@ export default function AdminDashboard() {
               />
             </div>
 
-            {/* إحصائيات أعداد المتقدمين لكل لجنة (محدّثة حسب الرغبة الأولى) */}
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
               <h4 className="font-black text-slate-900 text-sm">📊 إحصائيات المتقدمين لكل لجنة (حسب الرغبة الأولى)</h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -1768,7 +1846,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* فلاتر الفرز */}
             <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex flex-wrap gap-2">
                 <button
