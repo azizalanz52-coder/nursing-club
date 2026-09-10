@@ -4,7 +4,7 @@ import React, { useState, useEffect, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, getDoc, addDoc, query, orderBy } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 
 export default function CommitteeLeaderDashboard() {
@@ -32,10 +32,15 @@ export default function CommitteeLeaderDashboard() {
   const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('لجنة تنظيم الفعاليات');
   const [preferenceFilterTab, setPreferenceFilterTab] = useState<'pref-1' | 'pref-2' | 'pref-3'>('pref-1');
 
-  // حالات الإشعارات والمهام والتنبيهات
+  // حالات الإشعارات والمهام المرتبطة بالفعاليات والتنبيهات
   const [announcementText, setAnnouncementText] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
+  const [eventTitle, setEventTitle] = useState(''); // عنوان الفعالية المرتبطة بالمهمة
   const [taskDueDate, setTaskDueDate] = useState('');
+
+  // نافذة مركز التقارير والشكاوى المرفوعة
+  const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
+  const [showReportsModal, setShowReportsModal] = useState(false);
 
   // ميزات غرفة العمليات الإضافية (فرض الرقابة، الإنذارات الصارمة، وتصعيد المقصرين لرئيس النادي)
   const [warningReason, setWarningReason] = useState('');
@@ -54,6 +59,7 @@ export default function CommitteeLeaderDashboard() {
     }
     setUserPhone(phone);
     fetchLeaderData(phone);
+    fetchEscalatedReports();
   }, [router]);
 
   const fetchLeaderData = async (phone: string) => {
@@ -77,7 +83,6 @@ export default function CommitteeLeaderDashboard() {
       const assigned = uData.assignedCommittee || uData.committee || '';
       const roleStr = uData.role || '';
 
-      // التحقق هل هو من لجنة الجودة والتطوير؟
       if (roleStr.includes('جودة') || assigned.includes('جودة') || assigned.includes('الجودة')) {
         setIsQualityTeam(true);
       } else {
@@ -85,7 +90,6 @@ export default function CommitteeLeaderDashboard() {
         setSelectedManagedCommittee(assigned || 'لجنة تنظيم الفعاليات');
       }
 
-      // جلب جميع الطلبات
       const reqSnap = await getDocs(collection(db, 'applications'));
       const allReqs = reqSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setRequests(allReqs);
@@ -94,6 +98,17 @@ export default function CommitteeLeaderDashboard() {
     } catch (err) {
       console.error(err);
       setLoading(false);
+    }
+  };
+
+  // جلب تقارير الشكاوى المرفوعة من قاعدة البيانات
+  const fetchEscalatedReports = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'escalated_reports'));
+      const reports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setEscalatedReports(reports);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -215,23 +230,39 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
+  // رفع المهمة مع ربطها بعنوان الفعالية بصرامة تامة
   const handleAssignTask = async (e: FormEvent) => {
     e.preventDefault();
-    if (!taskTitle.trim()) return;
+    if (!taskTitle.trim() || !eventTitle.trim()) {
+      alert('الرجاء إدخال عنوان الفعالية وعنوان المهمة لضمان اكتمال مركز العمليات.');
+      return;
+    }
 
     try {
       const targetComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
       const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm || r.status === 'مقبول');
+      
+      // حفظ المهمة في قاعدة البيانات مركزياً لكي يتابعها الأعضاء وتراقبها الجودة
+      await addDoc(collection(db, 'committee_tasks'), {
+        committee: targetComm,
+        eventTitle: eventTitle,
+        taskTitle: taskTitle,
+        dueDate: taskDueDate || 'محدد قريباً',
+        status: 'قيد التنفيذ',
+        createdAt: Date.now()
+      });
+
       for (const mem of acceptedList) {
         if (mem.phone) {
           const uRef = doc(db, 'users', mem.phone);
           await updateDoc(uRef, {
-            latestNotification: `📋 تكليف جديد من لجنتك (${targetComm}): ${taskTitle} (موعد الاستحقاق: ${taskDueDate || 'قريباً'})`
+            latestNotification: `⚡ [مهمة فعالية: ${eventTitle}] من (${targetComm}): ${taskTitle} (الموعد: ${taskDueDate || 'عاجل'})`
           });
         }
       }
-      alert('تم رفع التكليف وإرساله للإشعار الفوري لأعضاء اللجنة بنجاح! 🎯');
+      alert(`تم ربط المهمة بفعالية (${eventTitle}) وإرسالها لكل أعضاء (${targetComm}) بنجاح! 🎯`);
       setTaskTitle('');
+      setEventTitle('');
       setTaskDueDate('');
     } catch (err) {
       console.error(err);
@@ -239,17 +270,25 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // دالة غرفة العمليات: رفع تقرير تصعيد وتقصير قائد اللجنة لرئيس النادي
+  // دالة غرفة العمليات: رفع تقرير تصعيد وتوثيق شكوى بحق قائد اللجنة المتقاعس إلى رئيس النادي
   const handleEscalateToPresident = async () => {
     if (!warningReason.trim()) {
-      alert('الرجاء كتابة سبب التقصير أو الإنذار بوضوح.');
+      alert('الرجاء كتابة سبب التقصير أو الشكوى بوضوح.');
       return;
     }
     try {
-      // إرسال تنبيه سحابي مسجل كإنذار أحمر رسمي يتم إرساله للإدارة العليا ورئيس النادي
-      alert(`🚨 [بلاغ عمليات صارم]: تم توثيق إنذار تقصير وإحالة رسمية بحق (${targetCommitteeForWarning}) إلى رئيس النادي فوراً. لا مجال للتسويف بعد اليوم!`);
+      await addDoc(collection(db, 'escalated_reports'), {
+        targetCommittee: targetCommitteeForWarning,
+        reporter: userData?.fullName || 'لجنة الجودة والتطوير',
+        reason: warningReason,
+        status: 'قيد الإجراء الحازم من رئيس النادي',
+        createdAt: Date.now()
+      });
+
+      alert(`🚨 [تم توثيق البلاغ وإحالته برتبة "سري للغاية"]: تم رفع الشكوى ضد (${targetCommitteeForWarning}) إلى مكتب رئيس النادي فوراً بحزم.`);
       setShowWarningModal(false);
       setWarningReason('');
+      fetchEscalatedReports();
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء إرسال البلاغ.');
@@ -292,15 +331,28 @@ export default function CommitteeLeaderDashboard() {
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-xl font-black text-slate-900">
-              {isQualityTeam ? '⚡ غرفة عمليات لجنة الجودة والتطوير (الإشراف والمتابعة العليا)' : 'لوحة تحكم رئيس اللجنة القيادية 🛡️'}
+              {isQualityTeam ? '⚡ غرفة عمليات لجنة الجودة والتطوير (العقل المدبر والمركز المرعب)' : 'لوحة تحكم رئيس اللجنة القيادية 🛡️'}
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة ورصد وتقييم كافة اللجان السبع' : `اللجنة المعينة لك: ${selectedManagedCommittee}`}
+              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة ورصد وإحالة كافة اللجان السبع برتبة عسكرية صارمة' : `اللجنة المعينة لك: ${selectedManagedCommittee}`}
             </p>
           </div>
-          <Link href="/" className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-200">
-            الرئيسية ←
-          </Link>
+          
+          <div className="flex gap-2 items-center">
+            {isQualityTeam && (
+              <button
+                type="button"
+                onClick={() => setShowReportsModal(true)}
+                className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5"
+              >
+                <span>🚨</span>
+                <span>مركز الشكاوى والتقارير المرفوعة ({escalatedReports.length})</span>
+              </button>
+            )}
+            <Link href="/" className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-200">
+              الرئيسية ←
+            </Link>
+          </div>
         </div>
 
         {/* إذا كان المستخدم من لجنة الجودة، نعرض له رادار اللجان السبع للمتابعة الصارمة */}
@@ -309,7 +361,7 @@ export default function CommitteeLeaderDashboard() {
             <div className="flex justify-between items-center flex-wrap gap-3">
               <h3 className="font-black text-slate-900 text-sm">رادار مراقبة ورصد إنجازات اللجان السبع (بدون أعذار أو تسويف):</h3>
               <span className="text-[11px] bg-red-100 text-red-700 font-bold px-3 py-1 rounded-xl">
-                ⚠️ نظام التقييم الصارم: أي تأخير يتم إحالته لرئيس النادي تلقائياً
+                ⚠️ ممنوع التواصل بالواتساب إلا بحالة الطوارئ القصوى وبإذن مباشر من رئيس النادي
               </span>
             </div>
             
@@ -335,7 +387,6 @@ export default function CommitteeLeaderDashboard() {
                     </div>
                     <h4 className="font-extrabold text-sm">{commName}</h4>
 
-                    {/* أزرار العمليات السريعة لقادة الجودة (إنذار أو تبليغ رئيس النادي مباشرة) */}
                     <div className="pt-2 flex gap-1.5 border-t border-white/10 mt-2">
                       <button
                         type="button"
@@ -383,7 +434,7 @@ export default function CommitteeLeaderDashboard() {
           </div>
         </div>
 
-        {/* الأدوات القيادية الإضافية (إشعار جماعي، مهام، تصدير أكسل) */}
+        {/* الأدوات القيادية المرعبة (إشعار جماعي، ربط المهام بعنوان الفعالية، وتصدير أكسل) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
@@ -408,22 +459,30 @@ export default function CommitteeLeaderDashboard() {
             </form>
           </div>
 
+          {/* خانة رفع المهام المرتبطة بعنوان الفعالية بدقة */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-2">
-              <h3 className="text-sm font-black text-slate-900">📋 رفع مهام وتكليفات للأعضاء</h3>
-              <p className="text-[11px] text-slate-500">حدد المهمة وتاريخ الاستحقاق لتظهر لأعضاء اللجنة فوراً.</p>
+              <h3 className="text-sm font-black text-slate-900">🎯 رفع المهام المرتبطة بالفعالية</h3>
+              <p className="text-[11px] text-slate-500">اربط التكليف بـ (عنوان الفعالية) لضبط الإنجاز ومحاسبة المقصرين.</p>
             </div>
             <form onSubmit={handleAssignTask} className="space-y-2 pt-1">
               <input
                 type="text"
-                placeholder="عنوان المهمة أو التكليف..."
+                placeholder="عنوان الفعالية المرتبطة (مثال: ملتقى التمريض السنوي)..."
+                value={eventTitle}
+                onChange={(e) => setEventTitle(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+              />
+              <input
+                type="text"
+                placeholder="تفاصيل المهمة المطلوبة..."
                 value={taskTitle}
                 onChange={(e) => setTaskTitle(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
               />
               <input
                 type="text"
-                placeholder="تاريخ الاستحقاق (مثال: الخميس القادم)"
+                placeholder="الموعد النهائي (مثال: الأربعاء القادم)"
                 value={taskDueDate}
                 onChange={(e) => setTaskDueDate(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
@@ -432,7 +491,7 @@ export default function CommitteeLeaderDashboard() {
                 type="submit"
                 className="w-full py-2 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow hover:brightness-110 cursor-pointer"
               >
-                نشر التكليف للأعضاء 🎯
+                نشر التكليف والربط بفعالية ⚡
               </button>
             </form>
           </div>
@@ -600,6 +659,38 @@ export default function CommitteeLeaderDashboard() {
               >
                 تأكيد القبول وإرسال الرابط ✅
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة مركز الشكاوى والتقارير المرفوعة للرئيس والآدمن */}
+      {showReportsModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
+          <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-red-500">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <h3 className="text-lg font-black text-slate-900">🚨 مركز التقارير والشكاوى المرفوعة بحق اللجان</h3>
+              <button onClick={() => setShowReportsModal(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕ إغلاق</button>
+            </div>
+            
+            <div className="space-y-3">
+              {escalatedReports.length === 0 ? (
+                <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير تقصير أو شكاوى مرفوعة حتى الآن. الوضع مستقر وتحت السيطرة.</p>
+              ) : (
+                escalatedReports.map((rep) => (
+                  <div key={rep.id} className="bg-red-50/60 border border-red-200 rounded-2xl p-4 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-black text-red-700">اللجنة المعنية: {rep.targetCommittee}</span>
+                      <span className="text-[10px] bg-red-200 text-red-900 font-bold px-2 py-0.5 rounded">بلاغ رسمي عاجل</span>
+                    </div>
+                    <p className="text-xs text-slate-800 font-semibold">السبب والتقصير المرصود: {rep.reason}</p>
+                    <div className="text-[10px] text-slate-500 flex justify-between pt-2 border-t border-red-200/50">
+                      <span>الرافع: {rep.reporter}</span>
+                      <span className="font-bold text-red-800">{rep.status}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

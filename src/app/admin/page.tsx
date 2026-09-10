@@ -85,9 +85,12 @@ export default function AdminDashboard() {
   const router = useRouter();
   
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions'>('requests');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports'>('requests');
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+
+  // حالات التقارير المرفوعة والشكاوى من لجنة الجودة
+  const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
 
   // حالات النوافذ المنبثقة المخصصة بهوية الموقع (بدل الـ alert والـ prompt والـ confirm)
   const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'confirm'>('none');
@@ -148,7 +151,19 @@ export default function AdminDashboard() {
     };
 
     checkAdminAuth();
+    fetchEscalatedReports();
   }, [router]);
+
+  // جلب تقارير الشكاوى والتقصير المرفوعة سحابياً
+  const fetchEscalatedReports = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'escalated_reports'));
+      const reports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setEscalatedReports(reports);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -1045,6 +1060,17 @@ export default function AdminDashboard() {
             </button>
           )}
 
+          {/* زر مركز التقارير والشكاوى المرفوعة من لجنة الجودة */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('escalated-reports')}
+            className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm relative ${
+              activeTab === 'escalated-reports' ? 'bg-red-600 text-white shadow-md scale-105' : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+            }`}
+          >
+            🚨 تقارير وشكاوى الجودة ({escalatedReports.length})
+          </button>
+
           {[
             { id: 'requests', label: '📥 طلبات الانضمام والأكسل' },
             { id: 'suggestions', label: '💡 آراء ومقترحات الطلاب' },
@@ -1069,6 +1095,50 @@ export default function AdminDashboard() {
             </button>
           ))}
         </div>
+
+        {/* نافذة مركز التقارير والشكاوى المرفوعة */}
+        {activeTab === 'escalated-reports' && (
+          <div className="bg-white rounded-3xl p-8 border border-red-300 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">🚨 مركز التقارير والشكاوى المرفوعة من لجنة الجودة</h3>
+                <p className="text-xs text-slate-500">هنا يتم رصد بلاغات التقصير والإنذارات الموجهة للجان للمتابعة الفورية واتخاذ القرار الحازم.</p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 font-bold text-xs">
+                إجمالي البلاغات: {escalatedReports.length}
+              </span>
+            </div>
+
+            {escalatedReports.length === 0 ? (
+              <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-sm font-bold">لا توجد تقارير تقصير أو شكاوى مرفوعة حتى الآن. الوضع ممتاز وتحت السيطرة التامة.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {escalatedReports.map((rep) => (
+                  <div key={rep.id} className="p-6 rounded-2xl border border-red-200 bg-red-50/40 shadow-sm flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-black text-red-800 text-sm">اللجنة المعنية: {rep.targetCommittee}</span>
+                        <span className="text-[10px] bg-red-200 text-red-900 font-mono px-2 py-0.5 rounded font-bold">
+                          {rep.createdAt ? new Date(rep.createdAt).toLocaleDateString('ar-SA') : ''}
+                        </span>
+                      </div>
+                      <p className="text-slate-800 text-xs sm:text-sm font-semibold leading-relaxed bg-white p-4 rounded-xl border border-red-100 shadow-inner">
+                        <strong>التفاصيل والتقصير المرصود:</strong> {rep.reason}
+                      </p>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-red-200 text-[11px]">
+                      <span className="text-slate-500">الرافع: {rep.reporter}</span>
+                      <span className="font-bold text-red-700 bg-red-100 px-3 py-1 rounded-lg">{rep.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {activeTab === 'users-manager' && isSystemAdminUser && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
