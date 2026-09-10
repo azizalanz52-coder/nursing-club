@@ -14,10 +14,9 @@ export default function CommitteeLeaderDashboard() {
   const [requests, setRequests] = useState<any[]>([]);
   const [whatsappLink, setWhatsappLink] = useState('');
 
-  // اللجنة المحددة والمخصصة لهذا القائد (يتم جلبها من حسابه)
-  const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('لجنة الاعلام');
+  const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('لجنة تنظيم الفعاليات');
+  const [preferenceFilterTab, setPreferenceFilterTab] = useState<'pref-1' | 'pref-2' | 'pref-3'>('pref-1');
 
-  // Modal القبول
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
 
@@ -45,20 +44,25 @@ export default function CommitteeLeaderDashboard() {
       const uData = userSnap.data();
       setUserData(uData);
 
-      // إذا كان المشرف الأساسي أو رئيس النادي، نوجهه للوحة الشاملة الرئيسية أو نسمح له بالتحكم
-      if (phone === '0553731265' || uData.role === 'System Admin' || uData.role === 'رئيس النادي' || uData.role === 'رئيسة النادي') {
+      // التوجيه الشامل للآدمن أو رئيس النادي بناءً على الصلاحيات الظاهرة في حسابك
+      if (
+        phone === '0553731265' || 
+        uData.role === 'System Admin' || 
+        uData.role === 'General Supervisor' || 
+        uData.role === 'رئيس النادي' || 
+        uData.role === 'رئيسة النادي' ||
+        uData.fullName?.includes('محمد أحمد ناصر')
+      ) {
         router.push('/admin');
         return;
       }
 
-      // تحديد اللجنة المعينة له تلقائياً
       if (uData.assignedCommittee) {
         setSelectedManagedCommittee(uData.assignedCommittee);
       } else if (uData.committee) {
         setSelectedManagedCommittee(uData.committee);
       }
 
-      // جلب طلبات الانضمام
       const reqSnap = await getDocs(collection(db, 'applications'));
       const allReqs = reqSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       setRequests(allReqs);
@@ -70,7 +74,6 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // دالة مطابقة دقيقة للجنة المعينة
   const matchesTargetCommittee = (choiceStr: string, targetComm: string) => {
     if (!choiceStr) return false;
     const cleanChoice = choiceStr.replace(/الـ/g, '').replace(/إ/g, 'ا').replace(/أ/g, 'ا').replace(/آ/g, 'ا').trim();
@@ -87,16 +90,12 @@ export default function CommitteeLeaderDashboard() {
     return choiceStr.includes(targetComm) || targetComm.includes(choiceStr);
   };
 
-  // تصفية الطلبات الخاصة باللجنة المعينة له حصرياً
+  // تصفية الطلبات بناءً على الرغبة المحددة بدقة (الأولى، الثانية، أو الثالثة) لمنع تداخل الأعداد
   const filteredRequests = (requests || []).filter(req => {
-    const f1 = req.firstChoice || '';
-    const f2 = req.secondChoice || '';
-    const f3 = req.thirdChoice || '';
+    const targetKey = preferenceFilterTab === 'pref-1' ? 'firstChoice' : preferenceFilterTab === 'pref-2' ? 'secondChoice' : 'thirdChoice';
+    const choiceValue = req[targetKey] || '';
     
-    return matchesTargetCommittee(f1, selectedManagedCommittee) || 
-           matchesTargetCommittee(f2, selectedManagedCommittee) || 
-           matchesTargetCommittee(f3, selectedManagedCommittee) ||
-           req.acceptedCommittee === selectedManagedCommittee;
+    return matchesTargetCommittee(choiceValue, selectedManagedCommittee) || req.acceptedCommittee === selectedManagedCommittee;
   });
 
   const handleAcceptSubmit = async () => {
@@ -131,7 +130,6 @@ export default function CommitteeLeaderDashboard() {
     }
   };
 
-  // دالة تحويل رغبة الطالب من قبل رئيس اللجنة
   const handleShiftPreference = async (req: Record<string, any>) => {
     const f1 = req.firstChoice || '';
     const f2 = req.secondChoice || '';
@@ -171,7 +169,7 @@ export default function CommitteeLeaderDashboard() {
           <div>
             <h1 className="text-xl font-black text-slate-900">لوحة تحكم رئيس اللجنة المعين 🛡️</h1>
             <p className="text-xs text-slate-500 mt-1">
-              أهلاً بك، {userData?.fullName} ({userData?.role}) • اللجنة المعينة لك: <strong className="text-[#630517]">{selectedManagedCommittee}</strong>
+              أهلاً بك، {userData?.fullName} • اللجنة المعينة لك: <strong className="text-[#630517]">{selectedManagedCommittee}</strong>
             </p>
           </div>
           <Link href="/" className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-200">
@@ -180,14 +178,35 @@ export default function CommitteeLeaderDashboard() {
         </div>
 
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-          <div className="flex justify-between items-center flex-wrap gap-2">
+          <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
               <h3 className="text-lg font-black text-slate-900">متقدمو وقبولو ({selectedManagedCommittee})</h3>
-              <p className="text-xs text-slate-500">هنا تظهر لك الطلبات الموجهة إلى لجنتك لتدرسها وتقبلها أو تحول رغباتهم.</p>
+              <p className="text-xs text-slate-500">اختر الرغبة لعرض المتقدمين بدقة دون تداخل الأرقام:</p>
             </div>
-            <span className="px-3 py-1 rounded-full bg-[#630517]/10 text-[#630517] font-bold text-xs">
-              النتائج المطابقة: {filteredRequests.length}
-            </span>
+            
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPreferenceFilterTab('pref-1')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-1' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+              >
+                🎯 الرغبة الأولى ({requests.filter(r => matchesTargetCommittee(r.firstChoice, selectedManagedCommittee)).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreferenceFilterTab('pref-2')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-2' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+              >
+                🥈 الرغبة الثانية ({requests.filter(r => matchesTargetCommittee(r.secondChoice, selectedManagedCommittee)).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreferenceFilterTab('pref-3')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-3' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+              >
+                🥉 الرغبة الثالثة ({requests.filter(r => matchesTargetCommittee(r.thirdChoice, selectedManagedCommittee)).length})
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -204,7 +223,7 @@ export default function CommitteeLeaderDashboard() {
               <tbody className="divide-y divide-slate-100">
                 {filteredRequests.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد طلبات متقدمين مطابقة لـ "{selectedManagedCommittee}" حالياً.</td>
+                    <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد طلبات متقدمين مطابقة لهذه الرغبة في "{selectedManagedCommittee}" حالياً.</td>
                   </tr>
                 ) : (
                   filteredRequests.map((req) => (
@@ -268,7 +287,6 @@ export default function CommitteeLeaderDashboard() {
 
       </div>
 
-      {/* Modal Accept */}
       {showAcceptModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
