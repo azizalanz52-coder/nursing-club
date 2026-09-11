@@ -466,6 +466,42 @@ export default function CommitteeDashboard() {
     alert('تم تصدير ملف الأكسل بنجاح وجاهز لرفعه للآدمن! 📊');
   };
 
+  // دالة اعتماد التقرير ورفع محفظة الجودة للإدارة العليا والرؤساء
+  const handleApproveAndSubmitToPresidents = async () => {
+    if (!confirm('هل أنت متأكد من اعتماد التقرير الختامي لمحفظة الجودة وإرساله رسمياً لمكتب الرؤساء والإدارة العليا؟')) return;
+
+    try {
+      const reportSummaryText = `🏆 [اعتماد تقرير محفظة الجودة الختامي]: تمت مراجعة إنجازات اللجان السبع، واعتماد الأعضاء المقبولين، وتقفيل مهام الفعاليات بنجاح تام.`;
+
+      // إرسال تنبيه فوري لجميع حسابات الرؤساء والإدارة العليا
+      for (const usr of allUsersList) {
+        if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
+          try {
+            await updateDoc(doc(db, 'users', usr.id), {
+              latestNotification: reportSummaryText
+            });
+          } catch (er) { console.error(er); }
+        }
+      }
+
+      // توثيق التقرير المعتمد في قاعدة البيانات
+      await addDoc(collection(db, 'escalated_reports'), {
+        targetCommittee: 'جميع اللجان السبع',
+        reporter: userData?.fullName || 'لجنة الجودة والتطوير',
+        reason: 'تم إعداد واعتماد تقرير محفظة أدلة الجودة الختامي ورفعه رسمياً لمكتب الرؤساء.',
+        status: '✅ معتمد ومنجز ومرفوع للرؤساء',
+        leaderDefenseReply: 'تم الإنجاز والاعتماد بنجاح',
+        createdAt: Date.now()
+      });
+
+      alert('🎉 تم اعتماد التقرير الختامي وإرسال الإشعار والتنبيه لمكتب الرؤساء والإدارة العليا بنجاح تام!');
+      fetchEscalatedReports();
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء اعتماد ورفع التقرير.');
+    }
+  };
+
   // دالة تصدير تقرير محفظة الجودة الشامل كملف PDF مرتب باستخدام نافذة الطباعة المتطورة
   const handleExportQualityPDF = () => {
     const printWindow = window.open('', '_blank');
@@ -500,7 +536,7 @@ export default function CommitteeDashboard() {
           <p>تاريخ التقرير: ${new Date().toLocaleDateString('ar-SA')} | الوقت: ${new Date().toLocaleTimeString('ar-SA')}</p>
         </div>
 
-        <div class="section-title">أولاً: ملخص إحصائيات وأداء اللجان السبع</div>
+        <div class="section-title">أولاً: ملخص إحصائيات وأداء اللجان السبع (تحديث حي مباشر)</div>
         <table>
           <thead>
             <tr>
@@ -515,11 +551,11 @@ export default function CommitteeDashboard() {
 
     allCommitteesList.forEach(comm => {
       const commMembers = requests.filter(r => r.acceptedCommittee === comm || r.status === 'مقبول').length;
-      const commApplicants = requests.filter(r => matchesTargetCommittee(r.firstChoice, comm)).length;
+      const commApplicants = requests.filter(r => matchesTargetCommittee(r.firstChoice, comm) || matchesTargetCommittee(r.secondChoice, comm) || matchesTargetCommittee(r.thirdChoice, comm)).length;
       htmlContent += `
         <tr>
           <td><strong>${comm}</strong></td>
-          <td>${commMembers} أعضاء</td>
+          <td>${commMembers} أعضاء مقبولة</td>
           <td>${commApplicants} متقدم</td>
           <td><span class="badge-ok">معتمد ومنتظم ✓</span></td>
         </tr>
@@ -617,6 +653,15 @@ export default function CommitteeDashboard() {
                 >
                   <span>📄</span>
                   <span>محفظة أدلة الجودة (PDF)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApproveAndSubmitToPresidents}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-black shadow hover:bg-amber-700 flex items-center gap-1.5 cursor-pointer animate-pulse"
+                  title="اعتماد التقرير ورفع للإدارة العليا والرؤساء"
+                >
+                  <span>🚀</span>
+                  <span>اعتماد الرفع للإدارة العليا</span>
                 </button>
                 <button
                   type="button"
