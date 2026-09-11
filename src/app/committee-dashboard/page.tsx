@@ -69,9 +69,9 @@ export default function CommitteeDashboard() {
   // حالة إخفاء الإنذار محلياً وسحابياً لضمان عدم ظهوره بعد حذفه
   const [warningHidden, setWarningHidden] = useState(false);
 
-  // حالات خاصة بلجنة الإعلام (رفع الصور والبوسترات سحابياً)
+  // حالات خاصة بلجنة الإعلام (رفع الصور ومقاطع الفيديو فقط)
   const [mediaTitle, setMediaTitle] = useState('');
-  const [mediaCategory, setMediaCategory] = useState('بوستر رسمي');
+  const [mediaCategory, setMediaCategory] = useState('تغطية فعالية');
   const [mediaBase64, setMediaBase64] = useState('/header-banner.png');
   const [mediaGallery, setMediaGallery] = useState<any[]>([]);
 
@@ -96,7 +96,6 @@ export default function CommitteeDashboard() {
     fetchMediaGallery();
     fetchScientificTexts();
 
-    // التحقق مما إذا تم إخفاء الإنذار سابقاً لهذا المستخدم محلياً
     const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
     if (isHiddenLocally === 'true') {
       setWarningHidden(true);
@@ -116,7 +115,6 @@ export default function CommitteeDashboard() {
       const uData = userSnap.data();
       setUserData(uData);
       
-      // التحقق من حقل الإخفاء في قاعدة البيانات سحابياً أيضاً
       if (uData.warningHidden) {
         setWarningHidden(true);
       }
@@ -931,13 +929,13 @@ export default function CommitteeDashboard() {
         {/* تفعيل أدوات اللجان المطورة (الموارد البشرية، الإعلام، المحتوى العلمي) */}
         {/* ======================================================== */}
 
-        {/* 1. أداة لجنة الموارد البشرية: فرز أفضل 40 طالب محول والتواصل معهم */}
+        {/* 1. أداة لجنة الموارد البشرية: فرز أفضل 40 طالب محول وتحويل الباقين لمراجعة الرغبات */}
         {currentActiveComm === 'لجنة الموارد البشرية' && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">👥 نظام فرز ومتابعة الطلاب المحولين (أفضل 40 طالب/ة)</h3>
-                <p className="text-xs text-slate-500">هنا يظهر الطلاب الذين تم تحويلهم للجنة الموارد البشرية بعد اكتفاء لجانهم الأولى؛ تواصل معهم عبر الواتساب للتأكد من جديتهم.</p>
+                <p className="text-xs text-slate-500">تحدد اللجان أفضل 40 طالب، ويتم تحويل الباقين للجنة الموارد البشرية لمراجعة القبول على الرغبة الثانية أو الثالثة والتواصل معهم.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-sky-100 text-sky-800 font-bold text-xs">
                 إجمالي المحولين المرشحين: {requests.slice(0, 40).length}
@@ -952,7 +950,7 @@ export default function CommitteeDashboard() {
                     <th className="pb-3">رقم الجوال</th>
                     <th className="pb-3">الرغبة الأولى (التي اكتفت)</th>
                     <th className="pb-3">الرغبات المسجلة</th>
-                    <th className="pb-3 text-left pl-2">فحص الجديّة عبر الواتساب</th>
+                    <th className="pb-3 text-left pl-2">تواصل واتساب</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -964,12 +962,12 @@ export default function CommitteeDashboard() {
                       <td className="py-3.5 text-slate-600">{req.secondChoice || '-'} / {req.thirdChoice || '-'}</td>
                       <td className="py-3.5 text-left pl-2">
                         <a
-                          href={`https://wa.me/${req.phone?.startsWith('0') ? '966' + req.phone.substring(1) : req.phone}?text=مرحباً بك ${req.fullName}، تم تحويلك رسمياً للعمل معنا في لجنة الموارد البشرية بنادي التمريض. نود التأكد من جديتك ورغبتك في الانضمام والبدء معنا! 🚀`}
+                          href={`https://wa.me/${req.phone?.startsWith('0') ? '966' + req.phone.substring(1) : req.phone}?text=مرحباً بك ${req.fullName}، تم تحويلك رسمياً للعمل معنا في لجنة الموارد البشرية بنادي التمريض. نود مراجعة رغبتك الثانية أو الثالثة والانضمام معنا! 🚀`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition-all inline-flex items-center gap-1"
                         >
-                          💬 تواصل واتساب للجدية
+                          💬 تواصل واتساب
                         </a>
                       </td>
                     </tr>
@@ -980,13 +978,13 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 2. أداة لجنة الإعلام: مركز رفع الصور والبوسترات سحابياً لمعرض الموقع */}
+        {/* 2. أداة لجنة الإعلام: مركز رفع الصور ومقاطع الفيديو فقط سحابياً لمعرض الموقع */}
         {currentActiveComm === 'لجنة الاعلام' && (
           <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900">🎨 مركز رفع ونشر الصور والبوسترات (لجنة الإعلام)</h3>
-                <p className="text-xs text-slate-500">ارفع التصاميم والبوسترات وتغطيات الفعاليات لتغذية واجهة المعرض والموقع مباشرة.</p>
+                <h3 className="text-xl font-black text-slate-900">📸 مركز رفع ونشر الصور ومقاطع الفيديو (لجنة الإعلام)</h3>
+                <p className="text-xs text-slate-500">ارفع صور وتغطيات الفعاليات لتغذية واجهة المعرض والموقع مباشرة.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
                 إجمالي المواد المرفوعة: {mediaGallery.length}
@@ -995,10 +993,10 @@ export default function CommitteeDashboard() {
 
             <form onSubmit={handleUploadMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">عنوان التصميم أو البوستر</label>
+                <label className="text-xs font-bold text-slate-700">عنوان الصورة أو المقطع</label>
                 <input
                   type="text"
-                  placeholder="مثال: بوستر ملتقى التمريض التوعوي"
+                  placeholder="مثال: تغطية ملتقى التمريض التوعوي"
                   value={mediaTitle}
                   onChange={(e) => setMediaTitle(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
@@ -1013,17 +1011,16 @@ export default function CommitteeDashboard() {
                   onChange={(e) => setMediaCategory(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
                 >
-                  <option value="بوستر رسمي">بوستر رسمي</option>
                   <option value="تغطية فعالية">تغطية فعالية</option>
-                  <option value="تصميم توعوي">تصميم توعوي صحي</option>
+                  <option value="صور ومقاطع">صور ومقاطع أرشيفية</option>
                 </select>
               </div>
 
               <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-bold text-slate-700">اختر ملف الصورة من جهازك</label>
+                <label className="text-xs font-bold text-slate-700">اختر ملف الصورة أو الفيديو من جهازك</label>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   onChange={async (e: ChangeEvent<HTMLInputElement>) => {
                     if (e.target.files && e.target.files[0]) {
                       setMediaBase64(await convertFileToBase64(e.target.files[0]));
@@ -1036,7 +1033,7 @@ export default function CommitteeDashboard() {
 
               <div className="sm:col-span-2 pt-2">
                 <button type="submit" className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer">
-                  + رفع ونشر المادة سحابياً في الموقع 🎬
+                  + رفع ونشر الصور والمقاطع سحابياً 🎬
                 </button>
               </div>
             </form>
