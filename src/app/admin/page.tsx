@@ -168,12 +168,18 @@ export default function AdminDashboard() {
     }
   };
 
-  // جلب أرشيف التقارير التاريخية (Historical Vault)
+  // جلب أرشيف التقارير التاريخية (Historical Vault) سحابياً من مجموعتي historical_vault_reports و quality_reports_archive
   const fetchHistoricalVault = async () => {
     try {
-      const snap = await getDocs(collection(db, 'historical_vault_reports'));
-      const reports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setHistoricalVaultReports(reports);
+      const snap1 = await getDocs(collection(db, 'historical_vault_reports'));
+      const snap2 = await getDocs(collection(db, 'quality_reports_archive'));
+      
+      const reports1 = snap1.docs.map(d => ({ id: d.id, ...d.data() }));
+      const reports2 = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      // دمج الأرشيفين لمنع أي ضياع للبيانات
+      const combined = [...reports1, ...reports2];
+      setHistoricalVaultReports(combined);
     } catch (e) {
       console.error(e);
     }
@@ -231,13 +237,13 @@ export default function AdminDashboard() {
   const [selectedCommitteeFilter, setSelectedCommitteeFilter] = useState<string>('لجنة التصميم');
 
   const [committees, setCommittees] = useState<Committee[]>([
-    { id: 'design', name: 'التصميم', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي', members: [] },
+    { id: 'design', name: 'لجنة التصميم', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي', members: [] },
     { id: 'media', name: 'لجنة الاعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
-    { id: 'events-org', name: 'تنظيم الفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', members: [] },
-    { id: 'hr', name: 'الموارد البشرية', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي', members: [] },
-    { id: 'pr', name: 'العلاقات العامة', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي', members: [] },
-    { id: 'scientific', name: 'المحتوى العلمي', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي', members: [] },
-    { id: 'quality', name: 'الجودة والتطوير', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري', members: [] },
+    { id: 'events-org', name: 'لجنة تنظيم الفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', members: [] },
+    { id: 'hr', name: 'لجنة الموارد البشرية', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي', members: [] },
+    { id: 'pr', name: 'لجنة العلاقات العامة', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي', members: [] },
+    { id: 'scientific', name: 'لجنة المحتوى العلمي', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي', members: [] },
+    { id: 'quality', name: 'لجنة الجودة والتطوير', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري', members: [] },
   ]);
 
   const [selectedCommitteeId, setSelectedCommitteeId] = useState<string>('design');
@@ -429,7 +435,6 @@ export default function AdminDashboard() {
     setModalType('confirm');
   };
 
-  // فتح نافذة إرسال الإنذار لقائد وقائدة اللجنة
   const handleOpenWarningModal = (rep: any) => {
     setWarningTargetReportId(rep.id);
     setWarningTargetCommittee(rep.targetCommittee);
@@ -437,7 +442,6 @@ export default function AdminDashboard() {
     setShowWarningModal(true);
   };
 
-  // إرسال الإنذار (تحديث حالة التقرير سحابياً إلى "تم إنذار القادة")
   const handleSendWarningToLeaders = async (e: FormEvent) => {
     e.preventDefault();
     if (!warningTargetReportId) return;
@@ -457,7 +461,7 @@ export default function AdminDashboard() {
       } : r));
 
       setShowWarningModal(false);
-      setModalMessage('تم إرسال الإنذار التحذيري لقائد وقائدة اللجنة بنجاح! 📨\n(سيتم منحهم المهلة المحددة قبل التصعيد النهائي للرؤساء)');
+      setModalMessage('تم إرسال الإنذار التحذيري لقائد وقائدة اللجنة بنجاح! 📨');
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -466,7 +470,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // تصعيد البلاغ نهائياً للرئيس ورئيسة النادي لعدم التجاوب (وينتقل إلى الأرشيف التاريخي تلقائياً)
   const handleEscalateToPresidentsFinal = async (rep: any) => {
     triggerConfirmModal(`هل أنت متأكد من عدم تجاوب قائد وقائدة (${rep.targetCommittee}) وترغب في رفع البلاغ وإحالته رسمياً للرئيس ورئيسة النادي الآن وأرشفته؟`, async () => {
       try {
@@ -478,7 +481,6 @@ export default function AdminDashboard() {
           escalatedToPresidentsAt: new Date().toISOString()
         });
 
-        // نسخه إلى الأرشيف التاريخي Historical Vault
         const archiveId = `vault_${rep.id}_${Date.now()}`;
         const archivedObj = {
           ...rep,
@@ -1217,7 +1219,7 @@ export default function AdminDashboard() {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">📊 رادار مراقبة أداء اللجان الشامل</h3>
-                <p className="text-xs text-slate-500">متابعة حية لحالات الإنجاز، أعداد الأعضاء المنضمين، ونسبة نشاط كل لجنة في النادي.</p>
+                <p className="text-xs text-slate-500">متابعة حية من قاعدة البيانات للأعضاء المقبولين، أداء اللجان، والجاهزية التشغيلية.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs">
                 عدد اللجان النشطة: {committees.length}
@@ -1226,9 +1228,10 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {committees.map((comm) => {
-                const memberCount = comm.members?.length || 0;
-                // حساب تقديري لمؤشر الأداء بناءً على عدد الأعضاء وقادتهم
-                const performanceScore = Math.min(100, memberCount * 15 + 40);
+                const acceptedCommMembers = requests.filter(r => r.acceptedCommittee === comm.name || r.status === 'مقبول').length;
+                const membersListCount = comm.members?.length || 0;
+                const totalActiveCount = Math.max(acceptedCommMembers, membersListCount);
+                const performanceScore = Math.min(100, totalActiveCount * 12 + 45);
 
                 return (
                   <div key={comm.id} className="p-6 rounded-2xl border border-indigo-100 bg-indigo-50/20 shadow-sm flex flex-col justify-between space-y-4">
@@ -1243,7 +1246,7 @@ export default function AdminDashboard() {
                       <div className="space-y-1 text-xs text-slate-700 bg-white p-3 rounded-xl border border-indigo-100">
                         <p><strong>👨‍✈️ قائد الطلاب:</strong> {comm.maleLeader || 'غير متوفر'}</p>
                         <p><strong>👩‍✈️ قائدة الطالبات:</strong> {comm.femaleLeader || 'غير متوفر'}</p>
-                        <p><strong>👥 إجمالي الأعضاء:</strong> {memberCount} أعضاء نشطين</p>
+                        <p><strong>👥 الأعضاء المقبولون:</strong> {totalActiveCount} أعضاء فاعلين</p>
                       </div>
 
                       {/* شريط التقدم لمؤشر الإنجاز */}
@@ -1278,7 +1281,7 @@ export default function AdminDashboard() {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">📦 أرشيف التقارير التاريخية (Historical Vault)</h3>
-                <p className="text-xs text-slate-500">سجل كامل ومؤرشف لكافة التقارير المعتمدة والبلاغات التي تم رفعها وإحالتها للرؤساء سابقاً.</p>
+                <p className="text-xs text-slate-500">سجل كامل ومؤرشف سحابياً لكافة التقارير المعتمدة وتقارير محفظة أدلة الجودة الختامية.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-bold text-xs">
                 إجمالي المؤرشف: {historicalVaultReports.length}
@@ -1287,24 +1290,24 @@ export default function AdminDashboard() {
 
             {historicalVaultReports.length === 0 ? (
               <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <p className="text-sm font-bold">لا توجد تقارير في الأرشيف التاريخي حتى الآن. سيتم أرشفة البلاغات المُحالة تلقائياً هنا.</p>
+                <p className="text-sm font-bold">لا توجد تقارير في الأرشيف التاريخي حتى الآن. سيتم أرشفة البلاغات والتقارير المعتمدة من لجنة الجودة تلقائياً هنا.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {historicalVaultReports.map((vaultItem) => (
-                  <div key={vaultItem.id} className="p-6 rounded-2xl border border-amber-200 bg-amber-50/40 shadow-sm space-y-3">
+                {historicalVaultReports.map((vaultItem, idx) => (
+                  <div key={vaultItem.id || idx} className="p-6 rounded-2xl border border-amber-200 bg-amber-50/40 shadow-sm space-y-3">
                     <div className="flex justify-between items-center flex-wrap gap-2">
-                      <span className="font-black text-amber-900 text-sm">اللجنة: {vaultItem.targetCommittee}</span>
+                      <span className="font-black text-amber-900 text-sm">العنوان / اللجنة: {vaultItem.title || vaultItem.targetCommittee}</span>
                       <span className="text-[10px] bg-amber-200 text-amber-900 font-mono px-2 py-0.5 rounded font-bold">
-                        {vaultItem.archivedAt ? new Date(vaultItem.archivedAt).toLocaleDateString('ar-SA') : ''}
+                        {vaultItem.dateStr || (vaultItem.archivedAt ? new Date(vaultItem.archivedAt).toLocaleDateString('ar-SA') : 'معتمد رسمياً')}
                       </span>
                     </div>
                     <p className="text-slate-800 text-xs sm:text-sm font-semibold bg-white p-3 rounded-xl border border-amber-100 shadow-inner">
-                      <strong>السبب:</strong> {vaultItem.reason}
+                      <strong>التفاصيل:</strong> {vaultItem.reason || vaultItem.status || 'معتمد ومؤرشف في محفظة أدلة الجودة'}
                     </p>
                     <div className="pt-2 border-t border-amber-200 flex justify-between items-center text-[11px] text-slate-600 font-bold">
-                      <span>الرافع: {vaultItem.reporter}</span>
-                      <span className="text-red-700 bg-red-100 px-2.5 py-1 rounded-lg">تمت الإحالة والأرشفة ✅</span>
+                      <span>الرافع والموثق: {vaultItem.reporter || vaultItem.author || 'لجنة الجودة والتطوير'}</span>
+                      <span className="text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg">✅ معتمد ومؤرشف سحابياً</span>
                     </div>
                   </div>
                 ))}
@@ -1345,6 +1348,13 @@ export default function AdminDashboard() {
                       <p className="text-slate-800 text-xs sm:text-sm font-semibold leading-relaxed bg-white p-4 rounded-xl border border-red-100 shadow-inner">
                         <strong>التفاصيل والتقصير المرصود:</strong> {rep.reason}
                       </p>
+
+                      {rep.leaderDefenseReply && (
+                        <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] text-emerald-900 space-y-1">
+                          <strong>💬 رد وتبرير قائد اللجنة:</strong>
+                          <p>{rep.leaderDefenseReply}</p>
+                        </div>
+                      )}
 
                       {rep.warningText && (
                         <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 space-y-1">
@@ -2082,13 +2092,13 @@ export default function AdminDashboard() {
               <h3 className="text-base font-extrabold text-slate-900">اختر اللجنة لتعديل قادتها وأعضائها</h3>
               <div className="flex flex-wrap gap-2">
                 {[
-                  { id: 'design', name: 'التصميم' },
+                  { id: 'design', name: 'لجنة التصميم' },
                   { id: 'media', name: 'لجنة الاعلام' },
-                  { id: 'events-org', name: 'تنظيم الفعاليات' },
-                  { id: 'hr', name: 'الموارد البشرية' },
-                  { id: 'pr', name: 'العلاقات العامة' },
-                  { id: 'scientific', name: 'المحتوى العلمي' },
-                  { id: 'quality', name: 'الجودة والتطوير' },
+                  { id: 'events-org', name: 'لجنة تنظيم الفعاليات' },
+                  { id: 'hr', name: 'لجنة الموارد البشرية' },
+                  { id: 'pr', name: 'لجنة العلاقات العامة' },
+                  { id: 'scientific', name: 'لجنة المحتوى العلمي' },
+                  { id: 'quality', name: 'لجنة الجودة والتطوير' },
                 ].map((com) => (
                   <button
                     key={com.id}
