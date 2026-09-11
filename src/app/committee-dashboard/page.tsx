@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, FormEvent } from 'react';
+import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
@@ -69,6 +69,17 @@ export default function CommitteeDashboard() {
   // حالة إخفاء الإنذار محلياً وسحابياً لضمان عدم ظهوره بعد حذفه
   const [warningHidden, setWarningHidden] = useState(false);
 
+  // حالات خاصة بلجنة الإعلام (رفع الصور والبوسترات سحابياً)
+  const [mediaTitle, setMediaTitle] = useState('');
+  const [mediaCategory, setMediaCategory] = useState('بوستر رسمي');
+  const [mediaBase64, setMediaBase64] = useState('/header-banner.png');
+  const [mediaGallery, setMediaGallery] = useState<any[]>([]);
+
+  // حالات خاصة بلجنة المحتوى العلمي (بنك صياغة النصوص الطبية والبنرات)
+  const [textBannerTitle, setTextBannerTitle] = useState('');
+  const [textBannerContent, setTextBannerContent] = useState('');
+  const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
+
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
     if (!phone) {
@@ -82,6 +93,8 @@ export default function CommitteeDashboard() {
     fetchCommitteeTasks();
     fetchAllUsers();
     fetchQualityArchives();
+    fetchMediaGallery();
+    fetchScientificTexts();
 
     // التحقق مما إذا تم إخفاء الإنذار سابقاً لهذا المستخدم محلياً
     const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
@@ -177,6 +190,83 @@ export default function CommitteeDashboard() {
       setQualityArchives(archives);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const fetchMediaGallery = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'media_committee_gallery'));
+      setMediaGallery(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchScientificTexts = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'scientific_committee_texts'));
+      setScientificTextsList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
+  };
+
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleUploadMediaSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!mediaTitle.trim()) return;
+    const mediaId = `media_${Date.now()}`;
+    const newObj = {
+      id: mediaId,
+      title: mediaTitle.trim(),
+      category: mediaCategory,
+      imageUrl: mediaBase64,
+      createdAt: new Date().toLocaleDateString('ar-SA')
+    };
+    try {
+      await addDoc(collection(db, 'media_committee_gallery'), newObj);
+      setMediaGallery([newObj, ...mediaGallery]);
+      setMediaTitle('');
+      setMediaBase64('/header-banner.png');
+      alert('تم رفع ونشر المادة الإعلامية سحابياً بنجاح! 📸🚀');
+    } catch (err) { console.error(err); }
+  };
+
+  const handleDeleteMedia = async (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذه المادة؟')) {
+      await deleteDoc(doc(db, 'media_committee_gallery', id));
+      setMediaGallery(mediaGallery.filter(m => m.id !== id));
+    }
+  };
+
+  const handleAddScientificTextSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!textBannerTitle.trim() || !textBannerContent.trim()) return;
+    const textId = `txt_${Date.now()}`;
+    const newTextObj = {
+      id: textId,
+      title: textBannerTitle.trim(),
+      content: textBannerContent.trim(),
+      author: userData?.fullName || 'لجنة المحتوى العلمي',
+      createdAt: new Date().toLocaleDateString('ar-SA')
+    };
+    try {
+      await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
+      setScientificTextsList([newTextObj, ...scientificTextsList]);
+      setTextBannerTitle('');
+      setTextBannerContent('');
+      alert('تم اعتماد ونشر النص والعبارة العلمية للبنرات والتصاميم بنجاح! 🔬✨');
+    } catch (err) { console.error(err); }
+  };
+
+  const handleDeleteScientificText = async (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا النص؟')) {
+      await deleteDoc(doc(db, 'scientific_committee_texts', id));
+      setScientificTextsList(scientificTextsList.filter(t => t.id !== id));
     }
   };
 
@@ -402,7 +492,7 @@ export default function CommitteeDashboard() {
           try {
             await updateDoc(doc(db, 'users', usr.id), {
               latestNotification: alertMsg,
-              warningHidden: false // إعادة تفعيل ظهور الإنذار عند إرسال إنذار جديد
+              warningHidden: false
             });
           } catch (er) { console.error(er); }
         }
@@ -502,7 +592,6 @@ export default function CommitteeDashboard() {
     alert('تم تصدير ملف الأكسل بنجاح وجاهز لرفعه للآدمن! 📊');
   };
 
-  // دالة اعتماد التقرير وحفظه في الأرشيف التاريخي ورفع محفظة الجودة للإدارة العليا ورئاسة النادي والأدمن
   const handleApproveAndSubmitToPresidents = async () => {
     if (!confirm('هل أنت متأكد من اعتماد التقرير الختامي لمحفظة الجودة وحفظه في الأرشيف التاريخي وإرساله رسمياً لمكتب الرؤساء والأدمن؟')) return;
 
@@ -510,7 +599,6 @@ export default function CommitteeDashboard() {
       const reportTitle = `تقرير محفظة أدلة الجودة الختامي (${new Date().toLocaleDateString('ar-SA')})`;
       const reportSummaryText = `🏆 [اعتماد تقرير محفظة الجودة الختامي]: تمت مراجعة إنجازات اللجان السبع، وحفظ الأرشيف، ورفع التقرير بنجاح تام.`;
 
-      // 1. حفظ التقرير في الأرشيف التاريخي (Historical Vault) مع حالة الاعتماد المؤرشف رسمياً لضمان ظهوره في صفحة الأدمن والرؤساء
       await addDoc(collection(db, 'quality_reports_archive'), {
         title: reportTitle,
         createdAt: Date.now(),
@@ -519,7 +607,6 @@ export default function CommitteeDashboard() {
         author: userData?.fullName || 'لجنة الجودة والتطوير'
       });
 
-      // 2. إرسال الإشعار والتنبيه لجميع حسابات الأدمن والرؤساء لضمان وصوله فوراً
       for (const usr of allUsersList) {
         if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
           try {
@@ -530,7 +617,6 @@ export default function CommitteeDashboard() {
         }
       }
 
-      // 3. توثيق البلاغ/التقرير في مجموعة escalated_reports أو مجموعة مخصصة لضمان ظهوره بصفحة الأدمن والرؤساء
       await addDoc(collection(db, 'escalated_reports'), {
         targetCommittee: 'جميع اللجان السبع',
         reporter: userData?.fullName || 'لجنة الجودة والتطوير',
@@ -549,7 +635,6 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // دالة تصدير تقرير محفظة الجودة الشامل كملف PDF مرتب مع الفقرة التحليلية الذكية
   const handleExportQualityPDF = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -767,7 +852,7 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* الأليرت بار القيادي (مع زر إخفاء دائم لا يعود أبداً بعد حذفه) */}
+        {/* الأليرت بار القيادي */}
         {!warningHidden && (
           <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between flex-wrap gap-4 border border-amber-400">
             <div className="flex items-center gap-3">
@@ -798,7 +883,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* صندوق تنبيهات وإنذارات اللجنة الحالية (خاص بقادة اللجان لتقديم الرد خلال 24 ساعة) */}
+        {/* صندوق تنبيهات وإنذارات اللجنة الحالية */}
         {!isQualityTeam && committeeReports.length > 0 && (
           <div className="bg-amber-50 border-2 border-amber-400 rounded-3xl p-6 space-y-4 shadow-sm">
             <div className="flex items-center gap-2">
@@ -836,6 +921,203 @@ export default function CommitteeDashboard() {
                       <span>إرسال الرد والتبرير الرسمي (خلال 24 ساعة)</span>
                     </button>
                   )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* تفعيل أدوات اللجان المطورة (الموارد البشرية، الإعلام، المحتوى العلمي) */}
+        {/* ======================================================== */}
+
+        {/* 1. أداة لجنة الموارد البشرية: فرز أفضل 40 طالب محول والتواصل معهم */}
+        {currentActiveComm === 'لجنة الموارد البشرية' && (
+          <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">👥 نظام فرز ومتابعة الطلاب المحولين (أفضل 40 طالب/ة)</h3>
+                <p className="text-xs text-slate-500">هنا يظهر الطلاب الذين تم تحويلهم للجنة الموارد البشرية بعد اكتفاء لجانهم الأولى؛ تواصل معهم عبر الواتساب للتأكد من جديتهم.</p>
+              </div>
+              <span className="px-3.5 py-1.5 rounded-xl bg-sky-100 text-sky-800 font-bold text-xs">
+                إجمالي المحولين المرشحين: {requests.slice(0, 40).length}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                    <th className="pb-3 pr-2">اسم الطالب / الطالبة</th>
+                    <th className="pb-3">رقم الجوال</th>
+                    <th className="pb-3">الرغبة الأولى (التي اكتفت)</th>
+                    <th className="pb-3">الرغبات المسجلة</th>
+                    <th className="pb-3 text-left pl-2">فحص الجديّة عبر الواتساب</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {requests.slice(0, 40).map((req, idx) => (
+                    <tr key={idx} className="hover:bg-sky-50/20">
+                      <td className="py-3.5 pr-2 font-bold text-slate-900">{req.fullName}</td>
+                      <td className="py-3.5 font-mono text-slate-700" dir="ltr">{req.phone}</td>
+                      <td className="py-3.5 text-red-600 font-semibold">{req.firstChoice || 'غير متوفر'}</td>
+                      <td className="py-3.5 text-slate-600">{req.secondChoice || '-'} / {req.thirdChoice || '-'}</td>
+                      <td className="py-3.5 text-left pl-2">
+                        <a
+                          href={`https://wa.me/${req.phone?.startsWith('0') ? '966' + req.phone.substring(1) : req.phone}?text=مرحباً بك ${req.fullName}، تم تحويلك رسمياً للعمل معنا في لجنة الموارد البشرية بنادي التمريض. نود التأكد من جديتك ورغبتك في الانضمام والبدء معنا! 🚀`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition-all inline-flex items-center gap-1"
+                        >
+                          💬 تواصل واتساب للجدية
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 2. أداة لجنة الإعلام: مركز رفع الصور والبوسترات سحابياً لمعرض الموقع */}
+        {currentActiveComm === 'لجنة الاعلام' && (
+          <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">🎨 مركز رفع ونشر الصور والبوسترات (لجنة الإعلام)</h3>
+                <p className="text-xs text-slate-500">ارفع التصاميم والبوسترات وتغطيات الفعاليات لتغذية واجهة المعرض والموقع مباشرة.</p>
+              </div>
+              <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
+                إجمالي المواد المرفوعة: {mediaGallery.length}
+              </span>
+            </div>
+
+            <form onSubmit={handleUploadMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">عنوان التصميم أو البوستر</label>
+                <input
+                  type="text"
+                  placeholder="مثال: بوستر ملتقى التمريض التوعوي"
+                  value={mediaTitle}
+                  onChange={(e) => setMediaTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">التصنيف الإعلامي</label>
+                <select
+                  value={mediaCategory}
+                  onChange={(e) => setMediaCategory(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
+                >
+                  <option value="بوستر رسمي">بوستر رسمي</option>
+                  <option value="تغطية فعالية">تغطية فعالية</option>
+                  <option value="تصميم توعوي">تصميم توعوي صحي</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-slate-700">اختر ملف الصورة من جهازك</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setMediaBase64(await convertFileToBase64(e.target.files[0]));
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-600 file:text-white cursor-pointer"
+                  required
+                />
+              </div>
+
+              <div className="sm:col-span-2 pt-2">
+                <button type="submit" className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer">
+                  + رفع ونشر المادة سحابياً في الموقع 🎬
+                </button>
+              </div>
+            </form>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+              {mediaGallery.map((item) => (
+                <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{item.category}</span>
+                    <h5 className="font-extrabold text-slate-900 text-xs">{item.title}</h5>
+                    <p className="text-[10px] text-slate-400">تاريخ الرفع: {item.createdAt}</p>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <a href={item.imageUrl} target="_blank" rel="noopener noreferrer" className="flex-1 py-1.5 bg-sky-50 text-sky-700 text-center font-bold text-xs rounded-lg">عرض 👁️</a>
+                    <button type="button" onClick={() => handleDeleteMedia(item.id)} className="px-3 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-lg">حذف ✕</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 3. أداة لجنة المحتوى العلمي: بنك صياغة النصوص الطبية والعبارات للبنرات والتصاميم */}
+        {currentActiveComm === 'لجنة المحتوى العلمي' && (
+          <div className="bg-white rounded-3xl p-8 border border-emerald-200 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">🔬 بنك صياغة النصوص الطبية والعبارات (للإعلام والتصميم)</h3>
+                <p className="text-xs text-slate-500">هنا تكتبون النصوص، العبارات التوعوية، والكلمات الرسمية التي تستخدمها لجان التصميم والإعلام في البنرات والمنشورات.</p>
+              </div>
+              <span className="px-3.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-xs">
+                إجمالي النصوص المعتمدة: {scientificTextsList.length}
+              </span>
+            </div>
+
+            <form onSubmit={handleAddScientificTextSubmit} className="grid grid-cols-1 gap-4 bg-emerald-50/40 p-6 rounded-2xl border border-emerald-200">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">عنوان البانر أو التصميم المستهدف</label>
+                <input
+                  type="text"
+                  placeholder="مثال: عبارات بوستر اليوم العالمي للتمريض"
+                  value={textBannerTitle}
+                  onChange={(e) => setTextBannerTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">النصوص والعبارات الدقيقة المعتمدة (لتأخذها لجان التصميم والإعلام)</label>
+                <textarea
+                  rows={3}
+                  placeholder="اكتب النص العلمي أو العبارة الإبداعية هنا لتكون مرجعاً للبنرات..."
+                  value={textBannerContent}
+                  onChange={(e) => setTextBannerContent(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  required
+                />
+              </div>
+
+              <div>
+                <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">
+                  + اعتماد ونشر النص للبنرات والتصاميم 📝✨
+                </button>
+              </div>
+            </form>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+              {scientificTextsList.map((txt) => (
+                <div key={txt.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">معتمد للإعلام والتصميم ✓</span>
+                      <span className="text-[10px] text-slate-400">{txt.createdAt}</span>
+                    </div>
+                    <h5 className="font-black text-slate-900 text-sm">{txt.title}</h5>
+                    <p className="text-xs text-slate-700 bg-white p-3 rounded-xl border border-slate-100 leading-relaxed font-semibold">"{txt.content}"</p>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <button type="button" onClick={() => handleDeleteScientificText(txt.id)} className="px-3 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-lg">حذف ✕</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1286,7 +1568,7 @@ export default function CommitteeDashboard() {
 
       </div>
 
-      {/* نافذة الأرشيف التاريخي للتقارير (Historical Vault) */}
+      {/* نافذة الأرشيف التاريخي للتقارير */}
       {showArchiveModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-indigo-500">
@@ -1402,7 +1684,7 @@ export default function CommitteeDashboard() {
         </div>
       )}
 
-      {/* نافذة مركز الشكاوى والتقارير المرفوعة (مع متابعة ردود القادة) */}
+      {/* نافذة مركز الشكاوى والتقارير المرفوعة */}
       {showReportsModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-red-500">
