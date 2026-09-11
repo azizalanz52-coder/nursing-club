@@ -235,7 +235,20 @@ export default function CommitteeDashboard() {
       setMediaGallery([newObj, ...mediaGallery]);
       setMediaTitle('');
       setMediaBase64('/header-banner.png');
-      alert('تم رفع ونشر المادة الإعلامية سحابياً بنجاح! 📸🚀');
+
+      // إشعار فوري للأدمن ومكتب الرؤساء ولجنة التصميم برفع مواد إعلامية جديدة
+      for (const usr of allUsersList) {
+        const cStr = usr.assignedCommittee || usr.committee || '';
+        if (cStr.includes('التصميم') || cStr.includes('الاعلام') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
+          try {
+            await updateDoc(doc(db, 'users', usr.id), {
+              latestNotification: `📸 [تحديث إعلامي جديد]: أضافت لجنة الإعلام مادة جديدة (${mediaTitle})`
+            });
+          } catch (er) { console.error(er); }
+        }
+      }
+
+      alert('تم رفع ونشر المادة الإعلامية سحابياً وربطها بلوحة الأدمن ومكتب الرؤساء بنجاح! 📸🚀');
     } catch (err) { console.error(err); }
   };
 
@@ -246,6 +259,7 @@ export default function CommitteeDashboard() {
     }
   };
 
+  // ربط المحتوى العلمي بلجنة التصميم ومكتب الرؤساء والأدمن
   const handleAddScientificTextSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!textBannerTitle.trim() || !textBannerContent.trim()) return;
@@ -260,9 +274,22 @@ export default function CommitteeDashboard() {
     try {
       await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
       setScientificTextsList([newTextObj, ...scientificTextsList]);
+
+      // إرسال إشعار فوري لرئيس لجنة التصميم وللرؤساء والأدمن
+      for (const usr of allUsersList) {
+        const cStr = usr.assignedCommittee || usr.committee || '';
+        if (cStr.includes('التصميم') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
+          try {
+            await updateDoc(doc(db, 'users', usr.id), {
+              latestNotification: `🔬 [محتوى علمي جديد موجه للبنرات والتصميم]: "${textBannerTitle}" - النص: ${textBannerContent}`
+            });
+          } catch (er) { console.error(er); }
+        }
+      }
+
       setTextBannerTitle('');
       setTextBannerContent('');
-      alert('تم اعتماد ونشر النص والعبارة العلمية للبنرات والتصاميم بنجاح! 🔬✨');
+      alert('تم اعتماد ونشر النص وعرضه مباشرة للجنة التصميم وإرساله لمكتب الرؤساء والأدمن بنجاح! 🔬✨');
     } catch (err) { console.error(err); }
   };
 
@@ -336,7 +363,6 @@ export default function CommitteeDashboard() {
     return matchesTargetCommittee(choiceValue, currentActiveComm) || req.acceptedCommittee === currentActiveComm;
   });
 
-  // الطلاب المحولين خصيصاً للجنة الموارد البشرية (من تم تحويلهم ولم تُقبل رغبتهم الأولى أو تم تحويلهم صراحةً)
   const transferredRequestsList = (requests || []).filter(req => req.transferredToHR === true || req.status === 'محول للموارد البشرية');
 
   const totalApplicantsCount = requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm) || matchesTargetCommittee(r.secondChoice, currentActiveComm) || matchesTargetCommittee(r.thirdChoice, currentActiveComm)).length;
@@ -725,7 +751,7 @@ export default function CommitteeDashboard() {
 
         <div class="executive-box">
           <strong>📝 الملخص التحليلي التنفيذي (Executive Summary):</strong>
-          يوثق هذا التقرير حالة الأداء الميداني والإداري لكافة اللجان السبع بنادي التمريض. يُظهر التحليل المباشر للبيانات استقراراً هيكلياً عالياً بوجود <strong>${totalAcceptedAll}</strong> عضواً مقبولاً وفاعلاً عبر مختلف الأقسام، مع تصدر <strong>${topCommName}</strong> لمؤشرات الاستقطاب والانضمام. تؤكد لجنة الجودة والتطوير أن كافة مسارات العمل والمهام تسير وفق المعايير المعتمدة والمخطط لها لضمان مخرجات استثنائية أمام إدارة الجامعة وعمادة الكلية.
+          يُوثق هذا التقرير حالة الأداء الميداني والإداري لكافة اللجان السبع بنادي التمريض. يُظهر التحليل المباشر للبيانات استقراراً هيكلياً عالياً بوجود <strong>${totalAcceptedAll}</strong> عضواً مقبولاً وفاعلاً عبر مختلف الأقسام، مع تصدر <strong>${topCommName}</strong> لمؤشرات الاستقطاب والانضمام. تؤكد لجنة الجودة والتطوير أن كافة مسارات العمل والمهام تسير وفق المعايير المعتمدة والمخطط لها لضمان مخرجات استثنائية أمام إدارة الجامعة وعمادة الكلية.
         </div>
 
         <div class="section-title">أولاً: جدول مؤشرات الأداء والأعضاء المقبولين باللجان السبع</div>
@@ -933,9 +959,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* ======================================================== */}
         {/* نظام اعتذارات الفعاليات والغياب للأعضاء */}
-        {/* ======================================================== */}
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
@@ -1054,7 +1078,7 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* 1. أداة لجنة الموارد البشرية: الطلبة المحولين (تكون فارغة ديناميكياً لحين تحويل الطلاب) */}
+        {/* 1. أداة لجنة الموارد البشرية */}
         {currentActiveComm === 'لجنة الموارد البشرية' && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
@@ -1109,13 +1133,13 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 2. أداة لجنة الإعلام: مركز رفع الصور ومقاطع الفيديو فقط */}
+        {/* 2. أداة لجنة الإعلام (مرتبطة بلوحة الأدمن ومكتب الرؤساء ولجنة التصميم) */}
         {currentActiveComm === 'لجنة الاعلام' && (
           <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900">📸 مركز رفع ونشر الصور ومقاطع الفيديو (لجنة الإعلام)</h3>
-                <p className="text-xs text-slate-500">ارفع صور وتغطيات الفعاليات والمقاطع لتغذية واجهة المعرض والموقع مباشرة.</p>
+                <h3 className="text-xl font-black text-slate-900">📸 مركز رفع ونشر الصور ومقاطع الفيديو (لجنة الإعلام - مربوط بالأدمن والرؤساء)</h3>
+                <p className="text-xs text-slate-500">ارفع صور وتغطيات الفعاليات والمقاطع لتغذية لوحة تحكم الأدمن ومكتب الرؤساء والمعرض والموقع مباشرة.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
                 إجمالي المواد المرفوعة: {mediaGallery.length}
@@ -1164,7 +1188,7 @@ export default function CommitteeDashboard() {
 
               <div className="sm:col-span-2 pt-2">
                 <button type="submit" className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer">
-                  + رفع ونشر الصور والمقاطع سحابياً 🎬
+                  + رفع ونشر الصور والمقاطع سحابياً (تصل للأدمن والرؤساء والتصميم) 🎬
                 </button>
               </div>
             </form>
@@ -1187,13 +1211,13 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 3. أداة لجنة المحتوى العلمي */}
+        {/* 3. أداة لجنة المحتوى العلمي (مربوطة بلجنة التصميم ومكتب الرؤساء والأدمن) */}
         {currentActiveComm === 'لجنة المحتوى العلمي' && (
           <div className="bg-white rounded-3xl p-8 border border-emerald-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900">🔬 بنك صياغة النصوص الطبية والعبارات (للإعلام والتصميم)</h3>
-                <p className="text-xs text-slate-500">هنا تكتبون النصوص والعبارات التوعوية التي تستخدمها اللجان في المنشورات.</p>
+                <h3 className="text-xl font-black text-slate-900">🔬 بنك صياغة النصوص الطبية والعبارات (مربوط بلجنة التصميم ومكتب الرؤساء والأدمن)</h3>
+                <p className="text-xs text-slate-500">هنا تكتبون النصوص والعبارات التوعوية التي تستخدمها لجان التصميم والإعلام، وتصل مباشرة للأدمن والرؤساء.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-xs">
                 إجمالي النصوص المعتمدة: {scientificTextsList.length}
@@ -1214,10 +1238,10 @@ export default function CommitteeDashboard() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">النصوص والعبارات الدقيقة المعتمدة</label>
+                <label className="text-xs font-bold text-slate-700">النصوص والعبارات الدقيقة المعتمدة (تصل للجنة التصميم والرؤساء)</label>
                 <textarea
                   rows={3}
-                  placeholder="اكتب النص العلمي أو العبارة الإبداعية هنا..."
+                  placeholder="اكتب النص العلمي أو العبارة الإبداعية هنا لتكون مرجعاً للبنرات والتصاميم..."
                   value={textBannerContent}
                   onChange={(e) => setTextBannerContent(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
@@ -1227,7 +1251,7 @@ export default function CommitteeDashboard() {
 
               <div>
                 <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">
-                  + اعتماد ونشر النص 📝✨
+                  + اعتماد ونشر النص للبنرات والتصاميم وللأدمن والرؤساء 📝✨
                 </button>
               </div>
             </form>
@@ -1237,7 +1261,7 @@ export default function CommitteeDashboard() {
                 <div key={txt.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">معتمد ✓</span>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">موصول بلجنة التصميم والرؤساء ✓</span>
                       <span className="text-[10px] text-slate-400">{txt.createdAt}</span>
                     </div>
                     <h5 className="font-black text-slate-900 text-sm">{txt.title}</h5>
