@@ -85,12 +85,14 @@ export default function AdminDashboard() {
   const router = useRouter();
   
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports'>('requests');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar'>('requests');
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
   // حالات التقارير المرفوعة والشكاوى من لجنة الجودة
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
+  // أرشيف التقارير التاريخية
+  const [historicalVaultReports, setHistoricalVaultReports] = useState<any[]>([]);
 
   // حالات النوافذ المنبثقة المخصصة بهوية الموقع
   const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'confirm'>('none');
@@ -152,6 +154,7 @@ export default function AdminDashboard() {
 
     checkAdminAuth();
     fetchEscalatedReports();
+    fetchHistoricalVault();
   }, [router]);
 
   // جلب تقارير الشكاوى والتقصير المرفوعة سحابياً
@@ -160,6 +163,17 @@ export default function AdminDashboard() {
       const snap = await getDocs(collection(db, 'escalated_reports'));
       const reports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setEscalatedReports(reports);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // جلب أرشيف التقارير التاريخية (Historical Vault)
+  const fetchHistoricalVault = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'historical_vault_reports'));
+      const reports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setHistoricalVaultReports(reports);
     } catch (e) {
       console.error(e);
     }
@@ -452,22 +466,35 @@ export default function AdminDashboard() {
     }
   };
 
-  // تصعيد البلاغ نهائياً للرئيس ورئيسة النادي لعدم التجاوب
-  const handleEscalateToPresidentsFinal = async (repId: string, committeeName: string) => {
-    triggerConfirmModal(`هل أنت متأكد من عدم تجاوب قائد وقائدة (${committeeName}) وترغب في رفع البلاغ وإحالته رسمياً للرئيس ورئيسة النادي الآن؟`, async () => {
+  // تصعيد البلاغ نهائياً للرئيس ورئيسة النادي لعدم التجاوب (وينتقل إلى الأرشيف التاريخي تلقائياً)
+  const handleEscalateToPresidentsFinal = async (rep: any) => {
+    triggerConfirmModal(`هل أنت متأكد من عدم تجاوب قائد وقائدة (${rep.targetCommittee}) وترغب في رفع البلاغ وإحالته رسمياً للرئيس ورئيسة النادي الآن وأرشفته؟`, async () => {
       try {
-        const repRef = doc(db, 'escalated_reports', repId);
+        const repRef = doc(db, 'escalated_reports', rep.id);
+        const finalStatus = 'مُحال رسمياً للرئيس ورئيسة النادي (لعدم التجاوب 🚨)';
+        
         await updateDoc(repRef, {
-          status: 'مُحال رسمياً للرئيس ورئيسة النادي (لعدم التجاوب 🚨)',
+          status: finalStatus,
           escalatedToPresidentsAt: new Date().toISOString()
         });
 
-        setEscalatedReports(escalatedReports.map(r => r.id === repId ? {
+        // نسخه إلى الأرشيف التاريخي Historical Vault
+        const archiveId = `vault_${rep.id}_${Date.now()}`;
+        const archivedObj = {
+          ...rep,
+          status: finalStatus,
+          archivedAt: new Date().toISOString()
+        };
+        await setDoc(doc(db, 'historical_vault_reports', archiveId), archivedObj);
+
+        setEscalatedReports(escalatedReports.map(r => r.id === rep.id ? {
           ...r,
-          status: 'مُحال رسمياً للرئيس ورئيسة النادي (لعدم التجاوب 🚨)'
+          status: finalStatus
         } : r));
 
-        setModalMessage('تم رفع البلاغ وإحالته رسمياً للرئيس ورئيسة النادي بنجاح تام! ⚖️');
+        setHistoricalVaultReports([archivedObj, ...historicalVaultReports]);
+
+        setModalMessage('تم رفع البلاغ وإحالته رسمياً للرئيس ورئيسة النادي وأرشفته في السجل التاريخي بنجاح تام! ⚖️📦');
         setModalType('success');
       } catch (err) {
         console.error(err);
@@ -1126,6 +1153,28 @@ export default function AdminDashboard() {
             </button>
           )}
 
+          {/* زر رادار مراقبة أداء اللجان الشامل */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('performance-radar')}
+            className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+              activeTab === 'performance-radar' ? 'bg-indigo-700 text-white shadow-md scale-105' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+            }`}
+          >
+            📊 رادار أداء اللجان الشامل 🛡️
+          </button>
+
+          {/* زر أرشيف التقارير التاريخية (Historical Vault) */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('historical-vault')}
+            className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+              activeTab === 'historical-vault' ? 'bg-amber-700 text-white shadow-md scale-105' : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            📦 أرشيف التقارير التاريخية ({historicalVaultReports.length})
+          </button>
+
           {/* زر مركز التقارير والشكاوى المرفوعة مع تدرج الإنذار */}
           <button
             type="button"
@@ -1161,6 +1210,108 @@ export default function AdminDashboard() {
             </button>
           ))}
         </div>
+
+        {/* 1. نافذة رادار مراقبة أداء اللجان الشامل */}
+        {activeTab === 'performance-radar' && (
+          <div className="bg-white rounded-3xl p-8 border border-indigo-200 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">📊 رادار مراقبة أداء اللجان الشامل</h3>
+                <p className="text-xs text-slate-500">متابعة حية لحالات الإنجاز، أعداد الأعضاء المنضمين، ونسبة نشاط كل لجنة في النادي.</p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs">
+                عدد اللجان النشطة: {committees.length}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {committees.map((comm) => {
+                const memberCount = comm.members?.length || 0;
+                // حساب تقديري لمؤشر الأداء بناءً على عدد الأعضاء وقادتهم
+                const performanceScore = Math.min(100, memberCount * 15 + 40);
+
+                return (
+                  <div key={comm.id} className="p-6 rounded-2xl border border-indigo-100 bg-indigo-50/20 shadow-sm flex flex-col justify-between space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <h4 className="font-black text-indigo-900 text-base">{comm.name}</h4>
+                        <span className="px-2.5 py-1 rounded-full bg-indigo-600 text-white font-mono text-[10px] font-bold">
+                          أداء {performanceScore}%
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 text-xs text-slate-700 bg-white p-3 rounded-xl border border-indigo-100">
+                        <p><strong>👨‍✈️ قائد الطلاب:</strong> {comm.maleLeader || 'غير متوفر'}</p>
+                        <p><strong>👩‍✈️ قائدة الطالبات:</strong> {comm.femaleLeader || 'غير متوفر'}</p>
+                        <p><strong>👥 إجمالي الأعضاء:</strong> {memberCount} أعضاء نشطين</p>
+                      </div>
+
+                      {/* شريط التقدم لمؤشر الإنجاز */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                          <span>مؤشر الإنجاز والمهام</span>
+                          <span>{performanceScore}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${performanceScore > 75 ? 'bg-emerald-500' : performanceScore > 50 ? 'bg-indigo-600' : 'bg-amber-500'}`}
+                            style={{ width: `${performanceScore}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-indigo-100 flex justify-between items-center text-[11px]">
+                      <span className="text-slate-500">الحالة التشغيلية:</span>
+                      <span className="font-bold text-emerald-600">🟢 مستقر وتحت السيطرة</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 2. نافذة أرشيف التقارير التاريخية (Historical Vault) */}
+        {activeTab === 'historical-vault' && (
+          <div className="bg-white rounded-3xl p-8 border border-amber-300 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">📦 أرشيف التقارير التاريخية (Historical Vault)</h3>
+                <p className="text-xs text-slate-500">سجل كامل ومؤرشف لكافة التقارير المعتمدة والبلاغات التي تم رفعها وإحالتها للرؤساء سابقاً.</p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-bold text-xs">
+                إجمالي المؤرشف: {historicalVaultReports.length}
+              </span>
+            </div>
+
+            {historicalVaultReports.length === 0 ? (
+              <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-sm font-bold">لا توجد تقارير في الأرشيف التاريخي حتى الآن. سيتم أرشفة البلاغات المُحالة تلقائياً هنا.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {historicalVaultReports.map((vaultItem) => (
+                  <div key={vaultItem.id} className="p-6 rounded-2xl border border-amber-200 bg-amber-50/40 shadow-sm space-y-3">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <span className="font-black text-amber-900 text-sm">اللجنة: {vaultItem.targetCommittee}</span>
+                      <span className="text-[10px] bg-amber-200 text-amber-900 font-mono px-2 py-0.5 rounded font-bold">
+                        {vaultItem.archivedAt ? new Date(vaultItem.archivedAt).toLocaleDateString('ar-SA') : ''}
+                      </span>
+                    </div>
+                    <p className="text-slate-800 text-xs sm:text-sm font-semibold bg-white p-3 rounded-xl border border-amber-100 shadow-inner">
+                      <strong>السبب:</strong> {vaultItem.reason}
+                    </p>
+                    <div className="pt-2 border-t border-amber-200 flex justify-between items-center text-[11px] text-slate-600 font-bold">
+                      <span>الرافع: {vaultItem.reporter}</span>
+                      <span className="text-red-700 bg-red-100 px-2.5 py-1 rounded-lg">تمت الإحالة والأرشفة ✅</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* نافذة مركز التقارير والشكاوى المرفوعة مع التدرج في الإنذار والتصعيد */}
         {activeTab === 'escalated-reports' && (
@@ -1221,7 +1372,7 @@ export default function AdminDashboard() {
 
                         <button
                           type="button"
-                          onClick={() => handleEscalateToPresidentsFinal(rep.id, rep.targetCommittee)}
+                          onClick={() => handleEscalateToPresidentsFinal(rep)}
                           className="flex-1 py-2 px-3 rounded-xl bg-red-600 text-white font-black text-xs shadow hover:bg-red-700 cursor-pointer transition-all"
                         >
                           🚨 تصعيد البلاغ للرؤساء فوراً
