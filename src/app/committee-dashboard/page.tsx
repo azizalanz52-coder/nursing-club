@@ -466,6 +466,116 @@ export default function CommitteeDashboard() {
     alert('تم تصدير ملف الأكسل بنجاح وجاهز لرفعه للآدمن! 📊');
   };
 
+  // دالة تصدير تقرير محفظة الجودة الشامل كملف PDF مرتب باستخدام نافذة الطباعة المتطورة
+  const handleExportQualityPDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('الرجاء السماح بفتح النوافذ المنبثقة (Pop-ups) لتحميل تقرير الـ PDF.');
+      return;
+    }
+
+    let htmlContent = `
+      <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <title>تقرير محفظة أدلة الجودة الشامل - نادي التمريض</title>
+        <style>
+          body { font-family: Tahoma, Arial, sans-serif; padding: 30px; color: #1e293b; background: #fff; direction: rtl; }
+          .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 30px; }
+          .header h1 { color: #630517; font-size: 22px; margin: 0 0 5px 0; }
+          .header p { color: #64748b; font-size: 12px; margin: 0; }
+          .section-title { font-size: 16px; font-weight: bold; color: #630517; margin-top: 25px; margin-bottom: 12px; border-right: 4px solid #F5D061; padding-right: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+          th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: right; }
+          th { background-color: #f1f5f9; color: #334155; font-weight: bold; }
+          .badge-ok { color: #047857; font-weight: bold; }
+          .badge-warn { color: #b45309; font-weight: bold; }
+          .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; pt: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>نادي كلية التمريض - جامعة حفر الباطن</h1>
+          <p>غرفة عمليات لجنة الجودة والتطوير • محفظة أدلة الجودة والتقارير الآلية الشاملة</p>
+          <p>تاريخ التقرير: ${new Date().toLocaleDateString('ar-SA')} | الوقت: ${new Date().toLocaleTimeString('ar-SA')}</p>
+        </div>
+
+        <div class="section-title">أولاً: ملخص إحصائيات وأداء اللجان السبع</div>
+        <table>
+          <thead>
+            <tr>
+              <th>اسم اللجنة</th>
+              <th>عدد الأعضاء المقبولين</th>
+              <th>إجمالي المتقدمين</th>
+              <th>حالة الأداء الميداني</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    allCommitteesList.forEach(comm => {
+      const commMembers = requests.filter(r => r.acceptedCommittee === comm || r.status === 'مقبول').length;
+      const commApplicants = requests.filter(r => matchesTargetCommittee(r.firstChoice, comm)).length;
+      htmlContent += `
+        <tr>
+          <td><strong>${comm}</strong></td>
+          <td>${commMembers} أعضاء</td>
+          <td>${commApplicants} متقدم</td>
+          <td><span class="badge-ok">معتمد ومنتظم ✓</span></td>
+        </tr>
+      `;
+    });
+
+    htmlContent += `
+          </tbody>
+        </table>
+
+        <div class="section-title">ثانياً: سجل البلاغات والإنذارات والردود النشطة</div>
+        <table>
+          <thead>
+            <tr>
+              <th>اللجنة المعنية</th>
+              <th>سبب الإنذار / التقصير</th>
+              <th>حالة البلاغ</th>
+              <th>رد وتبرير القائد</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    if (escalatedReports.length === 0) {
+      htmlContent += `<tr><td colspan="4" style="text-align: center; color: #64748b;">لا توجد أي إنذارات أو بلاغات تقصير مسجلة. الأوضاع مستقرة تماماً.</td></tr>`;
+    } else {
+      escalatedReports.forEach(rep => {
+        htmlContent += `
+          <tr>
+            <td><strong>${rep.targetCommittee}</strong></td>
+            <td>${rep.reason}</td>
+            <td><span class="badge-warn">${rep.status}</span></td>
+            <td>${rep.leaderDefenseReply || 'لم يتم إرسال تبرير بعد'}</td>
+          </tr>
+        `;
+      });
+    }
+
+    htmlContent += `
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <p>تم استخراج هذا التقرير إلكترونياً من النظام المركزي للجنة الجودة والتطوير • نادي التمريض جامعة حفر الباطن 2026</p>
+        </div>
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center font-bold text-slate-600 bg-slate-50">جاري تحميل لوحة تحكم اللجنة التفاعلية...</div>;
   }
@@ -496,16 +606,27 @@ export default function CommitteeDashboard() {
             </p>
           </div>
           
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             {isQualityTeam && (
-              <button
-                type="button"
-                onClick={() => setShowReportsModal(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>🚨</span>
-                <span>مركز الشكاوى والتقارير ({escalatedReports.length})</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleExportQualityPDF}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow hover:bg-emerald-700 flex items-center gap-1.5 cursor-pointer"
+                  title="تصدير تقرير محفظة الجودة الشامل PDF"
+                >
+                  <span>📄</span>
+                  <span>محفظة أدلة الجودة (PDF)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowReportsModal(true)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>🚨</span>
+                  <span>مركز الشكاوى والتقارير ({escalatedReports.length})</span>
+                </button>
+              </>
             )}
             <Link href="/" className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-200">
               الرئيسية ←
