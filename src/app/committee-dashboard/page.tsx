@@ -48,6 +48,10 @@ export default function CommitteeDashboard() {
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
   const [showReportsModal, setShowReportsModal] = useState(false);
 
+  // أرشيف التقارير التاريخية
+  const [qualityArchives, setQualityArchives] = useState<any[]>([]);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+
   // نظام الإنذار المتدرج
   const [warningReason, setWarningReason] = useState('');
   const [showWarningModal, setShowWarningModal] = useState(false);
@@ -74,6 +78,7 @@ export default function CommitteeDashboard() {
     fetchEscalatedReports();
     fetchCommitteeTasks();
     fetchAllUsers();
+    fetchQualityArchives();
   }, [router]);
 
   const fetchLeaderData = async (phone: string) => {
@@ -144,6 +149,16 @@ export default function CommitteeDashboard() {
       const snap = await getDocs(collection(db, 'committee_tasks'));
       const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setCommitteeTasks(tasks);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchQualityArchives = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'quality_reports_archive'));
+      const archives = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setQualityArchives(archives);
     } catch (e) {
       console.error(e);
     }
@@ -289,7 +304,8 @@ export default function CommitteeDashboard() {
       const targetComm = isQualityTeam ? targetCommitteeForTask : currentActiveComm;
       const formattedSubTasks = tasksListBuffer.map(taskText => ({
         text: taskText,
-        completed: false
+        completed: false,
+        completedBy: ''
       }));
 
       const newTaskObj = {
@@ -329,7 +345,9 @@ export default function CommitteeDashboard() {
       if (!taskItem) return;
 
       const updatedSubTasks = [...taskItem.subTasks];
-      updatedSubTasks[subTaskIdx].completed = !updatedSubTasks[subTaskIdx].completed;
+      const isNowCompleted = !updatedSubTasks[subTaskIdx].completed;
+      updatedSubTasks[subTaskIdx].completed = isNowCompleted;
+      updatedSubTasks[subTaskIdx].completedBy = isNowCompleted ? (userData?.fullName || 'عضو نشط') : '';
 
       const taskRef = doc(db, 'committee_tasks', taskId);
       await updateDoc(taskRef, { subTasks: updatedSubTasks });
@@ -466,14 +484,23 @@ export default function CommitteeDashboard() {
     alert('تم تصدير ملف الأكسل بنجاح وجاهز لرفعه للآدمن! 📊');
   };
 
-  // دالة اعتماد التقرير ورفع محفظة الجودة للإدارة العليا والرؤساء
+  // دالة اعتماد التقرير وحفظه في الأرشيف التاريخي ورفع محفظة الجودة للإدارة العليا
   const handleApproveAndSubmitToPresidents = async () => {
-    if (!confirm('هل أنت متأكد من اعتماد التقرير الختامي لمحفظة الجودة وإرساله رسمياً لمكتب الرؤساء والإدارة العليا؟')) return;
+    if (!confirm('هل أنت متأكد من اعتماد التقرير الختامي لمحفظة الجودة وحفظه في الأرشيف التاريخي وإرساله رسمياً لمكتب الرؤساء؟')) return;
 
     try {
-      const reportSummaryText = `🏆 [اعتماد تقرير محفظة الجودة الختامي]: تمت مراجعة إنجازات اللجان السبع، واعتماد الأعضاء المقبولين، وتقفيل مهام الفعاليات بنجاح تام.`;
+      const reportTitle = `تقرير محفظة أدلة الجودة الختامي (${new Date().toLocaleDateString('ar-SA')})`;
+      const reportSummaryText = `🏆 [اعتماد تقرير محفظة الجودة الختامي]: تمت مراجعة إنجازات اللجان السبع، وحفظ الأرشيف، ورفع التقرير بنجاح تام.`;
 
-      // إرسال تنبيه فوري لجميع حسابات الرؤساء والإدارة العليا
+      // حفظ التقرير في الأرشيف التاريخي (Historical Vault)
+      await addDoc(collection(db, 'quality_reports_archive'), {
+        title: reportTitle,
+        createdAt: Date.now(),
+        dateStr: new Date().toLocaleDateString('ar-SA'),
+        status: 'معتمد ومؤرشف رسمياً',
+        author: userData?.fullName || 'لجنة الجودة والتطوير'
+      });
+
       for (const usr of allUsersList) {
         if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
           try {
@@ -484,25 +511,25 @@ export default function CommitteeDashboard() {
         }
       }
 
-      // توثيق التقرير المعتمد في قاعدة البيانات
       await addDoc(collection(db, 'escalated_reports'), {
         targetCommittee: 'جميع اللجان السبع',
         reporter: userData?.fullName || 'لجنة الجودة والتطوير',
-        reason: 'تم إعداد واعتماد تقرير محفظة أدلة الجودة الختامي ورفعه رسمياً لمكتب الرؤساء.',
-        status: '✅ معتمد ومنجز ومرفوع للرؤساء',
-        leaderDefenseReply: 'تم الإنجاز والاعتماد بنجاح',
+        reason: 'تم إعداد واعتماد تقرير محفظة أدلة الجودة الختامي وأرشفته ورفعه رسمياً لمكتب الرؤساء.',
+        status: '✅ معتمد ومنجز ومؤرشف ومرفوع للرؤساء',
+        leaderDefenseReply: 'تم الإنجاز والاعتماد والأرشفة بنجاح',
         createdAt: Date.now()
       });
 
-      alert('🎉 تم اعتماد التقرير الختامي وإرسال الإشعار والتنبيه لمكتب الرؤساء والإدارة العليا بنجاح تام!');
+      alert('🎉 تم اعتماد التقرير، حفظه في الأرشيف التاريخي، وإرسال التنبيه لمكتب الرؤساء بنجاح تام!');
       fetchEscalatedReports();
+      fetchQualityArchives();
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء اعتماد ورفع التقرير.');
     }
   };
 
-  // دالة تصدير تقرير محفظة الجودة الشامل كملف PDF مرتب باستخدام نافذة الطباعة المتطورة
+  // دالة تصدير تقرير محفظة الجودة الشامل كملف PDF مرتب مع الفقرة التحليلية الذكية
   const handleExportQualityPDF = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -510,40 +537,58 @@ export default function CommitteeDashboard() {
       return;
     }
 
+    // حساب الفقرة التحليلية التنفيذية تلقائياً
+    const totalAcceptedAll = requests.filter(r => r.status === 'مقبول' || r.acceptedCommittee).length;
+    let topCommName = 'لجنة التصميم';
+    let maxMembers = -1;
+    allCommitteesList.forEach(c => {
+      const cnt = requests.filter(r => r.acceptedCommittee === c || r.status === 'مقبول').length;
+      if (cnt > maxMembers) {
+        maxMembers = cnt;
+        topCommName = c;
+      }
+    });
+
     let htmlContent = `
       <html lang="ar" dir="rtl">
       <head>
         <meta charset="UTF-8">
-        <title>تقرير محفظة أدلة الجودة الشامل - نادي التمريض</title>
+        <title>التقرير الاستشاري الختامي لمحفظة الجودة - نادي التمريض</title>
         <style>
-          body { font-family: Tahoma, Arial, sans-serif; padding: 30px; color: #1e293b; background: #fff; direction: rtl; }
-          .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 30px; }
-          .header h1 { color: #630517; font-size: 22px; margin: 0 0 5px 0; }
-          .header p { color: #64748b; font-size: 12px; margin: 0; }
-          .section-title { font-size: 16px; font-weight: bold; color: #630517; margin-top: 25px; margin-bottom: 12px; border-right: 4px solid #F5D061; padding-right: 10px; }
+          body { font-family: Tahoma, Arial, sans-serif; padding: 35px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.6; }
+          .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 25px; }
+          .header h1 { color: #630517; font-size: 20px; margin: 0 0 5px 0; font-weight: 900; }
+          .header p { color: #64748b; font-size: 11px; margin: 0; }
+          .executive-box { background: #f8fafc; border-right: 4px solid #630517; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 12px; color: #334155; }
+          .executive-box strong { color: #630517; }
+          .section-title { font-size: 14px; font-weight: bold; color: #630517; margin-top: 25px; margin-bottom: 10px; border-right: 4px solid #F5D061; padding-right: 8px; }
           table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
           th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: right; }
           th { background-color: #f1f5f9; color: #334155; font-weight: bold; }
           .badge-ok { color: #047857; font-weight: bold; }
           .badge-warn { color: #b45309; font-weight: bold; }
-          .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; pt: 10px; }
+          .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
         </style>
       </head>
       <body>
         <div class="header">
           <h1>نادي كلية التمريض - جامعة حفر الباطن</h1>
-          <p>غرفة عمليات لجنة الجودة والتطوير • محفظة أدلة الجودة والتقارير الآلية الشاملة</p>
-          <p>تاريخ التقرير: ${new Date().toLocaleDateString('ar-SA')} | الوقت: ${new Date().toLocaleTimeString('ar-SA')}</p>
+          <p>غرفة عمليات لجنة الجودة والتطوير • التقرير الاستشاري لمحفظة أدلة الجودة الشاملة</p>
+          <p>تاريخ الإصدار: ${new Date().toLocaleDateString('ar-SA')} | مرجع رقم: QMS-${Math.floor(Math.random() * 89999 + 10000)}</p>
         </div>
 
-        <div class="section-title">أولاً: ملخص إحصائيات وأداء اللجان السبع (تحديث حي مباشر)</div>
+        <div class="executive-box">
+          <strong>📝 الملخص التحليلي التنفيذي (Executive Summary):</strong>
+          يوثق هذا التقرير حالة الأداء الميداني والإداري لكافة اللجان السبع بنادي التمريض. يُظهر التحليل المباشر للبيانات استقراراً هيكلياً عالياً بوجود <strong>${totalAcceptedAll}</strong> عضواً مقبولاً وفاعلاً عبر مختلف الأقسام، مع تصدر <strong>${topCommName}</strong> لمؤشرات الاستقطاب والانضمام. تؤكد لجنة الجودة والتطوير أن كافة مسارات العمل والمهام تسير وفق المعايير المعتمدة والمخطط لها لضمان مخرجات استثنائية أمام إدارة الجامعة وعمادة الكلية.
+        </div>
+
+        <div class="section-title">أولاً: جدول مؤشرات الأداء والأعضاء المقبولين باللجان السبع</div>
         <table>
           <thead>
             <tr>
-              <th>اسم اللجنة</th>
-              <th>عدد الأعضاء المقبولين</th>
-              <th>إجمالي المتقدمين</th>
-              <th>حالة الأداء الميداني</th>
+              <th>اللجنة التنظيمية</th>
+              <th>الأعضاء المقبولون فعلياً</th>
+              <th>حالة الجودة والالتزام</th>
             </tr>
           </thead>
           <tbody>
@@ -551,13 +596,11 @@ export default function CommitteeDashboard() {
 
     allCommitteesList.forEach(comm => {
       const commMembers = requests.filter(r => r.acceptedCommittee === comm || r.status === 'مقبول').length;
-      const commApplicants = requests.filter(r => matchesTargetCommittee(r.firstChoice, comm) || matchesTargetCommittee(r.secondChoice, comm) || matchesTargetCommittee(r.thirdChoice, comm)).length;
       htmlContent += `
         <tr>
           <td><strong>${comm}</strong></td>
-          <td>${commMembers} أعضاء مقبولة</td>
-          <td>${commApplicants} متقدم</td>
-          <td><span class="badge-ok">معتمد ومنتظم ✓</span></td>
+          <td>${commMembers} أعضاء</td>
+          <td><span class="badge-ok">معتمد وفق المعايير ✓</span></td>
         </tr>
       `;
     });
@@ -566,21 +609,21 @@ export default function CommitteeDashboard() {
           </tbody>
         </table>
 
-        <div class="section-title">ثانياً: سجل البلاغات والإنذارات والردود النشطة</div>
+        <div class="section-title">ثانياً: سجل البلاغات والإنذارات والمتابعة الرقابية</div>
         <table>
           <thead>
             <tr>
               <th>اللجنة المعنية</th>
-              <th>سبب الإنذار / التقصير</th>
-              <th>حالة البلاغ</th>
-              <th>رد وتبرير القائد</th>
+              <th>سبب الإنذار أو التقصير المرصود</th>
+              <th>الحالة التنظيمية</th>
+              <th>تبرير ورد القائد</th>
             </tr>
           </thead>
           <tbody>
     `;
 
     if (escalatedReports.length === 0) {
-      htmlContent += `<tr><td colspan="4" style="text-align: center; color: #64748b;">لا توجد أي إنذارات أو بلاغات تقصير مسجلة. الأوضاع مستقرة تماماً.</td></tr>`;
+      htmlContent += `<tr><td colspan="4" style="text-align: center; color: #64748b;">لا توجد أي بلاغات تقصير مسجلة؛ الأداء التشغيلي يسير بلا عوائق.</td></tr>`;
     } else {
       escalatedReports.forEach(rep => {
         htmlContent += `
@@ -588,7 +631,7 @@ export default function CommitteeDashboard() {
             <td><strong>${rep.targetCommittee}</strong></td>
             <td>${rep.reason}</td>
             <td><span class="badge-warn">${rep.status}</span></td>
-            <td>${rep.leaderDefenseReply || 'لم يتم إرسال تبرير بعد'}</td>
+            <td>${rep.leaderDefenseReply || 'قيد المتابعة أو بانتظار التبرير'}</td>
           </tr>
         `;
       });
@@ -599,7 +642,7 @@ export default function CommitteeDashboard() {
         </table>
 
         <div class="footer">
-          <p>تم استخراج هذا التقرير إلكترونياً من النظام المركزي للجنة الجودة والتطوير • نادي التمريض جامعة حفر الباطن 2026</p>
+          <p>هذا التقرير معتمد إلكترونياً من لجنة الجودة والتطوير • نادي التمريض جامعة حفر الباطن 2026</p>
         </div>
         <script>
           window.onload = function() { window.print(); }
@@ -617,6 +660,22 @@ export default function CommitteeDashboard() {
   }
 
   const displayedTasks = committeeTasks.filter(t => t.committee === currentActiveComm);
+
+  // حساب نقاط الأعضاء الأفراد (Leaderboard) بناءً على المهام المنجزة في اللجنة الحالية
+  const memberScoresMap: { [memberName: string]: number } = {};
+  committeeTasks
+    .filter(t => t.committee === currentActiveComm)
+    .forEach(taskGroup => {
+      (taskGroup.subTasks || []).forEach((st: any) => {
+        if (st.completed && st.completedBy) {
+          memberScoresMap[st.completedBy] = (memberScoresMap[st.completedBy] || 0) + 10;
+        }
+      });
+    });
+
+  const rankedMembers = Object.entries(memberScoresMap)
+    .map(([name, score]) => ({ name, score }))
+    .sort((a, b) => b.score - a.score);
 
   // فلترة البلاغات والإنذارات الخاصة باللجنة الحالية بحيث تعرض الفريدة فقط بدون تكرار مزعج
   const committeeReports = Array.from(
@@ -649,11 +708,22 @@ export default function CommitteeDashboard() {
                   type="button"
                   onClick={handleExportQualityPDF}
                   className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow hover:bg-emerald-700 flex items-center gap-1.5 cursor-pointer"
-                  title="تصدير تقرير محفظة الجودة الشامل PDF"
+                  title="تصدير التقرير الاستشاري الشامل PDF"
                 >
                   <span>📄</span>
-                  <span>محفظة أدلة الجودة (PDF)</span>
+                  <span>التقرير الاستشاري (PDF)</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowArchiveModal(true)}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black shadow hover:bg-indigo-700 flex items-center gap-1.5 cursor-pointer"
+                  title="أرشيف التقارير التاريخية المعتمدة"
+                >
+                  <span>📂</span>
+                  <span>الأرشيف التاريخي ({qualityArchives.length})</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={handleApproveAndSubmitToPresidents}
@@ -663,13 +733,14 @@ export default function CommitteeDashboard() {
                   <span>🚀</span>
                   <span>اعتماد الرفع للإدارة العليا</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setShowReportsModal(true)}
                   className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>🚨</span>
-                  <span>مركز الشكاوى والتقارير ({escalatedReports.length})</span>
+                  <span>مركز الشكاوى ({escalatedReports.length})</span>
                 </button>
               </>
             )}
@@ -946,82 +1017,125 @@ export default function CommitteeDashboard() {
 
         </div>
 
-        {/* قائمة المهام المتعددة وتتبع العداد الديناميكي */}
-        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-          <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
-            <div>
-              <h3 className="text-lg font-black text-slate-900">📋 قائمة مهام اللجان وإنجاز العداد الديناميكي ({currentActiveComm})</h3>
-              <p className="text-xs text-slate-500">اضغط على (صح) على أي مهمة لإنجازها ومشاهدة شريط النسبة والمتبقي يتحدث تلقائياً:</p>
+        {/* قائمة المهام المتعددة وتتبع العداد الديناميكي + حاسبة كفاءة العضو الفردي */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+            <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">📋 قائمة مهام اللجان وإنجاز العداد الديناميكي ({currentActiveComm})</h3>
+                <p className="text-xs text-slate-500">اضغط على (صح) على أي مهمة لإنجازها وتسجيل نقاطك الفردية:</p>
+              </div>
+            </div>
+
+            {displayedTasks.length === 0 ? (
+              <p className="text-center py-12 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد قوائم مهام مسجلة لهذه اللجنة حالياً.</p>
+            ) : (
+              <div className="space-y-6">
+                {displayedTasks.map((taskGroup) => {
+                  const subTasks = taskGroup.subTasks || [];
+                  const completedCount = subTasks.filter((st: any) => st.completed).length;
+                  const totalCount = subTasks.length;
+                  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+                  const isFinished = progressPercent === 100;
+
+                  return (
+                    <div key={taskGroup.id} className="p-6 rounded-3xl border border-slate-200 bg-slate-50/50 shadow-sm space-y-4 relative">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-[10px] bg-[#630517]/10 text-[#630517] font-bold px-2.5 py-1 rounded-md">
+                            فعالية: {taskGroup.eventTitle}
+                          </span>
+                          <h4 className="font-extrabold text-slate-900 text-sm mt-2">الموعد: {taskGroup.dueDate}</h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTaskGroup(taskGroup.id)}
+                          className="text-red-500 text-xs font-bold hover:text-red-700"
+                        >
+                          حذف القائمة ✕
+                        </button>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-black">
+                          <span className={isFinished ? 'text-emerald-600' : 'text-slate-700'}>
+                            {isFinished ? '🎉 تم إنجاز كافة المهام بنجاح!' : `متبقي ${totalCount - completedCount} مهام لإتمام الكل`}
+                          </span>
+                          <span className="text-[#630517]">{progressPercent}%</span>
+                        </div>
+                        <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 ${isFinished ? 'bg-emerald-500' : 'bg-[#630517]'}`} 
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-2 border-t border-slate-200">
+                        {subTasks.map((st: any, idx: number) => (
+                          <div 
+                            key={idx} 
+                            onClick={() => handleToggleSubTask(taskGroup.id, idx)}
+                            className={`flex items-center justify-between p-3 rounded-2xl border cursor-pointer transition-all ${
+                              st.completed ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900 opacity-90' : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs border ${
+                                st.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
+                              }`}>
+                                {st.completed ? '✓' : ''}
+                              </div>
+                              <span className={`text-xs font-bold ${st.completed ? 'line-through' : ''}`}>{st.text}</span>
+                            </div>
+                            {st.completedBy && (
+                              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                                بإنجاز: {st.completedBy}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+            <div className="space-y-1">
+              <h3 className="text-sm font-black text-slate-900">🏆 لوحة الشرف ونقاط العضو الفردي</h3>
+              <p className="text-[11px] text-slate-500">الأعضاء الأكثر تفاعلاً وإنجازاً للمهام في ({currentActiveComm}):</p>
+            </div>
+
+            <div className="space-y-2.5 overflow-y-auto max-h-[380px] pt-2">
+              {rankedMembers.length === 0 ? (
+                <p className="text-center py-12 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لم يتم تسجيل إنجازات مهام للأعضاء بعد.</p>
+              ) : (
+                rankedMembers.map((member, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${
+                        idx === 0 ? 'bg-amber-400 text-slate-900 shadow' : idx === 1 ? 'bg-slate-300 text-slate-900' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {idx + 1}
+                      </span>
+                      <span className="font-bold text-slate-800">{member.name}</span>
+                    </div>
+                    <span className="font-black text-[#630517] bg-[#630517]/10 px-2.5 py-1 rounded-lg">
+                      {member.score} نقطة
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center">
+              * تحسب 10 نقاط لكل مهمة ينجزها العضو ويؤكدها بالنظام.
             </div>
           </div>
 
-          {displayedTasks.length === 0 ? (
-            <p className="text-center py-12 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد قوائم مهام مسجلة لهذه اللجنة حالياً.</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {displayedTasks.map((taskGroup) => {
-                const subTasks = taskGroup.subTasks || [];
-                const completedCount = subTasks.filter((st: any) => st.completed).length;
-                const totalCount = subTasks.length;
-                const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-                const isFinished = progressPercent === 100;
-
-                return (
-                  <div key={taskGroup.id} className="p-6 rounded-3xl border border-slate-200 bg-slate-50/50 shadow-sm space-y-4 relative">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[10px] bg-[#630517]/10 text-[#630517] font-bold px-2.5 py-1 rounded-md">
-                          فعالية: {taskGroup.eventTitle}
-                        </span>
-                        <h4 className="font-extrabold text-slate-900 text-sm mt-2">الموعد: {taskGroup.dueDate}</h4>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTaskGroup(taskGroup.id)}
-                        className="text-red-500 text-xs font-bold hover:text-red-700"
-                      >
-                        حذف القائمة ✕
-                      </button>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-black">
-                        <span className={isFinished ? 'text-emerald-600' : 'text-slate-700'}>
-                          {isFinished ? '🎉 تم إنجاز كافة المهام بنجاح!' : `متبقي ${totalCount - completedCount} مهام لإتمام الكل`}
-                        </span>
-                        <span className="text-[#630517]">{progressPercent}%</span>
-                      </div>
-                      <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full transition-all duration-300 ${isFinished ? 'bg-emerald-500' : 'bg-[#630517]'}`} 
-                          style={{ width: `${progressPercent}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 pt-2 border-t border-slate-200">
-                      {subTasks.map((st: any, idx: number) => (
-                        <div 
-                          key={idx} 
-                          onClick={() => handleToggleSubTask(taskGroup.id, idx)}
-                          className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${
-                            st.completed ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900 line-through opacity-80' : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className={`w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs border ${
-                            st.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
-                          }`}>
-                            {st.completed ? '✓' : ''}
-                          </div>
-                          <span className="text-xs font-bold">{st.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
 
         {/* الجدول الخاص بالمرشحين */}
@@ -1134,6 +1248,36 @@ export default function CommitteeDashboard() {
         </div>
 
       </div>
+
+      {/* نافذة الأرشيف التاريخي للتقارير (Historical Vault) */}
+      {showArchiveModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
+          <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-indigo-500">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <h3 className="text-lg font-black text-slate-900">📂 الأرشيف التاريخي لتقارير الجودة المعتمدة</h3>
+              <button onClick={() => setShowArchiveModal(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕ إغلاق</button>
+            </div>
+            
+            <div className="space-y-3">
+              {qualityArchives.length === 0 ? (
+                <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير مؤرشفة حتى الآن. اضغط على "اعتماد الرفع للإدارة العليا" لتوثيق أول تقرير.</p>
+              ) : (
+                qualityArchives.map((arch) => (
+                  <div key={arch.id} className="bg-indigo-50/50 border border-indigo-200 rounded-2xl p-4 flex justify-between items-center">
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-xs">{arch.title}</h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5">تاريخ الاعتماد: {arch.dateStr} • بواسطة: {arch.author}</p>
+                    </div>
+                    <span className="text-[10px] bg-indigo-600 text-white font-bold px-3 py-1 rounded-xl">
+                      {arch.status}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* نافذة تأكيد القبول برابط الواتساب */}
       {showAcceptModal && (
