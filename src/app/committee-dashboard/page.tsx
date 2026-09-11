@@ -80,6 +80,14 @@ export default function CommitteeDashboard() {
   const [textBannerContent, setTextBannerContent] = useState('');
   const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
 
+  // نظام اعتذارات الفعاليات والغياب للأعضاء
+  const [eventExcuses, setEventExcuses] = useState<any[]>([]);
+  const [showExcuseForm, setShowExcuseForm] = useState(false);
+  const [excuseEventName, setExcuseEventName] = useState('');
+  const [excuseEventDate, setExcuseEventDate] = useState('');
+  const [excuseReason, setExcuseReason] = useState('');
+  const [excuseFileName, setExcuseFileName] = useState('');
+
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
     if (!phone) {
@@ -95,6 +103,7 @@ export default function CommitteeDashboard() {
     fetchQualityArchives();
     fetchMediaGallery();
     fetchScientificTexts();
+    fetchEventExcuses();
 
     const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
     if (isHiddenLocally === 'true') {
@@ -156,39 +165,28 @@ export default function CommitteeDashboard() {
       const snap = await getDocs(collection(db, 'users'));
       const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setAllUsersList(users);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const fetchEscalatedReports = async () => {
     try {
       const snap = await getDocs(collection(db, 'escalated_reports'));
-      const reports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setEscalatedReports(reports);
-    } catch (e) {
-      console.error(e);
-    }
+      setEscalatedReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
   };
 
   const fetchCommitteeTasks = async () => {
     try {
       const snap = await getDocs(collection(db, 'committee_tasks'));
-      const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setCommitteeTasks(tasks);
-    } catch (e) {
-      console.error(e);
-    }
+      setCommitteeTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
   };
 
   const fetchQualityArchives = async () => {
     try {
       const snap = await getDocs(collection(db, 'quality_reports_archive'));
-      const archives = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setQualityArchives(archives);
-    } catch (e) {
-      console.error(e);
-    }
+      setQualityArchives(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
   };
 
   const fetchMediaGallery = async () => {
@@ -202,6 +200,13 @@ export default function CommitteeDashboard() {
     try {
       const snap = await getDocs(collection(db, 'scientific_committee_texts'));
       setScientificTextsList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchEventExcuses = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'event_excuses'));
+      setEventExcuses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
   };
 
@@ -268,6 +273,46 @@ export default function CommitteeDashboard() {
     }
   };
 
+  const handleSubmitExcuse = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!excuseEventName.trim() || !excuseReason.trim()) return;
+
+    const currentComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
+    const newExcuseObj = {
+      memberName: userData?.fullName || 'عضو اللجنة',
+      committee: currentComm,
+      eventName: excuseEventName.trim(),
+      eventDate: excuseEventDate || 'غير محدد',
+      reason: excuseReason.trim(),
+      attachmentName: excuseFileName || 'بدون مرفق',
+      status: 'قيد الانتظار',
+      createdAt: Date.now()
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, 'event_excuses'), newExcuseObj);
+      setEventExcuses([{ id: docRef.id, ...newExcuseObj }, ...eventExcuses]);
+      setExcuseEventName('');
+      setExcuseEventDate('');
+      setExcuseReason('');
+      setExcuseFileName('');
+      setShowExcuseForm(false);
+      alert('تم تقديم طلب الاعتذار عن الفعالية ورفعه للقائد بنجاح! 📨');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء تقديم طلب الاعتذار.');
+    }
+  };
+
+  const handleUpdateExcuseStatus = async (excuseId: string, newStatus: 'معتمد' | 'مرفوض') => {
+    try {
+      const excuseRef = doc(db, 'event_excuses', excuseId);
+      await updateDoc(excuseRef, { status: newStatus });
+      setEventExcuses(eventExcuses.map(ex => ex.id === excuseId ? { ...ex, status: newStatus } : ex));
+      alert(`تم ${newStatus === 'معتمد' ? 'اعتماد' : 'رفض'} طلب الاعتذار بنجاح.`);
+    } catch (err) { console.error(err); }
+  };
+
   const matchesTargetCommittee = (choiceStr: string, targetComm: string) => {
     if (!choiceStr) return false;
     const cleanChoice = choiceStr.replace(/الـ/g, '').replace(/إ/g, 'ا').replace(/أ/g, 'ا').replace(/آ/g, 'ا').trim();
@@ -290,6 +335,9 @@ export default function CommitteeDashboard() {
     const choiceValue = req[targetKey] || '';
     return matchesTargetCommittee(choiceValue, currentActiveComm) || req.acceptedCommittee === currentActiveComm;
   });
+
+  // الطلاب المحولين خصيصاً للجنة الموارد البشرية (من تم تحويلهم ولم تُقبل رغبتهم الأولى أو تم تحويلهم صراحةً)
+  const transferredRequestsList = (requests || []).filter(req => req.transferredToHR === true || req.status === 'محول للموارد البشرية');
 
   const totalApplicantsCount = requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm) || matchesTargetCommittee(r.secondChoice, currentActiveComm) || matchesTargetCommittee(r.thirdChoice, currentActiveComm)).length;
   const acceptedMembersCount = requests.filter(r => r.acceptedCommittee === currentActiveComm || r.status === 'مقبول').length;
@@ -331,9 +379,7 @@ export default function CommitteeDashboard() {
         const docRef = doc(db, 'applications', id);
         await updateDoc(docRef, { status: 'مرفوض' });
         setRequests((requests || []).map(r => r.id === id ? { ...r, status: 'مرفوض' } : r));
-      } catch (err) {
-        console.error(err);
-      }
+      } catch (err) { console.error(err); }
     }
   };
 
@@ -346,7 +392,9 @@ export default function CommitteeDashboard() {
       ...req,
       firstChoice: f2 || f3 || f1,
       secondChoice: f3 || f1 || f2,
-      thirdChoice: f1 || f2 || f3
+      thirdChoice: f1 || f2 || f3,
+      transferredToHR: true,
+      status: 'محول للموارد البشرية'
     };
 
     try {
@@ -354,10 +402,12 @@ export default function CommitteeDashboard() {
       await updateDoc(docRef, {
         firstChoice: updatedObj.firstChoice,
         secondChoice: updatedObj.secondChoice,
-        thirdChoice: updatedObj.thirdChoice
+        thirdChoice: updatedObj.thirdChoice,
+        transferredToHR: true,
+        status: 'محول للموارد البشرية'
       });
       setRequests((requests || []).map(r => r.id === req.id ? updatedObj : r));
-      alert('تم تحويل الطالب إلى رغبته التالية بنجاح! 🔄');
+      alert('تم تحويل الطالب إلى لجنة الموارد البشرية لمراجعة قبوله على الرغبة الثانية أو الثالثة بنجاح! 🔄');
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء تحويل رغبة الطالب.');
@@ -457,9 +507,7 @@ export default function CommitteeDashboard() {
       await updateDoc(taskRef, { subTasks: updatedSubTasks });
 
       setCommitteeTasks(committeeTasks.map(t => t.id === taskId ? { ...t, subTasks: updatedSubTasks } : t));
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleDeleteTaskGroup = async (taskId: string) => {
@@ -467,9 +515,7 @@ export default function CommitteeDashboard() {
       try {
         await deleteDoc(doc(db, 'committee_tasks', taskId));
         setCommitteeTasks(committeeTasks.filter(t => t.id !== taskId));
-      } catch (e) {
-        console.error(e);
-      }
+      } catch (e) { console.error(e); }
     }
   };
 
@@ -560,9 +606,7 @@ export default function CommitteeDashboard() {
         await deleteDoc(doc(db, 'escalated_reports', reportId));
         setEscalatedReports(escalatedReports.filter(r => r.id !== reportId));
         alert('تم حذف البلاغ بنجاح 🗑️');
-      } catch (e) {
-        console.error(e);
-      }
+      } catch (e) { console.error(e); }
     }
   };
 
@@ -746,9 +790,7 @@ export default function CommitteeDashboard() {
         <div class="footer">
           <p>هذا التقرير معتمد إلكترونياً من لجنة الجودة والتطوير • نادي التمريض جامعة حفر الباطن 2026</p>
         </div>
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
+        <script>window.onload = function() { window.print(); }</script>
       </body>
       </html>
     `;
@@ -762,6 +804,7 @@ export default function CommitteeDashboard() {
   }
 
   const displayedTasks = committeeTasks.filter(t => t.committee === currentActiveComm);
+  const committeeExcusesFiltered = eventExcuses.filter(ex => matchesTargetCommittee(ex.committee, currentActiveComm));
 
   const memberScoresMap: { [memberName: string]: number } = {};
   committeeTasks
@@ -804,43 +847,17 @@ export default function CommitteeDashboard() {
           <div className="flex gap-2 items-center flex-wrap">
             {isQualityTeam && (
               <>
-                <button
-                  type="button"
-                  onClick={handleExportQualityPDF}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow hover:bg-emerald-700 flex items-center gap-1.5 cursor-pointer"
-                  title="تصدير التقرير الاستشاري الشامل PDF"
-                >
-                  <span>📄</span>
-                  <span>التقرير الاستشاري (PDF)</span>
+                <button type="button" onClick={handleExportQualityPDF} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow hover:bg-emerald-700 flex items-center gap-1.5 cursor-pointer">
+                  <span>📄</span><span>التقرير الاستشاري (PDF)</span>
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowArchiveModal(true)}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black shadow hover:bg-indigo-700 flex items-center gap-1.5 cursor-pointer"
-                  title="أرشيف التقارير التاريخية المعتمدة"
-                >
-                  <span>📂</span>
-                  <span>الأرشيف التاريخي ({qualityArchives.length})</span>
+                <button type="button" onClick={() => setShowArchiveModal(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black shadow hover:bg-indigo-700 flex items-center gap-1.5 cursor-pointer">
+                  <span>📂</span><span>الأرشيف التاريخي ({qualityArchives.length})</span>
                 </button>
-
-                <button
-                  type="button"
-                  onClick={handleApproveAndSubmitToPresidents}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-black shadow hover:bg-amber-700 flex items-center gap-1.5 cursor-pointer animate-pulse"
-                  title="اعتماد التقرير ورفع للإدارة العليا والرؤساء والأدمن"
-                >
-                  <span>🚀</span>
-                  <span>اعتماد الرفع للإدارة العليا</span>
+                <button type="button" onClick={handleApproveAndSubmitToPresidents} className="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-black shadow hover:bg-amber-700 flex items-center gap-1.5 cursor-pointer animate-pulse">
+                  <span>🚀</span><span>اعتماد الرفع للإدارة العليا</span>
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowReportsModal(true)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <span>🚨</span>
-                  <span>مركز الشكاوى ({escalatedReports.length})</span>
+                <button type="button" onClick={() => setShowReportsModal(true)} className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5 cursor-pointer">
+                  <span>🚨</span><span>مركز الشكاوى ({escalatedReports.length})</span>
                 </button>
               </>
             )}
@@ -850,7 +867,7 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* الأليرت بار القيادي */}
+        {/* شريط التنبيهات القيادي */}
         {!warningHidden && (
           <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between flex-wrap gap-4 border border-amber-400">
             <div className="flex items-center gap-3">
@@ -866,22 +883,17 @@ export default function CommitteeDashboard() {
                 setWarningHidden(true);
                 localStorage.setItem(`warning_hidden_${userPhone}`, 'true');
                 if (userPhone) {
-                  try {
-                    await updateDoc(doc(db, 'users', userPhone), { warningHidden: true });
-                  } catch (e) {
-                    console.error(e);
-                  }
+                  try { await updateDoc(doc(db, 'users', userPhone), { warningHidden: true }); } catch (e) { console.error(e); }
                 }
               }}
-              className="px-3 py-1.5 bg-black/20 hover:bg-black/40 text-white rounded-xl text-xs font-bold transition-all border border-white/20 cursor-pointer flex items-center gap-1"
+              className="px-3 py-1.5 bg-black/25 hover:bg-black/45 text-white rounded-xl text-xs font-bold transition-all border border-white/20 cursor-pointer flex items-center gap-1"
             >
-              <span>✕</span>
-              <span>إخفاء الإنذار</span>
+              <span>✕</span><span>إخفاء الإنذار</span>
             </button>
           </div>
         )}
 
-        {/* صندوق تنبيهات وإنذارات اللجنة الحالية */}
+        {/* تنبيهات وإنذارات اللجنة الحالية */}
         {!isQualityTeam && committeeReports.length > 0 && (
           <div className="bg-amber-50 border-2 border-amber-400 rounded-3xl p-6 space-y-4 shadow-sm">
             <div className="flex items-center gap-2">
@@ -909,14 +921,10 @@ export default function CommitteeDashboard() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => {
-                        setActiveReportToReply(rep);
-                        setShowReplyModal(true);
-                      }}
+                      onClick={() => { setActiveReportToReply(rep); setShowReplyModal(true); }}
                       className="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700 cursor-pointer transition-all flex items-center gap-1.5"
                     >
-                      <span>✍️</span>
-                      <span>إرسال الرد والتبرير الرسمي (خلال 24 ساعة)</span>
+                      <span>✍️</span><span>إرسال الرد والتبرير الرسمي (خلال 24 ساعة)</span>
                     </button>
                   )}
                 </div>
@@ -926,19 +934,136 @@ export default function CommitteeDashboard() {
         )}
 
         {/* ======================================================== */}
-        {/* تفعيل أدوات اللجان المطورة (الموارد البشرية، الإعلام، المحتوى العلمي) */}
+        {/* نظام اعتذارات الفعاليات والغياب للأعضاء */}
         {/* ======================================================== */}
+        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+          <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">📝 نظام اعتذارات الفعاليات والغياب ({currentActiveComm})</h3>
+              <p className="text-xs text-slate-500">تقديم أعذار الغياب عن الفعاليات مع الأسباب والمرفقات للاعتماد:</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowExcuseForm(!showExcuseForm)}
+              className="px-4 py-2 bg-[#630517] text-[#F5D061] rounded-xl text-xs font-black shadow hover:brightness-110 cursor-pointer"
+            >
+              {showExcuseForm ? 'إلغاء' : '+ تقديم طلب اعتذار جديد'}
+            </button>
+          </div>
 
-        {/* 1. أداة لجنة الموارد البشرية: فرز أفضل 40 طالب محول وتحويل الباقين لمراجعة الرغبات */}
+          {showExcuseForm && (
+            <form onSubmit={handleSubmitExcuse} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
+              <h4 className="font-extrabold text-sm text-[#630517]">نموذج تقديم اعتذار رسمي عن حضور فعالية</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">اسم الفعالية</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: ورشة عمل الإسعافات الأولية"
+                    value={excuseEventName}
+                    onChange={(e) => setExcuseEventName(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">تاريخ الفعالية</label>
+                  <input
+                    type="date"
+                    value={excuseEventDate}
+                    onChange={(e) => setExcuseEventDate(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">سبب الغياب والاعتذار بالتفصيل</label>
+                <textarea
+                  rows={3}
+                  placeholder="اكتب أسباب الغياب بوضوح..."
+                  value={excuseReason}
+                  onChange={(e) => setExcuseReason(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  required
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="w-full sm:w-auto">
+                  <label className="cursor-pointer bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 w-fit">
+                    <span>📎</span>
+                    <span>{excuseFileName ? excuseFileName : 'إرفاق ملف العذر (صورة أو PDF)'}</span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setExcuseFileName(e.target.files[0].name);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                <button type="submit" className="w-full sm:w-auto bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:bg-emerald-700 cursor-pointer">
+                  إرسال الطلب للقائد للاعتماد 🚀
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="space-y-3">
+            <h4 className="font-extrabold text-sm text-slate-800">سجل طلبات الاعتذار الواردة للجنة:</h4>
+            {committeeExcusesFiltered.length === 0 ? (
+              <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد طلبات اعتذار مسجلة لهذه اللجنة حتى الآن.</p>
+            ) : (
+              committeeExcusesFiltered.map((ex) => (
+                <div key={ex.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-slate-900 text-xs">العضو: {ex.memberName}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        ex.status === 'معتمد' ? 'bg-emerald-100 text-emerald-800' : ex.status === 'مرفوض' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {ex.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-700 font-semibold">الفعالية: <span className="text-[#630517]">{ex.eventName}</span> (تاريخ: {ex.eventDate})</p>
+                    <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-100"><strong className="text-slate-800">السبب:</strong> {ex.reason}</p>
+                    <p className="text-[10px] text-slate-400">المرفق: {ex.attachmentName}</p>
+                  </div>
+                  
+                  <div className="flex gap-2 items-center">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateExcuseStatus(ex.id, 'معتمد')}
+                      className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 cursor-pointer"
+                    >
+                      اعتماد ✅
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateExcuseStatus(ex.id, 'مرفوض')}
+                      className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 cursor-pointer"
+                    >
+                      رفض ✕
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* 1. أداة لجنة الموارد البشرية: الطلبة المحولين (تكون فارغة ديناميكياً لحين تحويل الطلاب) */}
         {currentActiveComm === 'لجنة الموارد البشرية' && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900">👥 نظام فرز ومتابعة الطلاب المحولين (أفضل 40 طالب/ة)</h3>
-                <p className="text-xs text-slate-500">تحدد اللجان أفضل 40 طالب، ويتم تحويل الباقين للجنة الموارد البشرية لمراجعة القبول على الرغبة الثانية أو الثالثة والتواصل معهم.</p>
+                <h3 className="text-xl font-black text-slate-900">👥 قائمة الطلبة المحولين (مراجعة القبول)</h3>
+                <p className="text-xs text-slate-500">الطلاب الذين لم يُقبلوا برغبتهم الأولى وتم تحويلهم لمراجعة قبولهم على الرغبة الثانية أو الثالثة.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-sky-100 text-sky-800 font-bold text-xs">
-                إجمالي المحولين المرشحين: {requests.slice(0, 40).length}
+                إجمالي الطلبة المحولين: {transferredRequestsList.length}
               </span>
             </div>
 
@@ -949,42 +1074,48 @@ export default function CommitteeDashboard() {
                     <th className="pb-3 pr-2">اسم الطالب / الطالبة</th>
                     <th className="pb-3">رقم الجوال</th>
                     <th className="pb-3">الرغبة الأولى (التي اكتفت)</th>
-                    <th className="pb-3">الرغبات المسجلة</th>
+                    <th className="pb-3">الرغبات المسجلة الأخرى</th>
                     <th className="pb-3 text-left pl-2">تواصل واتساب</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {requests.slice(0, 40).map((req, idx) => (
-                    <tr key={idx} className="hover:bg-sky-50/20">
-                      <td className="py-3.5 pr-2 font-bold text-slate-900">{req.fullName}</td>
-                      <td className="py-3.5 font-mono text-slate-700" dir="ltr">{req.phone}</td>
-                      <td className="py-3.5 text-red-600 font-semibold">{req.firstChoice || 'غير متوفر'}</td>
-                      <td className="py-3.5 text-slate-600">{req.secondChoice || '-'} / {req.thirdChoice || '-'}</td>
-                      <td className="py-3.5 text-left pl-2">
-                        <a
-                          href={`https://wa.me/${req.phone?.startsWith('0') ? '966' + req.phone.substring(1) : req.phone}?text=مرحباً بك ${req.fullName}، تم تحويلك رسمياً للعمل معنا في لجنة الموارد البشرية بنادي التمريض. نود مراجعة رغبتك الثانية أو الثالثة والانضمام معنا! 🚀`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition-all inline-flex items-center gap-1"
-                        >
-                          💬 تواصل واتساب
-                        </a>
-                      </td>
+                  {transferredRequestsList.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-slate-400 font-bold">لا توجد طلبات محولة حالياً. القائمة فارغة في انتظار تحويل اللجان للطلاب.</td>
                     </tr>
-                  ))}
+                  ) : (
+                    transferredRequestsList.map((req, idx) => (
+                      <tr key={idx} className="hover:bg-sky-50/20">
+                        <td className="py-3.5 pr-2 font-bold text-slate-900">{req.fullName}</td>
+                        <td className="py-3.5 font-mono text-slate-700" dir="ltr">{req.phone}</td>
+                        <td className="py-3.5 text-red-600 font-semibold">{req.firstChoice || 'غير متوفر'}</td>
+                        <td className="py-3.5 text-slate-600">{req.secondChoice || '-'} / {req.thirdChoice || '-'}</td>
+                        <td className="py-3.5 text-left pl-2">
+                          <a
+                            href={`https://wa.me/${req.phone?.startsWith('0') ? '966' + req.phone.substring(1) : req.phone}?text=مرحباً بك ${req.fullName}، تم تحويلك للجنة الموارد البشرية لنتمكن من مراجعة قبولك على رغبتك الثانية أو الثالثة بنادي التمريض. 🚀`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition-all inline-flex items-center gap-1"
+                          >
+                            💬 تواصل واتساب
+                          </a>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* 2. أداة لجنة الإعلام: مركز رفع الصور ومقاطع الفيديو فقط سحابياً لمعرض الموقع */}
+        {/* 2. أداة لجنة الإعلام: مركز رفع الصور ومقاطع الفيديو فقط */}
         {currentActiveComm === 'لجنة الاعلام' && (
           <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">📸 مركز رفع ونشر الصور ومقاطع الفيديو (لجنة الإعلام)</h3>
-                <p className="text-xs text-slate-500">ارفع صور وتغطيات الفعاليات لتغذية واجهة المعرض والموقع مباشرة.</p>
+                <p className="text-xs text-slate-500">ارفع صور وتغطيات الفعاليات والمقاطع لتغذية واجهة المعرض والموقع مباشرة.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
                 إجمالي المواد المرفوعة: {mediaGallery.length}
@@ -1056,13 +1187,13 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 3. أداة لجنة المحتوى العلمي: بنك صياغة النصوص الطبية والعبارات للبنرات والتصاميم */}
+        {/* 3. أداة لجنة المحتوى العلمي */}
         {currentActiveComm === 'لجنة المحتوى العلمي' && (
           <div className="bg-white rounded-3xl p-8 border border-emerald-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">🔬 بنك صياغة النصوص الطبية والعبارات (للإعلام والتصميم)</h3>
-                <p className="text-xs text-slate-500">هنا تكتبون النصوص، العبارات التوعوية، والكلمات الرسمية التي تستخدمها لجان التصميم والإعلام في البنرات والمنشورات.</p>
+                <p className="text-xs text-slate-500">هنا تكتبون النصوص والعبارات التوعوية التي تستخدمها اللجان في المنشورات.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-xs">
                 إجمالي النصوص المعتمدة: {scientificTextsList.length}
@@ -1083,10 +1214,10 @@ export default function CommitteeDashboard() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">النصوص والعبارات الدقيقة المعتمدة (لتأخذها لجان التصميم والإعلام)</label>
+                <label className="text-xs font-bold text-slate-700">النصوص والعبارات الدقيقة المعتمدة</label>
                 <textarea
                   rows={3}
-                  placeholder="اكتب النص العلمي أو العبارة الإبداعية هنا لتكون مرجعاً للبنرات..."
+                  placeholder="اكتب النص العلمي أو العبارة الإبداعية هنا..."
                   value={textBannerContent}
                   onChange={(e) => setTextBannerContent(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
@@ -1096,7 +1227,7 @@ export default function CommitteeDashboard() {
 
               <div>
                 <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">
-                  + اعتماد ونشر النص للبنرات والتصاميم 📝✨
+                  + اعتماد ونشر النص 📝✨
                 </button>
               </div>
             </form>
@@ -1106,7 +1237,7 @@ export default function CommitteeDashboard() {
                 <div key={txt.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">معتمد للإعلام والتصميم ✓</span>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">معتمد ✓</span>
                       <span className="text-[10px] text-slate-400">{txt.createdAt}</span>
                     </div>
                     <h5 className="font-black text-slate-900 text-sm">{txt.title}</h5>
@@ -1121,7 +1252,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* إذا كان المستخدم من لجنة الجودة، نعرض له رادار اللجان السبع */}
+        {/* رادار الجودة السبع */}
         {isQualityTeam && (
           <div className="space-y-4">
             <div className="flex justify-between items-center flex-wrap gap-3">
@@ -1163,9 +1294,7 @@ export default function CommitteeDashboard() {
                           setShowWarningModal(true);
                         }}
                         className={`w-full py-1.5 rounded-xl text-[10px] font-bold transition-all ${
-                          selectedManagedCommittee === commName 
-                            ? 'bg-amber-500 text-white hover:bg-amber-600' 
-                            : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                          selectedManagedCommittee === commName ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
                         }`}
                       >
                         ⚠️ إنذار قائد وقائدة اللجنة
@@ -1180,9 +1309,7 @@ export default function CommitteeDashboard() {
                           setShowWarningModal(true);
                         }}
                         className={`w-full py-1.5 rounded-xl text-[10px] font-black transition-all ${
-                          selectedManagedCommittee === commName 
-                            ? 'bg-red-600 text-white hover:bg-red-700' 
-                            : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+                          selectedManagedCommittee === commName ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
                         }`}
                       >
                         🚨 تصعيد البلاغ للرئيس ورئيسة النادي
@@ -1200,13 +1327,13 @@ export default function CommitteeDashboard() {
           <div className="bg-gradient-to-br from-[#630517] to-[#80071D] text-white p-6 rounded-3xl shadow-xl space-y-2">
             <span className="text-[11px] font-bold text-[#F5D061] uppercase tracking-wider">إجمالي المتقدمين للجنة ({currentActiveComm})</span>
             <div className="text-3xl font-black">{totalApplicantsCount}</div>
-            <p className="text-xs text-white/80">المتقدمون برغباتهم (الأولى، الثانية، والثالثة)</p>
+            <p className="text-xs text-white/80">المتقدمون برغباتهم</p>
           </div>
 
           <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-2">
             <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">عدد الأعضاء المقبولين</span>
             <div className="text-3xl font-black text-slate-900">{acceptedMembersCount}</div>
-            <p className="text-xs text-slate-500">تم قبولهم وانضمامهم لقروب اللجنة</p>
+            <p className="text-xs text-slate-500">تم قبولهم وانضمامهم</p>
           </div>
 
           <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-2">
@@ -1220,7 +1347,6 @@ export default function CommitteeDashboard() {
 
         {/* الأدوات القيادية */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-2">
               <h3 className="text-sm font-black text-slate-900">📢 إرسال إشعار جماعي لأعضاء اللجنة</h3>
@@ -1234,10 +1360,7 @@ export default function CommitteeDashboard() {
                 onChange={(e) => setAnnouncementText(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
               />
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow hover:brightness-110 cursor-pointer"
-              >
+              <button type="submit" className="w-full py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow hover:brightness-110 cursor-pointer">
                 إرسال الإشعار الفوري 🚀
               </button>
             </form>
@@ -1256,15 +1379,13 @@ export default function CommitteeDashboard() {
                   onChange={(e) => setTargetCommitteeForTask(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-900"
                 >
-                  {allCommitteesList.map((c, i) => (
-                    <option key={i} value={c}>{c}</option>
-                  ))}
+                  {allCommitteesList.map((c, i) => (<option key={i} value={c}>{c}</option>))}
                 </select>
               )}
 
               <input
                 type="text"
-                placeholder="عنوان الفعالية المرتبطة (مثال: حفل التدشين)..."
+                placeholder="عنوان الفعالية المرتبطة..."
                 value={eventTitle}
                 onChange={(e) => setEventTitle(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
@@ -1278,13 +1399,7 @@ export default function CommitteeDashboard() {
                   onChange={(e) => setTaskInputText(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                 />
-                <button
-                  type="button"
-                  onClick={handleAddTaskToBuffer}
-                  className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 cursor-pointer"
-                >
-                  +
-                </button>
+                <button type="button" onClick={handleAddTaskToBuffer} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 cursor-pointer">+</button>
               </div>
 
               {tasksListBuffer.length > 0 && (
@@ -1300,16 +1415,13 @@ export default function CommitteeDashboard() {
 
               <input
                 type="text"
-                placeholder="الموعد النهائي (مثال: الأربعاء القادم)"
+                placeholder="الموعد النهائي"
                 value={taskDueDate}
                 onChange={(e) => setTaskDueDate(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
               />
 
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow hover:brightness-110 cursor-pointer"
-              >
+              <button type="submit" className="w-full py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow hover:brightness-110 cursor-pointer">
                 نشر قائمة المهام للجنة ⚡
               </button>
             </form>
@@ -1318,7 +1430,7 @@ export default function CommitteeDashboard() {
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-2">
               <h3 className="text-sm font-black text-slate-900">📊 تصدير أعضاء اللجنة (Excel)</h3>
-              <p className="text-[11px] text-slate-500">تصدير قائمة الأعضاء المقبولين بملف أكسل جاهز لرفعه للآدمن.</p>
+              <p className="text-[11px] text-slate-500">تصدير قائمة الأعضاء المقبولين بملف أكسل.</p>
             </div>
             <div className="pt-4">
               <button
@@ -1330,12 +1442,10 @@ export default function CommitteeDashboard() {
               </button>
             </div>
           </div>
-
         </div>
 
-        {/* قائمة المهام المتعددة وتتبع العداد الديناميكي + حاسبة كفاءة العضو الفردي */}
+        {/* قائمة المهام المتعددة ولوحة الشرف */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
           <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
               <div>
@@ -1359,39 +1469,26 @@ export default function CommitteeDashboard() {
                     <div key={taskGroup.id} className="p-6 rounded-3xl border border-slate-200 bg-slate-50/50 shadow-sm space-y-4 relative">
                       <div className="flex justify-between items-start">
                         <div>
-                          <span className="text-[10px] bg-[#630517]/10 text-[#630517] font-bold px-2.5 py-1 rounded-md">
-                            فعالية: {taskGroup.eventTitle}
-                          </span>
+                          <span className="text-[10px] bg-[#630517]/10 text-[#630517] font-bold px-2.5 py-1 rounded-md">فعالية: {taskGroup.eventTitle}</span>
                           <h4 className="font-extrabold text-slate-900 text-sm mt-2">الموعد: {taskGroup.dueDate}</h4>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTaskGroup(taskGroup.id)}
-                          className="text-red-500 text-xs font-bold hover:text-red-700"
-                        >
-                          حذف القائمة ✕
-                        </button>
+                        <button type="button" onClick={() => handleDeleteTaskGroup(taskGroup.id)} className="text-red-500 text-xs font-bold hover:text-red-700">حذف القائمة ✕</button>
                       </div>
 
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-xs font-black">
-                          <span className={isFinished ? 'text-emerald-600' : 'text-slate-700'}>
-                            {isFinished ? '🎉 تم إنجاز كافة المهام بنجاح!' : `متبقي ${totalCount - completedCount} مهام لإتمام الكل`}
-                          </span>
+                          <span className={isFinished ? 'text-emerald-600' : 'text-slate-700'}>{isFinished ? '🎉 تم إنجاز كافة المهام بنجاح!' : `متبقي ${totalCount - completedCount} مهام لإتمام الكل`}</span>
                           <span className="text-[#630517]">{progressPercent}%</span>
                         </div>
                         <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full transition-all duration-300 ${isFinished ? 'bg-emerald-500' : 'bg-[#630517]'}`} 
-                            style={{ width: `${progressPercent}%` }}
-                          />
+                          <div className={`h-full transition-all duration-300 ${isFinished ? 'bg-emerald-500' : 'bg-[#630517]'}`} style={{ width: `${progressPercent}%` }} />
                         </div>
                       </div>
 
                       <div className="space-y-2 pt-2 border-t border-slate-200">
                         {subTasks.map((st: any, idx: number) => (
-                          <div 
-                            key={idx} 
+                          <div
+                            key={idx}
                             onClick={() => handleToggleSubTask(taskGroup.id, idx)}
                             className={`flex items-center justify-between p-3 rounded-2xl border cursor-pointer transition-all ${
                               st.completed ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900 opacity-90' : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300'
@@ -1405,11 +1502,7 @@ export default function CommitteeDashboard() {
                               </div>
                               <span className={`text-xs font-bold ${st.completed ? 'line-through' : ''}`}>{st.text}</span>
                             </div>
-                            {st.completedBy && (
-                              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
-                                بإنجاز: {st.completedBy}
-                              </span>
-                            )}
+                            {st.completedBy && (<span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">بإنجاز: {st.completedBy}</span>)}
                           </div>
                         ))}
                       </div>
@@ -1440,18 +1533,13 @@ export default function CommitteeDashboard() {
                       </span>
                       <span className="font-bold text-slate-800">{member.name}</span>
                     </div>
-                    <span className="font-black text-[#630517] bg-[#630517]/10 px-2.5 py-1 rounded-lg">
-                      {member.score} نقطة
-                    </span>
+                    <span className="font-black text-[#630517] bg-[#630517]/10 px-2.5 py-1 rounded-lg">{member.score} نقطة</span>
                   </div>
                 ))
               )}
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center">
-              * تحسب 10 نقاط لكل مهمة ينجزها العضو ويؤكدها بالنظام.
-            </div>
+            <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center">* تحسب 10 نقاط لكل مهمة ينجزها العضو.</div>
           </div>
-
         </div>
 
         {/* الجدول الخاص بالمرشحين */}
@@ -1463,25 +1551,13 @@ export default function CommitteeDashboard() {
             </div>
             
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setPreferenceFilterTab('pref-1')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-1' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-              >
+              <button type="button" onClick={() => setPreferenceFilterTab('pref-1')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-1' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
                 🎯 الرغبة الأولى ({requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm)).length})
               </button>
-              <button
-                type="button"
-                onClick={() => setPreferenceFilterTab('pref-2')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-2' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-              >
+              <button type="button" onClick={() => setPreferenceFilterTab('pref-2')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-2' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
                 🥈 الرغبة الثانية ({requests.filter(r => matchesTargetCommittee(r.secondChoice, currentActiveComm)).length})
               </button>
-              <button
-                type="button"
-                onClick={() => setPreferenceFilterTab('pref-3')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-3' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-              >
+              <button type="button" onClick={() => setPreferenceFilterTab('pref-3')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-3' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
                 🥉 الرغبة الثالثة ({requests.filter(r => matchesTargetCommittee(r.thirdChoice, currentActiveComm)).length})
               </button>
             </div>
@@ -1500,16 +1576,11 @@ export default function CommitteeDashboard() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredRequests.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد طلبات متقدمين مطابقة لهذه الرغبة في "{currentActiveComm}" حالياً.</td>
-                  </tr>
+                  <tr><td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد طلبات متقدمين مطابقة لهذه الرغبة في "{currentActiveComm}" حالياً.</td></tr>
                 ) : (
                   filteredRequests.map((req) => (
                     <tr key={req.id} className="hover:bg-slate-50">
-                      <td className="py-3 pr-2 font-bold text-slate-900">
-                        {req.fullName} 
-                        <div className="text-[10px] text-slate-400 font-normal">📞 {req.phone}</div>
-                      </td>
+                      <td className="py-3 pr-2 font-bold text-slate-900">{req.fullName}<div className="text-[10px] text-slate-400 font-normal">📞 {req.phone}</div></td>
                       <td className="py-3 text-slate-600 font-mono">{req.universityId || '-'}</td>
                       <td className="py-3 text-slate-600 text-[11px] space-y-0.5">
                         <p><strong className="text-[#630517]">1:</strong> {req.firstChoice}</p>
@@ -1518,42 +1589,16 @@ export default function CommitteeDashboard() {
                       </td>
                       <td className="py-3">
                         <span className={`px-2.5 py-1 rounded-full font-bold border ${
-                          req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
-                          req.status === 'مرفوض' ? 'bg-red-50 text-red-700 border-red-200' : 
-                          'bg-amber-50 text-amber-700 border-amber-200'
+                          req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : req.status === 'مرفوض' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
                         }`}>
                           {req.status || 'معلق'}
                         </span>
-                        {req.acceptedCommittee && (
-                          <div className="text-[10px] text-[#630517] font-bold mt-1">مقبول في: {req.acceptedCommittee}</div>
-                        )}
+                        {req.acceptedCommittee && (<div className="text-[10px] text-[#630517] font-bold mt-1">مقبول في: {req.acceptedCommittee}</div>)}
                       </td>
                       <td className="py-3 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => handleShiftPreference(req)}
-                          className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer text-xs"
-                          title="تحويل الطالب لرغبته التالية"
-                        >
-                          🔄 تحويل لرغبة أخرى
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedReqId(req.id);
-                            setShowAcceptModal(true);
-                          }}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 cursor-pointer text-xs"
-                        >
-                          قبول ✅
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleReject(req.id)}
-                          className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-xs"
-                        >
-                          رفض ✕
-                        </button>
+                        <button type="button" onClick={() => handleShiftPreference(req)} className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer text-xs" title="تحويل الطالب لرغبته التالية وتحويله للموارد البشرية">🔄 تحويل للموارد البشرية</button>
+                        <button type="button" onClick={() => { setSelectedReqId(req.id); setShowAcceptModal(true); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 cursor-pointer text-xs">قبول ✅</button>
+                        <button type="button" onClick={() => handleReject(req.id)} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-xs">رفض ✕</button>
                       </td>
                     </tr>
                   ))
@@ -1565,7 +1610,7 @@ export default function CommitteeDashboard() {
 
       </div>
 
-      {/* نافذة الأرشيف التاريخي للتقارير */}
+      {/* النوافذ التفاعلية */}
       {showArchiveModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-indigo-500">
@@ -1573,10 +1618,9 @@ export default function CommitteeDashboard() {
               <h3 className="text-lg font-black text-slate-900">📂 الأرشيف التاريخي لتقارير الجودة المعتمدة</h3>
               <button onClick={() => setShowArchiveModal(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕ إغلاق</button>
             </div>
-            
             <div className="space-y-3">
               {qualityArchives.length === 0 ? (
-                <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير مؤرشفة حتى الآن. اضغط على "اعتماد الرفع للإدارة العليا" لتوثيق أول تقرير.</p>
+                <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير مؤرشفة حتى الآن.</p>
               ) : (
                 qualityArchives.map((arch) => (
                   <div key={arch.id} className="bg-indigo-50/50 border border-indigo-200 rounded-2xl p-4 flex justify-between items-center">
@@ -1584,9 +1628,7 @@ export default function CommitteeDashboard() {
                       <h4 className="font-extrabold text-slate-900 text-xs">{arch.title}</h4>
                       <p className="text-[10px] text-slate-500 mt-0.5">تاريخ الاعتماد: {arch.dateStr} • بواسطة: {arch.author}</p>
                     </div>
-                    <span className="text-[10px] bg-indigo-600 text-white font-bold px-3 py-1 rounded-xl">
-                      {arch.status}
-                    </span>
+                    <span className="text-[10px] bg-indigo-600 text-white font-bold px-3 py-1 rounded-xl">{arch.status}</span>
                   </div>
                 ))
               )}
@@ -1595,13 +1637,12 @@ export default function CommitteeDashboard() {
         </div>
       )}
 
-      {/* نافذة تأكيد القبول برابط الواتساب */}
       {showAcceptModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
             <h3 className="text-xl font-black text-slate-900 border-b border-slate-100 pb-3">تأكيد القبول في {currentActiveComm}</h3>
             <div className="space-y-4">
-              <p className="text-xs text-slate-600">سيتم قبول الطالب رسمياً في هذه اللجنة وربطه برابط قروب الواتساب الخاص بها وإرسال تنبيه فوري له.</p>
+              <p className="text-xs text-slate-600">سيتم قبول الطالب رسمياً في هذه اللجنة وربطه برابط قروب الواتساب.</p>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-600">رابط قروب الواتساب:</label>
                 <input
@@ -1615,73 +1656,43 @@ export default function CommitteeDashboard() {
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowAcceptModal(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs"
-              >
-                إلغاء
-              </button>
-              <button
-                type="button"
-                onClick={handleAcceptSubmit}
-                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-black text-xs shadow hover:bg-emerald-700 cursor-pointer"
-              >
-                تأكيد القبول وإرسال الرابط ✅
-              </button>
+              <button type="button" onClick={() => setShowAcceptModal(false)} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs">إلغاء</button>
+              <button type="button" onClick={handleAcceptSubmit} className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">تأكيد القبول وإرسال الرابط ✅</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* نافذة إرسال رد القائد المنذَر على الإنذار */}
       {showReplyModal && activeReportToReply && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-500">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500 mx-auto flex items-center justify-center text-3xl font-bold text-white">
-              ✍️
-            </div>
+            <div className="w-16 h-16 rounded-2xl bg-amber-500 mx-auto flex items-center justify-center text-3xl font-bold text-white">✍️</div>
             <div className="text-center space-y-1">
               <h3 className="text-xl font-black text-slate-900">تقديم الرد والتبرير الرسمي</h3>
               <p className="text-xs text-slate-500">الرد على الإنذار الوارد من لجنة الجودة والتطوير</p>
             </div>
-
             <div className="bg-slate-50 p-3 rounded-2xl text-xs space-y-1 border border-slate-200">
               <span className="font-bold text-slate-700 block">سبب الإنذار المرصود:</span>
               <p className="text-slate-600">{activeReportToReply.reason}</p>
             </div>
-
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700 block">اكتب تفاصيل التبرير أو خطة المعالجة:</label>
               <textarea
                 rows={3}
-                placeholder="اكتب التبرير أو الإجراء الذي تم اتخاذه..."
+                placeholder="اكتب التبرير..."
                 value={leaderDefenseReply}
                 onChange={(e) => setLeaderDefenseReply(e.target.value)}
                 className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
               />
             </div>
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowReplyModal(false)}
-                className="w-1/2 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs"
-              >
-                إلغاء
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmitLeaderReply}
-                className="w-1/2 py-3 rounded-2xl bg-amber-600 text-white font-black text-xs shadow-lg hover:bg-amber-700 cursor-pointer"
-              >
-                إرسال التبرير للجودة 📨
-              </button>
+              <button type="button" onClick={() => setShowReplyModal(false)} className="w-1/2 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs">إلغاء</button>
+              <button type="button" onClick={handleSubmitLeaderReply} className="w-1/2 py-3 rounded-2xl bg-amber-600 text-white font-black text-xs shadow-lg hover:bg-amber-700 cursor-pointer">إرسال التبرير للجودة 📨</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* نافذة مركز الشكاوى والتقارير المرفوعة */}
       {showReportsModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-red-500">
@@ -1689,35 +1700,23 @@ export default function CommitteeDashboard() {
               <h3 className="text-lg font-black text-slate-900">🚨 مركز التقارير والشكاوى ومتابعة ردود القادة</h3>
               <button onClick={() => setShowReportsModal(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕ إغلاق</button>
             </div>
-            
             <div className="space-y-4">
               {escalatedReports.length === 0 ? (
-                <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير تقصير أو شكاوى مرفوعة حتى الآن. الوضع مستقر وتحت السيطرة.</p>
+                <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير تقصير أو شكاوى مرفوعة حتى الآن.</p>
               ) : (
                 escalatedReports.map((rep) => (
                   <div key={rep.id} className="bg-red-50/60 border border-red-200 rounded-2xl p-4 space-y-3 relative">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black text-red-700">اللجنة المعنية: {rep.targetCommittee}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] bg-red-200 text-red-900 font-bold px-2 py-0.5 rounded">بلاغ رسمي</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteReport(rep.id)}
-                          className="px-2 py-0.5 bg-red-600 text-white rounded-md text-[10px] font-black hover:bg-red-700 cursor-pointer"
-                        >
-                          حذف البلاغ 🗑️
-                        </button>
-                      </div>
+                      <button type="button" onClick={() => handleDeleteReport(rep.id)} className="px-2 py-0.5 bg-red-600 text-white rounded-md text-[10px] font-black hover:bg-red-700 cursor-pointer">حذف البلاغ 🗑️</button>
                     </div>
                     <p className="text-xs text-slate-800 font-semibold">السبب والتقصير المرصود: {rep.reason}</p>
-
                     {rep.leaderDefenseReply && (
                       <div className="bg-white border border-emerald-300 p-3 rounded-xl text-xs space-y-1 shadow-inner">
                         <span className="font-bold text-emerald-800 block">💬 رد وتبرير قائد اللجنة:</span>
                         <p className="text-slate-700">{rep.leaderDefenseReply}</p>
                       </div>
                     )}
-
                     <div className="text-[10px] text-slate-500 flex justify-between pt-2 border-t border-red-200/50">
                       <span>الرافع: {rep.reporter}</span>
                       <span className="font-bold text-red-800">{rep.status}</span>
@@ -1730,7 +1729,6 @@ export default function CommitteeDashboard() {
         </div>
       )}
 
-      {/* نافذة إنذار القادة أو التصعيد النهائي */}
       {showWarningModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-500">
@@ -1741,30 +1739,19 @@ export default function CommitteeDashboard() {
               <h3 className="text-xl font-black text-slate-900">
                 {warningStepType === 'warn-leaders' ? 'إنذار داخلي لقائد وقائدة اللجنة' : 'تصعيد وإحالة البلاغ للرئيس ورئيسة النادي'}
               </h3>
-              <p className="text-xs text-slate-500">
-                {warningStepType === 'warn-leaders' 
-                  ? `توجيه إنذار تحذيري وإشعار فوري لـ (${targetCommitteeForWarning}) مع مهلة رد 24 ساعة` 
-                  : `تصعيد نهائي وإشعار الأعضاء ضد (${targetCommitteeForWarning})`}
-              </p>
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700 block">التفاصيل أو التقصير المرصود:</label>
               <textarea
                 rows={3}
-                placeholder={warningStepType === 'warn-leaders' ? "اكتب سبب الإنذار ومنح المهلة..." : "اكتب سبب عدم تجاوبهم للإحالة الفورية للرئيس..."}
+                placeholder="اكتب التفاصيل..."
                 value={warningReason}
                 onChange={(e) => setWarningReason(e.target.value)}
                 className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
               />
             </div>
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowWarningModal(false)}
-                className="w-1/2 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs"
-              >
-                إلغاء
-              </button>
+              <button type="button" onClick={() => setShowWarningModal(false)} className="w-1/2 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs">إلغاء</button>
               <button
                 type="button"
                 onClick={handleExecuteWarningOrEscalation}
@@ -1772,7 +1759,7 @@ export default function CommitteeDashboard() {
                   warningStepType === 'warn-leaders' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
-                {warningStepType === 'warn-leaders' ? 'إرسال الإنذار وإشعارهم 📨' : 'تصعيد وإشعارهم فوراً ⚖️'}
+                {warningStepType === 'warn-leaders' ? 'إرسال الإنذار 📨' : 'تصعيد البلاغ ⚖️'}
               </button>
             </div>
           </div>
