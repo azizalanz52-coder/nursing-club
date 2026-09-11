@@ -66,6 +66,9 @@ export default function CommitteeDashboard() {
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
 
+  // حالة إخفاء الإنذار محلياً وسحابياً لضمان عدم ظهوره بعد حذفه
+  const [warningHidden, setWarningHidden] = useState(false);
+
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
     if (!phone) {
@@ -79,6 +82,12 @@ export default function CommitteeDashboard() {
     fetchCommitteeTasks();
     fetchAllUsers();
     fetchQualityArchives();
+
+    // التحقق مما إذا تم إخفاء الإنذار سابقاً لهذا المستخدم محلياً
+    const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
+    if (isHiddenLocally === 'true') {
+      setWarningHidden(true);
+    }
   }, [router]);
 
   const fetchLeaderData = async (phone: string) => {
@@ -93,7 +102,13 @@ export default function CommitteeDashboard() {
 
       const uData = userSnap.data();
       setUserData(uData);
-      if (uData.latestNotification) {
+      
+      // التحقق من حقل الإخفاء في قاعدة البيانات سحابياً أيضاً
+      if (uData.warningHidden) {
+        setWarningHidden(true);
+      }
+
+      if (uData.latestNotification && !uData.warningHidden) {
         setLeaderCustomAlert(uData.latestNotification);
       }
 
@@ -110,6 +125,7 @@ export default function CommitteeDashboard() {
       } else {
         setIsQualityTeam(false);
         setSelectedManagedCommittee(assigned || 'لجنة تنظيم الفعاليات');
+        setSelectedMonitoredCommittee(assigned || 'لجنة تنظيم الفعاليات');
         setTargetCommitteeForTask(assigned || 'لجنة تنظيم الفعاليات');
       }
 
@@ -385,7 +401,8 @@ export default function CommitteeDashboard() {
         if (matchesTargetCommittee(commStr, targetCommitteeForWarning) || usr.role?.includes('رئيس')) {
           try {
             await updateDoc(doc(db, 'users', usr.id), {
-              latestNotification: alertMsg
+              latestNotification: alertMsg,
+              warningHidden: false // إعادة تفعيل ظهور الإنذار عند إرسال إنذار جديد
             });
           } catch (er) { console.error(er); }
         }
@@ -417,6 +434,7 @@ export default function CommitteeDashboard() {
 
       setShowWarningModal(false);
       setWarningReason('');
+      setWarningHidden(false);
       fetchEscalatedReports();
     } catch (err) {
       console.error(err);
@@ -484,15 +502,15 @@ export default function CommitteeDashboard() {
     alert('تم تصدير ملف الأكسل بنجاح وجاهز لرفعه للآدمن! 📊');
   };
 
-  // دالة اعتماد التقرير وحفظه في الأرشيف التاريخي ورفع محفظة الجودة للإدارة العليا
+  // دالة اعتماد التقرير وحفظه في الأرشيف التاريخي ورفع محفظة الجودة للإدارة العليا ورئاسة النادي والأدمن
   const handleApproveAndSubmitToPresidents = async () => {
-    if (!confirm('هل أنت متأكد من اعتماد التقرير الختامي لمحفظة الجودة وحفظه في الأرشيف التاريخي وإرساله رسمياً لمكتب الرؤساء؟')) return;
+    if (!confirm('هل أنت متأكد من اعتماد التقرير الختامي لمحفظة الجودة وحفظه في الأرشيف التاريخي وإرساله رسمياً لمكتب الرؤساء والأدمن؟')) return;
 
     try {
       const reportTitle = `تقرير محفظة أدلة الجودة الختامي (${new Date().toLocaleDateString('ar-SA')})`;
       const reportSummaryText = `🏆 [اعتماد تقرير محفظة الجودة الختامي]: تمت مراجعة إنجازات اللجان السبع، وحفظ الأرشيف، ورفع التقرير بنجاح تام.`;
 
-      // حفظ التقرير في الأرشيف التاريخي (Historical Vault)
+      // 1. حفظ التقرير في الأرشيف التاريخي (Historical Vault) مع حالة الاعتماد المؤرشف رسمياً لضمان ظهوره في صفحة الأدمن والرؤساء
       await addDoc(collection(db, 'quality_reports_archive'), {
         title: reportTitle,
         createdAt: Date.now(),
@@ -501,6 +519,7 @@ export default function CommitteeDashboard() {
         author: userData?.fullName || 'لجنة الجودة والتطوير'
       });
 
+      // 2. إرسال الإشعار والتنبيه لجميع حسابات الأدمن والرؤساء لضمان وصوله فوراً
       for (const usr of allUsersList) {
         if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
           try {
@@ -511,6 +530,7 @@ export default function CommitteeDashboard() {
         }
       }
 
+      // 3. توثيق البلاغ/التقرير في مجموعة escalated_reports أو مجموعة مخصصة لضمان ظهوره بصفحة الأدمن والرؤساء
       await addDoc(collection(db, 'escalated_reports'), {
         targetCommittee: 'جميع اللجان السبع',
         reporter: userData?.fullName || 'لجنة الجودة والتطوير',
@@ -520,7 +540,7 @@ export default function CommitteeDashboard() {
         createdAt: Date.now()
       });
 
-      alert('🎉 تم اعتماد التقرير، حفظه في الأرشيف التاريخي، وإرسال التنبيه لمكتب الرؤساء بنجاح تام!');
+      alert('🎉 تم اعتماد التقرير، حفظه في الأرشيف التاريخي، وترحيله بنجاح تام لمكتب الرؤساء والأدمن!');
       fetchEscalatedReports();
       fetchQualityArchives();
     } catch (err) {
@@ -537,7 +557,6 @@ export default function CommitteeDashboard() {
       return;
     }
 
-    // حساب الفقرة التحليلية التنفيذية تلقائياً
     const totalAcceptedAll = requests.filter(r => r.status === 'مقبول' || r.acceptedCommittee).length;
     let topCommName = 'لجنة التصميم';
     let maxMembers = -1;
@@ -661,7 +680,6 @@ export default function CommitteeDashboard() {
 
   const displayedTasks = committeeTasks.filter(t => t.committee === currentActiveComm);
 
-  // حساب نقاط الأعضاء الأفراد (Leaderboard) بناءً على المهام المنجزة في اللجنة الحالية
   const memberScoresMap: { [memberName: string]: number } = {};
   committeeTasks
     .filter(t => t.committee === currentActiveComm)
@@ -677,7 +695,6 @@ export default function CommitteeDashboard() {
     .map(([name, score]) => ({ name, score }))
     .sort((a, b) => b.score - a.score);
 
-  // فلترة البلاغات والإنذارات الخاصة باللجنة الحالية بحيث تعرض الفريدة فقط بدون تكرار مزعج
   const committeeReports = Array.from(
     new Map(
       escalatedReports
@@ -728,7 +745,7 @@ export default function CommitteeDashboard() {
                   type="button"
                   onClick={handleApproveAndSubmitToPresidents}
                   className="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-black shadow hover:bg-amber-700 flex items-center gap-1.5 cursor-pointer animate-pulse"
-                  title="اعتماد التقرير ورفع للإدارة العليا والرؤساء"
+                  title="اعتماد التقرير ورفع للإدارة العليا والرؤساء والأدمن"
                 >
                   <span>🚀</span>
                   <span>اعتماد الرفع للإدارة العليا</span>
@@ -750,16 +767,36 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* الأليرت بار القيادي */}
-        <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between flex-wrap gap-4 border border-amber-400">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl animate-pulse">🚨</span>
-            <div>
-              <h4 className="font-black text-sm text-yellow-100">شريط التنبيهات والبلاغات القيادية العاجلة:</h4>
-              <p className="text-xs font-bold mt-0.5">{leaderCustomAlert}</p>
+        {/* الأليرت بار القيادي (مع زر إخفاء دائم لا يعود أبداً بعد حذفه) */}
+        {!warningHidden && (
+          <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between flex-wrap gap-4 border border-amber-400">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl animate-pulse">🚨</span>
+              <div>
+                <h4 className="font-black text-sm text-yellow-100">شريط التنبيهات والبلاغات القيادية العاجلة:</h4>
+                <p className="text-xs font-bold mt-0.5">{leaderCustomAlert}</p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={async () => {
+                setWarningHidden(true);
+                localStorage.setItem(`warning_hidden_${userPhone}`, 'true');
+                if (userPhone) {
+                  try {
+                    await updateDoc(doc(db, 'users', userPhone), { warningHidden: true });
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }
+              }}
+              className="px-3 py-1.5 bg-black/20 hover:bg-black/40 text-white rounded-xl text-xs font-bold transition-all border border-white/20 cursor-pointer flex items-center gap-1"
+            >
+              <span>✕</span>
+              <span>إخفاء الإنذار</span>
+            </button>
           </div>
-        </div>
+        )}
 
         {/* صندوق تنبيهات وإنذارات اللجنة الحالية (خاص بقادة اللجان لتقديم الرد خلال 24 ساعة) */}
         {!isQualityTeam && committeeReports.length > 0 && (
