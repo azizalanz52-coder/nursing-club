@@ -256,7 +256,7 @@ export default function CommitteeDashboard() {
         }
       }
 
-      alert('تم رفع ونشر المادة الإعلامية سحابياً وربطها بلوحة الأدمن ومكتب الرؤساء بنجاح! 📸🚀');
+      alert('تم رفع ونشر المادة الإعلامية سحابياً لتصل للأدمن والرؤساء بنجاح! 📸🚀');
     } catch (err) { console.error(err); }
   };
 
@@ -1165,7 +1165,7 @@ export default function CommitteeDashboard() {
 
               <div className="sm:col-span-2 pt-2">
                 <button type="submit" className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer">
-                  + رفع ونشر الصور والمقاطع سحابياً (تصل للأدمن والرؤساء والتصميم) 🎬
+                  + رفع ونشر المواد سحابياً (تصل للأدمن) 🎬
                 </button>
               </div>
             </form>
@@ -1554,7 +1554,7 @@ export default function CommitteeDashboard() {
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-lg font-black text-slate-900">متقدمو وقبولو ({currentActiveComm})</h3>
+                <h3 className="text-lg font-black text-slate-900">المتقدمون ({currentActiveComm})</h3>
                 <p className="text-xs text-slate-500">اختر الرغبة لعرض المتقدمين بدقة وقبولهم برابط قروب الواتساب:</p>
               </div>
               
