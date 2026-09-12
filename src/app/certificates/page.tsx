@@ -4,17 +4,23 @@ import React, { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
+import jsPDF from 'jspdf';
 
 interface CertificateItem {
   id: string;
-  studentName: string;
+  recipientName: string;
   phone: string;
-  eventName: string;
+  password?: string;
+  certTitle: string;
+  category: string;
+  image: string;
   issueDate: string;
+  description: string;
 }
 
 export default function CertificatesPortal() {
   const [phoneInput, setPhoneInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
   const [searched, setSearched] = useState(false);
   const [userCertificates, setUserCertificates] = useState<CertificateItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -25,15 +31,68 @@ export default function CertificatesPortal() {
 
     setLoading(true);
     try {
-      const q = query(collection(db, 'club_certificates'), where('phone', '==', phoneInput.trim()));
+      // البحث في مجموعة site_certificates المعتمدة في لوحة التحكم
+      const q = query(collection(db, 'site_certificates'), where('phone', '==', phoneInput.trim()));
       const snap = await getDocs(q);
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as CertificateItem[];
+      let list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as CertificateItem[];
+
+      // التحقق من كلمة المرور إذا كانت مسجلة للشهادة
+      if (passwordInput.trim()) {
+        list = list.filter(c => !c.password || c.password === passwordInput.trim());
+      }
+
       setUserCertificates(list);
       setSearched(true);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = (cert: CertificateItem) => {
+    try {
+      const docPdf = new jsPDF({ orientation: 'landscape' });
+      
+      // تصميم وتنسيق محتوى ملف الـ PDF للشهادة
+      docPdf.setFillColor(255, 251, 235); // خلفية خفيفة فخمة
+      docPdf.rect(0, 0, 297, 210, 'F');
+
+      docPdf.setTextColor(99, 5, 23); // لون الشعار الأساسي
+      docPdf.setFontSize(22);
+      docPdf.text('University of Hafr Al Batin - Nursing Club', 148, 25, { align: 'center' });
+
+      docPdf.setFontSize(14);
+      docPdf.setTextColor(100, 100, 100);
+      docPdf.text('بوابة الاعتماد والتوثيق الفخري الرسمي', 148, 35, { align: 'center' });
+
+      docPdf.setFontSize(16);
+      docPdf.setTextColor(30, 30, 30);
+      docPdf.text('تشهد إدارة نادي كلية التمريض بأن المكرم /ـة:', 148, 65, { align: 'center' });
+
+      docPdf.setFontSize(26);
+      docPdf.setTextColor(99, 5, 23);
+      docPdf.text(cert.recipientName || 'عضو النادي', 148, 85, { align: 'center' });
+
+      docPdf.setFontSize(14);
+      docPdf.setTextColor(30, 30, 30);
+      docPdf.text('وذلك نظير مشاركته /ـها المتميزة وإنجازه /ـها المعتمد في:', 148, 105, { align: 'center' });
+
+      docPdf.setFontSize(20);
+      docPdf.setTextColor(180, 130, 20);
+      docPdf.text(cert.certTitle, 148, 125, { align: 'center' });
+
+      docPdf.setFontSize(12);
+      docPdf.setTextColor(80, 80, 80);
+      docPdf.text(`التفاصيل: ${cert.description || 'شهادة معتمدة من نادي كلية التمريض بجامعة حفر الباطن.'}`, 148, 145, { align: 'center' });
+
+      docPdf.text(`تاريخ الإصدار: ${new Date(cert.issueDate || Date.now()).toLocaleDateString('ar-SA')}`, 30, 185);
+      docPdf.text('رئيس نادي التمريض (معتمد سحابياً ✅)', 220, 185);
+
+      docPdf.save(`Certificate_${cert.recipientName || 'UHB'}.pdf`);
+    } catch (err) {
+      console.error('PDF Error:', err);
+      window.print(); // كخيار بديل في حال حدوث أي خطأ في المتصفح
     }
   };
 
@@ -59,8 +118,8 @@ export default function CertificatesPortal() {
           <span className="bg-amber-100 text-amber-900 font-bold text-xs px-4 py-1.5 rounded-full">
             بوابة الاعتماد الفخري 📜
           </span>
-          <h1 className="text-3xl font-black text-slate-900">استعرض شهاداتك الفخرية والدورات</h1>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">أدخل رقم جوالك المسجل لتحميل شهاداتك المعتمدة من النادي فوراً بجودة عالية.</p>
+          <h1 className="text-3xl font-black text-slate-900">استعرض جميع شهاداتك الفخرية والدورات</h1>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">أدخل رقم جوالك المسجل وكلمة المرور لاستعراض وتحميل كافة شهاداتك المعتمدة من النادي فوراً.</p>
         </div>
 
         <form onSubmit={handleSearchCertificates} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm max-w-lg mx-auto space-y-4">
@@ -76,12 +135,23 @@ export default function CertificatesPortal() {
               required
             />
           </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700">كلمة المرور</label>
+            <input
+              type="password"
+              placeholder="كلمة المرور الخاصة بك..."
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm text-center font-bold text-slate-900 focus:outline-none focus:border-amber-600"
+              required
+            />
+          </div>
           <button
             type="submit"
             disabled={loading}
             className="w-full py-3.5 rounded-xl bg-amber-600 text-white font-black text-xs shadow-lg hover:bg-amber-700 transition-all cursor-pointer"
           >
-            {loading ? 'جاري البحث...' : 'بحث واستعراض الشهادات 🔍'}
+            {loading ? 'جاري البحث...' : 'بحث واستعراض جميع الشهادات 🔍'}
           </button>
         </form>
 
@@ -89,8 +159,8 @@ export default function CertificatesPortal() {
           <div className="space-y-8">
             {userCertificates.length === 0 ? (
               <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-300 text-center space-y-2">
-                <p className="text-base font-bold text-slate-700">لا توجد شهادات مسجلة برقم الجوال ({phoneInput}).</p>
-                <p className="text-xs text-slate-400">تأكد من إدخال الرقم الصحيح أو تواصل مع إدارة النادي لإصدار شهادتك.</p>
+                <p className="text-base font-bold text-slate-700">لا توجد شهادات مسجلة برقم الجوال ({phoneInput}) أو كلمة المرور غير صحيحة.</p>
+                <p className="text-xs text-slate-400">تأكد من إدخال البيانات الصحيحة أو تواصل مع إدارة النادي لإصدار شهادتك.</p>
               </div>
             ) : (
               userCertificates.map((cert) => (
@@ -109,19 +179,22 @@ export default function CertificatesPortal() {
                   </div>
 
                   <div className="space-y-4 relative z-10 py-4 border-y border-amber-200/60">
-                    <p className="text-xs text-slate-600 font-bold">تشهد إدارة نادي التمريض بأن المتألق /ـة:</p>
+                    <p className="text-xs text-slate-600 font-bold">تشهد إدارة نادي التمريض بأن المكرم /ـة:</p>
                     <h3 className="text-2xl sm:text-3xl font-black text-[#630517] tracking-wide underline decoration-amber-400 decoration-2 underline-offset-8">
-                      {cert.studentName}
+                      {cert.recipientName}
                     </h3>
                     <p className="text-xs text-slate-600 font-bold">وذلك نظير مشاركته/ها الفعالة وإتمامه/ها بنجاح لـ:</p>
                     <h4 className="text-lg sm:text-xl font-black text-amber-900 bg-white/80 py-2 px-4 rounded-xl border border-amber-200 w-fit mx-auto shadow-inner">
-                      {cert.eventName}
+                      {cert.certTitle}
                     </h4>
+                    <p className="text-xs text-slate-600 font-medium max-w-md mx-auto">
+                      {cert.description}
+                    </p>
                   </div>
 
                   <div className="flex justify-between items-center text-xs text-slate-500 font-bold relative z-10 px-4">
                     <div>
-                      <p>تاريخ الإصدار: <span className="font-mono text-slate-800">{cert.issueDate}</span></p>
+                      <p>تاريخ الإصدار: <span className="font-mono text-slate-800">{new Date(cert.issueDate).toLocaleDateString('ar-SA')}</span></p>
                     </div>
                     <div>
                       <p className="font-black text-[#630517]">رئيس نادي التمريض</p>
@@ -129,14 +202,25 @@ export default function CertificatesPortal() {
                     </div>
                   </div>
 
-                  <div className="pt-2 relative z-10">
+                  <div className="pt-2 flex justify-center gap-4 relative z-10 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => window.print()}
+                      onClick={() => handleDownloadPdf(cert)}
                       className="px-8 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow-xl hover:brightness-110 transition-all cursor-pointer"
                     >
-                      📥 طباعة أو تحميل الشهادة PDF / صورة
+                      📥 تحميل الشهادة PDF رسمي
                     </button>
+                    {cert.image && (
+                      <a
+                        href={cert.image}
+                        download="certificate-image.jpg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-6 py-3 rounded-xl bg-amber-600 text-white font-black text-xs shadow hover:bg-amber-700 transition-all"
+                      >
+                        🖼️ عرض وتحميل صورة الشهادة
+                      </a>
+                    )}
                   </div>
 
                 </div>
