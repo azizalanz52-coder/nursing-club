@@ -82,20 +82,34 @@ interface UserAccount {
   lastActive?: number;
 }
 
+// واجهة إنجازات طلبة التمريض
+interface StudentAchievement {
+  id: string;
+  studentName: string;
+  awardName: string;
+  image: string;
+  description: string;
+  createdAt: string;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee'>('requests');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements'>('requests');
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
-  // حالات التقارير المرفوعة والشكاوى من لجنة الجودة
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
-  // أرشيف التقارير التاريخية
   const [historicalVaultReports, setHistoricalVaultReports] = useState<any[]>([]);
 
-  // حالات النوافذ المنبثقة المخصصة بهوية الموقع
+  // حالات إنجازات طلبة كلية التمريض
+  const [studentAchievements, setStudentAchievements] = useState<StudentAchievement[]>([]);
+  const [studentNameInput, setStudentNameInput] = useState<string>('');
+  const [awardNameInput, setAwardNameInput] = useState<string>('');
+  const [achievementDescInput, setAchievementDescInput] = useState<string>('');
+  const [studentImageInput, setStudentImageInput] = useState<string>('/logo.png');
+
   const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'name' | 'confirm'>('none');
   const [modalMessage, setModalMessage] = useState<string>('');
   const [activeUserPhoneForAction, setActiveUserPhoneForAction] = useState<string>('');
@@ -156,9 +170,62 @@ export default function AdminDashboard() {
     checkAdminAuth();
     fetchEscalatedReports();
     fetchHistoricalVault();
+    fetchStudentAchievements();
   }, [router]);
 
-  // جلب تقارير الشكاوى والتقصير المرفوعة سحابياً
+  const fetchStudentAchievements = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'student_achievements'));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as StudentAchievement[];
+      setStudentAchievements(list);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddStudentAchievement = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!studentNameInput.trim() || !awardNameInput.trim()) return;
+
+    const achId = Date.now().toString();
+    const newAch: StudentAchievement = {
+      id: achId,
+      studentName: studentNameInput.trim(),
+      awardName: awardNameInput.trim(),
+      image: studentImageInput,
+      description: achievementDescInput.trim() || 'إنجاز مشرف ومميز يضاف لسجل طالبات وطلاب كلية التمريض.',
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      await setDoc(doc(db, 'student_achievements', achId), newAch);
+      setStudentAchievements([newAch, ...studentAchievements]);
+      setStudentNameInput('');
+      setAwardNameInput('');
+      setAchievementDescInput('');
+      setStudentImageInput('/logo.png');
+      setModalMessage('تم إضافة إنجاز الطالب بنجاح ونشره سحابياً للموقع! 🏆✨');
+      setModalType('success');
+    } catch (err) {
+      console.error(err);
+      setModalMessage('حدث خطأ أثناء حفظ الإنجاز.');
+      setModalType('success');
+    }
+  };
+
+  const handleDeleteStudentAchievement = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من حذف هذا الإنجاز من السحابة؟', async () => {
+      try {
+        await deleteDoc(doc(db, 'student_achievements', id));
+        setStudentAchievements(studentAchievements.filter(a => a.id !== id));
+        setModalMessage('تم حذف الإنجاز بنجاح.');
+        setModalType('success');
+      } catch (err) {
+        console.error(err);
+      }
+    });
+  };
+
   const fetchEscalatedReports = async () => {
     try {
       const snap = await getDocs(collection(db, 'escalated_reports'));
@@ -169,7 +236,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // جلب أرشيف التقارير التاريخية (Historical Vault) سحابياً
   const fetchHistoricalVault = async () => {
     try {
       const snap1 = await getDocs(collection(db, 'historical_vault_reports'));
@@ -185,7 +251,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // وظيفة تحميل تقرير من الأرشيف كملف PDF
   const handleDownloadReportPdf = (vaultItem: any) => {
     try {
       const docPdf = new jsPDF();
@@ -225,7 +290,6 @@ export default function AdminDashboard() {
   const [newDiscDesc, setNewDiscDesc] = useState<string>('');
   const [newDiscImages, setNewDiscImages] = useState<string[]>([]);
 
-  // حالات خاصة بلجنة الإعلام (صور وفيديوهات)
   const [mediaUploads, setMediaUploads] = useState<any[]>([]);
   const [mediaTitle, setMediaTitle] = useState<string>('');
   const [mediaCategory, setMediaCategory] = useState<string>('تغطيات مرئية');
@@ -278,7 +342,6 @@ export default function AdminDashboard() {
   const [newMemberName, setNewMemberName] = useState<string>('');
   const [newMemberRole, setNewMemberRole] = useState<string>('');
 
-  // حالات نظام الإنذار المدرج لقائد وقائدة اللجنة قبل الإحالة للرؤساء
   const [showWarningModal, setShowWarningModal] = useState<boolean>(false);
   const [warningTargetReportId, setWarningTargetReportId] = useState<string>('');
   const [warningTargetCommittee, setWarningTargetCommittee] = useState<string>('');
@@ -1229,7 +1292,7 @@ export default function AdminDashboard() {
               نظام القيادة الماسية 🏆
             </span>
             <h2 className="text-xl font-black">غرفة عمليات القيادة ونبض النادي</h2>
-            <p className="text-xs text-white/80">تابع أداء اللجان، ادرس طلبات الانضمام، وانشر الفعاليات بحماس.</p>
+            <p className="text-xs text-white/80">تابع أداء اللجان، ادرس طلبات الانضمام، وانشر الفعاليات والإنجازات.</p>
           </div>
 
           <div className="flex gap-4">
@@ -1242,8 +1305,8 @@ export default function AdminDashboard() {
               <span className="text-[10px] font-bold text-white/90">الأعضاء المقبولون</span>
             </div>
             <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 text-center">
-              <span className="block text-2xl font-black text-sky-400">{events.length}</span>
-              <span className="text-[10px] font-bold text-white/90">الأنشطة والفعاليات</span>
+              <span className="block text-2xl font-black text-amber-300">{studentAchievements.length}</span>
+              <span className="text-[10px] font-bold text-white/90">إنجازات الطلبة</span>
             </div>
           </div>
         </div>
@@ -1260,6 +1323,16 @@ export default function AdminDashboard() {
               🔑 الحسابات والرتب والصلاحيات
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('student-achievements')}
+            className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+              activeTab === 'student-achievements' ? 'bg-amber-600 text-white shadow-md scale-105' : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            🏆 إنجازات طلبة كلية التمريض
+          </button>
 
           <button
             type="button"
@@ -1326,6 +1399,121 @@ export default function AdminDashboard() {
           ))}
         </div>
 
+        {/* قسم إنجازات طلبة كلية التمريض الجديد */}
+        {activeTab === 'student-achievements' && (
+          <div className="space-y-8">
+            <div className="bg-white rounded-3xl p-8 border border-amber-300 shadow-sm space-y-6">
+              <div className="border-b border-slate-100 pb-4">
+                <h3 className="text-xl font-black text-amber-900">🏆 إضافة إنجاز جديد لطالب من كلية التمريض</h3>
+                <p className="text-xs text-slate-500">أدخل اسم الطالب، اسم الجائزة أو التكريم، صورة الطالب، وتفاصيل الإنجاز لعرضها في الصفحة الرئيسية للموقع.</p>
+              </div>
+
+              <form onSubmit={handleAddStudentAchievement} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-amber-50/40 p-6 rounded-2xl border border-amber-200">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">اسم الطالب / الطالبة</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: عبدالعزيز بن سليمان العنزي"
+                    value={studentNameInput}
+                    onChange={(e) => setStudentNameInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">اسم الجائزة أو الإنجاز</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: المركز الأول في مسار الابتكار الطبي"
+                    value={awardNameInput}
+                    onChange={(e) => setAwardNameInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">صورة الطالب أو الطالبة الشخصية / التكريم (صورة 📁)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const base64 = await convertFileToBase64(e.target.files[0]);
+                        setStudentImageInput(base64);
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-600 file:text-white cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">وصف الإنجاز والتفاصيل</label>
+                  <textarea
+                    rows={3}
+                    placeholder="اكتب نبذة مختصرة عن التكريم أو الإنجاز المفخرة لكلية التمريض..."
+                    value={achievementDescInput}
+                    onChange={(e) => setAchievementDescInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 pt-2">
+                  <button
+                    type="submit"
+                    className="bg-amber-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-amber-700 cursor-pointer"
+                  >
+                    + نشر إنجاز الطالب في الموقع سحابياً 🚀
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+              <h3 className="text-xl font-black text-slate-900">سجل إنجازات طلبة كلية التمريض المعتمدة ({studentAchievements.length})</h3>
+              {studentAchievements.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <p className="text-sm font-bold">لم تتم إضافة أي إنجاز للطلبة حتى الآن.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {studentAchievements.map((ach) => (
+                    <div key={ach.id} className="p-6 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-sm flex flex-col justify-between space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <img src={ach.image || '/logo.png'} alt={ach.studentName} className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400 shadow" />
+                          <div>
+                            <h4 className="font-black text-slate-900 text-sm">{ach.studentName}</h4>
+                            <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-bold inline-block mt-1">
+                              {ach.awardName}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-slate-700 text-xs font-semibold bg-white p-3 rounded-xl border border-amber-100 shadow-inner leading-relaxed">
+                          "{ach.description}"
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-amber-200 flex justify-between items-center text-[11px]">
+                        <span className="text-slate-400">{new Date(ach.createdAt).toLocaleDateString('ar-SA')}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteStudentAchievement(ach.id)}
+                          className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                        >
+                          حذف الإنجاز ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* باقي التبويبات كما هي */}
         {activeTab === 'media-committee' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm space-y-6">
@@ -1369,7 +1557,6 @@ export default function AdminDashboard() {
                     onChange={handleSelectMediaFiles}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-rose-700 file:text-white cursor-pointer"
                   />
-                  <p className="text-[10px] text-slate-400">يمكنك رفع صيغ الصور والفيديوهات الشائعة (MP4, MOV, JPG, PNG)</p>
                 </div>
 
                 <div className="sm:col-span-2 pt-2">
