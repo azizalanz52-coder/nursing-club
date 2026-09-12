@@ -80,13 +80,12 @@ export default function CommitteeDashboard() {
   const [textBannerContent, setTextBannerContent] = useState('');
   const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
 
-  // نظام اعتذارات الفعاليات والغياب للأعضاء
+  // نظام الاعتذارات المباشر (بدون موافقة معقدة - إرسال فوري للموارد البشرية)
   const [eventExcuses, setEventExcuses] = useState<any[]>([]);
   const [showExcuseForm, setShowExcuseForm] = useState(false);
   const [excuseEventName, setExcuseEventName] = useState('');
   const [excuseEventDate, setExcuseEventDate] = useState('');
   const [excuseReason, setExcuseReason] = useState('');
-  const [excuseFileName, setExcuseFileName] = useState('');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -236,7 +235,6 @@ export default function CommitteeDashboard() {
       setMediaTitle('');
       setMediaBase64('/header-banner.png');
 
-      // إشعار فوري للأدمن ومكتب الرؤساء ولجنة التصميم برفع مواد إعلامية جديدة
       for (const usr of allUsersList) {
         const cStr = usr.assignedCommittee || usr.committee || '';
         if (cStr.includes('التصميم') || cStr.includes('الاعلام') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
@@ -259,7 +257,6 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // ربط المحتوى العلمي بلجنة التصميم ومكتب الرؤساء والأدمن
   const handleAddScientificTextSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!textBannerTitle.trim() || !textBannerContent.trim()) return;
@@ -275,7 +272,6 @@ export default function CommitteeDashboard() {
       await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
       setScientificTextsList([newTextObj, ...scientificTextsList]);
 
-      // إرسال إشعار فوري لرئيس لجنة التصميم وللرؤساء والأدمن
       for (const usr of allUsersList) {
         const cStr = usr.assignedCommittee || usr.committee || '';
         if (cStr.includes('التصميم') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
@@ -300,6 +296,7 @@ export default function CommitteeDashboard() {
     }
   };
 
+  // إرسال الاعتذار بشكل مباشر للموارد البشرية كإشعار إفادة بعدم المشاركة (بدون موافقة رسمية مقيدة)
   const handleSubmitExcuse = async (e: FormEvent) => {
     e.preventDefault();
     if (!excuseEventName.trim() || !excuseReason.trim()) return;
@@ -311,33 +308,35 @@ export default function CommitteeDashboard() {
       eventName: excuseEventName.trim(),
       eventDate: excuseEventDate || 'غير محدد',
       reason: excuseReason.trim(),
-      attachmentName: excuseFileName || 'بدون مرفق',
-      status: 'قيد الانتظار',
+      status: 'تم إفادة الموارد البشرية (اعتذار عدم مشاركة)',
       createdAt: Date.now()
     };
 
     try {
       const docRef = await addDoc(collection(db, 'event_excuses'), newExcuseObj);
       setEventExcuses([{ id: docRef.id, ...newExcuseObj }, ...eventExcuses]);
+
+      // إشعار فوري للجنة الموارد البشرية بأن العضو اعتذر وغير مشارك
+      for (const usr of allUsersList) {
+        const cStr = usr.assignedCommittee || usr.committee || '';
+        if (cStr.includes('الموارد البشرية') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
+          try {
+            await updateDoc(doc(db, 'users', usr.id), {
+              latestNotification: `ℹ️ [إفادة اعتذار عدم مشاركة]: أفاد الزميل (${userData?.fullName || 'عضو'}) بعدم مشاركته في فعالية (${excuseEventName}).`
+            });
+          } catch (er) { console.error(er); }
+        }
+      }
+
       setExcuseEventName('');
       setExcuseEventDate('');
       setExcuseReason('');
-      setExcuseFileName('');
       setShowExcuseForm(false);
-      alert('تم تقديم طلب الاعتذار عن الفعالية ورفعه للقائد بنجاح! 📨');
+      alert('تم إرسال إفادة الاعتذار وعدم المشاركة للموارد البشرية وسجلت بنجاح بدون تعقيد! 👍');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء تقديم طلب الاعتذار.');
+      alert('حدث خطأ أثناء إرسال الاعتذار.');
     }
-  };
-
-  const handleUpdateExcuseStatus = async (excuseId: string, newStatus: 'معتمد' | 'مرفوض') => {
-    try {
-      const excuseRef = doc(db, 'event_excuses', excuseId);
-      await updateDoc(excuseRef, { status: newStatus });
-      setEventExcuses(eventExcuses.map(ex => ex.id === excuseId ? { ...ex, status: newStatus } : ex));
-      alert(`تم ${newStatus === 'معتمد' ? 'اعتماد' : 'رفض'} طلب الاعتذار بنجاح.`);
-    } catch (err) { console.error(err); }
   };
 
   const matchesTargetCommittee = (choiceStr: string, targetComm: string) => {
@@ -959,25 +958,27 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* نظام اعتذارات الفعاليات والغياب للأعضاء */}
+        {/* ======================================================== */}
+        {/* نظام إفادة عدم المشاركة والاعتذار المباشر للموارد البشرية */}
+        {/* ======================================================== */}
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
-              <h3 className="text-lg font-black text-slate-900">📝 نظام اعتذارات الفعاليات والغياب ({currentActiveComm})</h3>
-              <p className="text-xs text-slate-500">تقديم أعذار الغياب عن الفعاليات مع الأسباب والمرفقات للاعتماد:</p>
+              <h3 className="text-lg font-black text-slate-900">📝 إفادة عدم المشاركة والاعتذار للفعاليات ({currentActiveComm})</h3>
+              <p className="text-xs text-slate-500">أبلغ الموارد البشرية فوراً بعدم مشاركتك في الفعالية بدون موافقة أو تعقيد:</p>
             </div>
             <button
               type="button"
               onClick={() => setShowExcuseForm(!showExcuseForm)}
               className="px-4 py-2 bg-[#630517] text-[#F5D061] rounded-xl text-xs font-black shadow hover:brightness-110 cursor-pointer"
             >
-              {showExcuseForm ? 'إلغاء' : '+ تقديم طلب اعتذار جديد'}
+              {showExcuseForm ? 'إلغاء' : '+ تسجيل اعتذار عدم مشاركة'}
             </button>
           </div>
 
           {showExcuseForm && (
             <form onSubmit={handleSubmitExcuse} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
-              <h4 className="font-extrabold text-sm text-[#630517]">نموذج تقديم اعتذار رسمي عن حضور فعالية</h4>
+              <h4 className="font-extrabold text-sm text-[#630517]">نموذج إفادة عدم المشاركة للموارد البشرية</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">اسم الفعالية</label>
@@ -1002,75 +1003,40 @@ export default function CommitteeDashboard() {
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">سبب الغياب والاعتذار بالتفصيل</label>
+                <label className="text-xs font-bold text-slate-700">سبب عدم المشاركة (مختصر)</label>
                 <textarea
-                  rows={3}
-                  placeholder="اكتب أسباب الغياب بوضوح..."
+                  rows={2}
+                  placeholder="سبب الاعتذار أو عدم التفرغ..."
                   value={excuseReason}
                   onChange={(e) => setExcuseReason(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
                   required
                 />
               </div>
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div className="w-full sm:w-auto">
-                  <label className="cursor-pointer bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 w-fit">
-                    <span>📎</span>
-                    <span>{excuseFileName ? excuseFileName : 'إرفاق ملف العذر (صورة أو PDF)'}</span>
-                    <input
-                      type="file"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          setExcuseFileName(e.target.files[0].name);
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-                <button type="submit" className="w-full sm:w-auto bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:bg-emerald-700 cursor-pointer">
-                  إرسال الطلب للقائد للاعتماد 🚀
+              <div className="flex justify-end">
+                <button type="submit" className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:bg-emerald-700 cursor-pointer">
+                  إرسال الإفادة للموارد البشرية مباشرة 🚀
                 </button>
               </div>
             </form>
           )}
 
           <div className="space-y-3">
-            <h4 className="font-extrabold text-sm text-slate-800">سجل طلبات الاعتذار الواردة للجنة:</h4>
+            <h4 className="font-extrabold text-sm text-slate-800">سجل الإفادات والاعتذارات المسجلة:</h4>
             {committeeExcusesFiltered.length === 0 ? (
-              <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد طلبات اعتذار مسجلة لهذه اللجنة حتى الآن.</p>
+              <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد إفادات اعتذار مسجلة لهذه اللجنة حتى الآن.</p>
             ) : (
               committeeExcusesFiltered.map((ex) => (
-                <div key={ex.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div key={ex.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-slate-900 text-xs">العضو: {ex.memberName}</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        ex.status === 'معتمد' ? 'bg-emerald-100 text-emerald-800' : ex.status === 'مرفوض' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
-                      }`}>
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800">
                         {ex.status}
                       </span>
                     </div>
                     <p className="text-xs text-slate-700 font-semibold">الفعالية: <span className="text-[#630517]">{ex.eventName}</span> (تاريخ: {ex.eventDate})</p>
                     <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-100"><strong className="text-slate-800">السبب:</strong> {ex.reason}</p>
-                    <p className="text-[10px] text-slate-400">المرفق: {ex.attachmentName}</p>
-                  </div>
-                  
-                  <div className="flex gap-2 items-center">
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateExcuseStatus(ex.id, 'معتمد')}
-                      className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 cursor-pointer"
-                    >
-                      اعتماد ✅
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateExcuseStatus(ex.id, 'مرفوض')}
-                      className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 cursor-pointer"
-                    >
-                      رفض ✕
-                    </button>
                   </div>
                 </div>
               ))
@@ -1083,11 +1049,11 @@ export default function CommitteeDashboard() {
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900">👥 قائمة الطلبة المحولين (مراجعة القبول)</h3>
-                <p className="text-xs text-slate-500">الطلاب الذين لم يُقبلوا برغبتهم الأولى وتم تحويلهم لمراجعة قبولهم على الرغبة الثانية أو الثالثة.</p>
+                <h3 className="text-xl font-black text-slate-900">👥 قائمة الطلبة المحولين وإفادات عدم المشاركة</h3>
+                <p className="text-xs text-slate-500">متابعة الطلاب المحولين وإفادات الاعتذار المباشرة من الأعضاء بعدم المشاركة.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-sky-100 text-sky-800 font-bold text-xs">
-                إجمالي الطلبة المحولين: {transferredRequestsList.length}
+                إجمالي المحولين: {transferredRequestsList.length}
               </span>
             </div>
 
@@ -1133,12 +1099,12 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 2. أداة لجنة الإعلام (مرتبطة بلوحة الأدمن ومكتب الرؤساء ولجنة التصميم) */}
+        {/* 2. أداة لجنة الإعلام */}
         {currentActiveComm === 'لجنة الاعلام' && (
           <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900">📸 مركز رفع ونشر الصور ومقاطع الفيديو (لجنة الإعلام - مربوط بالأدمن والرؤساء)</h3>
+                <h3 className="text-xl font-black text-slate-900">📸 مركز رفع ونشر الصور ومقاطع الفيديو (لجنة الإعلام)</h3>
                 <p className="text-xs text-slate-500">ارفع صور وتغطيات الفعاليات والمقاطع لتغذية لوحة تحكم الأدمن ومكتب الرؤساء والمعرض والموقع مباشرة.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
@@ -1211,7 +1177,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 3. أداة لجنة المحتوى العلمي (مربوطة بلجنة التصميم ومكتب الرؤساء والأدمن) */}
+        {/* 3. أداة لجنة المحتوى العلمي */}
         {currentActiveComm === 'لجنة المحتوى العلمي' && (
           <div className="bg-white rounded-3xl p-8 border border-emerald-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
