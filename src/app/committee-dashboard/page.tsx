@@ -18,7 +18,7 @@ export default function CommitteeDashboard() {
 
   // هل المستخدم من لجنة الجودة والتطوير؟
   const [isQualityTeam, setIsQualityTeam] = useState(false);
-  // هل المستخدم قائد للجنة أم عضو عادي؟ (لتحديد مستوى العرض والخصوصية)
+  // هل المستخدم قائد للجنة أم عضو عادي؟
   const [isCommitteeLeader, setIsCommitteeLeader] = useState(false);
 
   const [allCommitteesList] = useState<string[]>([
@@ -68,7 +68,6 @@ export default function CommitteeDashboard() {
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
 
-  // حالة إخفاء الإنذار محلياً وسحابياً لضمان عدم ظهوره بعد حذفه
   const [warningHidden, setWarningHidden] = useState(false);
 
   // حالات خاصة بلجنة الإعلام (رفع الصور ومقاطع الفيديو فقط)
@@ -77,17 +76,25 @@ export default function CommitteeDashboard() {
   const [mediaBase64, setMediaBase64] = useState('/header-banner.png');
   const [mediaGallery, setMediaGallery] = useState<any[]>([]);
 
-  // حالات خاصة بلجنة المحتوى العلمي (بنك صياغة النصوص الطبية والبنرات)
+  // حالات خاصة بلجنة المحتوى العلمي
   const [textBannerTitle, setTextBannerTitle] = useState('');
   const [textBannerContent, setTextBannerContent] = useState('');
   const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
 
-  // نظام الاعتذارات المباشر (بدون موافقة معقدة - إرسال فوري للموارد البشرية)
+  // نظام الاعتذارات المباشر
   const [eventExcuses, setEventExcuses] = useState<any[]>([]);
   const [showExcuseForm, setShowExcuseForm] = useState(false);
   const [excuseEventName, setExcuseEventName] = useState('');
   const [excuseEventDate, setExcuseEventDate] = useState('');
   const [excuseReason, setExcuseReason] = useState('');
+
+  // 🤝 حالات خاصة بلجنة العلاقات العامة (منظومة تتبع الشراكات والمحلات لمنع التكرار)
+  const [partnerName, setPartnerName] = useState('');
+  const [partnerContactPerson, setPartnerContactPerson] = useState('');
+  const [partnerPhone, setPartnerPhone] = useState('');
+  const [partnerStatus, setPartnerStatus] = useState<'قيد المراجعة' | 'وافقوا' | 'رفضوا'>('قيد المراجعة');
+  const [partnerNotes, setPartnerNotes] = useState('');
+  const [publicPartnersList, setPublicPartnersList] = useState<any[]>([]);
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -105,6 +112,7 @@ export default function CommitteeDashboard() {
     fetchMediaGallery();
     fetchScientificTexts();
     fetchEventExcuses();
+    fetchPublicPartners();
 
     const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
     if (isHiddenLocally === 'true') {
@@ -141,7 +149,6 @@ export default function CommitteeDashboard() {
       const assigned = uData.assignedCommittee || uData.committee || '';
       const roleStr = uData.role || '';
 
-      // التحقق هل المستخدم قائد للجنة أم عضو عادي
       if (roleStr.includes('رئيس') || roleStr.includes('مشرف') || roleStr.includes('قائد')) {
         setIsCommitteeLeader(true);
       } else {
@@ -218,6 +225,76 @@ export default function CommitteeDashboard() {
       const snap = await getDocs(collection(db, 'event_excuses'));
       setEventExcuses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
+  };
+
+  const fetchPublicPartners = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'public_partners_relations'));
+      setPublicPartnersList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
+  };
+
+  // 🤝 معالجة إضافة وإدارة الشركات والمحلات لمنع التكرار (لجنة العلاقات العامة)
+  const handleAddPartnerSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!partnerName.trim()) return;
+
+    const newPartnerObj = {
+      name: partnerName.trim(),
+      contactPerson: partnerContactPerson.trim() || 'غير محدد',
+      phone: partnerPhone.trim() || 'غير متوفر',
+      status: partnerStatus, // 'قيد المراجعة' | 'وافقوا' | 'رفضوا'
+      notes: partnerNotes.trim() || 'لا توجد ملاحظات إضافية',
+      addedBy: userData?.fullName || 'عضو العلاقات العامة',
+      createdAt: Date.now(),
+      dateStr: new Date().toLocaleDateString('ar-SA')
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, 'public_partners_relations'), newPartnerObj);
+      setPublicPartnersList([{ id: docRef.id, ...newPartnerObj }, ...publicPartnersList]);
+
+      // إشعار للأدمن والرؤساء عند توقيع شراكة ناجحة
+      if (partnerStatus === 'وافقوا') {
+        for (const usr of allUsersList) {
+          const cStr = usr.assignedCommittee || usr.committee || '';
+          if (cStr.includes('العلاقات') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
+            try {
+              await updateDoc(doc(db, 'users', usr.id), {
+                latestNotification: `🤝 [شراكة جديدة معتمدة]: تمت الموافقة رسمياً من قِبل (${partnerName}) بتنسيق لجنة العلاقات العامة.`
+              });
+            } catch (er) { console.error(er); }
+          }
+        }
+      }
+
+      setPartnerName('');
+      setPartnerContactPerson('');
+      setPartnerPhone('');
+      setPartnerNotes('');
+      setPartnerStatus('قيد المراجعة');
+      alert('تم تسجيل وتحديث حالة الشركة بنجاح! سيراها جميع الأعضاء لمنع تكرار التواصل. 🤝🎯');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء حفظ بيانات الشركة.');
+    }
+  };
+
+  const handleUpdatePartnerStatus = async (partnerId: string, newStatus: 'قيد المراجعة' | 'وافقوا' | 'رفضوا') => {
+    try {
+      const pRef = doc(db, 'public_partners_relations', partnerId);
+      await updateDoc(pRef, { status: newStatus });
+      setPublicPartnersList(publicPartnersList.map(p => p.id === partnerId ? { ...p, status: newStatus } : p));
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDeletePartner = async (partnerId: string) => {
+    if (confirm('هل أنت متأكد من حذف هذه الشركة أو المحل من السجل؟')) {
+      try {
+        await deleteDoc(doc(db, 'public_partners_relations', partnerId));
+        setPublicPartnersList(publicPartnersList.filter(p => p.id !== partnerId));
+      } catch (e) { console.error(e); }
+    }
   };
 
   const convertFileToBase64 = (file: File): Promise<string> => {
@@ -1055,6 +1132,129 @@ export default function CommitteeDashboard() {
           )}
         </div>
 
+        {/* ======================================================== */}
+        {/* 🤝 أداة لجنة العلاقات العامة (سجل الشراكات ومنع تكرار التواصل) */}
+        {/* ======================================================== */}
+        {(currentActiveComm === 'لجنة العلاقات العامة' || currentActiveComm === 'لجنة العلاقات') && (
+          <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">🤝 سجل الشراكات والمحلات المرئية (منع تكرار التواصل)</h3>
+                <p className="text-xs text-slate-500">قاعدة بيانات مركزية تشاهدها اللجنة بالكامل؛ لتجنب التواصل مع أي محل أو شركة سبق وتم التواصل معها أو تمت الموافقة عليها.</p>
+              </div>
+              <span className="px-3.5 py-1.5 rounded-xl bg-sky-100 text-sky-800 font-bold text-xs">
+                إجمالي الجهات المسجلة: {publicPartnersList.length}
+              </span>
+            </div>
+
+            {isCommitteeLeader && (
+              <form onSubmit={handleAddPartnerSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-sky-50/40 p-6 rounded-2xl border border-sky-200">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">اسم الشركة أو المحل</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: مقهى كيرف / صيدلية الدواء"
+                    value={partnerName}
+                    onChange={(e) => setPartnerName(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">اسم المسؤول أو الشخص المُتواصل معه</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: الأستاذ محمد (مدير الفرع)"
+                    value={partnerContactPerson}
+                    onChange={(e) => setPartnerContactPerson(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">رقم جوال أو هاتف الجهة</label>
+                  <input
+                    type="text"
+                    placeholder="05xxxxxxxx"
+                    value={partnerPhone}
+                    onChange={(e) => setPartnerPhone(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-mono"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">حالة التواصل الحالية (لمنع التكرار)</label>
+                  <select
+                    value={partnerStatus}
+                    onChange={(e: any) => setPartnerStatus(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
+                  >
+                    <option value="قيد المراجعة">⏳ قيد المراجعة / جاري التفاوض</option>
+                    <option value="وافقوا">✅ وافقوا رسمياً وتم إبرام التعاون</option>
+                    <option value="رفضوا">❌ نعتذر / رفضوا التعاون</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">تفاصيل أو ملاحظات الخصم / الرعاية المقدمة</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: وافقوا على تقديم خصم 20% لطلاب النادي ورعاية فعالية يوم التمريض"
+                    value={partnerNotes}
+                    onChange={(e) => setPartnerNotes(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  />
+                </div>
+
+                <div className="sm:col-span-3 pt-2">
+                  <button type="submit" className="bg-sky-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-sky-700 cursor-pointer">
+                    + تسجيل وإضافة الجهة للسجل العام (مانع التكرار) 🚀
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+              {publicPartnersList.length === 0 ? (
+                <p className="col-span-2 text-center py-8 text-slate-400 font-bold text-xs">لا توجد جهات أو شركات مسجلة في السجل حالياً.</p>
+              ) : (
+                publicPartnersList.map((partner) => (
+                  <div key={partner.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center flex-wrap gap-2">
+                        <span className={`text-[10px] font-black px-3 py-1 rounded-full ${
+                          partner.status === 'وافقوا' ? 'bg-emerald-100 text-emerald-800' : partner.status === 'رفضوا' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {partner.status === 'وافقوا' ? '✅ تم الموافقة والتعاون' : partner.status === 'رفضوا' ? '❌ نعتذر / مرفوض' : '⏳ قيد المراجعة والتفاوض'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">تاريخ الإضافة: {partner.dateStr}</span>
+                      </div>
+                      
+                      <h4 className="font-black text-slate-900 text-sm">{partner.name}</h4>
+                      <p className="text-xs text-slate-700"><strong>المسؤول:</strong> {partner.contactPerson} • <span className="font-mono" dir="ltr">{partner.phone}</span></p>
+                      <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-100"><strong>ملاحظات التعاون:</strong> {partner.notes}</p>
+                      <p className="text-[10px] text-slate-400">أضيف بواسطة: {partner.addedBy}</p>
+                    </div>
+
+                    {isCommitteeLeader && (
+                      <div className="flex justify-between items-center pt-3 border-t border-slate-200 flex-wrap gap-2">
+                        <div className="flex gap-1">
+                          <button type="button" onClick={() => handleUpdatePartnerStatus(partner.id, 'وافقوا')} className="px-2 py-1 bg-emerald-50 text-emerald-700 font-bold text-[10px] rounded-lg">وافقوا ✓</button>
+                          <button type="button" onClick={() => handleUpdatePartnerStatus(partner.id, 'قيد المراجعة')} className="px-2 py-1 bg-amber-50 text-amber-700 font-bold text-[10px] rounded-lg">قيد المراجعة ⏳</button>
+                          <button type="button" onClick={() => handleUpdatePartnerStatus(partner.id, 'رفضوا')} className="px-2 py-1 bg-red-50 text-red-600 font-bold text-[10px] rounded-lg">رفضوا ✕</button>
+                        </div>
+                        <button type="button" onClick={() => handleDeletePartner(partner.id)} className="px-2 py-1 bg-slate-200 text-slate-700 font-bold text-[10px] rounded-lg">حذف السجل</button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
         {/* 1. أداة لجنة الموارد البشرية (للقادة فقط) */}
         {isCommitteeLeader && currentActiveComm === 'لجنة الموارد البشرية' && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
@@ -1110,7 +1310,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 2. أداة لجنة الإعلام (للقادة والأعضاء المخصصين - لا يتم حذفها أبداً) */}
+        {/* 2. أداة لجنة الإعلام */}
         {(currentActiveComm === 'لجنة الاعلام' || currentActiveComm === 'لجنة الإعلام') && isCommitteeLeader && (
           <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
