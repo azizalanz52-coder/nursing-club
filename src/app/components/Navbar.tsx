@@ -131,19 +131,26 @@ export default function Navbar() {
     e.preventDefault();
     if (!phoneInput.trim()) return;
 
-    setSearchStatus('جاري التحقق من سجل الشهائد سحابياً...');
+     setSearchStatus('جاري التحقق من سجل الشهائد سحابياً...');
     try {
-      const certsRef = collection(db, 'club_certificates');
-      const q = query(certsRef, where('memberPhone', '==', phoneInput.trim()));
+      // تم تصحيح اسم المجموعة لتطابق 'site_certificates' الموجودة في لوحة التحكم
+      const certsRef = collection(db, 'site_certificates');
+      const q = query(certsRef, where('phone', '==', phoneInput.trim()));
       const snap = await getDocs(q);
 
-      const foundCerts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      let foundCerts = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+
+      // تصفية إضافية للتحقق من كلمة المرور إذا كانت مدخلة
+      if (passwordInput.trim()) {
+        foundCerts = foundCerts.filter(c => !c.password || c.password === passwordInput.trim());
+      }
+
       setMemberCertificates(foundCerts);
 
       if (foundCerts.length > 0) {
         setSearchStatus(`تم العثور على (${foundCerts.length}) شهادة معتمدة بنجاح! 🎉`);
       } else {
-        setSearchStatus('لا توجد شهائد مسجلة لهذا الرقم حتى الآن.');
+        setSearchStatus('لا توجد شهائد مسجلة لهذا الرقم وكلمة المرور حتى الآن.');
       }
     } catch (err) {
       console.error(err);
@@ -471,16 +478,18 @@ export default function Navbar() {
                 {memberCertificates.map((cert) => (
                   <div key={cert.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs">
                     <div>
-                      <span className="font-extrabold text-slate-900 block">{cert.eventTitle}</span>
-                      <span className="text-[10px] text-slate-500">إصدار: {cert.issueDate} | العضو: {cert.memberName}</span>
+                      <span className="font-extrabold text-slate-900 block">{cert.certTitle || cert.eventTitle}</span>
+                      <span className="text-[10px] text-slate-500">المستفيد: {cert.recipientName || cert.memberName}</span>
                     </div>
-                    <a
-                      href={cert.certFileUrl}
-                      download="certificate.jpg"
-                      className="px-3 py-1.5 bg-amber-600 text-white font-bold rounded-lg shadow hover:bg-amber-700"
-                    >
-                      تحميل 📥
-                    </a>
+                    {cert.image && (
+                      <a
+                        href={cert.image}
+                        download="certificate.jpg"
+                        className="px-3 py-1.5 bg-amber-600 text-white font-bold rounded-lg shadow hover:bg-amber-700"
+                      >
+                        تحميل 📥
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>
