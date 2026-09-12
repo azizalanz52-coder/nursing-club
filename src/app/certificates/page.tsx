@@ -2,7 +2,7 @@
 
 import React, { useState, FormEvent } from 'react';
 import Link from 'next/link';
-import { db } from '../../lib/firebase';
+import { db } from './../lib/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 
 interface CertificateItem {
