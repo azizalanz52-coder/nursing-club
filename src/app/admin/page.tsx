@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface PassionSlide {
   id: string;
@@ -137,7 +139,7 @@ export default function AdminDashboard() {
             setIsSystemAdminUser(false);
             if (
               userRole !== 'رئيس النادي' && 
-              userRole !== 'رئيسة النادي' && 
+              userRole !== 'نائبة الرئيس' && 
               !userRole.includes('رئيس لجنة') && 
               !userRole.includes('مشرف')
             ) {
@@ -168,7 +170,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // جلب أرشيف التقارير التاريخية (Historical Vault) سحابياً من مجموعتي historical_vault_reports و quality_reports_archive
+  // جلب أرشيف التقارير التاريخية (Historical Vault) سحابياً
   const fetchHistoricalVault = async () => {
     try {
       const snap1 = await getDocs(collection(db, 'historical_vault_reports'));
@@ -177,11 +179,30 @@ export default function AdminDashboard() {
       const reports1 = snap1.docs.map(d => ({ id: d.id, ...d.data() }));
       const reports2 = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
       
-      // دمج الأرشيفين لمنع أي ضياع للبيانات
       const combined = [...reports1, ...reports2];
       setHistoricalVaultReports(combined);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // وظيفة تحميل تقرير من الأرشيف كملف PDF
+  const handleDownloadReportPdf = (vaultItem: any) => {
+    try {
+      const docPdf = new jsPDF();
+      docPdf.text('Nursing Club - Historical Vault Report', 14, 20);
+      docPdf.text(`Title / Committee: ${vaultItem.title || vaultItem.targetCommittee || 'N/A'}`, 14, 30);
+      docPdf.text(`Details: ${vaultItem.reason || vaultItem.status || 'N/A'}`, 14, 40);
+      docPdf.text(`Reporter / Author: ${vaultItem.reporter || vaultItem.author || 'Quality Committee'}`, 14, 50);
+      docPdf.text(`Date: ${vaultItem.dateStr || (vaultItem.archivedAt ? new Date(vaultItem.archivedAt).toLocaleDateString() : 'N/A')}`, 14, 60);
+      docPdf.save(`Vault_Report_${vaultItem.id || Date.now()}.pdf`);
+      
+      setModalMessage('تم تحميل التقرير كملف PDF بنجاح! 📄');
+      setModalType('success');
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      setModalMessage('حدث خطأ أثناء محاولة تحميل ملف الـ PDF.');
+      setModalType('success');
     }
   };
 
@@ -252,7 +273,7 @@ export default function AdminDashboard() {
   const [newMemberName, setNewMemberName] = useState<string>('');
   const [newMemberRole, setNewMemberRole] = useState<string>('');
 
-  // حالات نظام الإنذار المدرج لقائد وقائدة اللجنة قبل التصعيد للرؤساء
+  // حالات نظام الإنذار المدرج لقائد وقائدة اللجنة قبل الإحالة للرؤساء
   const [showWarningModal, setShowWarningModal] = useState<boolean>(false);
   const [warningTargetReportId, setWarningTargetReportId] = useState<string>('');
   const [warningTargetCommittee, setWarningTargetCommittee] = useState<string>('');
@@ -438,7 +459,7 @@ export default function AdminDashboard() {
   const handleOpenWarningModal = (rep: any) => {
     setWarningTargetReportId(rep.id);
     setWarningTargetCommittee(rep.targetCommittee);
-    setWarningMessageText(`عاجل لقائد وقائدة (${rep.targetCommittee}): تم رصد تقصير في المهام لديكم (${rep.reason}). نرجو تدارك الأمر وتصحيحه خلال 24 ساعة، وإلا سيتم رفع بلاغ رسمي وإحالتكم فوراً لرئيس ورئيسة النادي لاتخاذ الإجراءات التأديبية ⚠️.`);
+    setWarningMessageText(`عاجل لقائد وقائدة (${rep.targetCommittee}): تم رصد تقصير في المهام لديكم (${rep.reason}). نرجو تدارك الأمر وتصحيحه خلال 24 ساعة، وإلا سيتم رفع بلاغ رسمي وإحالتكم فوراً لرئيس ونائبة الرئيس لاتخاذ الإجراءات التأديبية ⚠️.`);
     setShowWarningModal(true);
   };
 
@@ -471,10 +492,10 @@ export default function AdminDashboard() {
   };
 
   const handleEscalateToPresidentsFinal = async (rep: any) => {
-    triggerConfirmModal(`هل أنت متأكد من عدم تجاوب قائد وقائدة (${rep.targetCommittee}) وترغب في رفع البلاغ وإحالته رسمياً للرئيس ورئيسة النادي الآن وأرشفته؟`, async () => {
+    triggerConfirmModal(`هل أنت متأكد من عدم تجاوب قائد وقائدة (${rep.targetCommittee}) وترغب في رفع البلاغ وإحالته رسمياً لرئيس ونائبة الرئيس الآن وأرشفته؟`, async () => {
       try {
         const repRef = doc(db, 'escalated_reports', rep.id);
-        const finalStatus = 'مُحال رسمياً للرئيس ورئيسة النادي (لعدم التجاوب 🚨)';
+        const finalStatus = 'مُحال رسمياً لرئيس ونائبة الرئيس (لعدم التجاوب 🚨)';
         
         await updateDoc(repRef, {
           status: finalStatus,
@@ -496,7 +517,7 @@ export default function AdminDashboard() {
 
         setHistoricalVaultReports([archivedObj, ...historicalVaultReports]);
 
-        setModalMessage('تم رفع البلاغ وإحالته رسمياً للرئيس ورئيسة النادي وأرشفته في السجل التاريخي بنجاح تام! ⚖️📦');
+        setModalMessage('تم رفع البلاغ وإحالته رسمياً لرئيس ونائبة الرئيس وأرشفته في السجل التاريخي بنجاح تام! ⚖️📦');
         setModalType('success');
       } catch (err) {
         console.error(err);
@@ -1155,7 +1176,6 @@ export default function AdminDashboard() {
             </button>
           )}
 
-          {/* زر رادار مراقبة أداء اللجان الشامل */}
           <button
             type="button"
             onClick={() => setActiveTab('performance-radar')}
@@ -1166,7 +1186,6 @@ export default function AdminDashboard() {
             📊 رادار أداء اللجان الشامل 🛡️
           </button>
 
-          {/* زر أرشيف التقارير التاريخية (Historical Vault) */}
           <button
             type="button"
             onClick={() => setActiveTab('historical-vault')}
@@ -1177,7 +1196,6 @@ export default function AdminDashboard() {
             📦 أرشيف التقارير التاريخية ({historicalVaultReports.length})
           </button>
 
-          {/* زر مركز التقارير والشكاوى المرفوعة مع تدرج الإنذار */}
           <button
             type="button"
             onClick={() => setActiveTab('escalated-reports')}
@@ -1213,7 +1231,6 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* 1. نافذة رادار مراقبة أداء اللجان الشامل */}
         {activeTab === 'performance-radar' && (
           <div className="bg-white rounded-3xl p-8 border border-indigo-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
@@ -1249,7 +1266,6 @@ export default function AdminDashboard() {
                         <p><strong>👥 الأعضاء المقبولون:</strong> {totalActiveCount} أعضاء فاعلين</p>
                       </div>
 
-                      {/* شريط التقدم لمؤشر الإنجاز */}
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] font-bold text-slate-500">
                           <span>مؤشر الإنجاز والمهام</span>
@@ -1275,7 +1291,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 2. نافذة أرشيف التقارير التاريخية (Historical Vault) */}
         {activeTab === 'historical-vault' && (
           <div className="bg-white rounded-3xl p-8 border border-amber-300 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
@@ -1305,9 +1320,18 @@ export default function AdminDashboard() {
                     <p className="text-slate-800 text-xs sm:text-sm font-semibold bg-white p-3 rounded-xl border border-amber-100 shadow-inner">
                       <strong>التفاصيل:</strong> {vaultItem.reason || vaultItem.status || 'معتمد ومؤرشف في محفظة أدلة الجودة'}
                     </p>
-                    <div className="pt-2 border-t border-amber-200 flex justify-between items-center text-[11px] text-slate-600 font-bold">
+                    <div className="pt-2 border-t border-amber-200 flex justify-between items-center text-[11px] text-slate-600 font-bold flex-wrap gap-2">
                       <span>الرافع والموثق: {vaultItem.reporter || vaultItem.author || 'لجنة الجودة والتطوير'}</span>
-                      <span className="text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg">✅ معتمد ومؤرشف سحابياً</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadReportPdf(vaultItem)}
+                          className="px-3 py-1 bg-amber-700 text-white rounded-lg font-bold text-[11px] shadow hover:bg-amber-800 transition-colors"
+                        >
+                          📥 تحميل PDF
+                        </button>
+                        <span className="text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg">✅ معتمد</span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1316,13 +1340,12 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* نافذة مركز التقارير والشكاوى المرفوعة مع التدرج في الإنذار والتصعيد */}
         {activeTab === 'escalated-reports' && (
           <div className="bg-white rounded-3xl p-8 border border-red-300 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900">🚨 مركز تقارير الجودة (نظام الإنذار والتصعيد للرؤساء)</h3>
-                <p className="text-xs text-slate-500">أرسل إنذاراً تحذيرياً أولاً لقائد وقائدة اللجنة، وإذا لم يتجاوبوا قم بإحالة البلاغ رسمياً للرئيس ورئيسة النادي.</p>
+                <h3 className="text-xl font-black text-slate-900">🚨 مركز تقارير الجودة (نظام الإنذار والإحالة للرؤساء)</h3>
+                <p className="text-xs text-slate-500">أرسل إنذاراً تحذيرياً أولاً لقائد وقائدة اللجنة، وإذا لم يتجاوبوا قم بإحالة البلاغ رسمياً لرئيس ونائبة الرئيس.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 font-bold text-xs">
                 إجمالي البلاغات: {escalatedReports.length}
@@ -1370,7 +1393,6 @@ export default function AdminDashboard() {
                         <span className="font-bold text-red-700 bg-red-100 px-3 py-1 rounded-lg">{rep.status || 'معلق'}</span>
                       </div>
 
-                      {/* أزرار اتخاذ القرار المتدرج */}
                       <div className="flex gap-2 pt-1 flex-wrap">
                         <button
                           type="button"
@@ -1385,7 +1407,7 @@ export default function AdminDashboard() {
                           onClick={() => handleEscalateToPresidentsFinal(rep)}
                           className="flex-1 py-2 px-3 rounded-xl bg-red-600 text-white font-black text-xs shadow hover:bg-red-700 cursor-pointer transition-all"
                         >
-                          🚨 تصعيد البلاغ للرؤساء فوراً
+                          🚨 إحالة البلاغ للرؤساء فوراً
                         </button>
                       </div>
                     </div>
@@ -1498,7 +1520,7 @@ export default function AdminDashboard() {
                             <option value="System Admin">System Admin (مدير النظام)</option>
                             <option value="General Supervisor">General Supervisor (مشرف عام)</option>
                             <option value="رئيس النادي">رئيس النادي</option>
-                            <option value="رئيسة النادي">رئيسة النادي</option>
+                            <option value="نائبة الرئيس">نائبة الرئيس</option>
                             <option value="رئيس لجنة / مشرف قسم">رئيس لجنة</option>
                             <option value="عضو مميز / منسق">عضو مميز</option>
                             <option value="عضو أساسي">عضو أساسي</option>
@@ -2396,7 +2418,6 @@ export default function AdminDashboard() {
 
       </div>
 
-      {/* نافذة كتابة وإرسال الإنذار لقائد وقائدة اللجنة */}
       {showWarningModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={handleSendWarningToLeaders} className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 border-2 border-amber-400">
@@ -2433,7 +2454,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* نافذة رسائل النجاح أو التنبيهات المخصصة بهوية الموقع */}
       {modalType === 'success' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061]">
@@ -2455,7 +2475,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* نافذة التأكيد */}
       {modalType === 'confirm' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061]">
@@ -2463,7 +2482,7 @@ export default function AdminDashboard() {
               🚨
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black text-slate-900">تأكيد التصعيد للرؤساء</h3>
+              <h3 className="text-xl font-black text-slate-900">تأكيد الإحالة للرؤساء</h3>
               <p className="text-xs text-slate-600 font-medium leading-relaxed">{modalMessage}</p>
             </div>
             <div className="flex gap-3 pt-2">
@@ -2482,14 +2501,13 @@ export default function AdminDashboard() {
                 }}
                 className="w-1/2 py-3 rounded-xl bg-red-600 text-white font-black text-xs shadow hover:bg-red-700 cursor-pointer"
               >
-                تأكيد التصعيد رسمياً ⚖️
+                تأكيد الإحالة رسمياً ⚖️
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* نافذة تعديل رقم الجوال */}
       {modalType === 'phone' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={submitUpdatePhone} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
@@ -2527,7 +2545,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* نافذة تعديل كلمة المرور */}
       {modalType === 'password' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={submitUpdatePassword} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
@@ -2565,7 +2582,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* نافذة القبول الأصلية */}
       {showAcceptModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
