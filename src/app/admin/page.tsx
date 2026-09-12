@@ -86,7 +86,7 @@ export default function AdminDashboard() {
   const router = useRouter();
   
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar'>('requests');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee'>('requests');
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
@@ -225,6 +225,12 @@ export default function AdminDashboard() {
   const [newDiscDesc, setNewDiscDesc] = useState<string>('');
   const [newDiscImages, setNewDiscImages] = useState<string[]>([]);
 
+  // حالات خاصة بلجنة الإعلام (صور وفيديوهات)
+  const [mediaUploads, setMediaUploads] = useState<any[]>([]);
+  const [mediaTitle, setMediaTitle] = useState<string>('');
+  const [mediaCategory, setMediaCategory] = useState<string>('تغطيات مرئية');
+  const [mediaFiles, setMediaFiles] = useState<string[]>([]);
+
   const [events, setEvents] = useState<EventItem[]>([]);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState<string>('');
@@ -322,6 +328,13 @@ export default function AdminDashboard() {
           discoverSnap.forEach((d) => { eventsList.push({ id: d.id, ...d.data() } as DiscoverEvent); });
           setDiscoverEvents(eventsList);
           setSelectedEventId(eventsList[0]?.id || '');
+        }
+
+        const mediaSnap = await getDocs(collection(db, 'media_committee_uploads'));
+        if (!mediaSnap.empty) {
+          const mediaList: any[] = [];
+          mediaSnap.forEach((d) => { mediaList.push({ id: d.id, ...d.data() }); });
+          setMediaUploads(mediaList);
         }
 
         const querySnapshot = await getDocs(collection(db, 'applications'));
@@ -711,6 +724,55 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleSelectMediaFiles = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      const base64Files: string[] = [];
+      for (const file of filesArray) {
+        const base64 = await convertFileToBase64(file);
+        base64Files.push(base64);
+      }
+      setMediaFiles((prev) => [...prev, ...base64Files]);
+    }
+  };
+
+  const handleUploadMediaCommitteeContent = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!mediaTitle.trim()) return;
+    const mediaId = Date.now().toString();
+    const mediaObj = {
+      id: mediaId,
+      title: mediaTitle,
+      category: mediaCategory,
+      files: mediaFiles,
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      await setDoc(doc(db, 'media_committee_uploads', mediaId), mediaObj);
+      setMediaUploads([mediaObj, ...mediaUploads]);
+      setMediaTitle('');
+      setMediaFiles([]);
+      setModalMessage('تم رفع الصور والفيديوهات الخاصة بلجنة الإعلام بنجاح سحابياً! 🎥📸');
+      setModalType('success');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteMediaUpload = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من حذف محتوى لجنة الإعلام هذا؟', async () => {
+      try {
+        await deleteDoc(doc(db, 'media_committee_uploads', id));
+        setMediaUploads(mediaUploads.filter((m) => m.id !== id));
+        setModalMessage('تم الحذف بنجاح.');
+        setModalType('success');
+      } catch (err) {
+        console.error(err);
+      }
+    });
   };
 
   const handleAddMultipleImagesToExistingEvent = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -1211,6 +1273,16 @@ export default function AdminDashboard() {
 
           <button
             type="button"
+            onClick={() => setActiveTab('media-committee')}
+            className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+              activeTab === 'media-committee' ? 'bg-rose-700 text-white shadow-md scale-105' : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+            }`}
+          >
+            🎥 قسم لجنة الإعلام (صور وفيديوهات)
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('historical-vault')}
             className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
               activeTab === 'historical-vault' ? 'bg-amber-700 text-white shadow-md scale-105' : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
@@ -1253,6 +1325,111 @@ export default function AdminDashboard() {
             </button>
           ))}
         </div>
+
+        {activeTab === 'media-committee' && (
+          <div className="space-y-8">
+            <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm space-y-6">
+              <div className="border-b border-slate-100 pb-4">
+                <h3 className="text-xl font-black text-rose-900">🎥 رفع وتوثيق محتوى لجنة الإعلام (صور وفيديوهات)</h3>
+                <p className="text-xs text-slate-500">خاص برفع التغطيات المرئية والفيديوهات والصور وتخزينها سحابياً لعرضها في المنصة.</p>
+              </div>
+
+              <form onSubmit={handleUploadMediaCommitteeContent} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-rose-50/30 p-6 rounded-2xl border border-rose-100">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">عنوان التغطية أو الفعالية</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: تغطية ملتقى التمريض المرئي"
+                    value={mediaTitle}
+                    onChange={(e) => setMediaTitle(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-rose-700"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">تصنيف المحتوى</label>
+                  <select
+                    value={mediaCategory}
+                    onChange={(e) => setMediaCategory(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
+                  >
+                    <option value="تغطيات مرئية وفيديوهات">تغطيات مرئية وفيديوهات 🎥</option>
+                    <option value="صور فوتوغرافية">صور فوتوغرافية 📸</option>
+                    <option value="موشن غرافيك">موشن غرافيك 🎬</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">اختر الملفات (صور وفيديوهات متعددة 📁)</label>
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    onChange={handleSelectMediaFiles}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-rose-700 file:text-white cursor-pointer"
+                  />
+                  <p className="text-[10px] text-slate-400">يمكنك رفع صيغ الصور والفيديوهات الشائعة (MP4, MOV, JPG, PNG)</p>
+                </div>
+
+                <div className="sm:col-span-2 pt-2">
+                  <button
+                    type="submit"
+                    className="bg-rose-700 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-rose-800 cursor-pointer"
+                  >
+                    + رفع ونشر محتوى لجنة الإعلام سحابياً
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+              <h3 className="text-xl font-black text-slate-900">أرشيف تغطيات لجنة الإعلام ({mediaUploads.length})</h3>
+              {mediaUploads.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <p className="text-sm font-bold">لم يتم رفع أي محتوى مرئي أو صور للجنة الإعلام حتى الآن.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {mediaUploads.map((item) => (
+                    <div key={item.id} className="p-6 rounded-2xl border border-rose-100 bg-rose-50/10 shadow-sm space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h4 className="font-black text-rose-900 text-sm">{item.title}</h4>
+                        <span className="text-[10px] bg-rose-100 text-rose-800 px-2.5 py-1 rounded-full font-bold">{item.category}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {item.files?.map((fileSrc: string, fIdx: number) => {
+                          const isVideo = fileSrc.startsWith('data:video') || fileSrc.includes('.mp4');
+                          return (
+                            <div key={fIdx} className="relative h-28 rounded-xl overflow-hidden bg-slate-900 border border-slate-200 shadow-sm">
+                              {isVideo ? (
+                                <video src={fileSrc} controls className="w-full h-full object-cover" />
+                              ) : (
+                                <img src={fileSrc} alt={`محتوى ${fIdx + 1}`} className="w-full h-full object-cover" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="pt-2 border-t border-rose-100 flex justify-between items-center text-[11px]">
+                        <span className="text-slate-400">{new Date(item.createdAt).toLocaleDateString('ar-SA')}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMediaUpload(item.id)}
+                          className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                        >
+                          حذف المحتوى ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {activeTab === 'performance-radar' && (
           <div className="bg-white rounded-3xl p-8 border border-indigo-200 shadow-sm space-y-6">
@@ -1368,7 +1545,7 @@ export default function AdminDashboard() {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">🚨 مركز تقارير الجودة (نظام الإنذار والإحالة للرؤساء)</h3>
-                <p className="text-xs text-slate-500">أرسل إنذاراً تحذيرياً أولاً لقائد وقائدة اللجنة، وإذا لم يتجاوبوا قم بإحالة البلاغ رسمياً لرئيس ونائبة الرئيس.</p>
+                <p className="text-xs text-slate-500">أرسل إنذاراً تحذيرياً أولاً لقائد وقائدة اللجنة، وإذا لم يتجاوبوا قم إحالة البلاغ رسمياً لرئيس ونائبة الرئيس.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 font-bold text-xs">
                 إجمالي البلاغات: {escalatedReports.length}
@@ -1638,7 +1815,7 @@ export default function AdminDashboard() {
         {activeTab === 'discover' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة مع معرض صور سحابي</h3>
+              <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة مع معرض صور وفيديوهات سحابي</h3>
               <form onSubmit={handleCreateNewDiscoverEvent} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">عنوان الفعالية الجديدة</label>
@@ -1671,10 +1848,10 @@ export default function AdminDashboard() {
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر صور المعرض (متعددة 📁)</label>
+                  <label className="text-xs font-bold text-slate-700">اختر صور وفيديوهات المعرض (صور وفيديوهات متعددة 📁)</label>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*"
                     multiple
                     onChange={handleSelectMultipleImagesForNewEvent}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
@@ -1692,7 +1869,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">إدارة الصور وإضافتها للفعاليات القائمة (سحابي)</h3>
+              <h3 className="text-xl font-black text-slate-900">إدارة الصور والفيديوهات وإضافتها للفعاليات القائمة (سحابي)</h3>
               <div className="flex flex-wrap gap-3">
                 {discoverEvents.map((ev) => (
                   <button
@@ -1703,7 +1880,7 @@ export default function AdminDashboard() {
                       selectedEventId === ev.id ? 'bg-[#630517] text-[#F5D061] shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    {ev.title} ({ev.images?.length || 0} صور)
+                    {ev.title} ({ev.images?.length || 0} ملفات)
                   </button>
                 ))}
               </div>
@@ -1711,7 +1888,7 @@ export default function AdminDashboard() {
               {currentEditedEvent && (
                 <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
                   <div className="flex justify-between items-center flex-wrap gap-4">
-                    <h4 className="font-extrabold text-slate-900 text-sm">إضافة صور جديدة لـ: {currentEditedEvent.title}</h4>
+                    <h4 className="font-extrabold text-slate-900 text-sm">إضافة صور أو فيديوهات جديدة لـ: {currentEditedEvent.title}</h4>
                     <button
                       type="button"
                       onClick={() => handleDeleteEntireDiscoverEvent(currentEditedEvent.id)}
@@ -1722,7 +1899,7 @@ export default function AdminDashboard() {
                   </div>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*"
                     multiple
                     onChange={handleAddMultipleImagesToExistingEvent}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
@@ -1732,20 +1909,27 @@ export default function AdminDashboard() {
 
               {currentEditedEvent && (
                 <div className="space-y-4">
-                  <h4 className="font-extrabold text-slate-900 text-sm">الصور الحالية بالسحابة للفعالية ({currentEditedEvent.images?.length || 0})</h4>
+                  <h4 className="font-extrabold text-slate-900 text-sm">الملفات الحالية بالسحابة للفعالية ({currentEditedEvent.images?.length || 0})</h4>
                   <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                    {currentEditedEvent.images?.map((img, idx) => (
-                      <div key={idx} className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 group bg-slate-100 shadow-sm">
-                        <img src={img} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveImageFromEvent(idx)}
-                          className="absolute top-2 right-2 bg-red-600 text-white w-7 h-7 rounded-full text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
+                    {currentEditedEvent.images?.map((img, idx) => {
+                      const isVideo = img.startsWith('data:video') || img.includes('.mp4');
+                      return (
+                        <div key={idx} className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 group bg-slate-900 shadow-sm">
+                          {isVideo ? (
+                            <video src={img} className="w-full h-full object-cover" />
+                          ) : (
+                            <img src={img} alt={`ملف ${idx + 1}`} className="w-full h-full object-cover" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImageFromEvent(idx)}
+                            className="absolute top-2 right-2 bg-red-600 text-white w-7 h-7 rounded-full text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1759,10 +1943,10 @@ export default function AdminDashboard() {
               <h3 className="text-xl font-black text-slate-900">إدارة صور وعبارات بطاقة "شغف، عطاء، واحترافية" (سحابي)</h3>
               <form onSubmit={handleAddPassionSlide} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر صورة الشريحة من جهازك</label>
+                  <label className="text-xs font-bold text-slate-700">اختر صورة أو فيديو الشريحة من جهازك</label>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*"
                     onChange={async (e: ChangeEvent<HTMLInputElement>) => {
                       if (e.target.files && e.target.files[0]) {
                         const base64 = await convertFileToBase64(e.target.files[0]);
@@ -1795,21 +1979,28 @@ export default function AdminDashboard() {
               <div className="space-y-4">
                 <h4 className="font-extrabold text-slate-900 text-sm">الشرائح السحابية الحالية ({passionSlides.length})</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {passionSlides.map((slide) => (
-                    <div key={slide.id} className="relative h-44 rounded-2xl overflow-hidden border border-slate-200 group shadow-sm bg-slate-900">
-                      <img src={slide.image} alt="شريحة" className="w-full h-full object-cover opacity-50" />
-                      <div className="absolute inset-0 p-4 flex flex-col justify-between z-10 text-white text-xs">
-                        <p className="font-bold line-clamp-3 text-[#F5D061]">{slide.quote}</p>
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePassionSlide(slide.id)}
-                          className="self-end bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-black shadow cursor-pointer"
-                        >
-                          حذف
-                        </button>
+                  {passionSlides.map((slide) => {
+                    const isVideo = slide.image.startsWith('data:video') || slide.image.includes('.mp4');
+                    return (
+                      <div key={slide.id} className="relative h-44 rounded-2xl overflow-hidden border border-slate-200 group shadow-sm bg-slate-900">
+                        {isVideo ? (
+                          <video src={slide.image} className="w-full h-full object-cover opacity-50" />
+                        ) : (
+                          <img src={slide.image} alt="شريحة" className="w-full h-full object-cover opacity-50" />
+                        )}
+                        <div className="absolute inset-0 p-4 flex flex-col justify-between z-10 text-white text-xs">
+                          <p className="font-bold line-clamp-3 text-[#F5D061]">{slide.quote}</p>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePassionSlide(slide.id)}
+                            className="self-end bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-black shadow cursor-pointer"
+                          >
+                            حذف
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -1899,10 +2090,10 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر بوستر الفعالية من جهازك</label>
+                  <label className="text-xs font-bold text-slate-600">اختر بوستر أو فيديو الفعالية من جهازك</label>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*"
                     onChange={async (e: ChangeEvent<HTMLInputElement>) => {
                       if (e.target.files && e.target.files[0]) {
                         const fileUrl = await convertFileToBase64(e.target.files[0]);
@@ -2000,10 +2191,10 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر صورة البانر من جهازك</label>
+                  <label className="text-xs font-bold text-slate-600">اختر صورة أو فيديو البانر من جهازك</label>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*"
                     onChange={async (e: ChangeEvent<HTMLInputElement>) => {
                       if (e.target.files && e.target.files[0]) {
                         const fileUrl = await convertFileToBase64(e.target.files[0]);
@@ -2092,10 +2283,10 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر شعار الشريك من جهازك</label>
+                  <label className="text-xs font-bold text-slate-600">اختر شعار أو فيديو الشريك من جهازك</label>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*"
                     onChange={async (e: ChangeEvent<HTMLInputElement>) => {
                       if (e.target.files && e.target.files[0]) {
                         const fileUrl = await convertFileToBase64(e.target.files[0]);
@@ -2120,22 +2311,29 @@ export default function AdminDashboard() {
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-4">
               <h3 className="text-xl font-black text-slate-900">الشركاء والرعاة الحاليون بالسحابة ({partners.length})</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {partners.map((p) => (
-                  <div key={p.id} className="p-4 rounded-2xl border border-slate-200 flex flex-col items-center text-center space-y-3 bg-slate-50 relative group">
-                    <img src={p.logo} alt={p.name} className="w-16 h-16 object-contain rounded-xl bg-white p-2 shadow-sm" />
-                    <div>
-                      <h4 className="font-extrabold text-slate-900 text-xs">{p.name}</h4>
-                      <span className="text-[10px] text-[#630517] font-bold bg-[#630517]/10 px-2 py-0.5 rounded-md mt-1 inline-block">{p.category}</span>
+                {partners.map((p) => {
+                  const isVideo = p.logo.startsWith('data:video') || p.logo.includes('.mp4');
+                  return (
+                    <div key={p.id} className="p-4 rounded-2xl border border-slate-200 flex flex-col items-center text-center space-y-3 bg-slate-50 relative group">
+                      {isVideo ? (
+                        <video src={p.logo} className="w-16 h-16 object-contain rounded-xl bg-white p-2 shadow-sm" />
+                      ) : (
+                        <img src={p.logo} alt={p.name} className="w-16 h-16 object-contain rounded-xl bg-white p-2 shadow-sm" />
+                      )}
+                      <div>
+                        <h4 className="font-extrabold text-slate-900 text-xs">{p.name}</h4>
+                        <span className="text-[10px] text-[#630517] font-bold bg-[#630517]/10 px-2 py-0.5 rounded-md mt-1 inline-block">{p.category}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePartner(p.id)}
+                        className="absolute top-2 left-2 bg-red-600 text-white w-6 h-6 rounded-full text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePartner(p.id)}
-                      className="absolute top-2 left-2 bg-red-600 text-white w-6 h-6 rounded-full text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
