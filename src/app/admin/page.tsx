@@ -82,7 +82,6 @@ interface UserAccount {
   lastActive?: number;
 }
 
-// واجهة إنجازات طلبة التمريض
 interface StudentAchievement {
   id: string;
   studentName: string;
@@ -99,11 +98,9 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements'>('requests');
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
-
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
   const [historicalVaultReports, setHistoricalVaultReports] = useState<any[]>([]);
 
-  // حالات إنجازات طلبة كلية التمريض
   const [studentAchievements, setStudentAchievements] = useState<StudentAchievement[]>([]);
   const [studentNameInput, setStudentNameInput] = useState<string>('');
   const [awardNameInput, setAwardNameInput] = useState<string>('');
@@ -327,8 +324,8 @@ export default function AdminDashboard() {
   const [selectedCommitteeFilter, setSelectedCommitteeFilter] = useState<string>('لجنة التصميم');
 
   const [committees, setCommittees] = useState<Committee[]>([
-    { id: 'design', name: 'لجنة التصميم', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي', members: [] },
-    { id: 'media', name: 'لجنة الاعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
+    { id: 'design', name: 'لجنة التصميم', maleLeader: 'عبدالرحمن الشهري', femaleLeader: 'شجون الحربي', members: [] },
+    { id: 'media', name: 'لجنة الإعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
     { id: 'events-org', name: 'لجنة تنظيم الفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', members: [] },
     { id: 'hr', name: 'لجنة الموارد البشرية', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي', members: [] },
     { id: 'pr', name: 'لجنة العلاقات العامة', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي', members: [] },
@@ -1226,7 +1223,7 @@ export default function AdminDashboard() {
     });
   };
 
-  const committeeNamesList = ['لجنة التصميم', 'لجنة الاعلام', 'لجنة تنظيم الفعاليات', 'لجنة الموارد البشرية', 'لجنة العلاقات العامة', 'لجنة المحتوى العلمي', 'لجنة الجودة والتطوير'];
+  const committeeNamesList = ['لجنة التصميم', 'لجنة الإعلام', 'لجنة تنظيم الفعاليات', 'لجنة الموارد البشرية', 'لجنة العلاقات العامة', 'لجنة المحتوى العلمي', 'لجنة الجودة والتطوير'];
   
   const matchesCommittee = (choiceStr: string, targetCommName: string) => {
     if (!choiceStr) return false;
@@ -1399,7 +1396,6 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* قسم إنجازات طلبة كلية التمريض الجديد */}
         {activeTab === 'student-achievements' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-amber-300 shadow-sm space-y-6">
@@ -1413,7 +1409,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-700">اسم الطالب / الطالبة</label>
                   <input
                     type="text"
-                    placeholder="مثال: عبدالعزيز بن سليمان العنزي"
+                    placeholder="مثال: عبد العزيز سليمان العنزي"
                     value={studentNameInput}
                     onChange={(e) => setStudentNameInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
@@ -1513,7 +1509,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* باقي التبويبات كما هي */}
         {activeTab === 'media-committee' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm space-y-6">
@@ -1826,7 +1821,7 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-slate-100">
                   <tr className="hover:bg-slate-50 bg-rose-50/20">
                     <td className="py-4 pr-2 font-black text-[#630517]">
-                      عبدالعزيز العنزي (المشرف الأساسي)
+                      عبدالرحمن الشهري (المشرف الأساسي)
                       <span className="block text-[10px] text-emerald-600 font-bold mt-0.5">🟢 متصل الآن</span>
                     </td>
                     <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
@@ -1926,11 +1921,11 @@ export default function AdminDashboard() {
                         <td className="py-4">
                           {(usr.role?.includes('رئيس لجنة') || usr.role?.includes('مشرف')) ? (
                             <select
-                              value={usr.assignedCommittee || 'لجنة الاعلام'}
+                              value={usr.assignedCommittee || 'لجنة الإعلام'}
                               onChange={(e) => handleAssignedCommitteeChange(usr.phone, e.target.value)}
                               className="px-3 py-1.5 rounded-xl border border-[#630517]/30 text-xs font-black text-[#630517] bg-[#630517]/5 shadow-sm focus:outline-none"
                             >
-                              <option value="لجنة الاعلام">لجنة الاعلام</option>
+                              <option value="لجنة الإعلام">لجنة الإعلام</option>
                               <option value="لجنة التصميم">لجنة التصميم</option>
                               <option value="لجنة تنظيم الفعاليات">لجنة تنظيم الفعاليات</option>
                               <option value="لجنة الموارد البشرية">لجنة الموارد البشرية</option>
@@ -2533,7 +2528,7 @@ export default function AdminDashboard() {
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'design', name: 'لجنة التصميم' },
-                  { id: 'media', name: 'لجنة الاعلام' },
+                  { id: 'media', name: 'لجنة الإعلام' },
                   { id: 'events-org', name: 'لجنة تنظيم الفعاليات' },
                   { id: 'hr', name: 'لجنة الموارد البشرية' },
                   { id: 'pr', name: 'لجنة العلاقات العامة' },
@@ -2843,7 +2838,7 @@ export default function AdminDashboard() {
               ⚠️
             </div>
             <div className="space-y-2 text-center">
-              <h3 className="text-xl font-black text-slate-900">إرسال إنذار تحذيري لقادة ({warningTargetCommittee})</h3>
+              <h3 className="text-xl font-black text-slate-900">إرسال إنذار تحذيري قادة ({warningTargetCommittee})</h3>
               <p className="text-xs text-slate-500">نص الإنذار الذي سيصل للجنة مع مهلة التصحيح:</p>
             </div>
             <textarea
@@ -3051,7 +3046,7 @@ export default function AdminDashboard() {
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 bg-white"
                 >
                   <option value="لجنة التصميم">لجنة التصميم</option>
-                  <option value="لجنة الاعلام">لجنة الاعلام</option>
+                  <option value="لجنة الإعلام">لجنة الإعلام</option>
                   <option value="لجنة تنظيم الفعاليات">لجنة تنظيم الفعاليات</option>
                   <option value="لجنة الموارد البشرية">لجنة الموارد البشرية</option>
                   <option value="لجنة العلاقات العامة">لجنة العلاقات العامة</option>

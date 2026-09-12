@@ -52,11 +52,22 @@ const DEFAULT_PARTNERS = [
   { id: '2', name: 'كوفي غاء', category: 'شريك إستراتيجي', logo: '/ghaa.png' }
 ];
 
+interface StudentAchievement {
+  id: string;
+  studentName?: string; // يدعم النص القديم
+  studentNames?: string[]; // يدعم الأسماء المتعددة الجماعية الجديدة
+  awardName: string;
+  image: string;
+  description: string;
+  createdAt: string;
+}
+
 export default function DiscoverPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [passionSlides, setPassionSlides] = useState(DEFAULT_PASSION_SLIDES);
   const [discoverEvents, setDiscoverEvents] = useState(DEFAULT_DISCOVER_EVENTS);
   const [partners, setPartners] = useState(DEFAULT_PARTNERS);
+  const [studentAchievements, setStudentAchievements] = useState<StudentAchievement[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
 
   useEffect(() => {
@@ -104,6 +115,16 @@ export default function DiscoverPage() {
             setPartners(partnersList);
           }
         }
+
+        // Fetch Student Achievements
+        const achievementsSnap = await getDocs(collection(db, 'student_achievements'));
+        if (!achievementsSnap.empty) {
+          const achievementsList: StudentAchievement[] = [];
+          achievementsSnap.forEach((d) => {
+            achievementsList.push({ id: d.id, ...d.data() } as StudentAchievement);
+          });
+          setStudentAchievements(achievementsList);
+        }
       } catch (err) {
         console.error('Error fetching cloud data:', err);
       }
@@ -145,6 +166,93 @@ export default function DiscoverPage() {
           </div>
         </div>
       </section>
+
+      {/* قسم إنجازات طلبة كلية التمريض (الجديد كلياً - تصميم فاخر ومتجاوب) */}
+      {studentAchievements.length > 0 && (
+        <section className="py-20 bg-gradient-to-b from-amber-50/60 via-white to-slate-50 border-b border-amber-200/50">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+            
+            <div className="text-center max-w-2xl mx-auto space-y-3">
+              <span className="inline-block px-4 py-1.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-extrabold tracking-widest uppercase shadow-sm">
+                🏆 نبض التميز والفخر
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+                إنجازات طلبة كلية التمريض
+              </h2>
+              <p className="text-slate-600 text-sm sm:text-base font-medium">
+                نحتفي بنخبة من طلاب وطالبات كلية التمريض بجامعة حفر الباطن الحاصلين على جوائز ومراكز متقدمة تشرف الكلية والنادي.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {studentAchievements.map((ach) => {
+                // معالجة عرض الأسماء سواء كانت مصفوفة أسماء متعددة أو نص عادي مفصول
+                const namesList = ach.studentNames && ach.studentNames.length > 0 
+                  ? ach.studentNames 
+                  : (ach.studentName ? ach.studentName.split(/[\n,]+/).map(n => n.trim()).filter(Boolean) : []);
+
+                return (
+                  <div 
+                    key={ach.id} 
+                    className="bg-white rounded-3xl p-6 sm:p-8 border border-amber-200 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col justify-between space-y-6 group relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-400 via-[#630517] to-amber-500" />
+
+                    <div className="space-y-5">
+                      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-right">
+                        <div className="relative shrink-0">
+                          <img 
+                            src={ach.image || '/logo.png'} 
+                            alt="صورة الإنجاز" 
+                            className="w-20 h-20 rounded-2xl object-cover border-2 border-amber-400 shadow-md group-hover:scale-105 transition-transform" 
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/logo.png';
+                            }}
+                          />
+                          <div className="absolute -bottom-2 -right-2 bg-amber-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-md">
+                            ⭐
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 w-full">
+                          <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-black border border-amber-200">
+                            {ach.awardName}
+                          </span>
+                          
+                          {/* عرض أسماء الطلبة (فردي أو جماعي لفريق العمل) */}
+                          <div className="space-y-1 pt-1">
+                            {namesList.length > 0 ? (
+                              namesList.map((name, idx) => (
+                                <p key={idx} className="font-extrabold text-slate-900 text-sm">
+                                  {name}
+                                </p>
+                              ))
+                            ) : (
+                              <p className="font-extrabold text-slate-900 text-sm">فريق إنجاز كلية التمريض</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-100 shadow-inner">
+                        <p className="text-slate-700 text-xs sm:text-sm font-medium leading-relaxed text-center sm:text-right">
+                          "{ach.description}"
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-[11px] text-slate-400 font-bold">
+                      <span>كلية التمريض - جامعة حفر الباطن</span>
+                      <span>{ach.createdAt ? new Date(ach.createdAt).toLocaleDateString('ar-SA') : ''}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+          </div>
+        </section>
+      )}
 
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -349,7 +457,6 @@ export default function DiscoverPage() {
                 key={partner.id || partner.name} 
                 className="p-6 rounded-3xl bg-slate-50 border border-slate-200 shadow-md flex flex-col items-center justify-center w-60 h-52 hover:border-[#630517] hover:scale-105 transition-all overflow-hidden space-y-3 group"
               >
-                {/* تم تكبير الحاوية من w-20 h-20 إلى w-28 h-28 لتظهر الصورة بحجم أكبر وأوضح */}
                 <div className="w-28 h-28 bg-white rounded-2xl p-2.5 shadow-inner flex items-center justify-center overflow-hidden border border-slate-100">
                   <img 
                     src={partner.logo && partner.logo.trim() !== '' ? partner.logo : '/logo.png'} 
