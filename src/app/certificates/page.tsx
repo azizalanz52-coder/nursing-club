@@ -4,7 +4,6 @@ import React, { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import jsPDF from 'jspdf';
 
 interface CertificateItem {
   id: string;
@@ -51,56 +50,15 @@ export default function CertificatesPortal() {
   };
 
   const handleDownloadPdf = (cert: CertificateItem) => {
-    try {
-      const docPdf = new jsPDF({ orientation: 'landscape' });
-      
-      // تصميم وتنسيق محتوى ملف الـ PDF للشهادة
-      docPdf.setFillColor(255, 251, 235); // خلفية خفيفة فخمة
-      docPdf.rect(0, 0, 297, 210, 'F');
-
-      docPdf.setTextColor(99, 5, 23); // لون الشعار الأساسي
-      docPdf.setFontSize(22);
-      docPdf.text('University of Hafr Al Batin - Nursing Club', 148, 25, { align: 'center' });
-
-      docPdf.setFontSize(14);
-      docPdf.setTextColor(100, 100, 100);
-      docPdf.text('بوابة الاعتماد والتوثيق الفخري الرسمي', 148, 35, { align: 'center' });
-
-      docPdf.setFontSize(16);
-      docPdf.setTextColor(30, 30, 30);
-      docPdf.text('تشهد إدارة نادي كلية التمريض بأن المكرم /ـة:', 148, 65, { align: 'center' });
-
-      docPdf.setFontSize(26);
-      docPdf.setTextColor(99, 5, 23);
-      docPdf.text(cert.recipientName || 'عضو النادي', 148, 85, { align: 'center' });
-
-      docPdf.setFontSize(14);
-      docPdf.setTextColor(30, 30, 30);
-      docPdf.text('وذلك نظير مشاركته /ـها المتميزة وإنجازه /ـها المعتمد في:', 148, 105, { align: 'center' });
-
-      docPdf.setFontSize(20);
-      docPdf.setTextColor(180, 130, 20);
-      docPdf.text(cert.certTitle, 148, 125, { align: 'center' });
-
-      docPdf.setFontSize(12);
-      docPdf.setTextColor(80, 80, 80);
-      docPdf.text(`التفاصيل: ${cert.description || 'شهادة معتمدة من نادي كلية التمريض بجامعة حفر الباطن.'}`, 148, 145, { align: 'center' });
-
-      docPdf.text(`تاريخ الإصدار: ${new Date(cert.issueDate || Date.now()).toLocaleDateString('ar-SA')}`, 30, 185);
-      docPdf.text('رئيس نادي التمريض (معتمد سحابياً ✅)', 220, 185);
-
-      docPdf.save(`Certificate_${cert.recipientName || 'UHB'}.pdf`);
-    } catch (err) {
-      console.error('PDF Error:', err);
-      window.print(); // كخيار بديل في حال حدوث أي خطأ في المتصفح
-    }
+    // استخدام الطباعة النظامية للمتصفح لحفظ الشهادة بدعم كامل 100% للغة العربية وبدون أي رموز
+    window.print();
   };
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       
       {/* النافبار */}
-      <nav className="bg-white border-b border-slate-200 py-4 px-6 flex justify-between items-center shadow-sm">
+      <nav className="bg-white border-b border-slate-200 py-4 px-6 flex justify-between items-center shadow-sm print:hidden">
         <Link href="/" className="flex items-center gap-3">
           <span className="w-10 h-10 rounded-xl bg-[#630517] text-[#F5D061] flex items-center justify-center font-black text-lg shadow">
             UHB
@@ -114,7 +72,7 @@ export default function CertificatesPortal() {
 
       <div className="max-w-4xl mx-auto px-4 py-16 space-y-10">
         
-        <div className="text-center space-y-3">
+        <div className="text-center space-y-3 print:hidden">
           <span className="bg-amber-100 text-amber-900 font-bold text-xs px-4 py-1.5 rounded-full">
             بوابة الاعتماد الفخري 📜
           </span>
@@ -122,7 +80,7 @@ export default function CertificatesPortal() {
           <p className="text-xs text-slate-500 max-w-md mx-auto">أدخل رقم جوالك المسجل وكلمة المرور لاستعراض وتحميل كافة شهاداتك المعتمدة من النادي فوراً.</p>
         </div>
 
-        <form onSubmit={handleSearchCertificates} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm max-w-lg mx-auto space-y-4">
+        <form onSubmit={handleSearchCertificates} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm max-w-lg mx-auto space-y-4 print:hidden">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">رقم الجوال المسجل</label>
             <input
@@ -158,7 +116,7 @@ export default function CertificatesPortal() {
         {searched && (
           <div className="space-y-8">
             {userCertificates.length === 0 ? (
-              <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-300 text-center space-y-2">
+              <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-300 text-center space-y-2 print:hidden">
                 <p className="text-base font-bold text-slate-700">لا توجد شهادات مسجلة برقم الجوال ({phoneInput}) أو كلمة المرور غير صحيحة.</p>
                 <p className="text-xs text-slate-400">تأكد من إدخال البيانات الصحيحة أو تواصل مع إدارة النادي لإصدار شهادتك.</p>
               </div>
@@ -202,13 +160,24 @@ export default function CertificatesPortal() {
                     </div>
                   </div>
 
-                  <div className="pt-2 flex justify-center gap-4 relative z-10 flex-wrap">
+                  {cert.image && (
+                    <div className="relative z-10 pt-4 border-t border-amber-200">
+                      <p className="text-xs font-bold text-slate-700 mb-2">تصميم الشهادة المعتمد:</p>
+                      <img 
+                        src={cert.image} 
+                        alt="Certificate" 
+                        className="max-h-96 mx-auto rounded-2xl shadow-md border border-amber-300 object-contain"
+                      />
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex justify-center gap-4 relative z-10 flex-wrap print:hidden">
                     <button
                       type="button"
                       onClick={() => handleDownloadPdf(cert)}
                       className="px-8 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow-xl hover:brightness-110 transition-all cursor-pointer"
                     >
-                      📥 تحميل الشهادة PDF رسمي
+                      🖨️ طباعة أو حفظ الشهادة PDF رسمي
                     </button>
                     {cert.image && (
                       <a
