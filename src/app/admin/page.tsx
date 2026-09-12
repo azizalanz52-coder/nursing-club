@@ -96,7 +96,7 @@ export default function AdminDashboard() {
   const [historicalVaultReports, setHistoricalVaultReports] = useState<any[]>([]);
 
   // حالات النوافذ المنبثقة المخصصة بهوية الموقع
-  const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'confirm'>('none');
+  const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'name' | 'confirm'>('none');
   const [modalMessage, setModalMessage] = useState<string>('');
   const [activeUserPhoneForAction, setActiveUserPhoneForAction] = useState<string>('');
   const [modalInputVal, setModalInputVal] = useState<string>('');
@@ -403,6 +403,30 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error(err);
       setModalMessage('حدث خطأ أثناء تحديث كلمة المرور.');
+      setModalType('success');
+    }
+  };
+
+  const openNameModal = (phone: string, currentName: string) => {
+    setActiveUserPhoneForAction(phone);
+    setModalInputVal(currentName || '');
+    setModalType('name');
+  };
+
+  const submitUpdateName = async (e: FormEvent) => {
+    e.preventDefault();
+    const trimmedName = modalInputVal.trim();
+    if (!trimmedName) return;
+
+    try {
+      const userRef = doc(db, 'users', activeUserPhoneForAction);
+      await updateDoc(userRef, { fullName: trimmedName });
+      setUsersList(usersList.map(u => u.phone === activeUserPhoneForAction ? { ...u, fullName: trimmedName } : u));
+      setModalMessage('تم تحديث اسم المستخدم بنجاح سحابياً! 👤');
+      setModalType('success');
+    } catch (err) {
+      console.error(err);
+      setModalMessage('حدث خطأ أثناء تحديث الاسم.');
       setModalType('success');
     }
   };
@@ -1420,8 +1444,8 @@ export default function AdminDashboard() {
         {activeTab === 'users-manager' && isSystemAdminUser && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
-              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، كلمات المرور، والرتب (خاص بالمشرف الأساسي 🛡️)</h3>
-              <p className="text-xs text-slate-500">عند تغيير رتبة أي عضو سيصله التنبيه في نفس اللحظة عبر السحابة.</p>
+              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، الأسماء، كلمات المرور، والرتب (خاص بالمشرف الأساسي 🛡️)</h3>
+              <p className="text-xs text-slate-500">يمكنك تعديل اسم المستخدم، رقم الجوال، كلمة المرور، أو الرتبة وتحديثها سحابياً في أي وقت.</p>
             </div>
             
             <div className="overflow-x-auto">
@@ -1470,7 +1494,17 @@ export default function AdminDashboard() {
                     return (
                       <tr key={idx} className="hover:bg-slate-50">
                         <td className="py-4 pr-2 font-bold text-slate-900">
-                          {usr.fullName || 'مستخدم مسجل'}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span>{usr.fullName || 'مستخدم مسجل'}</span>
+                            <button
+                              type="button"
+                              onClick={() => openNameModal(usr.phone, usr.fullName || '')}
+                              className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-bold hover:bg-indigo-100 cursor-pointer shadow-sm transition-all"
+                              title="تعديل الاسم الكامل"
+                            >
+                              ✏️ تعديل الاسم
+                            </button>
+                          </div>
                           <span className={`block text-[10px] font-bold mt-0.5 ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
                             {isOnline ? '🟢 نشط الآن في الموقع' : '⚪ غير متصل حالياً'}
                           </span>
@@ -1481,7 +1515,7 @@ export default function AdminDashboard() {
                             <button
                               type="button"
                               onClick={() => openPhoneModal(usr.phone)}
-                              className="text-[10px] bg-sky-50 text-sky-700 px-2.5 py-1 rounded-lg font-bold hover:bg-sky-100 cursor-pointer shadow-sm transition-all"
+                              className="text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-lg font-bold hover:bg-sky-100 cursor-pointer shadow-sm transition-all"
                               title="تعديل رقم الجوال"
                             >
                               ✏️ تعديل الرقم
@@ -1503,7 +1537,7 @@ export default function AdminDashboard() {
                             <button
                               type="button"
                               onClick={() => openPasswordModal(usr.phone)}
-                              className="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-lg font-bold hover:bg-amber-100 cursor-pointer shadow-sm transition-all"
+                              className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-lg font-bold hover:bg-amber-100 cursor-pointer shadow-sm transition-all"
                               title="تعديل كلمة المرور"
                             >
                               ✏️ تعديل
@@ -2504,6 +2538,43 @@ export default function AdminDashboard() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {modalType === 'name' && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <form onSubmit={submitUpdateName} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
+            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              👤
+            </div>
+            <div className="space-y-2 text-center">
+              <h3 className="text-xl font-black text-slate-900">تعديل الاسم الكامل</h3>
+              <p className="text-xs text-slate-500">أدخل الاسم الجديد للعضو:</p>
+            </div>
+            <input
+              type="text"
+              placeholder="الاسم الكامل الجديد..."
+              value={modalInputVal}
+              onChange={(e) => setModalInputVal(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-bold text-center text-slate-900 focus:outline-none focus:border-[#630517]"
+              required
+            />
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalType('none')}
+                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
+              >
+                Submit 🚀
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
