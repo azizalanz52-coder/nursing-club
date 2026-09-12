@@ -18,6 +18,8 @@ export default function CommitteeDashboard() {
 
   // هل المستخدم من لجنة الجودة والتطوير؟
   const [isQualityTeam, setIsQualityTeam] = useState(false);
+  // هل المستخدم قائد للجنة أم عضو عادي؟ (لتحديد مستوى العرض والخصوصية)
+  const [isCommitteeLeader, setIsCommitteeLeader] = useState(false);
 
   const [allCommitteesList] = useState<string[]>([
     'لجنة التصميم',
@@ -139,8 +141,16 @@ export default function CommitteeDashboard() {
       const assigned = uData.assignedCommittee || uData.committee || '';
       const roleStr = uData.role || '';
 
+      // التحقق هل المستخدم قائد للجنة أم عضو عادي
+      if (roleStr.includes('رئيس') || roleStr.includes('مشرف') || roleStr.includes('قائد')) {
+        setIsCommitteeLeader(true);
+      } else {
+        setIsCommitteeLeader(false);
+      }
+
       if (roleStr.includes('جودة') || assigned.includes('جودة') || assigned.includes('الجودة')) {
         setIsQualityTeam(true);
+        setIsCommitteeLeader(true);
       } else {
         setIsQualityTeam(false);
         setSelectedManagedCommittee(assigned || 'لجنة تنظيم الفعاليات');
@@ -301,7 +311,7 @@ export default function CommitteeDashboard() {
     e.preventDefault();
     if (!excuseEventName.trim() || !excuseReason.trim()) return;
 
-    const currentComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
+    const currentComm = userData?.assignedCommittee || userData?.committee || 'اللجنة الخاصة';
     const newExcuseObj = {
       memberName: userData?.fullName || 'عضو اللجنة',
       committee: currentComm,
@@ -316,7 +326,6 @@ export default function CommitteeDashboard() {
       const docRef = await addDoc(collection(db, 'event_excuses'), newExcuseObj);
       setEventExcuses([{ id: docRef.id, ...newExcuseObj }, ...eventExcuses]);
 
-      // إشعار فوري للجنة الموارد البشرية بأن العضو اعتذر وغير مشارك
       for (const usr of allUsersList) {
         const cStr = usr.assignedCommittee || usr.committee || '';
         if (cStr.includes('الموارد البشرية') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
@@ -862,10 +871,10 @@ export default function CommitteeDashboard() {
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-xl font-black text-slate-900">
-              {isQualityTeam ? '⚡ غرفة عمليات لجنة الجودة والتطوير (العقل المدبر والمركز المرعب)' : `لوحة تحكم رئيس لجنة (${currentActiveComm}) 🛡️`}
+              {isQualityTeam ? '⚡ غرفة عمليات لجنة الجودة والتطوير (العقل المدبر والمركز المرعب)' : isCommitteeLeader ? `لوحة تحكم رئيس لجنة (${currentActiveComm}) 🛡️` : `بوابة العضو المنضم في (${userData?.assignedCommittee || userData?.committee || 'اللجنة'}) 🩺`}
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة ورصد وإنذار وإحالة اللجان السبع برتبة عسكرية صارمة' : `إدارة شؤون وأعضاء ومهام اللجنة المعينة لك`}
+              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة ورصد وإنذار وإحالة اللجان السبع برتبة عسكرية صارمة' : isCommitteeLeader ? 'إدارة شؤون وأعضاء ومهام اللجنة المعينة لك' : 'متابعة المهام الخاصة بلجنتك وإرسال إفادات عدم المشاركة بخصوصية تامة'}
             </p>
           </div>
           
@@ -919,7 +928,7 @@ export default function CommitteeDashboard() {
         )}
 
         {/* تنبيهات وإنذارات اللجنة الحالية */}
-        {!isQualityTeam && committeeReports.length > 0 && (
+        {!isQualityTeam && isCommitteeLeader && committeeReports.length > 0 && (
           <div className="bg-amber-50 border-2 border-amber-400 rounded-3xl p-6 space-y-4 shadow-sm">
             <div className="flex items-center gap-2">
               <span className="text-2xl">⚠️</span>
@@ -959,20 +968,20 @@ export default function CommitteeDashboard() {
         )}
 
         {/* ======================================================== */}
-        {/* نظام إفادة عدم المشاركة والاعتذار المباشر للموارد البشرية */}
+        {/* نظام إفادة عدم المشاركة والاعتذار المباشر (متاح للأعضاء والقادة) */}
         {/* ======================================================== */}
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
-              <h3 className="text-lg font-black text-slate-900">📝 إفادة عدم المشاركة والاعتذار للفعاليات ({currentActiveComm})</h3>
-              <p className="text-xs text-slate-500">أبلغ الموارد البشرية فوراً بعدم مشاركتك في الفعالية بدون موافقة أو تعقيد:</p>
+              <h3 className="text-lg font-black text-slate-900">📝 إفادة عدم المشاركة والاعتذار للفعاليات (خصوصية تامة للأعضاء)</h3>
+              <p className="text-xs text-slate-500">أبلغ الموارد البشرية فوراً بعدم مشاركتك في الفعالية بدون موافقة أو إظهار القوائم الخاصة للآخرين:</p>
             </div>
             <button
               type="button"
               onClick={() => setShowExcuseForm(!showExcuseForm)}
               className="px-4 py-2 bg-[#630517] text-[#F5D061] rounded-xl text-xs font-black shadow hover:brightness-110 cursor-pointer"
             >
-              {showExcuseForm ? 'إلغاء' : '+ تسجيل اعتذار عدم مشاركة'}
+              {showExcuseForm ? 'إلغاء' : '+ رفع إفادة اعتذار عدم مشاركة'}
             </button>
           </div>
 
@@ -1021,31 +1030,33 @@ export default function CommitteeDashboard() {
             </form>
           )}
 
-          <div className="space-y-3">
-            <h4 className="font-extrabold text-sm text-slate-800">سجل الإفادات والاعتذارات المسجلة:</h4>
-            {committeeExcusesFiltered.length === 0 ? (
-              <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد إفادات اعتذار مسجلة لهذه اللجنة حتى الآن.</p>
-            ) : (
-              committeeExcusesFiltered.map((ex) => (
-                <div key={ex.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-slate-900 text-xs">العضو: {ex.memberName}</span>
-                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800">
-                        {ex.status}
-                      </span>
+          {isCommitteeLeader && (
+            <div className="space-y-3">
+              <h4 className="font-extrabold text-sm text-slate-800">سجل الإفادات والاعتذارات المسجلة بلجنتك:</h4>
+              {committeeExcusesFiltered.length === 0 ? (
+                <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد إفادات اعتذار مسجلة لهذه اللجنة حتى الآن.</p>
+              ) : (
+                committeeExcusesFiltered.map((ex) => (
+                  <div key={ex.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-slate-900 text-xs">العضو: {ex.memberName}</span>
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800">
+                          {ex.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-700 font-semibold">الفعالية: <span className="text-[#630517]">{ex.eventName}</span> (تاريخ: {ex.eventDate})</p>
+                      <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-100"><strong className="text-slate-800">السبب:</strong> {ex.reason}</p>
                     </div>
-                    <p className="text-xs text-slate-700 font-semibold">الفعالية: <span className="text-[#630517]">{ex.eventName}</span> (تاريخ: {ex.eventDate})</p>
-                    <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-100"><strong className="text-slate-800">السبب:</strong> {ex.reason}</p>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
-        {/* 1. أداة لجنة الموارد البشرية */}
-        {currentActiveComm === 'لجنة الموارد البشرية' && (
+        {/* 1. أداة لجنة الموارد البشرية (للقادة فقط) */}
+        {isCommitteeLeader && currentActiveComm === 'لجنة الموارد البشرية' && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
@@ -1099,8 +1110,8 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 2. أداة لجنة الإعلام */}
-        {currentActiveComm === 'لجنة الاعلام' && (
+        {/* 2. أداة لجنة الإعلام (للقادة والأعضاء المخصصين) */}
+        {currentActiveComm === 'لجنة الاعلام' && isCommitteeLeader && (
           <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
@@ -1178,7 +1189,7 @@ export default function CommitteeDashboard() {
         )}
 
         {/* 3. أداة لجنة المحتوى العلمي */}
-        {currentActiveComm === 'لجنة المحتوى العلمي' && (
+        {currentActiveComm === 'لجنة المحتوى العلمي' && isCommitteeLeader && (
           <div className="bg-white rounded-3xl p-8 border border-emerald-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
@@ -1242,7 +1253,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* رادار الجودة السبع */}
+        {/* رادار الجودة السبع (للقادة فقط) */}
         {isQualityTeam && (
           <div className="space-y-4">
             <div className="flex justify-between items-center flex-wrap gap-3">
@@ -1312,129 +1323,133 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* إحصائيات فورية */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className="bg-gradient-to-br from-[#630517] to-[#80071D] text-white p-6 rounded-3xl shadow-xl space-y-2">
-            <span className="text-[11px] font-bold text-[#F5D061] uppercase tracking-wider">إجمالي المتقدمين للجنة ({currentActiveComm})</span>
-            <div className="text-3xl font-black">{totalApplicantsCount}</div>
-            <p className="text-xs text-white/80">المتقدمون برغباتهم</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-2">
-            <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">عدد الأعضاء المقبولين</span>
-            <div className="text-3xl font-black text-slate-900">{acceptedMembersCount}</div>
-            <p className="text-xs text-slate-500">تم قبولهم وانضمامهم</p>
-          </div>
-
-          <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-2">
-            <span className="text-[11px] font-bold text-sky-600 uppercase tracking-wider">نسبة الإنجاز واستيعاب اللجنة</span>
-            <div className="text-3xl font-black text-slate-900">
-              {totalApplicantsCount > 0 ? Math.round((acceptedMembersCount / totalApplicantsCount) * 100) : 0}%
-            </div>
-            <p className="text-xs text-slate-500">معدل قبول المتقدمين</p>
-          </div>
-        </div>
-
-        {/* الأدوات القيادية */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
-            <div className="space-y-2">
-              <h3 className="text-sm font-black text-slate-900">📢 إرسال إشعار جماعي لأعضاء اللجنة</h3>
-              <p className="text-[11px] text-slate-500">اكتب رسالة ستصل كإشعار فوري داخل لوحة تحكم كل عضو مقبول بـ ({currentActiveComm}).</p>
-            </div>
-            <form onSubmit={handleSendBroadcastAnnouncement} className="space-y-3 pt-2">
-              <textarea
-                rows={2}
-                placeholder="اكتب نص التعميم أو التنبيه هنا..."
-                value={announcementText}
-                onChange={(e) => setAnnouncementText(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
-              />
-              <button type="submit" className="w-full py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow hover:brightness-110 cursor-pointer">
-                إرسال الإشعار الفوري 🚀
-              </button>
-            </form>
-          </div>
-
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
-            <div className="space-y-2">
-              <h3 className="text-sm font-black text-slate-900">🎯 رفع مهام (قائمة متعددة Checklist)</h3>
-              <p className="text-[11px] text-slate-500">أضف عدة مهام تحت فعالية واحدة، وتابع نسبة إنجازها بدقة.</p>
+        {/* إحصائيات فورية (للقادة فقط) */}
+        {isCommitteeLeader && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="bg-gradient-to-br from-[#630517] to-[#80071D] text-white p-6 rounded-3xl shadow-xl space-y-2">
+              <span className="text-[11px] font-bold text-[#F5D061] uppercase tracking-wider">إجمالي المتقدمين للجنة ({currentActiveComm})</span>
+              <div className="text-3xl font-black">{totalApplicantsCount}</div>
+              <p className="text-xs text-white/80">المتقدمون برغباتهم</p>
             </div>
 
-            <form onSubmit={handlePublishTasksList} className="space-y-3 pt-1">
-              {isQualityTeam && (
-                <select
-                  value={targetCommitteeForTask}
-                  onChange={(e) => setTargetCommitteeForTask(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-900"
-                >
-                  {allCommitteesList.map((c, i) => (<option key={i} value={c}>{c}</option>))}
-                </select>
-              )}
+            <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-2">
+              <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">عدد الأعضاء المقبولين</span>
+              <div className="text-3xl font-black text-slate-900">{acceptedMembersCount}</div>
+              <p className="text-xs text-slate-500">تم قبولهم وانضمامهم</p>
+            </div>
 
-              <input
-                type="text"
-                placeholder="عنوان الفعالية المرتبطة..."
-                value={eventTitle}
-                onChange={(e) => setEventTitle(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
-              />
+            <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-2">
+              <span className="text-[11px] font-bold text-sky-600 uppercase tracking-wider">نسبة الإنجاز واستيعاب اللجنة</span>
+              <div className="text-3xl font-black text-slate-900">
+                {totalApplicantsCount > 0 ? Math.round((acceptedMembersCount / totalApplicantsCount) * 100) : 0}%
+              </div>
+              <p className="text-xs text-slate-500">معدل قبول المتقدمين</p>
+            </div>
+          </div>
+        )}
 
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="أكتب مهمة فرعية واضغط إضافة..."
-                  value={taskInputText}
-                  onChange={(e) => setTaskInputText(e.target.value)}
+        {/* الأدوات القيادية (للقادة فقط) */}
+        {isCommitteeLeader && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+              <div className="space-y-2">
+                <h3 className="text-sm font-black text-slate-900">📢 إرسال إشعار جماعي لأعضاء اللجنة</h3>
+                <p className="text-[11px] text-slate-500">اكتب رسالة ستصل كإشعار فوري داخل لوحة تحكم كل عضو مقبول بـ ({currentActiveComm}).</p>
+              </div>
+              <form onSubmit={handleSendBroadcastAnnouncement} className="space-y-3 pt-2">
+                <textarea
+                  rows={2}
+                  placeholder="اكتب نص التعميم أو التنبيه هنا..."
+                  value={announcementText}
+                  onChange={(e) => setAnnouncementText(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                 />
-                <button type="button" onClick={handleAddTaskToBuffer} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 cursor-pointer">+</button>
+                <button type="submit" className="w-full py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow hover:brightness-110 cursor-pointer">
+                  إرسال الإشعار الفوري 🚀
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+              <div className="space-y-2">
+                <h3 className="text-sm font-black text-slate-900">🎯 رفع مهام (قائمة متعددة Checklist)</h3>
+                <p className="text-[11px] text-slate-500">أضف عدة مهام تحت فعالية واحدة، وتابع نسبة إنجازها بدقة.</p>
               </div>
 
-              {tasksListBuffer.length > 0 && (
-                <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 space-y-1 max-h-24 overflow-y-auto">
-                  {tasksListBuffer.map((t, idx) => (
-                    <div key={idx} className="flex justify-between items-center text-[11px] bg-white px-2.5 py-1 rounded-lg border border-slate-100">
-                      <span>• {t}</span>
-                      <button type="button" onClick={() => handleRemoveTaskFromBuffer(idx)} className="text-red-600 font-bold">✕</button>
-                    </div>
-                  ))}
+              <form onSubmit={handlePublishTasksList} className="space-y-3 pt-1">
+                {isQualityTeam && (
+                  <select
+                    value={targetCommitteeForTask}
+                    onChange={(e) => setTargetCommitteeForTask(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-900"
+                  >
+                    {allCommitteesList.map((c, i) => (<option key={i} value={c}>{c}</option>))}
+                  </select>
+                )}
+
+                <input
+                  type="text"
+                  placeholder="عنوان الفعالية المرتبطة..."
+                  value={eventTitle}
+                  onChange={(e) => setEventTitle(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                />
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="أكتب مهمة فرعية واضغط إضافة..."
+                    value={taskInputText}
+                    onChange={(e) => setTaskInputText(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                  />
+                  <button type="button" onClick={handleAddTaskToBuffer} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 cursor-pointer">+</button>
                 </div>
-              )}
 
-              <input
-                type="text"
-                placeholder="الموعد النهائي"
-                value={taskDueDate}
-                onChange={(e) => setTaskDueDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
-              />
+                {tasksListBuffer.length > 0 && (
+                  <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 space-y-1 max-h-24 overflow-y-auto">
+                    {tasksListBuffer.map((t, idx) => (
+                      <div key={idx} className="flex justify-between items-center text-[11px] bg-white px-2.5 py-1 rounded-lg border border-slate-100">
+                        <span>• {t}</span>
+                        <button type="button" onClick={() => handleRemoveTaskFromBuffer(idx)} className="text-red-600 font-bold">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-              <button type="submit" className="w-full py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow hover:brightness-110 cursor-pointer">
-                نشر قائمة المهام للجنة ⚡
-              </button>
-            </form>
-          </div>
+                <input
+                  type="text"
+                  placeholder="الموعد النهائي"
+                  value={taskDueDate}
+                  onChange={(e) => setTaskDueDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                />
 
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
-            <div className="space-y-2">
-              <h3 className="text-sm font-black text-slate-900">📊 تصدير أعضاء اللجنة (Excel)</h3>
-              <p className="text-[11px] text-slate-500">تصدير قائمة الأعضاء المقبولين بملف أكسل.</p>
+                <button type="submit" className="w-full py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow hover:brightness-110 cursor-pointer">
+                  نشر قائمة المهام للجنة ⚡
+                </button>
+              </form>
             </div>
-            <div className="pt-4">
-              <button
-                type="button"
-                onClick={handleExportCommitteeExcel}
-                className="w-full py-3.5 rounded-xl bg-emerald-600 text-white font-black text-xs shadow-lg hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-2"
-              >
-                <span>📥 تحميل ملف Excel للأعضاء</span>
-              </button>
+
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+              <div className="space-y-2">
+                <h3 className="text-sm font-black text-slate-900">📊 تصدير أعضاء اللجنة (Excel)</h3>
+                <p className="text-[11px] text-slate-500">تصدير قائمة الأعضاء المقبولين بملف أكسل.</p>
+              </div>
+              <div className="pt-4">
+                <button
+                  type="button"
+                  onClick={handleExportCommitteeExcel}
+                  className="w-full py-3.5 rounded-xl bg-emerald-600 text-white font-black text-xs shadow-lg hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>📥 تحميل ملف Excel للأعضاء</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* قائمة المهام المتعددة ولوحة الشرف */}
+        {/* قائمة المهام المتعددة ولوحة الشرف (متاحة للجميع مع الحفاظ على الخصوصية) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
@@ -1462,7 +1477,9 @@ export default function CommitteeDashboard() {
                           <span className="text-[10px] bg-[#630517]/10 text-[#630517] font-bold px-2.5 py-1 rounded-md">فعالية: {taskGroup.eventTitle}</span>
                           <h4 className="font-extrabold text-slate-900 text-sm mt-2">الموعد: {taskGroup.dueDate}</h4>
                         </div>
-                        <button type="button" onClick={() => handleDeleteTaskGroup(taskGroup.id)} className="text-red-500 text-xs font-bold hover:text-red-700">حذف القائمة ✕</button>
+                        {isCommitteeLeader && (
+                          <button type="button" onClick={() => handleDeleteTaskGroup(taskGroup.id)} className="text-red-500 text-xs font-bold hover:text-red-700">حذف القائمة ✕</button>
+                        )}
                       </div>
 
                       <div className="space-y-1.5">
@@ -1532,71 +1549,73 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* الجدول الخاص بالمرشحين */}
-        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-          <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
-            <div>
-              <h3 className="text-lg font-black text-slate-900">متقدمو وقبولو ({currentActiveComm})</h3>
-              <p className="text-xs text-slate-500">اختر الرغبة لعرض المتقدمين بدقة وقبولهم برابط قروب الواتساب:</p>
+        {/* الجدول الخاص بالمرشحين (يظهر للقادة فقط للحفاظ على الخصوصية التامة للأعضاء العاديين) */}
+        {isCommitteeLeader && (
+          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+            <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">متقدمو وقبولو ({currentActiveComm})</h3>
+                <p className="text-xs text-slate-500">اختر الرغبة لعرض المتقدمين بدقة وقبولهم برابط قروب الواتساب:</p>
+              </div>
+              
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setPreferenceFilterTab('pref-1')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-1' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                  🎯 الرغبة الأولى ({requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm)).length})
+                </button>
+                <button type="button" onClick={() => setPreferenceFilterTab('pref-2')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-2' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                  🥈 الرغبة الثانية ({requests.filter(r => matchesTargetCommittee(r.secondChoice, currentActiveComm)).length})
+                </button>
+                <button type="button" onClick={() => setPreferenceFilterTab('pref-3')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-3' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                  🥉 الرغبة الثالثة ({requests.filter(r => matchesTargetCommittee(r.thirdChoice, currentActiveComm)).length})
+                </button>
+              </div>
             </div>
-            
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setPreferenceFilterTab('pref-1')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-1' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                🎯 الرغبة الأولى ({requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm)).length})
-              </button>
-              <button type="button" onClick={() => setPreferenceFilterTab('pref-2')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-2' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                🥈 الرغبة الثانية ({requests.filter(r => matchesTargetCommittee(r.secondChoice, currentActiveComm)).length})
-              </button>
-              <button type="button" onClick={() => setPreferenceFilterTab('pref-3')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-3' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                🥉 الرغبة الثالثة ({requests.filter(r => matchesTargetCommittee(r.thirdChoice, currentActiveComm)).length})
-              </button>
-            </div>
-          </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                  <th className="pb-3 pr-2">اسم المتقدم</th>
-                  <th className="pb-3">الرقم الجامعي</th>
-                  <th className="pb-3">الرغبات</th>
-                  <th className="pb-3">الحالة</th>
-                  <th className="pb-3 text-left pl-2">إجراءات وصلاحيات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredRequests.length === 0 ? (
-                  <tr><td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد طلبات متقدمين مطابقة لهذه الرغبة في "{currentActiveComm}" حالياً.</td></tr>
-                ) : (
-                  filteredRequests.map((req) => (
-                    <tr key={req.id} className="hover:bg-slate-50">
-                      <td className="py-3 pr-2 font-bold text-slate-900">{req.fullName}<div className="text-[10px] text-slate-400 font-normal">📞 {req.phone}</div></td>
-                      <td className="py-3 text-slate-600 font-mono">{req.universityId || '-'}</td>
-                      <td className="py-3 text-slate-600 text-[11px] space-y-0.5">
-                        <p><strong className="text-[#630517]">1:</strong> {req.firstChoice}</p>
-                        <p><strong className="text-slate-400">2:</strong> {req.secondChoice}</p>
-                        <p><strong className="text-slate-400">3:</strong> {req.thirdChoice}</p>
-                      </td>
-                      <td className="py-3">
-                        <span className={`px-2.5 py-1 rounded-full font-bold border ${
-                          req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : req.status === 'مرفوض' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>
-                          {req.status || 'معلق'}
-                        </span>
-                        {req.acceptedCommittee && (<div className="text-[10px] text-[#630517] font-bold mt-1">مقبول في: {req.acceptedCommittee}</div>)}
-                      </td>
-                      <td className="py-3 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
-                        <button type="button" onClick={() => handleShiftPreference(req)} className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer text-xs" title="تحويل الطالب لرغبته التالية وتحويله للموارد البشرية">🔄 تحويل للموارد البشرية</button>
-                        <button type="button" onClick={() => { setSelectedReqId(req.id); setShowAcceptModal(true); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 cursor-pointer text-xs">قبول ✅</button>
-                        <button type="button" onClick={() => handleReject(req.id)} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-xs">رفض ✕</button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                    <th className="pb-3 pr-2">اسم المتقدم</th>
+                    <th className="pb-3">الرقم الجامعي</th>
+                    <th className="pb-3">الرغبات</th>
+                    <th className="pb-3">الحالة</th>
+                    <th className="pb-3 text-left pl-2">إجراءات وصلاحيات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredRequests.length === 0 ? (
+                    <tr><td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد طلبات متقدمين مطابقة لهذه الرغبة في "{currentActiveComm}" حالياً.</td></tr>
+                  ) : (
+                    filteredRequests.map((req) => (
+                      <tr key={req.id} className="hover:bg-slate-50">
+                        <td className="py-3 pr-2 font-bold text-slate-900">{req.fullName}<div className="text-[10px] text-slate-400 font-normal">📞 {req.phone}</div></td>
+                        <td className="py-3 text-slate-600 font-mono">{req.universityId || '-'}</td>
+                        <td className="py-3 text-slate-600 text-[11px] space-y-0.5">
+                          <p><strong className="text-[#630517]">1:</strong> {req.firstChoice}</p>
+                          <p><strong className="text-slate-400">2:</strong> {req.secondChoice}</p>
+                          <p><strong className="text-slate-400">3:</strong> {req.thirdChoice}</p>
+                        </td>
+                        <td className="py-3">
+                          <span className={`px-2.5 py-1 rounded-full font-bold border ${
+                            req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : req.status === 'مرفوض' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            {req.status || 'معلق'}
+                          </span>
+                          {req.acceptedCommittee && (<div className="text-[10px] text-[#630517] font-bold mt-1">مقبول في: {req.acceptedCommittee}</div>)}
+                        </td>
+                        <td className="py-3 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
+                          <button type="button" onClick={() => handleShiftPreference(req)} className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer text-xs" title="تحويل الطالب لرغبته التالية وتحويله للموارد البشرية">🔄 تحويل للموارد البشرية</button>
+                          <button type="button" onClick={() => { setSelectedReqId(req.id); setShowAcceptModal(true); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 cursor-pointer text-xs">قبول ✅</button>
+                          <button type="button" onClick={() => handleReject(req.id)} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-xs">رفض ✕</button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
 
