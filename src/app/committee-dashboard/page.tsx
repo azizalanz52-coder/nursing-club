@@ -153,9 +153,10 @@ export default function CommitteeDashboard() {
         setIsCommitteeLeader(true);
       } else {
         setIsQualityTeam(false);
-        setSelectedManagedCommittee(assigned || 'لجنة تنظيم الفعاليات');
-        setSelectedMonitoredCommittee(assigned || 'لجنة تنظيم الفعاليات');
-        setTargetCommitteeForTask(assigned || 'لجنة تنظيم الفعاليات');
+        const resolvedComm = assigned || 'لجنة تنظيم الفعاليات';
+        setSelectedManagedCommittee(resolvedComm);
+        setSelectedMonitoredCommittee(resolvedComm);
+        setTargetCommitteeForTask(resolvedComm);
       }
 
       const reqSnap = await getDocs(collection(db, 'applications'));
@@ -306,7 +307,6 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // إرسال الاعتذار بشكل مباشر للموارد البشرية كإشعار إفادة بعدم المشاركة (بدون موافقة رسمية مقيدة)
   const handleSubmitExcuse = async (e: FormEvent) => {
     e.preventDefault();
     if (!excuseEventName.trim() || !excuseReason.trim()) return;
@@ -968,7 +968,7 @@ export default function CommitteeDashboard() {
         )}
 
         {/* ======================================================== */}
-        {/* نظام إفادة عدم المشاركة والاعتذار المباشر (متاح للأعضاء والقادة) */}
+        {/* نظام إفادة عدم المشاركة والاعتذار المباشر */}
         {/* ======================================================== */}
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
@@ -1110,8 +1110,8 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 2. أداة لجنة الإعلام (للقادة والأعضاء المخصصين) */}
-        {currentActiveComm === 'لجنة الاعلام' && isCommitteeLeader && (
+        {/* 2. أداة لجنة الإعلام (للقادة والأعضاء المخصصين - لا يتم حذفها أبداً) */}
+        {(currentActiveComm === 'لجنة الاعلام' || currentActiveComm === 'لجنة الإعلام') && isCommitteeLeader && (
           <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
@@ -1449,7 +1449,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* قائمة المهام المتعددة ولوحة الشرف (متاحة للجميع مع الحفاظ على الخصوصية) */}
+        {/* قائمة المهام المتعددة ولوحة الشرف */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
@@ -1549,7 +1549,7 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* الجدول الخاص بالمرشحين (يظهر للقادة فقط للحفاظ على الخصوصية التامة للأعضاء العاديين) */}
+        {/* الجدول الخاص بالمرشحين */}
         {isCommitteeLeader && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
