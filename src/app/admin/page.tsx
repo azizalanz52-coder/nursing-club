@@ -383,11 +383,49 @@ export default function AdminDashboard() {
     }
   };
 
+  // دالة ضغط الصور وتحويلها لـ Base64 لضمان عدم تعليق السحابة
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+      if (file.type.startsWith('video/')) {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (error) => reject(error);
+        return;
+      }
+
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.onerror = (error) => reject(error);
+      };
       reader.onerror = (error) => reject(error);
     });
   };
@@ -402,6 +440,7 @@ export default function AdminDashboard() {
   const [newDiscCategory, setNewDiscCategory] = useState<string>('أنشطة كبرى');
   const [newDiscDesc, setNewDiscDesc] = useState<string>('');
   const [newDiscImages, setNewDiscImages] = useState<string[]>([]);
+  const [isUploadingDiscover, setIsUploadingDiscover] = useState<boolean>(false);
 
   const [mediaUploads, setMediaUploads] = useState<any[]>([]);
   const [mediaTitle, setMediaTitle] = useState<string>('');
@@ -876,13 +915,16 @@ export default function AdminDashboard() {
     }
   };
 
+  // تعديل وتأمين عملية رفع الفعالية مع مؤشر تحميل ومعالجة آمنة لضمان عدم توقف الزر
   const handleCreateNewDiscoverEvent = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newDiscTitle.trim()) return;
+    if (!newDiscTitle.trim() || isUploadingDiscover) return;
+
+    setIsUploadingDiscover(true);
     const eventId = Date.now().toString();
     const newEventObj: DiscoverEvent = {
       id: eventId,
-      title: newDiscTitle,
+      title: newDiscTitle.trim(),
       category: newDiscCategory,
       description: newDiscDesc || 'فعالية تابعة لنادي التمريض.',
       images: newDiscImages.length > 0 ? newDiscImages : ['/logo.png']
@@ -895,10 +937,14 @@ export default function AdminDashboard() {
       setNewDiscTitle('');
       setNewDiscDesc('');
       setNewDiscImages([]);
-      setModalMessage('تم إنشاء الفعالية ونشر الصور سحابياً للجميع! 🖼️');
+      setModalMessage('تم إنشاء الفعالية ونشر الصور سحابياً للجميع بنجاح! 🖼️🚀');
       setModalType('success');
     } catch (err) {
-      console.error(err);
+      console.error('Error saving event:', err);
+      setModalMessage('حدث خطأ أثناء رفع الفعالية بالسحابة. تأكد من حجم الملفات وحاول مجدداً.');
+      setModalType('success');
+    } finally {
+      setIsUploadingDiscover(false);
     }
   };
 
@@ -2347,6 +2393,7 @@ export default function AdminDashboard() {
                     value={newDiscTitle}
                     onChange={(e) => setNewDiscTitle(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                    required
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -2378,13 +2425,17 @@ export default function AdminDashboard() {
                     onChange={handleSelectMultipleImagesForNewEvent}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
+                  {newDiscImages.length > 0 && (
+                    <p className="text-xs font-bold text-emerald-600 mt-1">✅ تم اختيار وتجهيز عدد الملفات: {newDiscImages.length}</p>
+                  )}
                 </div>
                 <div className="sm:col-span-2 pt-2">
                   <button
                     type="submit"
-                    className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 cursor-pointer"
+                    disabled={isUploadingDiscover}
+                    className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 cursor-pointer disabled:opacity-50"
                   >
-                    + رفع ونشر الفعالية سحابياً للجميع
+                    {isUploadingDiscover ? '⏳ جاري الرفع سحابياً للجميع...' : '+ رفع ونشر الفعالية سحابياً للجميع 🚀'}
                   </button>
                 </div>
               </form>
@@ -3411,7 +3462,7 @@ export default function AdminDashboard() {
             <div className="flex justify-end gap-3 pt-4">
               <button
                 type="button"
-                onClick={() => setShowAcceptModal(false)}
+                onClick={() => setShowAcceptModal, (false)}
                 className="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200"
               >
                 إلغاء
