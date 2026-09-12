@@ -94,6 +94,8 @@ interface StudentAchievement {
 interface CertificateItem {
   id: string;
   recipientName: string;
+  phone: string;
+  password?: string;
   certTitle: string;
   category: string;
   image: string;
@@ -118,10 +120,12 @@ export default function AdminDashboard() {
   const [achievementDescInput, setAchievementDescInput] = useState<string>('');
   const [studentImageInput, setStudentImageInput] = useState<string>('/logo.png');
 
-  // Certificates States
+  // Certificates States with Phone & Password
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
   const [editingCertId, setEditingCertId] = useState<string | null>(null);
   const [certRecipientInput, setCertRecipientInput] = useState<string>('');
+  const [certPhoneInput, setCertPhoneInput] = useState<string>('');
+  const [certPasswordInput, setCertPasswordInput] = useState<string>('');
   const [certTitleInput, setCertTitleInput] = useState<string>('');
   const [certCategoryInput, setCertCategoryInput] = useState<string>('شهادة شكر وتقدير');
   const [certImageInput, setCertImageInput] = useState<string>('/logo.png');
@@ -213,12 +217,14 @@ export default function AdminDashboard() {
 
   const handleSaveCertificate = async (e: FormEvent) => {
     e.preventDefault();
-    if (!certRecipientInput.trim() || !certTitleInput.trim()) return;
+    if (!certRecipientInput.trim() || !certTitleInput.trim() || !certPhoneInput.trim()) return;
 
     const certId = editingCertId ? editingCertId : Date.now().toString();
     const updatedCert: CertificateItem = {
       id: certId,
       recipientName: certRecipientInput.trim(),
+      phone: certPhoneInput.trim(),
+      password: certPasswordInput.trim() || '123456',
       certTitle: certTitleInput.trim(),
       category: certCategoryInput,
       image: certImageInput,
@@ -230,13 +236,15 @@ export default function AdminDashboard() {
       await setDoc(doc(db, 'site_certificates', certId), updatedCert);
       if (editingCertId) {
         setCertificates(certificates.map(c => c.id === certId ? updatedCert : c));
-        setModalMessage('تم تحديث وتعديل الشهادة بنجاح سحابياً! ✏️📜');
+        setModalMessage('تم تحديث وتعديل الشهادة برقم الجوال وكلمة المرور بنجاح سحابياً! ✏️📜');
       } else {
         setCertificates([updatedCert, ...certificates]);
-        setModalMessage('تم اصدار ونشر الشهادة سحابياً بنجاح! 🎓✨');
+        setModalMessage('تم اصدار ونشر الشهادة وربطها برقم الجوال وكلمة المرور بنجاح! 🎓✨');
       }
       setEditingCertId(null);
       setCertRecipientInput('');
+      setCertPhoneInput('');
+      setCertPasswordInput('');
       setCertTitleInput('');
       setCertDescInput('');
       setCertImageInput('/logo.png');
@@ -251,6 +259,8 @@ export default function AdminDashboard() {
   const handleEditCertificateClick = (cert: CertificateItem) => {
     setEditingCertId(cert.id);
     setCertRecipientInput(cert.recipientName);
+    setCertPhoneInput(cert.phone || '');
+    setCertPasswordInput(cert.password || '');
     setCertTitleInput(cert.certTitle);
     setCertCategoryInput(cert.category || 'شهادة شكر وتقدير');
     setCertDescInput(cert.description);
@@ -1520,7 +1530,7 @@ export default function AdminDashboard() {
                   <h3 className="text-xl font-black text-sky-900">
                     {editingCertId ? '✏️ تعديل بيانات الشهادة المعتمدة' : '📜 إصدار ورفع شهادة شكر أو إنجاز جديدة'}
                   </h3>
-                  <p className="text-xs text-slate-500">أدخل اسم المكرم، عنوان الشهادة أو الفعالية، نوع الشهادة، ملف الشهادة أو الصورة، واضغط حفظ لنشرها سحابياً.</p>
+                  <p className="text-xs text-slate-500">أدخل اسم المكرم، رقم الجوال وكلمة المرور الخاصة به (للاستعلام)، عنوان الشهادة، نوع الشهادة، ملف الشهادة أو الصورة، واضغط حفظ.</p>
                 </div>
                 {editingCertId && (
                   <button
@@ -1528,6 +1538,8 @@ export default function AdminDashboard() {
                     onClick={() => {
                       setEditingCertId(null);
                       setCertRecipientInput('');
+                      setCertPhoneInput('');
+                      setCertPasswordInput('');
                       setCertTitleInput('');
                       setCertDescInput('');
                       setCertImageInput('/logo.png');
@@ -1539,7 +1551,7 @@ export default function AdminDashboard() {
                 )}
               </div>
 
-              <form onSubmit={handleSaveCertificate} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-sky-50/40 p-6 rounded-2xl border border-sky-200">
+              <form onSubmit={handleSaveCertificate} className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-sky-50/40 p-6 rounded-2xl border border-sky-200">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">اسم المستفيد أو المكرم</label>
                   <input
@@ -1553,6 +1565,32 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">رقم جوال المستفيد (للاستعلام)</label>
+                  <input
+                    type="text"
+                    placeholder="05XXXXXXXX"
+                    value={certPhoneInput}
+                    onChange={(e) => setCertPhoneInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-sky-600 font-mono"
+                    dir="ltr"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">كلمة المرور الخاصة به (للاستعلام)</label>
+                  <input
+                    type="text"
+                    placeholder="كلمة المرور..."
+                    value={certPasswordInput}
+                    onChange={(e) => setCertPasswordInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-sky-600 font-mono"
+                    dir="ltr"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700">عنوان الشهادة أو الفعالية</label>
                   <input
                     type="text"
@@ -1578,7 +1616,7 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 sm:col-span-3">
                   <label className="text-xs font-bold text-slate-700">صورة أو ملف الشهادة (📁)</label>
                   <input
                     type="file"
@@ -1593,10 +1631,10 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                <div className="space-y-1.5 sm:col-span-2">
+                <div className="space-y-1.5 sm:col-span-3">
                   <label className="text-xs font-bold text-slate-700">وصف أو تفاصيل إضافية للشهادة</label>
                   <textarea
-                    rows={3}
+                    rows={2}
                     placeholder="اكتب تفاصيل تكريم العضو أو مساهمته الفعالة..."
                     value={certDescInput}
                     onChange={(e) => setCertDescInput(e.target.value)}
@@ -1604,12 +1642,12 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                <div className="sm:col-span-2 pt-2">
+                <div className="sm:col-span-3 pt-2">
                   <button
                     type="submit"
                     className="bg-sky-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-sky-700 cursor-pointer"
                   >
-                    {editingCertId ? '💾 حفظ التعديلات وتحديث الشهادة سحابياً' : '+ إصدار ونشر الشهادة سحابياً 🚀'}
+                    {editingCertId ? '💾 حفظ التعديلات وتحديث الشهادة سحابياً' : '+ إصدار ونشر الشهادة سحابياً وربطها برقم الجوال وكلمة المرور 🚀'}
                   </button>
                 </div>
               </form>
@@ -1630,6 +1668,7 @@ export default function AdminDashboard() {
                           <img src={cert.image || '/logo.png'} alt={cert.certTitle} className="w-14 h-14 rounded-2xl object-cover border-2 border-sky-400 shadow" />
                           <div>
                             <h4 className="font-black text-slate-900 text-sm">👤 {cert.recipientName}</h4>
+                            <span className="text-[10px] text-slate-500 font-mono block" dir="ltr">📞 {cert.phone || 'غير مسجل'}</span>
                             <span className="text-[10px] bg-sky-200 text-sky-900 px-2 py-0.5 rounded-full font-bold inline-block mt-1">
                               {cert.category}
                             </span>
