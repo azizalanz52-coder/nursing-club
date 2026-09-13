@@ -243,7 +243,7 @@ export default function CommitteeDashboard() {
       name: partnerName.trim(),
       contactPerson: partnerContactPerson.trim() || 'غير محدد',
       phone: partnerPhone.trim() || 'غير متوفر',
-      status: partnerStatus, // 'قيد المراجعة' | 'وافقوا' | 'رفضوا'
+      status: partnerStatus,
       notes: partnerNotes.trim() || 'لا توجد ملاحظات إضافية',
       addedBy: userData?.fullName || 'عضو العلاقات العامة',
       createdAt: Date.now(),
@@ -254,7 +254,6 @@ export default function CommitteeDashboard() {
       const docRef = await addDoc(collection(db, 'public_partners_relations'), newPartnerObj);
       setPublicPartnersList([{ id: docRef.id, ...newPartnerObj }, ...publicPartnersList]);
 
-      // إشعار للأدمن والرؤساء عند توقيع شراكة ناجحة
       if (partnerStatus === 'وافقوا') {
         for (const usr of allUsersList) {
           const cStr = usr.assignedCommittee || usr.committee || '';
@@ -639,7 +638,7 @@ export default function CommitteeDashboard() {
     try {
       const alertMsg = warningStepType === 'warn-leaders' 
         ? `⚠️ [إنذار رسمي من الجودة للجنة ${targetCommitteeForWarning}]: ${warningReason} (يُرجى إرسال الرد والتبرير خلال 24 ساعة)`
-        : `🚨 [تصعيد عاجل للرؤساء ضد لجنة ${targetCommitteeForWarning}]: ${warningReason}`;
+        : `🚨 [إحالة عاجلة للرؤساء ضد لجنة ${targetCommitteeForWarning}]: ${warningReason}`;
 
       for (const usr of allUsersList) {
         const commStr = usr.assignedCommittee || usr.committee || '';
@@ -669,12 +668,12 @@ export default function CommitteeDashboard() {
           targetCommittee: targetCommitteeForWarning,
           reporter: userData?.fullName || 'لجنة الجودة والتطوير',
           reason: `[عدم تجاوب مع الإنذار السابق]: ${warningReason}`,
-          status: '🚨 مُحال رسمياً للرئيس ورئيسة النادي (لعدم التجاوب والتأديب)',
+          status: '🚨 مُحال رسمياً للرئيس ونائبة الرئيس (لعدم التجاوب والتأديب)',
           leaderDefenseReply: '',
           escalatedAt: Date.now(),
           createdAt: Date.now()
         });
-        alert(`⚖️ [تم التصعيد النهائي للرؤساء وتنبيههم]: تم إحالة البلاغ رسمياً لمكتب رئيس ورئيسة النادي.`);
+        alert(`⚖️ [تم الإحالة النهائية للرؤساء وتنبيههم]: تم إحالة البلاغ رسمياً لمكتب الرئيس ونائبة الرئيس.`);
       }
 
       setShowWarningModal(false);
@@ -1011,7 +1010,7 @@ export default function CommitteeDashboard() {
               <span className="text-2xl">⚠️</span>
               <div>
                 <h3 className="font-black text-amber-900 text-sm">تنبيهات وإنذارات رسمية مسجلة بحق لجنتك (مطلوبة الرد):</h3>
-                <p className="text-xs text-amber-700">لديك مهلة 24 ساعة لتقديم الرد أو التبرير لتفادي تصعيد البلاغ لمكتب الرؤساء.</p>
+                <p className="text-xs text-amber-700">لديك مهلة 24 ساعة لتقديم الرد أو التبرير لتفادي إحالة البلاغ لمكتب الرؤساء.</p>
               </div>
             </div>
 
@@ -1457,9 +1456,9 @@ export default function CommitteeDashboard() {
         {isQualityTeam && (
           <div className="space-y-4">
             <div className="flex justify-between items-center flex-wrap gap-3">
-              <h3 className="font-black text-slate-900 text-sm">رادار مراقبة ورصد إنجازات اللجان السبع (إنذار القادة أولاً ثم التصعيد):</h3>
+              <h3 className="font-black text-slate-900 text-sm">رادار مراقبة ورصد إنجازات اللجان السبع (إنذار القادة أولاً ثم الإحالة):</h3>
               <span className="text-[11px] bg-red-100 text-red-700 font-bold px-3 py-1 rounded-xl">
-                ⚠️ النظام النظامي: إنذار القادة بمهلة 24 ساعة للرد، وإذا لم يتجاوبوا يتم رفع البلاغ للرؤساء
+                ⚠️ النظام النظامي: إنذار القادة بمهلة 24 ساعة للرد، وإذا لم يتجاوبوا يتم إحالة البلاغ للرؤساء
               </span>
             </div>
             
@@ -1513,7 +1512,7 @@ export default function CommitteeDashboard() {
                           selectedManagedCommittee === commName ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
                         }`}
                       >
-                        🚨 تصعيد البلاغ للرئيس ورئيسة النادي
+                        🚨 إحالة البلاغ للرئيس ونائبة الرئيس
                       </button>
                     </div>
                   </div>
@@ -1946,7 +1945,7 @@ export default function CommitteeDashboard() {
             </div>
             <div className="text-center space-y-1">
               <h3 className="text-xl font-black text-slate-900">
-                {warningStepType === 'warn-leaders' ? 'إنذار داخلي لقائد وقائدة اللجنة' : 'تصعيد وإحالة البلاغ للرئيس ورئيسة النادي'}
+                {warningStepType === 'warn-leaders' ? 'إنذار داخلي لقائد وقائدة اللجنة' : 'إحالة البلاغ للرئيس ونائبة الرئيس'}
               </h3>
             </div>
             <div className="space-y-2">
@@ -1968,7 +1967,7 @@ export default function CommitteeDashboard() {
                   warningStepType === 'warn-leaders' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
-                {warningStepType === 'warn-leaders' ? 'إرسال الإنذار 📨' : 'تصعيد البلاغ ⚖️'}
+                {warningStepType === 'warn-leaders' ? 'إرسال الإنذار 📨' : 'إحالة البلاغ ⚖️'}
               </button>
             </div>
           </div>
