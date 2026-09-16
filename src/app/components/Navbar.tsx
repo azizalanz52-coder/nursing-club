@@ -262,7 +262,6 @@ export default function Navbar() {
             </button>
           </nav>
 
-          {/* تم عكس مكان تسجيل الدخول وانضمام النادي هنا */}
           <div className="hidden md:flex items-center gap-3">
             {userName ? (
               <div className="flex items-center gap-2">
@@ -313,12 +312,16 @@ export default function Navbar() {
               </button>
             )}
 
-            <Link 
-              href="/join" 
-              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] font-black text-xs sm:text-sm shadow-lg hover:brightness-110 transition-all cursor-pointer"
+            {/* تم قفل زر تقديم طلب الانضمام وإضافة علامة القفل */}
+            <button
+              type="button"
+              disabled
+              title="تم إغلاق فترة التقديم وانضمام النادي"
+              className="px-5 py-2.5 rounded-2xl bg-slate-200 text-slate-500 font-black text-xs sm:text-sm shadow-inner cursor-not-allowed flex items-center gap-1.5"
             >
-              الانضمام للنادي 
-            </Link>
+              <span>🔒</span>
+              <span>تقديم طلب الانضمام (مغلق)</span>
+            </button>
           </div>
 
           <div className="flex md:hidden items-center gap-2">
@@ -330,12 +333,15 @@ export default function Navbar() {
               تسجيل الدخول
             </button>
 
-            <Link 
-              href="/join" 
-              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#F5D061] to-[#C99C21] text-[#630517] font-black text-[11px] shadow"
+            <button
+              type="button"
+              disabled
+              title="مغلق"
+              className="px-3 py-1.5 rounded-xl bg-slate-200 text-slate-500 font-black text-[11px] shadow cursor-not-allowed flex items-center gap-1"
             >
-              الانضمام للنادي
-            </Link>
+              <span>🔒</span>
+              <span>الانضمام (مغلق)</span>
+            </button>
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
