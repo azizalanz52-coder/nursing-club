@@ -4,7 +4,7 @@ import React from 'react';
 
 export default function WhatsAppCommunity() {
   // يمكنك استبدال هذا الرابط برابط مجتمع الواتساب الخاص بكم
-  const communityLink = "https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP";
+  const communityLink = "https://chat.whatsapp.com/Hz2RnzkW0oEHh1vvttSiPF";
 
   return (
     <section className="relative py-20 bg-gradient-to-b from-white via-slate-50 to-white overflow-hidden" dir="rtl">
