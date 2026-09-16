@@ -133,14 +133,12 @@ export default function Navbar() {
 
     setSearchStatus('جاري التحقق من سجل الشهائد سحابياً...');
     try {
-      // البحث في مجموعة site_certificates المطابقة لمسار الشهادات
       const certsRef = collection(db, 'site_certificates');
       const q = query(certsRef, where('phone', '==', phoneInput.trim()));
       const snap = await getDocs(q);
 
       let foundCerts = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
 
-      // التحقق من كلمة المرور إذا تم إدخالها
       if (passwordInput.trim()) {
         foundCerts = foundCerts.filter(c => !c.password || c.password === passwordInput.trim());
       }
@@ -196,7 +194,6 @@ export default function Navbar() {
 
   return (
     <>
-      {/* نافذة مباركة الترقية والاحتفال (مخصصة للتهنئة فقط) */}
       {showPromotionModal && promotionMessage && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
           <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative">
@@ -234,7 +231,6 @@ export default function Navbar() {
 
       <header className={`w-full bg-white border-b border-slate-100 fixed top-0 z-50 transition-transform duration-300 ${showNavbar ? 'translate-y-0' : '-translate-y-full'}`}>
         
-        {/* المحتوى الرئيسي للنافبار */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between" dir="rtl">
           
           <Link href="/" className="flex items-center gap-2.5 shrink-0" onClick={() => setMobileMenuOpen(false)}>
@@ -257,7 +253,6 @@ export default function Navbar() {
             <Link href="/events" className="hover:text-rose-900 transition-colors">الفعاليات</Link>
             <Link href="/team" className="hover:text-rose-900 transition-colors">أعضاء النادي</Link>
             
-            {/* زر الشهائد المضاف خصيصاً في النافبار */}
             <button
               type="button"
               onClick={() => setShowCertModal(true)}
@@ -267,14 +262,8 @@ export default function Navbar() {
             </button>
           </nav>
 
+          {/* تم عكس مكان تسجيل الدخول وانضمام النادي هنا */}
           <div className="hidden md:flex items-center gap-3">
-            <Link 
-              href="/join" 
-              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] font-black text-xs sm:text-sm shadow-lg hover:brightness-110 transition-all cursor-pointer"
-            >
-              تقديم طلب الانضمام
-            </Link>
-
             {userName ? (
               <div className="flex items-center gap-2">
                 {isAdmin && (
@@ -323,9 +312,24 @@ export default function Navbar() {
                 تسجيل الدخول
               </button>
             )}
+
+            <Link 
+              href="/join" 
+              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] font-black text-xs sm:text-sm shadow-lg hover:brightness-110 transition-all cursor-pointer"
+            >
+              تقديم طلب الانضمام
+            </Link>
           </div>
 
           <div className="flex md:hidden items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsLoginModalOpen(true)}
+              className="text-slate-700 font-bold text-[11px] px-2.5 py-1.5 rounded-xl bg-slate-100"
+            >
+              تسجيل الدخول
+            </button>
+
             <Link 
               href="/join" 
               className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#F5D061] to-[#C99C21] text-[#630517] font-black text-[11px] shadow"
@@ -350,7 +354,6 @@ export default function Navbar() {
 
         </div>
 
-        {/* 🚨 شريط الإنذار والبار القيادي (تحت الشعار داخل النافبار) */}
         {showLeaderAlertInNavbar && (
           <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white px-4 py-1.5 shadow-inner flex items-center justify-between text-xs font-black border-t border-amber-400/30" dir="rtl">
             <div className="flex items-center gap-2 mx-auto">
@@ -367,7 +370,6 @@ export default function Navbar() {
           </div>
         )}
 
-        {/* قائمة الجوال المنسدلة */}
         {mobileMenuOpen && (
           <div className="md:hidden absolute top-full right-0 left-0 bg-white border-b border-slate-200 shadow-2xl p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-200" dir="rtl">
             <nav className="flex flex-col space-y-3 text-sm font-bold text-slate-700 pb-4 border-b border-slate-100">
@@ -428,7 +430,6 @@ export default function Navbar() {
         )}
       </header>
 
-      {/* نافذة منبثقة لاستعراض وتحميل الشهادات مباشرة من النافبار */}
       {showCertModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
           <div className="bg-white text-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-400">
