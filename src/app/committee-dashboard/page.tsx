@@ -234,7 +234,6 @@ export default function CommitteeDashboard() {
     } catch (e) { console.error(e); }
   };
 
-  // 🤝 معالجة إضافة وإدارة الشركات والمحلات لمنع التكرار (لجنة العلاقات العامة)
   const handleAddPartnerSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!partnerName.trim()) return;
@@ -1132,7 +1131,7 @@ export default function CommitteeDashboard() {
         </div>
 
         {/* ======================================================== */}
-        {/* 🤝 أداة لجنة العلاقات العامة (سجل الشراكات والمحلات لمنع التكرار) */}
+        {/* 🤝 أداة لجنة العلاقات العامة */}
         {/* ======================================================== */}
         {(currentActiveComm === 'لجنة العلاقات العامة' || currentActiveComm === 'لجنة العلاقات') && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
@@ -1254,7 +1253,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 1. أداة لجنة الموارد البشرية (للقادة فقط) */}
+        {/* 1. أداة لجنة الموارد البشرية */}
         {isCommitteeLeader && currentActiveComm === 'لجنة الموارد البشرية' && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
@@ -1748,8 +1747,8 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* الجدول الخاص بالمرشحين */}
-        {isCommitteeLeader && (
+        {/* الجدول الخاص بالمرشحين (يتم إخفاؤه تماماً عن لجنة الجودة والتطوير لأنها لجنة إشرافية رقابية وليست لجنة تقديم) */}
+        {isCommitteeLeader && !isQualityTeam && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
               <div>
