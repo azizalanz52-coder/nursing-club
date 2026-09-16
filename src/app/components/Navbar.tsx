@@ -312,15 +312,15 @@ export default function Navbar() {
               </button>
             )}
 
-            {/* تم قفل زر تقديم طلب الانضمام وإضافة علامة القفل */}
+            {/* زر تقديم الطلب المغلق (متاح في الكمبيوتر بشكل هادئ مع علامة القفل) */}
             <button
               type="button"
               disabled
-              title="تم إغلاق فترة التقديم وانضمام النادي"
-              className="px-5 py-2.5 rounded-2xl bg-slate-200 text-slate-500 font-black text-xs sm:text-sm shadow-inner cursor-not-allowed flex items-center gap-1.5"
+              title="تم إغلاق فترة التقديم والانضمام للنادي"
+              className="px-4 py-2.5 rounded-2xl bg-slate-100 text-slate-400 font-bold text-xs shadow-inner cursor-not-allowed flex items-center gap-1.5 border border-slate-200"
             >
               <span>🔒</span>
-              <span>تقديم طلب الانضمام (مغلق)</span>
+              <span>الانضمام (مغلق)</span>
             </button>
           </div>
 
@@ -328,19 +328,9 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setIsLoginModalOpen(true)}
-              className="text-slate-700 font-bold text-[11px] px-2.5 py-1.5 rounded-xl bg-slate-100"
+              className="text-slate-700 font-bold text-[11px] px-3 py-2 rounded-xl bg-slate-100"
             >
               تسجيل الدخول
-            </button>
-
-            <button
-              type="button"
-              disabled
-              title="مغلق"
-              className="px-3 py-1.5 rounded-xl bg-slate-200 text-slate-500 font-black text-[11px] shadow cursor-not-allowed flex items-center gap-1"
-            >
-              <span>🔒</span>
-              <span>الانضمام (مغلق)</span>
             </button>
 
             <button
@@ -383,6 +373,18 @@ export default function Navbar() {
               <Link href="/check-status" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">🔍 استعلام عن القبول</Link>
               <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الفعاليات</Link>
               <Link href="/team" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">أعضاء النادي</Link>
+              
+              {/* زر تقديم الانضمام المغلق داخل القائمة المنسدلة للجوال */}
+              <div className="py-1">
+                <button
+                  type="button"
+                  disabled
+                  className="w-full text-right text-slate-400 font-bold py-1.5 px-3 rounded-xl bg-slate-100 flex items-center gap-2 cursor-not-allowed"
+                >
+                  <span>🔒</span> تقديم الانضمام (مغلق)
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={() => {
@@ -426,7 +428,7 @@ export default function Navbar() {
                     setMobileMenuOpen(false);
                     setIsLoginModalOpen(true);
                   }}
-                  className="block text-center w-full py-3 rounded-2xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition-colors cursor-pointer"
+                  className="block text-center w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-bold text-xs hover:brightness-110 transition-all cursor-pointer shadow"
                 >
                   تسجيل الدخول
                 </button>
