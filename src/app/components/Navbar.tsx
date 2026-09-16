@@ -28,7 +28,7 @@ export default function Navbar() {
   
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
-  // حالات نافذة استعراض وتحميل الشهائد من النافبار (محفوظة كمرجع احتياطي لعدم حذف أي كود)
+  // حالات نافذة استعراض وتحميل الشهائد من النافبار
   const [showCertModal, setShowCertModal] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -133,12 +133,14 @@ export default function Navbar() {
 
     setSearchStatus('جاري التحقق من سجل الشهائد سحابياً...');
     try {
+      // البحث في مجموعة site_certificates المطابقة لمسار الشهادات
       const certsRef = collection(db, 'site_certificates');
       const q = query(certsRef, where('phone', '==', phoneInput.trim()));
       const snap = await getDocs(q);
 
       let foundCerts = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
 
+      // التحقق من كلمة المرور إذا تم إدخالها
       if (passwordInput.trim()) {
         foundCerts = foundCerts.filter(c => !c.password || c.password === passwordInput.trim());
       }
@@ -255,13 +257,14 @@ export default function Navbar() {
             <Link href="/events" className="hover:text-rose-900 transition-colors">الفعاليات</Link>
             <Link href="/team" className="hover:text-rose-900 transition-colors">أعضاء النادي</Link>
             
-            {/* زر الشهائد الموجه لصفحة الشهادات المستقلة */}
-            <Link
-              href="/certificates"
+            {/* زر الشهائد المضاف خصيصاً في النافبار */}
+            <button
+              type="button"
+              onClick={() => setShowCertModal(true)}
               className="px-3.5 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all font-black text-xs shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
-              🎖️ الشهائد
-            </Link>
+              🎖️ الشهادات
+            </button>
           </nav>
 
           <div className="hidden md:flex items-center gap-3">
@@ -372,13 +375,16 @@ export default function Navbar() {
               <Link href="/check-status" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">🔍 استعلام عن القبول</Link>
               <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الفعاليات</Link>
               <Link href="/team" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">أعضاء النادي</Link>
-              <Link
-                href="/certificates"
-                onClick={() => setMobileMenuOpen(false)}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setShowCertModal(true);
+                }}
                 className="text-right text-amber-800 font-black py-1 flex items-center gap-2"
               >
-                <span>🎖️</span> استعراض الشهائد
-              </Link>
+                <span>🎖️</span> استعراض الشهادات
+              </button>
             </nav>
 
             <div className="space-y-3 pt-1">
@@ -422,14 +428,86 @@ export default function Navbar() {
         )}
       </header>
 
-      {/* نافذة منبثقة محتفظ بها كمرجع سحابي برمجياً لضمان عدم حذف أي متغيرات أصلية */}
+      {/* نافذة منبثقة لاستعراض وتحميل الشهادات مباشرة من النافبار */}
       {showCertModal && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 hidden">
-          <div className="bg-white text-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
-            <form onSubmit={handleFetchCertificatesFromNav}>
-              <input type="text" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} />
-              <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} />
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
+          <div className="bg-white text-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-400">
+            <div className="w-16 h-16 bg-amber-500 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              🎖️
+            </div>
+            
+            <div className="space-y-1 text-center">
+              <h3 className="text-xl font-black">بوابة استعراض وتحميل الشهائد</h3>
+              <p className="text-xs text-slate-500">أدخل رقم جوالك وكلمة المرور لتحميل شهاداتك الفخرية المعتمدة فوراً:</p>
+            </div>
+
+            <form onSubmit={handleFetchCertificatesFromNav} className="space-y-4">
+              <input
+                type="text"
+                placeholder="رقم الجوال (05XXXXXXXX)"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-amber-500 bg-white"
+                dir="ltr"
+                required
+              />
+              <input
+                type="password"
+                placeholder="كلمة المرور"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500 bg-white"
+                required
+              />
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-amber-600 text-white font-black text-xs shadow hover:bg-amber-700 cursor-pointer transition-all"
+              >
+                بحث واستعراض الشهائد 🔍
+              </button>
             </form>
+
+            {searchStatus && (
+              <p className="text-xs text-amber-800 font-bold text-center bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                {searchStatus}
+              </p>
+            )}
+
+            {memberCertificates.length > 0 && (
+              <div className="space-y-3 max-h-60 overflow-y-auto pt-2">
+                {memberCertificates.map((cert) => (
+                  <div key={cert.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs">
+                    <div>
+                      <span className="font-extrabold text-slate-900 block">{cert.certTitle}</span>
+                      <span className="text-[10px] text-slate-500">المستفيد: {cert.recipientName}</span>
+                    </div>
+                    {cert.image && (
+                      <a
+                        href={cert.image}
+                        download="certificate.jpg"
+                        className="px-3 py-1.5 bg-amber-600 text-white font-bold rounded-lg shadow hover:bg-amber-700"
+                      >
+                        تحميل 📥
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowCertModal(false);
+                setMemberCertificates([]);
+                setSearchStatus('');
+                setPhoneInput('');
+                setPasswordInput('');
+              }}
+              className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+            >
+              إغلاق ✕
+            </button>
           </div>
         </div>
       )}
