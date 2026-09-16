@@ -947,10 +947,10 @@ export default function CommitteeDashboard() {
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-xl font-black text-slate-900">
-              {isQualityTeam ? '⚡ غرفة عمليات لجنة الجودة والتطوير (العقل المدبر والمركز المرعب)' : isCommitteeLeader ? `لوحة تحكم رئيس لجنة (${currentActiveComm}) 🛡️` : `بوابة العضو المنضم في (${userData?.assignedCommittee || userData?.committee || 'اللجنة'}) 🩺`}
+              {isQualityTeam ? '⚡ غرفة متابعة وتقييم أداء اللجان (لجنة الجودة والتطوير)' : isCommitteeLeader ? `لوحة تحكم رئيس لجنة (${currentActiveComm}) 🛡️` : `بوابة العضو المنضم في (${userData?.assignedCommittee || userData?.committee || 'اللجنة'}) 🩺`}
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'صلاحية مراقبة ورصد وإنذار وإحالة اللجان السبع برتبة عسكرية صارمة' : isCommitteeLeader ? 'إدارة شؤون وأعضاء ومهام اللجنة المعينة لك' : 'متابعة المهام الخاصة بلجنتك وإرسال إفادات عدم المشاركة بخصوصية تامة'}
+              أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'متابعة وتقييم أداء اللجان السبع وتقديم التوجيهات الإدارية' : isCommitteeLeader ? 'إدارة شؤون وأعضاء ومهام اللجنة المعينة لك' : 'متابعة المهام الخاصة بلجنتك وإرسال إفادات عدم المشاركة بخصوصية تامة'}
             </p>
           </div>
           
@@ -1009,7 +1009,7 @@ export default function CommitteeDashboard() {
             <div className="flex items-center gap-2">
               <span className="text-2xl">⚠️</span>
               <div>
-                <h3 className="font-black text-amber-900 text-sm">تنبيهات وإنذارات رسمية مسجلة بحق لجنتك (مطلوبة الرد):</h3>
+                <h3 className="font-black text-amber-900 text-sm">تنبيهات وملاحظات إدارية مسجلة بحق لجنتك (مطلوبة الرد):</h3>
                 <p className="text-xs text-amber-700">لديك مهلة 24 ساعة لتقديم الرد أو التبرير لتفادي إحالة البلاغ لمكتب الرؤساء.</p>
               </div>
             </div>
@@ -1021,7 +1021,7 @@ export default function CommitteeDashboard() {
                     <span className="font-bold text-slate-500">المرسل: {rep.reporter}</span>
                     <span className="font-black text-amber-800">{rep.status}</span>
                   </div>
-                  <p className="text-xs font-semibold text-slate-800">سبب الإنذار والتقصير المرصود: {rep.reason}</p>
+                  <p className="text-xs font-semibold text-slate-800">سبب الملاحظة أو التقصير المرصود: {rep.reason}</p>
 
                   {rep.leaderDefenseReply ? (
                     <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs space-y-1">
@@ -1132,7 +1132,7 @@ export default function CommitteeDashboard() {
         </div>
 
         {/* ======================================================== */}
-        {/* 🤝 أداة لجنة العلاقات العامة (سجل الشراكات ومنع تكرار التواصل) */}
+        {/* 🤝 أداة لجنة العلاقات العامة (سجل الشراكات والمحلات لمنع التكرار) */}
         {/* ======================================================== */}
         {(currentActiveComm === 'لجنة العلاقات العامة' || currentActiveComm === 'لجنة العلاقات') && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
@@ -1456,9 +1456,9 @@ export default function CommitteeDashboard() {
         {isQualityTeam && (
           <div className="space-y-4">
             <div className="flex justify-between items-center flex-wrap gap-3">
-              <h3 className="font-black text-slate-900 text-sm">رادار مراقبة ورصد إنجازات اللجان السبع (إنذار القادة أولاً ثم الإحالة):</h3>
+              <h3 className="font-black text-slate-900 text-sm">رادار متابعة وتقييم إنجازات اللجان السبع (تنبيه القادة أولاً ثم الإحالة):</h3>
               <span className="text-[11px] bg-red-100 text-red-700 font-bold px-3 py-1 rounded-xl">
-                ⚠️ النظام النظامي: إنذار القادة بمهلة 24 ساعة للرد، وإذا لم يتجاوبوا يتم إحالة البلاغ للرؤساء
+                ⚠️ آلية العمل: إرسال تنبيه للقادة بمهلة 24 ساعة للرد، وإذا لم يتجاوبوا يتم إحالة البلاغ للرؤساء
               </span>
             </div>
             
@@ -1478,7 +1478,7 @@ export default function CommitteeDashboard() {
                   >
                     <div className="flex justify-between items-center">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedManagedCommittee === commName ? 'bg-white/20 text-[#F5D061]' : 'bg-slate-100 text-slate-600'}`}>
-                        مراقبة عليا
+                        متابعة عليا
                       </span>
                       <span className="text-lg font-black">{count} أعضاء</span>
                     </div>
@@ -1497,7 +1497,7 @@ export default function CommitteeDashboard() {
                           selectedManagedCommittee === commName ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
                         }`}
                       >
-                        ⚠️ إنذار قائد وقائدة اللجنة
+                        ⚠️ تنبيه قائد وقائدة اللجنة
                       </button>
 
                       <button
@@ -1877,10 +1877,10 @@ export default function CommitteeDashboard() {
             <div className="w-16 h-16 rounded-2xl bg-amber-500 mx-auto flex items-center justify-center text-3xl font-bold text-white">✍️</div>
             <div className="text-center space-y-1">
               <h3 className="text-xl font-black text-slate-900">تقديم الرد والتبرير الرسمي</h3>
-              <p className="text-xs text-slate-500">الرد على الإنذار الوارد من لجنة الجودة والتطوير</p>
+              <p className="text-xs text-slate-500">الرد على الملاحظة الواردة من لجنة الجودة والتطوير</p>
             </div>
             <div className="bg-slate-50 p-3 rounded-2xl text-xs space-y-1 border border-slate-200">
-              <span className="font-bold text-slate-700 block">سبب الإنذار المرصود:</span>
+              <span className="font-bold text-slate-700 block">سبب الملاحظة المرصودة:</span>
               <p className="text-slate-600">{activeReportToReply.reason}</p>
             </div>
             <div className="space-y-2">
@@ -1945,11 +1945,11 @@ export default function CommitteeDashboard() {
             </div>
             <div className="text-center space-y-1">
               <h3 className="text-xl font-black text-slate-900">
-                {warningStepType === 'warn-leaders' ? 'إنذار داخلي لقائد وقائدة اللجنة' : 'إحالة البلاغ للرئيس ونائبة الرئيس'}
+                {warningStepType === 'warn-leaders' ? 'تنبيه قائد وقائدة اللجنة' : 'إحالة البلاغ للرئيس ونائبة الرئيس'}
               </h3>
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">التفاصيل أو التقصير المرصود:</label>
+              <label className="text-xs font-bold text-slate-700 block">التفاصيل أو الملاحظة المرصودة:</label>
               <textarea
                 rows={3}
                 placeholder="اكتب التفاصيل..."
@@ -1967,7 +1967,7 @@ export default function CommitteeDashboard() {
                   warningStepType === 'warn-leaders' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
-                {warningStepType === 'warn-leaders' ? 'إرسال الإنذار 📨' : 'إحالة البلاغ ⚖️'}
+                {warningStepType === 'warn-leaders' ? 'إرسال التنبيه 📨' : 'إحالة البلاغ ⚖️'}
               </button>
             </div>
           </div>
