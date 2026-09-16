@@ -317,7 +317,7 @@ export default function Navbar() {
               href="/join" 
               className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#630517] font-black text-xs sm:text-sm shadow-lg hover:brightness-110 transition-all cursor-pointer"
             >
-              تقديم طلب الانضمام
+              الانضمام للنادي 
             </Link>
           </div>
 
@@ -334,7 +334,7 @@ export default function Navbar() {
               href="/join" 
               className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#F5D061] to-[#C99C21] text-[#630517] font-black text-[11px] shadow"
             >
-              تقديم الانضمام
+              الانضمام للنادي
             </Link>
 
             <button
