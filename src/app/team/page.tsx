@@ -1,24 +1,21 @@
-حدث ذي 
-import Hero from "./components/Hero";
-import About from "./components/home/About";
-import Statistics from "./components/home/Statistics";
-import LeadershipPreview from "./components/home/LeadershipPreview";
-import CommitteesPreview from "./components/home/CommitteesPreview";
-import EventsPreview from "./components/home/EventsPreview";
-import WhatsAppCommunity from "./components/home/WhatsAppCommunity";
-import Footer from "./components/Footer";
+import Hero from "../components/Hero";
+import About from "../components/home/About";
+import LeadershipPreview from "../components/home/LeadershipPreview";
+import CommitteesPreview from "../components/home/CommitteesPreview";
+import EventsPreview from "../components/home/EventsPreview";
+import WhatsAppCommunity from "../components/home/WhatsAppCommunity";
+import Footer from "../components/Footer";
 
-export default function Home() {
-  return (
-    <main>
-      <Hero />
-      <About />
-      <Statistics />
-      <LeadershipPreview />
-      <CommitteesPreview />
-      <EventsPreview />
-      <WhatsAppCommunity />
-      <Footer />
-    </main>
-  );
+export default function TeamPage() {
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-800">
+      <Hero />
+      <About />
+      <LeadershipPreview />
+      <CommitteesPreview />
+      <EventsPreview />
+      <WhatsAppCommunity />
+      <Footer />
+    </main>
+  );
 }
