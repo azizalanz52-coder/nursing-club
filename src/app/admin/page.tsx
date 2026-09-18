@@ -107,6 +107,7 @@ export default function AdminDashboard() {
   const router = useRouter();
   
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
+  const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates'>('requests');
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
@@ -157,6 +158,7 @@ export default function AdminDashboard() {
 
         if (phone === '0553731265' || adminAuth) {
           setIsSystemAdminUser(true);
+          setIsPresidentsRole(true);
           return;
         }
 
@@ -167,10 +169,15 @@ export default function AdminDashboard() {
           const userData = userSnap.data();
           const userRole = userData.role || 'عضو أساسي';
 
-          if (phone === '0553731265' || userRole === 'System Admin' || userRole === 'رئيس النادي' || userRole === 'نائبة الرئيس') {
+          if (userRole === 'رئيس النادي' || userRole === 'نائبة الرئيس') {
+            setIsPresidentsRole(true);
+            setIsSystemAdminUser(false); // لا يمتلك صلاحية تعديل رتب الحسابات الأساسية
+          } else if (phone === '0553731265' || userRole === 'System Admin') {
             setIsSystemAdminUser(true);
+            setIsPresidentsRole(true);
           } else {
             setIsSystemAdminUser(false);
+            setIsPresidentsRole(false);
             if (
               userRole !== 'رئيس النادي' && 
               userRole !== 'نائبة الرئيس' && 
