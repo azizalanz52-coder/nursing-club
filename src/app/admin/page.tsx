@@ -167,7 +167,7 @@ export default function AdminDashboard() {
           const userData = userSnap.data();
           const userRole = userData.role || 'عضو أساسي';
 
-          if (phone === '0553731265' || userRole === 'System Admin') {
+          if (phone === '0553731265' || userRole === 'System Admin' || userRole === 'رئيس النادي' || userRole === 'نائبة الرئيس') {
             setIsSystemAdminUser(true);
           } else {
             setIsSystemAdminUser(false);
@@ -383,7 +383,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // دالة ضغط الصور وتحويلها لـ Base64 لضمان عدم تعليق السحابة
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       if (file.type.startsWith('video/')) {
@@ -915,7 +914,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // تعديل وتأمين عملية رفع الفعالية مع مؤشر تحميل ومعالجة آمنة لضمان عدم توقف الزر
   const handleCreateNewDiscoverEvent = async (e: FormEvent) => {
     e.preventDefault();
     if (!newDiscTitle.trim() || isUploadingDiscover) return;
@@ -3462,7 +3460,7 @@ export default function AdminDashboard() {
             <div className="flex justify-end gap-3 pt-4">
               <button
                 type="button"
-                onClick={() => setShowAcceptModal, (false)}
+                onClick={() => setShowAcceptModal(false)}
                 className="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200"
               >
                 إلغاء
