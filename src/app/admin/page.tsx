@@ -815,7 +815,8 @@ export default function AdminDashboard() {
         const wb = XLSX.read(buffer, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
+        // استخدام sheet_to_json مع { raw: false } لضمان قراءة التواريخ والنصوص تماماً كما تظهر في ملف الأكسل
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false }) as any[];
 
         if (!data || data.length < 2) {
           setModalMessage('الملف فارغ أو لا يحتوي على البيانات المطلوبة.');
@@ -840,8 +841,8 @@ export default function AdminDashboard() {
         for (const row of rows) {
           if (!row || row.length === 0) continue;
 
-          // الأعمدة المتوقعة عادة في نماذج قوقل: [Timestamp, Name, Phone, UnivId, Major, 1st, 2nd, 3rd]
-          const submissionTimestamp = String(row[0] || new Date().toLocaleString()).trim();
+          // الأعمدة في أكسل قوقل فورم: [0: Timestamp, 1: FullName, 2: Phone, 3: UnivId, 4: Major, 5: 1st, 6: 2nd, 7: 3rd]
+          const rawTimestamp = String(row[0] || '').trim();
           const fullName = String(row[1] || '').trim(); 
           const phone = String(row[2] || '').trim();    
           const universityId = String(row[3] || '').trim(); 
@@ -868,7 +869,7 @@ export default function AdminDashboard() {
             secondChoice,
             thirdChoice,
             status: 'معلق',
-            submittedAt: submissionTimestamp || new Date().toISOString(),
+            submittedAt: rawTimestamp || new Date().toLocaleString('ar-SA'),
             importedAt: new Date().toISOString()
           };
 
@@ -878,7 +879,12 @@ export default function AdminDashboard() {
           addedCount++;
         }
 
-        setModalMessage(`تمت العملية بنجاح! 🚀\n- أُضيف جديد: ${addedCount}\n- تم تخطي المكرر: ${skippedCount}`);
+        // تحديث القائمة فوراً بعد الاستيراد
+        const updatedSnap = await getDocs(collection(db, 'applications'));
+        const fetchedRequests = updatedSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) as Record<string, any>[];
+        setRequests(fetchedRequests);
+
+        setModalMessage(`تمت عملية استيراد الأكسل بنجاح! 🚀\n- أُضيف جديد: ${addedCount}\n- تم تخطي المكرر: ${skippedCount}`);
         setModalType('success');
       } catch (err) {
         console.error('Error importing excel:', err);
@@ -1211,10 +1217,8 @@ export default function AdminDashboard() {
 
   const openAcceptModal = (reqId: string) => {
     setSelectedRequestId(reqId);
-    
     const defaultComm = committees.find(c => c.name === acceptedCommittee);
     setWhatsappLink(defaultComm?.whatsappLink || '');
-    
     setShowAcceptModal(true);
   };
 
@@ -3061,7 +3065,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {currentCommittee.members. امتلاك.map((m, idx) => (
+                      {currentCommittee.members.map((m, idx) => (
                         <tr key={idx} className="hover:bg-slate-50">
                           <td className="py-3 pr-2 font-bold text-slate-900">{m.name}</td>
                           <td className="py-3 text-slate-600">{m.role}</td>
@@ -3112,7 +3116,7 @@ export default function AdminDashboard() {
             <div className="bg-emerald-50 border-2 border-emerald-300 p-6 rounded-3xl flex items-center justify-between flex-wrap gap-4 shadow-sm">
               <div className="space-y-1">
                 <h4 className="font-black text-emerald-900 text-base">📥 استيراد بيانات المتقدمين من ملف الأكسل (بدون تكرار 🛡️)</h4>
-                <p className="text-xs text-emerald-700">ارفع ملف الردود لجلب جميع الطلاب الجدد فقط، والنظام سيتجاهل الأسماء والأرقام المكررة تلقائياً!</p>
+                <p className="text-xs text-emerald-700">ارفع ملف الردود لجلب جميع الطلاب الجدد وتاريخ التقديم الأصلي تماماً كما ورد في الأكسل!</p>
               </div>
               <input
                 type="file"
@@ -3209,7 +3213,7 @@ export default function AdminDashboard() {
                     <tr className="border-b border-slate-200 text-slate-400 font-bold">
                       <th className="pb-3 pr-2">اسم المتقدم</th>
                       <th className="pb-3">الرقم الجامعي / المستوى</th>
-                      <th className="pb-3">وقت التقديم (Timestamp) والتخرج</th>
+                      <th className="pb-3">وقت وتاريخ التقديم (من الأكسل)</th>
                       <th className="pb-3">الرغبات الثلاث</th>
                       <th className="pb-3">الحالة واللجنة</th>
                       <th className="pb-3 text-left pl-2">الإجراءات والتحويل</th>
@@ -3221,85 +3225,74 @@ export default function AdminDashboard() {
                         <td colSpan={6} className="py-8 text-center text-slate-400">لا توجد طلبات تطابق هذا البحث أو الفرز حالياً.</td>
                       </tr>
                     ) : (
-                      filteredRequests.map((req) => {
-                        // تحديد هل تخرج أم لا بناءً على المستوى أو النص
-                        const levelText = String(req.level || req.major || '').toLowerCase();
-                        const isGraduated = levelText.includes('تخرج') || levelText.includes('امتياز') || levelText.includes('الثامن') || levelText.includes('السابع') || levelText.includes('خريج');
-
-                        return (
-                          <tr key={req.id} className="hover:bg-slate-50">
-                            <td className="py-4 pr-2 font-bold text-slate-900">
-                              {req.fullName}
-                              <div className="text-[10px] text-slate-500 font-normal">📞 {req.phone}</div>
-                            </td>
-                            <td className="py-4 text-slate-600">
-                              {req.universityId || '-'} <br />
-                              <span className="text-[10px] text-slate-400">{req.major}</span>
-                            </td>
-                            <td className="py-4 text-slate-700">
-                              <span className="font-mono text-[11px] bg-slate-100 px-2.5 py-1 rounded-lg block w-fit font-bold text-slate-800" dir="ltr">
-                                🕒 {req.submittedAt || req.importedAt || 'غير متوفر'}
+                      filteredRequests.map((req) => (
+                        <tr key={req.id} className="hover:bg-slate-50">
+                          <td className="py-4 pr-2 font-bold text-slate-900">
+                            {req.fullName}
+                            <div className="text-[10px] text-slate-500 font-normal">📞 {req.phone}</div>
+                          </td>
+                          <td className="py-4 text-slate-600">
+                            {req.universityId || '-'} <br />
+                            <span className="text-[10px] text-slate-400">{req.major}</span>
+                          </td>
+                          <td className="py-4 text-slate-700">
+                            <span className="font-mono text-[11px] bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-lg block w-fit font-bold" dir="ltr">
+                              🕒 {req.submittedAt || req.importedAt || 'غير متوفر'}
+                            </span>
+                          </td>
+                          <td className="py-4 text-slate-700">
+                            <div className="space-y-0.5 text-[11px]">
+                              <p><strong className="text-[#630517]">1:</strong> {req.firstChoice || '-'}</p>
+                              <p><strong className="text-slate-400">2:</strong> {req.secondChoice || '-'}</p>
+                              <p><strong className="text-slate-400">3:</strong> {req.thirdChoice || '-'}</p>
+                            </div>
+                          </td>
+                          <td className="py-4">
+                            <span className={`px-2.5 py-1 rounded-full font-bold border block w-fit mb-1 ${
+                              req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                              req.status === 'مرفوض' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
+                              {req.status || 'معلق'}
+                            </span>
+                            {req.acceptedCommittee && (
+                              <span className="text-[10px] font-bold text-[#630517] bg-[#630517]/10 px-2 py-0.5 rounded-md">
+                                مقبول في: {req.acceptedCommittee}
                               </span>
-                              <div className="mt-1">
-                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold inline-block ${isGraduated ? 'bg-amber-100 text-amber-900' : 'bg-indigo-50 text-indigo-700'}`}>
-                                  {isGraduated ? '🎓 متخرج / مستوى متقدم' : '📚 منتظم في الدراسة'}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-4 text-slate-700">
-                              <div className="space-y-0.5 text-[11px]">
-                                <p><strong className="text-[#630517]">1:</strong> {req.firstChoice || '-'}</p>
-                                <p><strong className="text-slate-400">2:</strong> {req.secondChoice || '-'}</p>
-                                <p><strong className="text-slate-400">3:</strong> {req.thirdChoice || '-'}</p>
-                              </div>
-                            </td>
-                            <td className="py-4">
-                              <span className={`px-2.5 py-1 rounded-full font-bold border block w-fit mb-1 ${
-                                req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
-                                req.status === 'مرفوض' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                              }`}>
-                                {req.status || 'معلق'}
-                              </span>
-                              {req.acceptedCommittee && (
-                                <span className="text-[10px] font-bold text-[#630517] bg-[#630517]/10 px-2 py-0.5 rounded-md">
-                                  مقبول في: {req.acceptedCommittee}
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-4 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
-                              <button
-                                type="button"
-                                onClick={() => openManualShiftModal(req)}
-                                className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
-                                title="تحديد وتحويل رغبة الطالب يدويّاً"
-                              >
-                                🔄 تحويل لرغبة أخرى
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openAcceptModal(req.id)}
-                                className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
-                              >
-                                قبول ✅
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRejectRequest(req.id)}
-                                className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer"
-                              >
-                                رفض ✕
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteRequest(req.id)}
-                                className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
-                              >
-                                {req.status === 'مقبول' ? 'إزالة (طرد) 🗑️' : 'حذف نهائي 🗑️'}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
+                            )}
+                          </td>
+                          <td className="py-4 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => openManualShiftModal(req)}
+                              className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
+                              title="تحديد وتحويل رغبة الطالب يدويّاً"
+                            >
+                              🔄 تحويل لرغبة أخرى
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openAcceptModal(req.id)}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
+                            >
+                              قبول ✅
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectRequest(req.id)}
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer"
+                            >
+                              رفض ✕
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRequest(req.id)}
+                              className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                            >
+                              {req.status === 'مقبول' ? 'إزالة (طرد) 🗑️' : 'حذف نهائي 🗑️'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>
