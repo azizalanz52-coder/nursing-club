@@ -840,6 +840,8 @@ export default function AdminDashboard() {
         for (const row of rows) {
           if (!row || row.length === 0) continue;
 
+          // الأعمدة المتوقعة عادة في نماذج قوقل: [Timestamp, Name, Phone, UnivId, Major, 1st, 2nd, 3rd]
+          const submissionTimestamp = String(row[0] || new Date().toLocaleString()).trim();
           const fullName = String(row[1] || '').trim(); 
           const phone = String(row[2] || '').trim();    
           const universityId = String(row[3] || '').trim(); 
@@ -866,6 +868,7 @@ export default function AdminDashboard() {
             secondChoice,
             thirdChoice,
             status: 'معلق',
+            submittedAt: submissionTimestamp || new Date().toISOString(),
             importedAt: new Date().toISOString()
           };
 
@@ -1209,7 +1212,6 @@ export default function AdminDashboard() {
   const openAcceptModal = (reqId: string) => {
     setSelectedRequestId(reqId);
     
-    // جلب رابط الواتساب التلقائي للجنة الافتراضية الأولى
     const defaultComm = committees.find(c => c.name === acceptedCommittee);
     setWhatsappLink(defaultComm?.whatsappLink || '');
     
@@ -1313,7 +1315,6 @@ export default function AdminDashboard() {
     });
   };
 
-  // Open manual shift modal
   const openManualShiftModal = (req: Record<string, any>) => {
     setSelectedReqForShift(req);
     setTargetShiftCommittee(req.firstChoice || 'لجنة التصميم');
@@ -1441,9 +1442,7 @@ export default function AdminDashboard() {
     return requests.filter(r => matchesCommittee(r[prefKey], commName)).length;
   };
 
-  // Filter and Alphabetically sort requests
   const filteredRequests = requests.filter(req => {
-    // Sub-tab filter
     let matchesSubTab = true;
     if (requestSubTab === 'accepted') matchesSubTab = req.status === 'مقبول';
     else if (requestSubTab === 'pref-1') matchesSubTab = matchesCommittee(req.firstChoice, selectedCommitteeFilter);
@@ -1452,7 +1451,6 @@ export default function AdminDashboard() {
 
     if (!matchesSubTab) return false;
 
-    // Search query filter (Name or Phone)
     if (requestSearchQuery.trim()) {
       const q = requestSearchQuery.trim().toLowerCase();
       const name = (req.fullName || '').toLowerCase();
@@ -1463,7 +1461,6 @@ export default function AdminDashboard() {
 
     return true;
   }).sort((a, b) => {
-    // Alphabetical sort by full name
     const nameA = (a.fullName || '').trim();
     const nameB = (b.fullName || '').trim();
     return nameA.localeCompare(nameB, 'ar');
@@ -1519,7 +1516,6 @@ export default function AdminDashboard() {
         </div>
 
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
-          {/* صلاحية المشرف الأساسي والرئيس ونائبته */}
           {(isSystemAdminUser || isPresidentsRole) && (
             <button
               type="button"
@@ -2235,7 +2231,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* تبويب الحسابات: يظهر للمشرف الأساسي أو رئيس النادي ونائبته */}
         {activeTab === 'users-manager' && (isSystemAdminUser || isPresidentsRole) && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
@@ -3066,7 +3061,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {currentCommittee.members.map((m, idx) => (
+                      {currentCommittee.members. امتلاك.map((m, idx) => (
                         <tr key={idx} className="hover:bg-slate-50">
                           <td className="py-3 pr-2 font-bold text-slate-900">{m.name}</td>
                           <td className="py-3 text-slate-600">{m.role}</td>
@@ -3182,7 +3177,6 @@ export default function AdminDashboard() {
               </div>
 
               <div className="flex items-center gap-3 flex-wrap">
-                {/* Search Bar for requests */}
                 <input
                   type="text"
                   placeholder="🔍 ابحث بالاسم أو رقم الجوال..."
@@ -3215,6 +3209,7 @@ export default function AdminDashboard() {
                     <tr className="border-b border-slate-200 text-slate-400 font-bold">
                       <th className="pb-3 pr-2">اسم المتقدم</th>
                       <th className="pb-3">الرقم الجامعي / المستوى</th>
+                      <th className="pb-3">وقت التقديم (Timestamp) والتخرج</th>
                       <th className="pb-3">الرغبات الثلاث</th>
                       <th className="pb-3">الحالة واللجنة</th>
                       <th className="pb-3 text-left pl-2">الإجراءات والتحويل</th>
@@ -3223,72 +3218,88 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-slate-100">
                     {filteredRequests.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات تطابق هذا البحث أو الفرز حالياً.</td>
+                        <td colSpan={6} className="py-8 text-center text-slate-400">لا توجد طلبات تطابق هذا البحث أو الفرز حالياً.</td>
                       </tr>
                     ) : (
-                      filteredRequests.map((req) => (
-                        <tr key={req.id} className="hover:bg-slate-50">
-                          <td className="py-4 pr-2 font-bold text-slate-900">
-                            {req.fullName}
-                            <div className="text-[10px] text-slate-500 font-normal">📞 {req.phone}</div>
-                          </td>
-                          <td className="py-4 text-slate-600">
-                            {req.universityId || '-'} <br />
-                            <span className="text-[10px] text-slate-400">{req.major}</span>
-                          </td>
-                          <td className="py-4 text-slate-700">
-                            <div className="space-y-0.5 text-[11px]">
-                              <p><strong className="text-[#630517]">1:</strong> {req.firstChoice || '-'}</p>
-                              <p><strong className="text-slate-400">2:</strong> {req.secondChoice || '-'}</p>
-                              <p><strong className="text-slate-400">3:</strong> {req.thirdChoice || '-'}</p>
-                            </div>
-                          </td>
-                          <td className="py-4">
-                            <span className={`px-2.5 py-1 rounded-full font-bold border block w-fit mb-1 ${
-                              req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
-                              req.status === 'مرفوض' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}>
-                              {req.status || 'معلق'}
-                            </span>
-                            {req.acceptedCommittee && (
-                              <span className="text-[10px] font-bold text-[#630517] bg-[#630517]/10 px-2 py-0.5 rounded-md">
-                                مقبول في: {req.acceptedCommittee}
+                      filteredRequests.map((req) => {
+                        // تحديد هل تخرج أم لا بناءً على المستوى أو النص
+                        const levelText = String(req.level || req.major || '').toLowerCase();
+                        const isGraduated = levelText.includes('تخرج') || levelText.includes('امتياز') || levelText.includes('الثامن') || levelText.includes('السابع') || levelText.includes('خريج');
+
+                        return (
+                          <tr key={req.id} className="hover:bg-slate-50">
+                            <td className="py-4 pr-2 font-bold text-slate-900">
+                              {req.fullName}
+                              <div className="text-[10px] text-slate-500 font-normal">📞 {req.phone}</div>
+                            </td>
+                            <td className="py-4 text-slate-600">
+                              {req.universityId || '-'} <br />
+                              <span className="text-[10px] text-slate-400">{req.major}</span>
+                            </td>
+                            <td className="py-4 text-slate-700">
+                              <span className="font-mono text-[11px] bg-slate-100 px-2.5 py-1 rounded-lg block w-fit font-bold text-slate-800" dir="ltr">
+                                🕒 {req.submittedAt || req.importedAt || 'غير متوفر'}
                               </span>
-                            )}
-                          </td>
-                          <td className="py-4 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => openManualShiftModal(req)}
-                              className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
-                              title="تحديد وتحويل رغبة الطالب يدويّاً"
-                            >
-                              🔄 تحويل لرغبة أخرى
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openAcceptModal(req.id)}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
-                            >
-                              قبول ✅
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRejectRequest(req.id)}
-                              className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer"
-                            >
-                              رفض ✕
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteRequest(req.id)}
-                              className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
-                            >
-                              {req.status === 'مقبول' ? 'إزالة (طرد) 🗑️' : 'حذف نهائي 🗑️'}
-                            </button>
-                          </td>
-                        </tr>
-                      ))
+                              <div className="mt-1">
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold inline-block ${isGraduated ? 'bg-amber-100 text-amber-900' : 'bg-indigo-50 text-indigo-700'}`}>
+                                  {isGraduated ? '🎓 متخرج / مستوى متقدم' : '📚 منتظم في الدراسة'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-4 text-slate-700">
+                              <div className="space-y-0.5 text-[11px]">
+                                <p><strong className="text-[#630517]">1:</strong> {req.firstChoice || '-'}</p>
+                                <p><strong className="text-slate-400">2:</strong> {req.secondChoice || '-'}</p>
+                                <p><strong className="text-slate-400">3:</strong> {req.thirdChoice || '-'}</p>
+                              </div>
+                            </td>
+                            <td className="py-4">
+                              <span className={`px-2.5 py-1 rounded-full font-bold border block w-fit mb-1 ${
+                                req.status === 'مقبول' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                                req.status === 'مرفوض' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}>
+                                {req.status || 'معلق'}
+                              </span>
+                              {req.acceptedCommittee && (
+                                <span className="text-[10px] font-bold text-[#630517] bg-[#630517]/10 px-2 py-0.5 rounded-md">
+                                  مقبول في: {req.acceptedCommittee}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-4 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => openManualShiftModal(req)}
+                                className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
+                                title="تحديد وتحويل رغبة الطالب يدويّاً"
+                              >
+                                🔄 تحويل لرغبة أخرى
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openAcceptModal(req.id)}
+                                className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer"
+                              >
+                                قبول ✅
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectRequest(req.id)}
+                                className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer"
+                              >
+                                رفض ✕
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRequest(req.id)}
+                                className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                              >
+                                {req.status === 'مقبول' ? 'إزالة (طرد) 🗑️' : 'حذف نهائي 🗑️'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -3299,7 +3310,6 @@ export default function AdminDashboard() {
 
       </div>
 
-      {/* Manual Shift Preference Modal */}
       {showShiftModal && selectedReqForShift && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-sky-400">
