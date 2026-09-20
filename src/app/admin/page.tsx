@@ -139,6 +139,14 @@ export default function AdminDashboard() {
   const [modalInputVal, setModalInputVal] = useState<string>('');
   const [confirmActionCallback, setConfirmActionCallback] = useState<(() => void) | null>(null);
 
+  // States for Manual Shift Preference Modal
+  const [showShiftModal, setShowShiftModal] = useState<boolean>(false);
+  const [selectedReqForShift, setSelectedReqForShift] = useState<Record<string, any> | null>(null);
+  const [targetShiftCommittee, setTargetShiftCommittee] = useState<string>('لجنة التصميم');
+
+  // Search filter for requests
+  const [requestSearchQuery, setRequestSearchQuery] = useState<string>('');
+
   const togglePasswordVisibility = (phone: string) => {
     setShowPasswords((prev) => ({
       ...prev,
@@ -1305,27 +1313,30 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleShiftPreference = async (req: Record<string, any>) => {
-    const f1 = req.firstChoice || '';
-    const f2 = req.secondChoice || '';
-    const f3 = req.thirdChoice || '';
+  // Open manual shift modal
+  const openManualShiftModal = (req: Record<string, any>) => {
+    setSelectedReqForShift(req);
+    setTargetShiftCommittee(req.firstChoice || 'لجنة التصميم');
+    setShowShiftModal(true);
+  };
+
+  const handleConfirmManualShift = async () => {
+    if (!selectedReqForShift) return;
 
     const updatedObj = {
-      ...req,
-      firstChoice: f2 || f3 || f1,
-      secondChoice: f3 || f1 || f2,
-      thirdChoice: f1 || f2 || f3
+      ...selectedReqForShift,
+      firstChoice: targetShiftCommittee
     };
 
     try {
-      const docRef = doc(db, 'applications', req.id);
+      const docRef = doc(db, 'applications', selectedReqForShift.id);
       await updateDoc(docRef, {
-        firstChoice: updatedObj.firstChoice,
-        secondChoice: updatedObj.secondChoice,
-        thirdChoice: updatedObj.thirdChoice
+        firstChoice: targetShiftCommittee
       });
-      setRequests(requests.map(r => r.id === req.id ? updatedObj : r));
-      setModalMessage('تم تحويل الطالب إلى رغبته التالية بنجاح سحابياً! 🔄');
+      setRequests(requests.map(r => r.id === selectedReqForShift.id ? updatedObj : r));
+      setShowShiftModal(false);
+      setSelectedReqForShift(null);
+      setModalMessage(`تم تحويل رغبة الطالب إلى (${targetShiftCommittee}) بنجاح سحابياً! 🔄`);
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -1430,18 +1441,32 @@ export default function AdminDashboard() {
     return requests.filter(r => matchesCommittee(r[prefKey], commName)).length;
   };
 
+  // Filter and Alphabetically sort requests
   const filteredRequests = requests.filter(req => {
-    if (requestSubTab === 'accepted') return req.status === 'مقبول';
-    if (requestSubTab === 'pref-1') {
-      return matchesCommittee(req.firstChoice, selectedCommitteeFilter);
+    // Sub-tab filter
+    let matchesSubTab = true;
+    if (requestSubTab === 'accepted') matchesSubTab = req.status === 'مقبول';
+    else if (requestSubTab === 'pref-1') matchesSubTab = matchesCommittee(req.firstChoice, selectedCommitteeFilter);
+    else if (requestSubTab === 'pref-2') matchesSubTab = matchesCommittee(req.secondChoice, selectedCommitteeFilter);
+    else if (requestSubTab === 'pref-3') matchesSubTab = matchesCommittee(req.thirdChoice, selectedCommitteeFilter);
+
+    if (!matchesSubTab) return false;
+
+    // Search query filter (Name or Phone)
+    if (requestSearchQuery.trim()) {
+      const q = requestSearchQuery.trim().toLowerCase();
+      const name = (req.fullName || '').toLowerCase();
+      const phone = (req.phone || '').toLowerCase();
+      const univId = (req.universityId || '').toLowerCase();
+      return name.includes(q) || phone.includes(q) || univId.includes(q);
     }
-    if (requestSubTab === 'pref-2') {
-      return matchesCommittee(req.secondChoice, selectedCommitteeFilter);
-    }
-    if (requestSubTab === 'pref-3') {
-      return matchesCommittee(req.thirdChoice, selectedCommitteeFilter);
-    }
-    return true; 
+
+    return true;
+  }).sort((a, b) => {
+    // Alphabetical sort by full name
+    const nameA = (a.fullName || '').trim();
+    const nameB = (b.fullName || '').trim();
+    return nameA.localeCompare(nameB, 'ar');
   });
 
   return (
@@ -1494,7 +1519,8 @@ export default function AdminDashboard() {
         </div>
 
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
-          {isSystemAdminUser && (
+          {/* صلاحية المشرف الأساسي والرئيس ونائبته */}
+          {(isSystemAdminUser || isPresidentsRole) && (
             <button
               type="button"
               onClick={() => setActiveTab('users-manager')}
@@ -2209,10 +2235,11 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === 'users-manager' && isSystemAdminUser && (
+        {/* تبويب الحسابات: يظهر للمشرف الأساسي أو رئيس النادي ونائبته */}
+        {activeTab === 'users-manager' && (isSystemAdminUser || isPresidentsRole) && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4">
-              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، الأسماء، كلمات المرور، والرتب (خاص بالمشرف الأساسي 🛡️)</h3>
+              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، الأسماء، كلمات المرور، والرتب (خاص بالإدارة ورئاسة النادي 🛡️)</h3>
               <p className="text-xs text-slate-500">يمكنك تعديل اسم المستخدم، رقم الجوال، كلمة المرور، أو الرتبة وتحديثها سحابياً في أي وقت.</p>
             </div>
             
@@ -3154,22 +3181,33 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              {(requestSubTab === 'pref-1' || requestSubTab === 'pref-2' || requestSubTab === 'pref-3') && (
-                <select
-                  value={selectedCommitteeFilter}
-                  onChange={(e) => setSelectedCommitteeFilter(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-900"
-                >
-                  {committeeNamesList.map((c, i) => (
-                    <option key={i} value={c}>{c}</option>
-                  ))}
-                </select>
-              )}
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Search Bar for requests */}
+                <input
+                  type="text"
+                  placeholder="🔍 ابحث بالاسم أو رقم الجوال..."
+                  value={requestSearchQuery}
+                  onChange={(e) => setRequestSearchQuery(e.target.value)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50 focus:outline-none focus:border-[#630517] w-60"
+                />
+
+                {(requestSubTab === 'pref-1' || requestSubTab === 'pref-2' || requestSubTab === 'pref-3') && (
+                  <select
+                    value={selectedCommitteeFilter}
+                    onChange={(e) => setSelectedCommitteeFilter(e.target.value)}
+                    className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-900"
+                  >
+                    {committeeNamesList.map((c, i) => (
+                      <option key={i} value={c}>{c}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h3 className="text-xl font-black text-slate-900">
-                {requestSubTab === 'accepted' ? 'قائمة الأعضاء المقبولين وإدارتهم' : 'طلبات انضمام الأعضاء'} ({filteredRequests.length})
+                {requestSubTab === 'accepted' ? 'قائمة الأعضاء المقبولين وإدارتهم' : 'طلبات انضمام الأعضاء (مرتبة أبجدياً 🔤)'} ({filteredRequests.length})
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs">
@@ -3185,7 +3223,7 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-slate-100">
                     {filteredRequests.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات تطابق هذا الفرز حالياً.</td>
+                        <td colSpan={5} className="py-8 text-center text-slate-400">لا توجد طلبات تطابق هذا البحث أو الفرز حالياً.</td>
                       </tr>
                     ) : (
                       filteredRequests.map((req) => (
@@ -3221,9 +3259,9 @@ export default function AdminDashboard() {
                           <td className="py-4 text-left pl-2 flex gap-1.5 justify-end flex-wrap">
                             <button
                               type="button"
-                              onClick={() => handleShiftPreference(req)}
+                              onClick={() => openManualShiftModal(req)}
                               className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
-                              title="تحويل الطالب لرغبته التالية"
+                              title="تحديد وتحويل رغبة الطالب يدويّاً"
                             >
                               🔄 تحويل لرغبة أخرى
                             </button>
@@ -3260,6 +3298,51 @@ export default function AdminDashboard() {
         )}
 
       </div>
+
+      {/* Manual Shift Preference Modal */}
+      {showShiftModal && selectedReqForShift && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-sky-400">
+            <div className="w-16 h-16 bg-sky-600 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              🔄
+            </div>
+            <div className="space-y-2 text-center">
+              <h3 className="text-xl font-black text-slate-900">تحديد ورغبة الطالب يدويّاً</h3>
+              <p className="text-xs text-slate-500">اختر اللجنة الجديدة للمتقدم <span className="font-bold text-slate-800">{selectedReqForShift.fullName}</span>:</p>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700">اختر اللجنة المطلوبة:</label>
+              <select
+                value={targetShiftCommittee}
+                onChange={(e) => setTargetShiftCommittee(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-sky-600"
+              >
+                {committeeNamesList.map((c, idx) => (
+                  <option key={idx} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowShiftModal(false)}
+                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmManualShift}
+                className="w-1/2 py-3 rounded-xl bg-sky-600 text-white font-black text-xs shadow hover:bg-sky-700 cursor-pointer"
+              >
+                حفظ وتحويل الرغبة 🚀
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showWarningModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
