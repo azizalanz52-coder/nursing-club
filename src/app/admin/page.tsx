@@ -68,6 +68,7 @@ interface Committee {
   name: string;
   maleLeader: string;
   femaleLeader: string;
+  whatsappLink?: string;
   members: CommitteeMember[];
 }
 
@@ -171,7 +172,7 @@ export default function AdminDashboard() {
 
           if (userRole === 'رئيس النادي' || userRole === 'نائبة الرئيس') {
             setIsPresidentsRole(true);
-            setIsSystemAdminUser(false); // لا يمتلك صلاحية تعديل رتب الحسابات الأساسية
+            setIsSystemAdminUser(false);
           } else if (phone === '0553731265' || userRole === 'System Admin') {
             setIsSystemAdminUser(true);
             setIsPresidentsRole(true);
@@ -485,13 +486,13 @@ export default function AdminDashboard() {
   const [selectedCommitteeFilter, setSelectedCommitteeFilter] = useState<string>('لجنة التصميم');
 
   const [committees, setCommittees] = useState<Committee[]>([
-    { id: 'design', name: 'لجنة التصميم', maleLeader: 'عبدالرحمن الشهري', femaleLeader: 'شجون الحربي', members: [] },
-    { id: 'media', name: 'لجنة الإعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', members: [] },
-    { id: 'events-org', name: 'لجنة تنظيم الفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', members: [] },
-    { id: 'hr', name: 'لجنة الموارد البشرية', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي', members: [] },
-    { id: 'pr', name: 'لجنة العلاقات العامة', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي', members: [] },
-    { id: 'scientific', name: 'لجنة المحتوى العلمي', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي', members: [] },
-    { id: 'quality', name: 'لجنة الجودة والتطوير', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري', members: [] },
+    { id: 'design', name: 'لجنة التصميم', maleLeader: 'عبدالرحمن الشهري', femaleLeader: 'شجون الحربي', whatsappLink: '', members: [] },
+    { id: 'media', name: 'لجنة الإعلام', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري', whatsappLink: '', members: [] },
+    { id: 'events-org', name: 'لجنة تنظيم الفعاليات', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري', whatsappLink: '', members: [] },
+    { id: 'hr', name: 'لجنة الموارد البشرية', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي', whatsappLink: '', members: [] },
+    { id: 'pr', name: 'لجنة العلاقات العامة', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي', whatsappLink: '', members: [] },
+    { id: 'scientific', name: 'لجنة المحتوى العلمي', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي', whatsappLink: '', members: [] },
+    { id: 'quality', name: 'لجنة الجودة والتطوير', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري', whatsappLink: '', members: [] },
   ]);
 
   const [selectedCommitteeId, setSelectedCommitteeId] = useState<string>('design');
@@ -1199,7 +1200,18 @@ export default function AdminDashboard() {
 
   const openAcceptModal = (reqId: string) => {
     setSelectedRequestId(reqId);
+    
+    // جلب رابط الواتساب التلقائي للجنة الافتراضية الأولى
+    const defaultComm = committees.find(c => c.name === acceptedCommittee);
+    setWhatsappLink(defaultComm?.whatsappLink || '');
+    
     setShowAcceptModal(true);
+  };
+
+  const handleCommitteeSelectChange = (newCommName: string) => {
+    setAcceptedCommittee(newCommName);
+    const matchedComm = committees.find(c => c.name === newCommName);
+    setWhatsappLink(matchedComm?.whatsappLink || '');
   };
 
   const handleConfirmAcceptRequest = async () => {
@@ -1240,12 +1252,14 @@ export default function AdminDashboard() {
       let existingMembers: CommitteeMember[] = [];
       let maleLeader = 'قائد الطلاب';
       let femaleLeader = 'قائدة الطالبات';
+      let existingWhatsapp = '';
 
       if (commSnap.exists()) {
         const commData = commSnap.data();
         existingMembers = commData.members || [];
         maleLeader = commData.maleLeader || maleLeader;
         femaleLeader = commData.femaleLeader || femaleLeader;
+        existingWhatsapp = commData.whatsappLink || '';
       }
 
       const newMemberObj: CommitteeMember = {
@@ -1260,6 +1274,7 @@ export default function AdminDashboard() {
       await setDoc(commDocRef, {
         maleLeader,
         femaleLeader,
+        whatsappLink: existingWhatsapp,
         members: updatedMembers
       }, { merge: true });
 
@@ -1338,9 +1353,10 @@ export default function AdminDashboard() {
       await setDoc(doc(db, 'committees', selectedCommitteeId), {
         maleLeader: currentCommittee.maleLeader,
         femaleLeader: currentCommittee.femaleLeader,
+        whatsappLink: currentCommittee.whatsappLink || '',
         members: currentCommittee.members || []
       }, { merge: true });
-      setModalMessage(`تم حفظ وتحديث قادة "${currentCommittee.name}" بنجاح سحابياً! ✨`);
+      setModalMessage(`تم حفظ وتحديث قادة ورابط واتساب "${currentCommittee.name}" بنجاح سحابياً! ✨`);
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -1360,6 +1376,7 @@ export default function AdminDashboard() {
       await setDoc(doc(db, 'committees', selectedCommitteeId), {
         maleLeader: currentCommittee.maleLeader,
         femaleLeader: currentCommittee.femaleLeader,
+        whatsappLink: currentCommittee.whatsappLink || '',
         members: updatedMembers
       }, { merge: true });
       setModalMessage('تم إضافة العضو بنجاح سحابياً! 👥');
@@ -1380,6 +1397,7 @@ export default function AdminDashboard() {
         await setDoc(doc(db, 'committees', selectedCommitteeId), {
           maleLeader: currentCommittee.maleLeader,
           femaleLeader: currentCommittee.femaleLeader,
+          whatsappLink: currentCommittee.whatsappLink || '',
           members: updatedMembers
         }, { merge: true });
         setModalMessage('تم الحذف بنجاح.');
@@ -2920,7 +2938,7 @@ export default function AdminDashboard() {
         {activeTab === 'team' && (
           <div className="space-y-6">
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-base font-extrabold text-slate-900">اختر اللجنة لتعديل قادتها وأعضائها</h3>
+              <h3 className="text-base font-extrabold text-slate-900">اختر اللجنة لتعديل قادتها ورابط قروب الواتساب الخاص بها</h3>
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'design', name: 'لجنة التصميم' },
@@ -2947,7 +2965,7 @@ export default function AdminDashboard() {
 
             <form onSubmit={handleSaveLeadersSubmit} className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                <h3 className="text-xl font-black text-slate-900">إدارة قادة {currentCommittee.name}</h3>
+                <h3 className="text-xl font-black text-slate-900">إدارة قادة ورابط واتساب {currentCommittee.name}</h3>
                 <span className="text-xs bg-[#630517]/10 text-[#630517] font-bold px-3 py-1 rounded-full">
                   {(currentCommittee.members || []).length} أعضاء
                 </span>
@@ -2978,6 +2996,22 @@ export default function AdminDashboard() {
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-emerald-700">🔗 رابط قروب الواتساب التلقائي لهذه اللجنة</label>
+                  <input
+                    type="text"
+                    placeholder="https://chat.whatsapp.com/..."
+                    value={currentCommittee.whatsappLink || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, whatsappLink: val } : c));
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/30 text-xs text-slate-900 focus:outline-none focus:border-emerald-600 font-mono"
+                    dir="ltr"
+                  />
+                  <span className="block text-[11px] text-slate-500">عند قبول أي طالب في هذه اللجنة، سيتم وضع هذا الرابط تلقائياً في رسالة القبول والإشعار بدون كتابته يدوياً! ✨</span>
+                </div>
               </div>
 
               <div>
@@ -2985,7 +3019,7 @@ export default function AdminDashboard() {
                   type="submit"
                   className="bg-[#630517] text-[#F5D061] px-6 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 transition-all cursor-pointer"
                 >
-                  💾 حفظ وتحديث قادة اللجنة
+                  💾 حفظ وتحديث بيانات ورابط اللجنة
                 </button>
               </div>
             </form>
@@ -3431,14 +3465,14 @@ export default function AdminDashboard() {
       {showAcceptModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-black text-slate-900 border-b border-slate-100 pb-3">إتمام قبول العضو</h3>
+            <h3 className="text-xl font-black text-slate-900 border-b border-slate-100 pb-3">تأكيد القبول في {acceptedCommittee}</h3>
             
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-600">تم القبول في لجنة:</label>
                 <select
                   value={acceptedCommittee}
-                  onChange={(e) => setAcceptedCommittee(e.target.value)}
+                  onChange={(e) => handleCommitteeSelectChange(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 bg-white"
                 >
                   <option value="لجنة التصميم">لجنة التصميم</option>
@@ -3452,15 +3486,16 @@ export default function AdminDashboard() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600">رابط الانضمام لقروب اللجنة (واتساب):</label>
+                <label className="text-xs font-bold text-emerald-700">🔗 رابط قروب الواتساب (مُجلب تلقائياً من إعدادات اللجنة ✨):</label>
                 <input
                   type="text"
-                  placeholder="https://chat.whatsapp.com/..."
+                  placeholder="لم يتم إضافته في إعدادات اللجنة بعد..."
                   value={whatsappLink}
                   onChange={(e) => setWhatsappLink(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-[#630517]"
+                  className="w-full px-4 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm text-slate-900 font-mono focus:outline-none focus:border-emerald-600"
                   dir="ltr"
                 />
+                <span className="block text-[10px] text-slate-400">يمكنك تعديله أو إضافة رابط جديد من تبويب "القادة والأعضاء" لكل لجنة.</span>
               </div>
             </div>
 
@@ -3477,7 +3512,7 @@ export default function AdminDashboard() {
                 onClick={handleConfirmAcceptRequest}
                 className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black hover:bg-emerald-700 shadow-lg cursor-pointer"
               >
-                تأكيد القبول وإرسال الرابط
+                تأكيد القبول وإرسال الرابط ✅
               </button>
             </div>
           </div>
