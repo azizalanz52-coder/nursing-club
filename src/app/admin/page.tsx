@@ -109,7 +109,7 @@ export default function AdminDashboard() {
   
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates'>('requests');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates'>('team');
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
@@ -122,7 +122,6 @@ export default function AdminDashboard() {
   const [achievementDescInput, setAchievementDescInput] = useState<string>('');
   const [studentImageInput, setStudentImageInput] = useState<string>('/logo.png');
 
-  // Certificates States with Phone & Password
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
   const [editingCertId, setEditingCertId] = useState<string | null>(null);
   const [certRecipientInput, setCertRecipientInput] = useState<string>('');
@@ -139,12 +138,10 @@ export default function AdminDashboard() {
   const [modalInputVal, setModalInputVal] = useState<string>('');
   const [confirmActionCallback, setConfirmActionCallback] = useState<(() => void) | null>(null);
 
-  // States for Manual Shift Preference Modal
   const [showShiftModal, setShowShiftModal] = useState<boolean>(false);
   const [selectedReqForShift, setSelectedReqForShift] = useState<Record<string, any> | null>(null);
   const [targetShiftCommittee, setTargetShiftCommittee] = useState<string>('لجنة التصميم');
 
-  // Search filter for requests
   const [requestSearchQuery, setRequestSearchQuery] = useState<string>('');
 
   const togglePasswordVisibility = (phone: string) => {
@@ -758,7 +755,7 @@ export default function AdminDashboard() {
   };
 
   const handleEscalateToPresidentsFinal = async (rep: any) => {
-    triggerConfirmModal(`هل أنت متأكد من عدم تجاوب قائد وقائدة (${rep.targetCommittee}) وترغب في رفع البلاغ وإحالته رسمياً لرئيس ونائبة الرئيس الآن وأرشفته؟`, async () => {
+    triggerConfirmModal(`هل أنت متأكد من عدم تجاوب قائد وقائدة (${rep.targetCommittee}) وترغب في رفع البلاغ وإحالتته رسمياً لرئيس ونائبة الرئيس الآن وأرشفته؟`, async () => {
       try {
         const repRef = doc(db, 'escalated_reports', rep.id);
         const finalStatus = 'مُحال رسمياً لرئيس ونائبة الرئيس (لعدم التجاوب 🚨)';
@@ -2961,7 +2958,7 @@ export default function AdminDashboard() {
         {activeTab === 'team' && (
           <div className="space-y-6">
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-base font-extrabold text-slate-900">اختر اللجنة لتعديل قادتها ورابط قروب الواتساب الخاص بها</h3>
+              <h3 className="text-base font-extrabold text-slate-900">اختر اللجنة لتعديل قادتها ورابط قروب الواتساب الخاص بها والأعضاء المنضمين</h3>
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'design', name: 'لجنة التصميم' },
@@ -2990,7 +2987,8 @@ export default function AdminDashboard() {
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
                 <h3 className="text-xl font-black text-slate-900">إدارة قادة ورابط واتساب {currentCommittee.name}</h3>
                 <span className="text-xs bg-[#630517]/10 text-[#630517] font-bold px-3 py-1 rounded-full">
-                  {(currentCommittee.members || []).length} أعضاء
+                  {/* دمج الأعضاء اليدويين مع الطلاب المقبولين في هذه اللجنة تلقائياً */}
+                  {((currentCommittee.members || []).length + requests.filter(r => r.status === 'مقبول' && matchesCommittee(r.acceptedCommittee || r.firstChoice, currentCommittee.name)).length)} أعضاء
                 </span>
               </div>
 
@@ -3048,44 +3046,71 @@ export default function AdminDashboard() {
             </form>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة</h4>
-              {(!currentCommittee.members || currentCommittee.members.length === 0) ? (
-                <p className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-2xl">لا يوجد أعضاء حالياً.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-right text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                        <th className="pb-2 pr-2">اسم العضو</th>
-                        <th className="pb-2">الدور</th>
-                        <th className="pb-2 text-left pl-2">إجراء</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {currentCommittee.members.map((m, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="py-3 pr-2 font-bold text-slate-900">{m.name}</td>
-                          <td className="py-3 text-slate-600">{m.role}</td>
-                          <td className="py-3 text-left pl-2">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteMember(idx)}
-                              className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
-                            >
-                              حذف
-                            </button>
-                          </td>
+              <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة (تشمل المقبولين تلقائياً والأعضاء المضافين)</h4>
+              
+              {(() => {
+                // جلب الأعضاء المضافين يدوياً
+                const manualMembers = currentCommittee.members || [];
+                // جلب الأعضاء المقبولين تلقائياً من طلبات الانضمام في هذه اللجنة
+                const acceptedFromRequests = requests
+                  .filter(r => r.status === 'مقبول' && matchesCommittee(r.acceptedCommittee || r.firstChoice, currentCommittee.name))
+                  .map(r => ({
+                    name: r.fullName,
+                    role: r.major || 'عضو منضم',
+                    status: 'نشط (مقبول رسمي)',
+                    phone: r.phone || ''
+                  }));
+
+                // دمج القائمتين بدون تكرار حسب الاسم
+                const allCombinedMembers = [...manualMembers];
+                acceptedFromRequests.forEach(acc => {
+                  if (!allCombinedMembers.some(m => m.name === acc.name)) {
+                    allCombinedMembers.push(acc);
+                  }
+                });
+
+                if (allCombinedMembers.length === 0) {
+                  return <p className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-2xl">لا يوجد أعضاء في هذه اللجنة حتى الآن. قم بقبول أعضاء من صفحة "طلبات الانضمام" ليظهروا هنا تلقائياً!</p>;
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-right text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                          <th className="pb-2 pr-2">اسم العضو</th>
+                          <th className="pb-2">الدور أو التخصص</th>
+                          <th className="pb-2">رقم الجوال</th>
+                          <th className="pb-2 text-left pl-2">إجراء</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {allCombinedMembers.map((m, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50">
+                            <td className="py-3 pr-2 font-bold text-slate-900">👤 {m.name}</td>
+                            <td className="py-3 text-slate-600">{m.role}</td>
+                            <td className="py-3 text-slate-500 font-mono" dir="ltr">{m.phone || 'غير متوفر'}</td>
+                            <td className="py-3 text-left pl-2">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMember(idx)}
+                                className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                              >
+                                حذف
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
 
               <form onSubmit={handleAddMemberSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
                 <input
                   type="text"
-                  placeholder="اسم العضو الجديد"
+                  placeholder="اسم العضو الجديد يدوياً"
                   value={newMemberName}
                   onChange={(e) => setNewMemberName(e.target.value)}
                   className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
@@ -3101,7 +3126,7 @@ export default function AdminDashboard() {
                   type="submit"
                   className="bg-[#630517] text-[#F5D061] py-2.5 rounded-xl font-bold text-xs shadow hover:brightness-110 cursor-pointer"
                 >
-                  + إضافة عضو وحفظه سحابياً
+                  + إضافة عضو يدوياً وحفظه
                 </button>
               </form>
             </div>
