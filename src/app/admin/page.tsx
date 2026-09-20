@@ -815,7 +815,6 @@ export default function AdminDashboard() {
         const wb = XLSX.read(buffer, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        // استخدام sheet_to_json مع { raw: false } لضمان قراءة التواريخ والنصوص تماماً كما تظهر في ملف الأكسل
         const data = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false }) as any[];
 
         if (!data || data.length < 2) {
@@ -841,7 +840,6 @@ export default function AdminDashboard() {
         for (const row of rows) {
           if (!row || row.length === 0) continue;
 
-          // الأعمدة في أكسل قوقل فورم: [0: Timestamp, 1: FullName, 2: Phone, 3: UnivId, 4: Major, 5: 1st, 6: 2nd, 7: 3rd]
           const rawTimestamp = String(row[0] || '').trim();
           const fullName = String(row[1] || '').trim(); 
           const phone = String(row[2] || '').trim();    
@@ -879,7 +877,6 @@ export default function AdminDashboard() {
           addedCount++;
         }
 
-        // تحديث القائمة فوراً بعد الاستيراد
         const updatedSnap = await getDocs(collection(db, 'applications'));
         const fetchedRequests = updatedSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) as Record<string, any>[];
         setRequests(fetchedRequests);
