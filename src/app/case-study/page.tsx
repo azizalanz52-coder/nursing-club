@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { db } from '../../lib/firebase';
+import { collection, adddoc, getDocs, query, where } from 'firebase/firestore';
 
 interface CaseQuestion {
   id: number;
@@ -81,23 +83,57 @@ export default function CaseStudyPage() {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [showResults, setShowResults] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
+  
+  // بيانات الطالب للتحقق والتميز
+  const [studentName, setStudentName] = useState('');
+  const [studentPhone, setStudentPhone] = useState('');
+  const [hasSubmittedToday, setHasSubmittedToday] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const dayIndex = Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % casePool.length;
     setActiveCases(casePool[dayIndex]);
 
+    // جلب بيانات الطالب المخزنة مسبقاً إن وجدت
+    const savedName = localStorage.getItem('userName');
+    const savedPhone = localStorage.getItem('userPhone');
+    if (savedName) setStudentName(savedName);
+    if (savedPhone) {
+      setStudentPhone(savedPhone);
+      checkIfAlreadySubmitted(savedPhone);
+    }
+
     const timer = setInterval(() => {
       const now = new Date();
       const hoursLeft = 23 - now.getHours();
       const minsLeft = 59 - now.getMinutes();
-      setTimeLeft(`${hoursLeft}h ${minsLeft}m until next refresh`);
+      setTimeLeft(`${hoursLeft} hours and ${minsLeft} minutes`);
     }, 1000);
 
     return () => clearInterval(timer);
   }, []);
 
+  const checkIfAlreadySubmitted = async (phone: string) => {
+    try {
+      const q = query(collection(db, 'case_study_submissions'), where('phone', '==', phone));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        // التحقق إذا كانت المشاركة اليوم
+        const data = snap.docs[0].data();
+        const submissionDate = new Date(data.timestamp).toDateString();
+        const todayDate = new Date().toDateString();
+        if (submissionDate === todayDate) {
+          setHasSubmittedToday(true);
+          setShowResults(true);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleSelectOption = (caseId: number, optionIndex: number) => {
-    if (showResults) return;
+    if (showResults || hasSubmittedToday) return;
     setSelectedAnswers(prev => ({ ...prev, [caseId]: optionIndex }));
   };
 
@@ -109,15 +145,47 @@ export default function CaseStudyPage() {
     return score;
   };
 
+  const handleSubmitAnswers = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentName.trim() || !studentPhone.trim()) {
+      alert('الرجاء إدخال الاسم ورقم الجوال لتسجيل النتيجة!');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const score = calculateScore();
+      await adddoc(collection(db, 'case_study_submissions'), {
+        name: studentName.trim(),
+        phone: studentPhone.trim(),
+        score: score,
+        total: activeCases.length,
+        timestamp: Date.now(),
+        dateStr: new Date().toLocaleDateString()
+      });
+
+      localStorage.setItem('userName', studentName.trim());
+      localStorage.setItem('userPhone', studentPhone.trim());
+
+      setHasSubmittedToday(true);
+      setShowResults(true);
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء حفظ النتيجة، تأكد من الاتصال.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 pb-20" dir="ltr">
       <div className="bg-[#630517] text-white py-12 px-6 text-center space-y-3 shadow-md">
         <span className="bg-[#F5D061] text-[#630517] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider inline-block">
-          ⏱️ Daily Clinical Challenge (Refreshes every 24h)
+          ⏱️ Daily Clinical Challenge
         </span>
         <h1 className="text-3xl sm:text-4xl font-black">Nursing Clinical Case Studies</h1>
         <p className="text-xs sm:text-sm text-white/80 max-w-xl mx-auto">
-          Test your knowledge with realistic clinical scenarios. <span className="text-[#F5D061] font-bold">{timeLeft}</span>
+          Test your knowledge. Next challenge refresh in: <span className="text-[#F5D061] font-bold">{timeLeft}</span>
         </p>
         <div className="pt-2">
           <Link href="/" className="text-xs text-[#F5D061] underline font-bold">
@@ -160,6 +228,7 @@ export default function CaseStudyPage() {
                       key={optIdx}
                       type="button"
                       onClick={() => handleSelectOption(item.id, optIdx)}
+                      disabled={showResults || hasSubmittedToday}
                       className={`w-full text-left p-4 rounded-2xl border text-xs sm:text-sm transition-all cursor-pointer flex items-center justify-between ${btnStyle}`}
                     >
                       <span>{opt}</span>
@@ -181,29 +250,47 @@ export default function CaseStudyPage() {
           </div>
         ))}
 
-        <div className="text-center pt-4">
-          {!showResults ? (
-            <button
-              type="button"
-              onClick={() => setShowResults(true)}
-              className="bg-[#630517] text-[#F5D061] px-10 py-4 rounded-2xl font-black text-sm shadow-xl hover:scale-105 transition-all cursor-pointer"
-            >
-              Submit & View Results 🎯
-            </button>
-          ) : (
-            <div className="bg-emerald-50 border-2 border-emerald-300 p-6 rounded-3xl space-y-2">
-              <h3 className="text-xl font-black text-emerald-900">Your Score: {calculateScore()} / {activeCases.length} Correct! 🎉</h3>
-              <p className="text-xs text-emerald-700">Thank you for participating. New cases will appear after 24 hours.</p>
-              <button
-                type="button"
-                onClick={() => { setShowResults(false); setSelectedAnswers({}); }}
-                className="mt-2 bg-emerald-600 text-white px-6 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 cursor-pointer"
-              >
-                Try Again
-              </button>
+        {!showResults ? (
+          <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <h3 className="text-sm font-black text-slate-900">Enter your details to submit your score:</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Full Name (الاسم الكامل)"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                className="p-3 rounded-xl border border-slate-300 text-xs font-bold"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Phone Number (رقم الجوال 05XXXXXXXX)"
+                value={studentPhone}
+                onChange={(e) => setStudentPhone(e.target.value)}
+                className="p-3 rounded-xl border border-slate-300 text-xs font-bold"
+                dir="ltr"
+                required
+              />
             </div>
-          )}
-        </div>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full bg-[#630517] text-[#F5D061] py-4 rounded-2xl font-black text-sm shadow-xl hover:brightness-110 transition-all cursor-pointer"
+            >
+              {submitting ? 'Submitting...' : 'Submit Answers & Save Score 🎯'}
+            </button>
+          </form>
+        ) : (
+          <div className="bg-emerald-50 border-2 border-emerald-300 p-6 rounded-3xl space-y-3 text-center">
+            <h3 className="text-xl font-black text-emerald-900">Your Score: {calculateScore()} / {activeCases.length} Correct! 🎉</h3>
+            <p className="text-xs text-emerald-700 font-medium">
+              Thank you for participating. Your response has been recorded successfully.
+            </p>
+            <div className="bg-white/80 p-3 rounded-2xl border border-emerald-200 text-xs text-slate-700 font-bold">
+              ⏳ Next challenge available after: <span className="text-[#630517]">{timeLeft}</span>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

@@ -109,11 +109,14 @@ export default function AdminDashboard() {
   
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates'>('team');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study'>('case-study');
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
   const [historicalVaultReports, setHistoricalVaultReports] = useState<any[]>([]);
+
+  // حالة جلب مشاركات الكيس سدي (Case Study Submissions)
+  const [caseSubmissions, setCaseSubmissions] = useState<any[]>([]);
 
   const [studentAchievements, setStudentAchievements] = useState<StudentAchievement[]>([]);
   const [editingAchievementId, setEditingAchievementId] = useState<string | null>(null);
@@ -206,7 +209,19 @@ export default function AdminDashboard() {
     fetchHistoricalVault();
     fetchStudentAchievements();
     fetchCertificates();
+    fetchCaseSubmissions(); // جلب مشاركات الكيس سدي
   }, [router]);
+
+  // دالة جلب مشاركات الكيس سدي في لوحة الأدمن
+  const fetchCaseSubmissions = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'case_study_submissions'));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setCaseSubmissions(list);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchStudentAchievements = async () => {
     try {
@@ -480,7 +495,6 @@ export default function AdminDashboard() {
 
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [requests, setRequests] = useState<Record<string, any>[]>([]);
-  const [usersList, setUsersList] = useState<UserAccount[]>([]);
   
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
@@ -510,6 +524,8 @@ export default function AdminDashboard() {
   const [warningTargetReportId, setWarningTargetReportId] = useState<string>('');
   const [warningTargetCommittee, setWarningTargetCommittee] = useState<string>('');
   const [warningMessageText, setWarningMessageText] = useState<string>('');
+
+  const [usersList, setUsersList] = useState<UserAccount[]>([]);
 
   useEffect(() => {
     const fetchCloudData = async () => {
@@ -1514,6 +1530,16 @@ export default function AdminDashboard() {
         </div>
 
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
+          <button
+            type="button"
+            onClick={() => setActiveTab('case-study')}
+            className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+              activeTab === 'case-study' ? 'bg-emerald-700 text-white shadow-md scale-105' : 'bg-emerald-50 text-emerald-900 border border-emerald-200 hover:bg-emerald-100'
+            }`}
+          >
+            🩺 دراسة الحالة ({caseSubmissions.length})
+          </button>
+
           {(isSystemAdminUser || isPresidentsRole) && (
             <button
               type="button"
@@ -1610,6 +1636,77 @@ export default function AdminDashboard() {
             </button>
           ))}
         </div>
+
+        {/* عرض تبويب دراسة الحالة (Case Study Submissions) */}
+        {activeTab === 'case-study' && (
+          <div className="bg-white rounded-3xl p-8 border border-emerald-300 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black text-emerald-900">🩺 دراسة الحالة والطلاب المتفاعلون (Case Study Submissions)</h3>
+                <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين، درجاتهم أو نقاطهم، وأرقام جوالاتهم (يمكنك الاعتماد عليها لإصدار الشهادات).</p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
+                إجمالي المشاركات: {caseSubmissions.length}
+              </span>
+            </div>
+
+            {caseSubmissions.length === 0 ? (
+              <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-sm font-bold">لم يتم تسجيل أي مشاركات في دراسة الحالة حتى الآن من جدول `case_study_submissions`.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                      <th className="pb-3 pr-2">اسم الطالب / المشارك</th>
+                      <th className="pb-3">رقم الجوال</th>
+                      <th className="pb-3">الدرجة / النقاط</th>
+                      <th className="pb-3">تاريخ ووقت المشاركة</th>
+                      <th className="pb-3 text-left pl-2">إجراء سريع</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {caseSubmissions.map((sub, idx) => (
+                      <tr key={sub.id || idx} className="hover:bg-slate-50">
+                        <td className="py-4 pr-2 font-bold text-slate-900">
+                          👤 {sub.studentName || sub.fullName || sub.name || 'مشارك كريم'}
+                        </td>
+                        <td className="py-4 text-slate-600 font-mono" dir="ltr">
+                          📞 {sub.phone || sub.phoneNumber || 'غير متوفر'}
+                        </td>
+                        <td className="py-4">
+                          <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs font-mono">
+                            ⭐ {sub.score || sub.points || sub.grade || '0'} نقاط / درجة
+                          </span>
+                        </td>
+                        <td className="py-4 text-slate-500 font-mono" dir="ltr">
+                          🕒 {sub.createdAt || sub.submittedAt ? new Date(sub.createdAt || sub.submittedAt).toLocaleString('ar-SA') : 'حديث'}
+                        </td>
+                        <td className="py-4 text-left pl-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCertRecipientInput(sub.studentName || sub.fullName || sub.name || '');
+                              setCertPhoneInput(sub.phone || sub.phoneNumber || '');
+                              setCertTitleInput('شهادة مشاركة وإنجاز في دراسة الحالة الطبية');
+                              setCertCategoryInput('شهادة اجتياز دورة');
+                              setActiveTab('certificates');
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer shadow-sm"
+                          >
+                            إصدار شهادة له 📜
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {activeTab === 'certificates' && (
           <div className="space-y-8">
@@ -2987,7 +3084,6 @@ export default function AdminDashboard() {
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
                 <h3 className="text-xl font-black text-slate-900">إدارة قادة ورابط واتساب {currentCommittee.name}</h3>
                 <span className="text-xs bg-[#630517]/10 text-[#630517] font-bold px-3 py-1 rounded-full">
-                  {/* دمج الأعضاء اليدويين مع الطلاب المقبولين في هذه اللجنة تلقائياً */}
                   {((currentCommittee.members || []).length + requests.filter(r => r.status === 'مقبول' && matchesCommittee(r.acceptedCommittee || r.firstChoice, currentCommittee.name)).length)} أعضاء
                 </span>
               </div>
@@ -3049,9 +3145,7 @@ export default function AdminDashboard() {
               <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة (تشمل المقبولين تلقائياً والأعضاء المضافين)</h4>
               
               {(() => {
-                // جلب الأعضاء المضافين يدوياً
                 const manualMembers = currentCommittee.members || [];
-                // جلب الأعضاء المقبولين تلقائياً من طلبات الانضمام في هذه اللجنة
                 const acceptedFromRequests = requests
                   .filter(r => r.status === 'مقبول' && matchesCommittee(r.acceptedCommittee || r.firstChoice, currentCommittee.name))
                   .map(r => ({
@@ -3061,7 +3155,6 @@ export default function AdminDashboard() {
                     phone: r.phone || ''
                   }));
 
-                // دمج القائمتين بدون تكرار حسب الاسم
                 const allCombinedMembers = [...manualMembers];
                 acceptedFromRequests.forEach(acc => {
                   if (!allCombinedMembers.some(m => m.name === acc.name)) {
