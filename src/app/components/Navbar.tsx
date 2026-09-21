@@ -18,6 +18,9 @@ export default function Navbar() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
+  // حالة فتح وإغلاق الانضمام من لوحة الأدمن سحابياً
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
+  
   // حالات نافذة الترقية والمباركة الاحتفالية المنفصلة
   const [promotionMessage, setPromotionMessage] = useState<string | null>(null);
   const [showPromotionModal, setShowPromotionModal] = useState<boolean>(false);
@@ -66,9 +69,19 @@ export default function Navbar() {
     }
     setAdminAuth(isAuthAdmin);
 
+    // الاستماع لحالة فتح/إغلاق الانضمام من إعدادات الأدمن سحابياً
+    const settingsRef = doc(db, 'site_settings', 'general');
+    const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setIsRegistrationOpen(data.isRegistrationOpen === true);
+      }
+    });
+
     document.body.style.paddingTop = '85px';
 
     return () => {
+      unsubSettings();
       document.body.style.paddingTop = '0px';
     };
   }, []);
@@ -312,26 +325,38 @@ export default function Navbar() {
               </button>
             )}
 
-            {/* زر تقديم الطلب المغلق (متاح في الكمبيوتر بشكل هادئ مع علامة القفل) */}
-            <button
-              type="button"
-              disabled
-              title="تم إغلاق فترة التقديم والانضمام للنادي"
-              className="px-4 py-2.5 rounded-2xl bg-slate-100 text-slate-400 font-bold text-xs shadow-inner cursor-not-allowed flex items-center gap-1.5 border border-slate-200"
-            >
-              <span>🔒</span>
-              <span>الانضمام (مغلق)</span>
-            </button>
+            {/* زر تقديم الانضمام (يتحكم به الأدمن سحابياً: مفتوح أو مغلق) */}
+            {isRegistrationOpen ? (
+              <Link
+                href="/register"
+                className="px-4 py-2.5 rounded-2xl bg-emerald-600 text-white font-bold text-xs shadow hover:bg-emerald-700 transition-all flex items-center gap-1.5"
+              >
+                <span>✨</span>
+                <span>الانضمام للنادي</span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled
+                title="تم إغلاق فترة التقديم والانضمام للنادي"
+                className="px-4 py-2.5 rounded-2xl bg-slate-100 text-slate-400 font-bold text-xs shadow-inner cursor-not-allowed flex items-center gap-1.5 border border-slate-200"
+              >
+                <span>🔒</span>
+                <span>الانضمام (مغلق)</span>
+              </button>
+            )}
           </div>
 
           <div className="flex md:hidden items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsLoginModalOpen(true)}
-              className="text-slate-700 font-bold text-[11px] px-3 py-2 rounded-xl bg-slate-100"
-            >
-              تسجيل الدخول
-            </button>
+            {!userName && (
+              <button
+                type="button"
+                onClick={() => setIsLoginModalOpen(true)}
+                className="text-slate-700 font-bold text-[11px] px-3 py-2 rounded-xl bg-slate-100"
+              >
+                تسجيل الدخول
+              </button>
+            )}
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -374,15 +399,25 @@ export default function Navbar() {
               <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الفعاليات</Link>
               <Link href="/case-study" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">Case Study 🩺</Link>
               
-              {/* زر تقديم الانضمام المغلق داخل القائمة المنسدلة للجوال */}
+              {/* زر تقديم الانضمام داخل القائمة المنسدلة للجوال */}
               <div className="py-1">
-                <button
-                  type="button"
-                  disabled
-                  className="w-full text-right text-slate-400 font-bold py-1.5 px-3 rounded-xl bg-slate-100 flex items-center gap-2 cursor-not-allowed"
-                >
-                  <span>🔒</span> تقديم الانضمام (مغلق)
-                </button>
+                {isRegistrationOpen ? (
+                  <Link
+                    href="/register"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full text-right text-white font-bold py-2 px-3 rounded-xl bg-emerald-600 flex items-center gap-2"
+                  >
+                    <span>✨</span> الانضمام للنادي
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full text-right text-slate-400 font-bold py-1.5 px-3 rounded-xl bg-slate-100 flex items-center gap-2 cursor-not-allowed"
+                  >
+                    <span>🔒</span> تقديم الانضمام (مغلق)
+                  </button>
+                )}
               </div>
 
               <button

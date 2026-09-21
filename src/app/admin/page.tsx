@@ -111,11 +111,13 @@ export default function AdminDashboard() {
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study'>('case-study');
 
+  // حالة التحكم بإغلاق وفتح التسجيل سحابياً 🚀
+  const [isRegistrationClosed, setIsRegistrationClosed] = useState<boolean>(false);
+
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
   const [historicalVaultReports, setHistoricalVaultReports] = useState<any[]>([]);
 
-  // حالة جلب مشاركات الكيس سدي (Case Study Submissions)
   const [caseSubmissions, setCaseSubmissions] = useState<any[]>([]);
 
   const [studentAchievements, setStudentAchievements] = useState<StudentAchievement[]>([]);
@@ -209,10 +211,42 @@ export default function AdminDashboard() {
     fetchHistoricalVault();
     fetchStudentAchievements();
     fetchCertificates();
-    fetchCaseSubmissions(); // جلب مشاركات الكيس سدي
+    fetchCaseSubmissions();
+    fetchSiteSettings();
   }, [router]);
 
-  // دالة جلب مشاركات الكيس سدي في لوحة الأدمن
+  // دالة لجلب إعدادات الموقع العامة (مثل حالة إغلاق التسجيل)
+  const fetchSiteSettings = async () => {
+    try {
+      const settingsRef = doc(db, 'site_settings', 'general');
+      const snap = await getDoc(settingsRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (typeof data.isRegistrationClosed === 'boolean') {
+          setIsRegistrationClosed(data.isRegistrationClosed);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // دالة تبديل حالة إغلاق/فتح التسجيل بنقرة زر سحابياً 🚀
+  const handleToggleRegistrationStatus = async () => {
+    const newState = !isRegistrationClosed;
+    try {
+      const settingsRef = doc(db, 'site_settings', 'general');
+      await setDoc(settingsRef, { isRegistrationClosed: newState }, { merge: true });
+      setIsRegistrationClosed(newState);
+      setModalMessage(newState ? 'تم إغلاق باب التسجيل بنجاح سحابياً! 🔒🚫' : 'تم فتح باب التسجيل بنجاح سحابياً للجميع! 🔓✨');
+      setModalType('success');
+    } catch (err) {
+      console.error(err);
+      setModalMessage('حدث خطأ أثناء تغيير حالة التسجيل.');
+      setModalType('success');
+    }
+  };
+
   const fetchCaseSubmissions = async () => {
     try {
       const snap = await getDocs(collection(db, 'case_study_submissions'));
@@ -1494,12 +1528,27 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <Link
-          href="/"
-          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all border border-slate-200"
-        >
-          العودة للموقع الرئيسي ←
-        </Link>
+        <div className="flex items-center gap-3">
+          {/* زر فتح وإغلاق التسجيل السحابي الفوري 🚀 */}
+          <button
+            type="button"
+            onClick={handleToggleRegistrationStatus}
+            className={`px-4 py-2 rounded-xl font-black text-xs transition-all shadow-sm flex items-center gap-2 cursor-pointer ${
+              isRegistrationClosed 
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse' 
+                : 'bg-red-600 hover:bg-red-700 text-white'
+            }`}
+          >
+            {isRegistrationClosed ? '🟢 فتح التسجيل للزوار' : '🔴 إغلاق التسجيل الفوري'}
+          </button>
+
+          <Link
+            href="/"
+            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all border border-slate-200"
+          >
+            العودة للموقع الرئيسي ←
+          </Link>
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -1637,7 +1686,6 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* عرض تبويب دراسة الحالة (Case Study Submissions) */}
         {activeTab === 'case-study' && (
           <div className="bg-white rounded-3xl p-8 border border-emerald-300 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
