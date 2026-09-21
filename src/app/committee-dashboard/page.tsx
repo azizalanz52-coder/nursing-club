@@ -691,7 +691,7 @@ export default function CommitteeDashboard() {
     try {
       let alertMsg = '';
       if (warningStepType === 'warn-leaders') {
-        alertMsg = `⚠️ [إنذار رسمي من الجودة لقادة لجنة ${targetCommitteeForWarning}]: ${warningReason} (يُرجى إرسال الرد والتبرير خلال 24 ساعة)`;
+        alertMsg = `⚠️ [إنذار رسمي من الجودة قادة لجنة ${targetCommitteeForWarning}]: ${warningReason} (يُرجى إرسال الرد والتبرير خلال 24 ساعة)`;
       } else if (warningStepType === 'warn-members') {
         alertMsg = `⚠️ [تنبيه رسمي من الجودة لأعضاء لجنة ${targetCommitteeForWarning}]: ${warningReason}`;
       } else {
