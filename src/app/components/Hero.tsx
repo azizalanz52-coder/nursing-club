@@ -27,15 +27,6 @@ export default function Hero() {
       buttonText: 'اكتشف النادي',
       buttonLink: '/discover',
     },
-    {
-      id: 'national-day',
-      tag: 'اليوم الوطني السعودي 🇸🇦',
-      title: 'نحتفل بالوطن ونمضي قدماً بالعطاء',
-      description: 'نرفع أسمى آيات التهاني والتبريكات للقيادة الرشيدة بمناسبة اليوم الوطني المجيد.',
-      image: '/header-banner.png',
-      buttonText: 'فعاليات اليوم الوطني',
-      buttonLink: '/events',
-    },
   ]);
 
   const [acceptedData, setAcceptedData] = useState<{ committee: string; whatsapp: string } | null>(null);
