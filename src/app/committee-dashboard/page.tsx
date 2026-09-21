@@ -1709,7 +1709,7 @@ export default function CommitteeDashboard() {
                               </td>
                               <td className="py-3 text-left pl-2">
                                 <a
-                                  href={`https://wa.me/${member.phone?.startsWith('0') ? '966' + member.phone.substring(1) : member.phone}?text=مرحباً بك ${member.fullName}، بصفتنا لجنة الجودة والتطوير نتابع سير أعمالك في (${current.currentActiveComm || currentActiveComm}). نتمنى لك التوفيق! ⚡`}
+                                  href={`https://wa.me/${member.phone?.startsWith('0') ? '966' + member.phone.substring(1) : member.phone}?text=مرحباً بك ${member.fullName}، بصفتنا لجنة الجودة والتطوير نتابع سير أعمالك في (${currentActiveComm}). نتمنى لك التوفيق! ⚡`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="px-3 py-1 bg-emerald-600 text-white font-bold rounded-lg text-[11px] inline-flex items-center gap-1 shadow hover:bg-emerald-700"
