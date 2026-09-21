@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { db } from './../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { db } from '../lib/firebase';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 
 const COMMITTEES = [
   'لجنة التصميم',
@@ -28,9 +29,29 @@ export default function JoinPage() {
     experience: '',
   });
 
+  const [isRegistrationClosed, setIsRegistrationClosed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+
+  // جلب حالة الإغلاق/الفتح سحابياً من لوحة الأدمن لتتزامن مع النافبار والزر
+  useEffect(() => {
+    const checkSettings = async () => {
+      try {
+        const settingsRef = doc(db, 'site_settings', 'general');
+        const snap = await getDoc(settingsRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          if (typeof data.isRegistrationClosed === 'boolean') {
+            setIsRegistrationClosed(data.isRegistrationClosed);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching settings:', err);
+      }
+    };
+    checkSettings();
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -59,7 +80,8 @@ export default function JoinPage() {
     try {
       await addDoc(collection(db, 'applications'), {
         ...formData,
-        status: 'pending',
+        status: 'معلق',
+        submittedAt: new Date().toLocaleString('ar-SA'),
         createdAt: serverTimestamp(),
       });
 
@@ -83,6 +105,31 @@ export default function JoinPage() {
       setLoading(false);
     }
   };
+
+  // إذا تم إغلاق النموذج من لوحة التحكم، تظهر صفحة القفل فوراً
+  if (isRegistrationClosed) {
+    return (
+      <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4" dir="rtl">
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-xl text-center space-y-6 border border-slate-200">
+          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-inner">
+            🔒
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-slate-900">عذراً، نموذج الانضمام مغلق حالياً</h2>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              تم إغلاق فترة استقبال طلبات الانضمام للجان نادي التمريض مؤقتاً من قبل الإدارة. ننتظركم في الفترات القادمة!
+            </p>
+          </div>
+          <Link
+            href="/"
+            className="block w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow hover:brightness-110 transition-all"
+          >
+            العودة للصفحة الرئيسية ←
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-100 py-12 px-4 sm:px-6 lg:px-8 font-sans text-black" dir="rtl">
@@ -109,12 +156,20 @@ export default function JoinPage() {
             <p className="text-sm font-semibold text-emerald-900">
               شكرًا لاهتمامك بالانضمام لنادي التمريض. سيتم مراجعة طلبك والتواصل معك قريبًا.
             </p>
-            <button
-              onClick={() => setSubmitted(false)}
-              className="mt-4 bg-emerald-700 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:bg-emerald-800 transition-all shadow-sm"
-            >
-              تقديم طلب آخر
-            </button>
+            <div className="flex gap-3 justify-center pt-2">
+              <button
+                onClick={() => setSubmitted(false)}
+                className="bg-emerald-700 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:bg-emerald-800 transition-all shadow-sm cursor-pointer"
+              >
+                تقديم طلب آخر
+              </button>
+              <Link
+                href="/check-status"
+                className="bg-slate-800 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:bg-slate-900 transition-all shadow-sm"
+              >
+                استعلام عن القبول 🔍
+              </Link>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6 text-black" autoComplete="off">
@@ -150,7 +205,8 @@ export default function JoinPage() {
                   onChange={handleChange}
                   placeholder="مثال: 2200001234"
                   autoComplete="off"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-black font-medium focus:ring-2 focus:ring-rose-900 focus:outline-none text-sm placeholder:text-slate-400 bg-white"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-black font-medium focus:ring-2 focus:ring-rose-900 focus:outline-none text-sm placeholder:text-slate-400 bg-white font-mono"
+                  dir="ltr"
                 />
               </div>
               <div>
@@ -170,7 +226,7 @@ export default function JoinPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-black text-black mb-1.5">البريد الإلكتروني </label>
+                <label className="block text-sm font-black text-black mb-1.5">البريد الإلكتروني</label>
                 <input
                   type="email"
                   name="email"
@@ -180,6 +236,7 @@ export default function JoinPage() {
                   placeholder="name@gmail.com"
                   autoComplete="off"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-black font-medium focus:ring-2 focus:ring-rose-900 focus:outline-none text-sm placeholder:text-slate-400 bg-white"
+                  dir="ltr"
                 />
               </div>
               <div>
@@ -192,7 +249,8 @@ export default function JoinPage() {
                   onChange={handleChange}
                   placeholder="0500000000"
                   autoComplete="off"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-black font-medium focus:ring-2 focus:ring-rose-900 focus:outline-none text-sm placeholder:text-slate-400 bg-white"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-black font-medium focus:ring-2 focus:ring-rose-900 focus:outline-none text-sm placeholder:text-slate-400 bg-white font-mono"
+                  dir="ltr"
                 />
               </div>
             </div>
@@ -257,6 +315,7 @@ export default function JoinPage() {
                 placeholder="https://drive.google.com/... أو رابط Behance"
                 autoComplete="off"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-black font-medium focus:ring-2 focus:ring-rose-900 focus:outline-none text-sm placeholder:text-slate-400 bg-white"
+                dir="ltr"
               />
               <p className="mt-1 text-xs text-slate-500 font-medium">
                 * يُفضل للمتقدمين للجان التصميم والإعلام إرفاق رابط يحتوي على نماذج الأعمال أو ملف PDF عبر Drive.
