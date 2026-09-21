@@ -2347,7 +2347,7 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-slate-100">
                   <tr className="hover:bg-slate-50 bg-rose-50/20">
                     <td className="py-4 pr-2 font-black text-[#630517]">
-                      عبدالرحمن الشهري (المشرف الأساسي)
+                      عبدالعزيز سليمان العنزي (Admin)
                       <span className="block text-[10px] text-emerald-600 font-bold mt-0.5">🟢 متصل الآن</span>
                     </td>
                     <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
