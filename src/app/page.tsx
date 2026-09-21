@@ -5,11 +5,12 @@ import CommitteesPreview from "./components/home/CommitteesPreview";
 import EventsPreview from "./components/home/EventsPreview";
 import CaseStudyCard from "./components/home/CaseStudyCard";
 import WhatsAppCommunity from "./components/home/WhatsAppCommunity";
+import SuggestionBox from "./components/home/SuggestionBox";
 import Footer from "./components/Footer";
 
-export default function TeamPage() {
+export default function Home() {
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800">
+    <main>
       <Hero />
       <About />
       <LeadershipPreview />
@@ -17,6 +18,7 @@ export default function TeamPage() {
       <EventsPreview />
       <CaseStudyCard />
       <WhatsAppCommunity />
+      <SuggestionBox />
       <Footer />
     </main>
   );
