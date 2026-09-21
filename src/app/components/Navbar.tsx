@@ -18,8 +18,8 @@ export default function Navbar() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // حالة فتح وإغلاق الانضمام من لوحة الأدمن سحابياً
-  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
+  // حالة فتح وإغلاق الانضمام من لوحة الأدمن سحابياً (مطابقة لـ isRegistrationClosed)
+  const [isRegistrationClosed, setIsRegistrationClosed] = useState(false);
   
   // حالات نافذة الترقية والمباركة الاحتفالية المنفصلة
   const [promotionMessage, setPromotionMessage] = useState<string | null>(null);
@@ -74,7 +74,9 @@ export default function Navbar() {
     const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setIsRegistrationOpen(data.isRegistrationOpen === true);
+        if (typeof data.isRegistrationClosed === 'boolean') {
+          setIsRegistrationClosed(data.isRegistrationClosed);
+        }
       }
     });
 
@@ -325,8 +327,8 @@ export default function Navbar() {
               </button>
             )}
 
-            {/* زر تقديم الانضمام (يتحكم به الأدمن سحابياً: مفتوح أو مغلق) */}
-            {isRegistrationOpen ? (
+            {/* زر تقديم الانضمام (يتحكم به الأدمن سحابياً بناءً على إغلاق/فتح النموذج) */}
+            {!isRegistrationClosed ? (
               <Link
                 href="/register"
                 className="px-4 py-2.5 rounded-2xl bg-emerald-600 text-white font-bold text-xs shadow hover:bg-emerald-700 transition-all flex items-center gap-1.5"
@@ -401,7 +403,7 @@ export default function Navbar() {
               
               {/* زر تقديم الانضمام داخل القائمة المنسدلة للجوال */}
               <div className="py-1">
-                {isRegistrationOpen ? (
+                {!isRegistrationClosed ? (
                   <Link
                     href="/register"
                     onClick={() => setMobileMenuOpen(false)}
