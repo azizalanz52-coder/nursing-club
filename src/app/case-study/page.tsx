@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
-import { collection, adddoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 
 interface CaseQuestion {
   id: number;
@@ -84,7 +84,6 @@ export default function CaseStudyPage() {
   const [showResults, setShowResults] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
   
-  // بيانات الطالب للتحقق والتميز
   const [studentName, setStudentName] = useState('');
   const [studentPhone, setStudentPhone] = useState('');
   const [hasSubmittedToday, setHasSubmittedToday] = useState(false);
@@ -94,7 +93,6 @@ export default function CaseStudyPage() {
     const dayIndex = Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % casePool.length;
     setActiveCases(casePool[dayIndex]);
 
-    // جلب بيانات الطالب المخزنة مسبقاً إن وجدت
     const savedName = localStorage.getItem('userName');
     const savedPhone = localStorage.getItem('userPhone');
     if (savedName) setStudentName(savedName);
@@ -118,7 +116,6 @@ export default function CaseStudyPage() {
       const q = query(collection(db, 'case_study_submissions'), where('phone', '==', phone));
       const snap = await getDocs(q);
       if (!snap.empty) {
-        // التحقق إذا كانت المشاركة اليوم
         const data = snap.docs[0].data();
         const submissionDate = new Date(data.timestamp).toDateString();
         const todayDate = new Date().toDateString();
@@ -155,8 +152,9 @@ export default function CaseStudyPage() {
     setSubmitting(true);
     try {
       const score = calculateScore();
-      await adddoc(collection(db, 'case_study_submissions'), {
-        name: studentName.trim(),
+      // تم تصحيح adddoc إلى addDoc هنا:
+      await addDoc(collection(db, 'case_study_submissions'), {
+        studentName: studentName.trim(), // تم توحيد المفتاح ليتوافق مع لوحة التحكم
         phone: studentPhone.trim(),
         score: score,
         total: activeCases.length,
@@ -259,7 +257,7 @@ export default function CaseStudyPage() {
                 placeholder="Full Name (الاسم الكامل)"
                 value={studentName}
                 onChange={(e) => setStudentName(e.target.value)}
-                className="p-3 rounded-xl border border-slate-300 text-xs font-bold"
+                className="p-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900"
                 required
               />
               <input
@@ -267,7 +265,7 @@ export default function CaseStudyPage() {
                 placeholder="Phone Number (رقم الجوال 05XXXXXXXX)"
                 value={studentPhone}
                 onChange={(e) => setStudentPhone(e.target.value)}
-                className="p-3 rounded-xl border border-slate-300 text-xs font-bold"
+                className="p-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900"
                 dir="ltr"
                 required
               />
