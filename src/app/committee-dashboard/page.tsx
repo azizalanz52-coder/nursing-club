@@ -4,7 +4,7 @@ import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, getDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, getDoc, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 
 export default function CommitteeDashboard() {
@@ -14,6 +14,11 @@ export default function CommitteeDashboard() {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<any[]>([]);
   const [whatsappLink, setWhatsappLink] = useState('');
+  
+  // نظام تخزين روابط الواتساب الخاصة بكل لجنة بشكل مستقل وسحابي
+  const [committeeWhatsappLinks, setCommitteeWhatsappLinks] = useState<{ [key: string]: string }>({});
+  const [currentCommitteeWhatsappInput, setCurrentCommitteeWhatsappInput] = useState('');
+
   const [allUsersList, setAllUsersList] = useState<any[]>([]);
 
   // هل المستخدم من لجنة الجودة والتطوير؟
@@ -113,12 +118,46 @@ export default function CommitteeDashboard() {
     fetchScientificTexts();
     fetchEventExcuses();
     fetchPublicPartners();
+    fetchCommitteeWhatsappLinks();
 
     const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
     if (isHiddenLocally === 'true') {
       setWarningHidden(true);
     }
   }, [router]);
+
+  const fetchCommitteeWhatsappLinks = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'committee_whatsapp_links'));
+      const linksMap: { [key: string]: string } = {};
+      snap.docs.forEach(d => {
+        linksMap[d.id] = d.data().link || '';
+      });
+      setCommitteeWhatsappLinks(linksMap);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveCommitteeWhatsapp = async (commName: string) => {
+    if (!currentCommitteeWhatsappInput.trim()) {
+      alert('الرجاء إدخال رابط الواتساب أولاً.');
+      return;
+    }
+    try {
+      await setDoc(doc(db, 'committee_whatsapp_links', commName), {
+        link: currentCommitteeWhatsappInput.trim(),
+        updatedAt: Date.now(),
+        updatedBy: userData?.fullName || 'قائد اللجنة'
+      });
+      setCommitteeWhatsappLinks(prev => ({ ...prev, [commName]: currentCommitteeWhatsappInput.trim() }));
+      setWhatsappLink(currentCommitteeWhatsappInput.trim());
+      alert(`تم حفظ وتحديث رابط قروب (${commName}) بنجاح ليرتبط تلقائياً بالمقبولين! 🔗✅`);
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء حفظ رابط الواتساب.');
+    }
+  };
 
   const fetchLeaderData = async (phone: string) => {
     try {
@@ -155,15 +194,23 @@ export default function CommitteeDashboard() {
         setIsCommitteeLeader(false);
       }
 
+      let resolvedComm = assigned || 'لجنة تنظيم الفعاليات';
       if (roleStr.includes('جودة') || assigned.includes('جودة') || assigned.includes('الجودة')) {
         setIsQualityTeam(true);
         setIsCommitteeLeader(true);
       } else {
         setIsQualityTeam(false);
-        const resolvedComm = assigned || 'لجنة تنظيم الفعاليات';
         setSelectedManagedCommittee(resolvedComm);
         setSelectedMonitoredCommittee(resolvedComm);
         setTargetCommitteeForTask(resolvedComm);
+      }
+
+      // جلب رابط الواتساب الخاص باللجنة الحالية تلقائياً إن وجد
+      const linkSnap = await getDoc(doc(db, 'committee_whatsapp_links', resolvedComm));
+      if (linkSnap.exists()) {
+        const savedLink = linkSnap.data().link || '';
+        setWhatsappLink(savedLink);
+        setCurrentCommitteeWhatsappInput(savedLink);
       }
 
       const reqSnap = await getDocs(collection(db, 'applications'));
@@ -448,35 +495,39 @@ export default function CommitteeDashboard() {
 
   const transferredRequestsList = (requests || []).filter(req => req.transferredToHR === true || req.status === 'محول للموارد البشرية');
 
-  // حساب دقيق ومستقل لكل لجنة بناءً على رغبة المتقدم الأولى أو مقبولي اللجنة فعلياً
   const totalApplicantsCount = requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm)).length;
   const acceptedMembersCount = requests.filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm))).length;
 
   const handleAcceptSubmit = async () => {
     if (!selectedReqId) return;
+    const activeWhatsapp = committeeWhatsappLinks[currentActiveComm] || whatsappLink;
+    if (!activeWhatsapp) {
+      alert('الرجاء تعيين وحفظ رابط قروب الواتساب الخاص لهذه اللجنة أولاً لكي يتم إرساله للطالب تلقائياً.');
+      return;
+    }
+
     try {
       const targetReq = requests.find(r => r.id === selectedReqId);
       const docRef = doc(db, 'applications', selectedReqId);
       await updateDoc(docRef, {
         status: 'مقبول',
         acceptedCommittee: currentActiveComm,
-        whatsappLink: whatsappLink,
-        latestNotification: `مبروك! تم قبولك رسمياً في (${currentActiveComm}) 🎉. انضم لقروب الواتساب: ${whatsappLink}`
+        whatsappLink: activeWhatsapp,
+        latestNotification: `مبروك! تم قبولك رسمياً في (${currentActiveComm}) 🎉. انضم لقروب الواتساب: ${activeWhatsapp}`
       });
 
       if (targetReq?.phone) {
         try {
           const userDocRef = doc(db, 'users', targetReq.phone);
           await updateDoc(userDocRef, {
-            latestNotification: `🎉 مبارك القبول النهائي في (${currentActiveComm})!`
+            latestNotification: `🎉 مبارك القبول النهائي في (${currentActiveComm})! رابط قروب الواتساب: ${activeWhatsapp}`
           });
         } catch (e) { console.error(e); }
       }
 
-      setRequests((requests || []).map(r => r.id === selectedReqId ? { ...r, status: 'مقبول', acceptedCommittee: currentActiveComm, whatsappLink } : r));
+      setRequests((requests || []).map(r => r.id === selectedReqId ? { ...r, status: 'مقبول', acceptedCommittee: currentActiveComm, whatsappLink: activeWhatsapp } : r));
       setShowAcceptModal(false);
-      setWhatsappLink('');
-      alert(`تم قبول المتقدم في (${currentActiveComm}) بنجاح! 🎉`);
+      alert(`تم قبول المتقدم في (${currentActiveComm}) بنجاح وإرسال رابط الواتساب تلقائياً! 🎉`);
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء قبول الطلب.');
@@ -976,6 +1027,38 @@ export default function CommitteeDashboard() {
             </Link>
           </div>
         </div>
+
+        {/* ربط رابط الواتساب الخاص باللجنة (جديد ومضاف للقادة) */}
+        {isCommitteeLeader && !isQualityTeam && (
+          <div className="bg-emerald-50 border-2 border-emerald-400 rounded-3xl p-6 space-y-4 shadow-sm">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🔗</span>
+                <div>
+                  <h4 className="font-black text-sm text-emerald-900">ربط رابط مجموعة الواتساب الخاصة بـ ({currentActiveComm}):</h4>
+                  <p className="text-xs text-emerald-700">هنا يمكنك ربط لوحة تحكم لجنتك برابط الواتساب لكي يُرسل تلقائياً لأي طالب تقبله.</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+              <input
+                type="text"
+                placeholder="https://chat.whatsapp.com/..."
+                value={currentCommitteeWhatsappInput}
+                onChange={(e) => setCurrentCommitteeWhatsappInput(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-emerald-300 text-xs bg-white text-slate-900 font-mono"
+                dir="ltr"
+              />
+              <button
+                type="button"
+                onClick={() => handleSaveCommitteeWhatsapp(currentActiveComm)}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shadow"
+              >
+                حفظ رابط الواتساب ✓
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* شريط التنبيهات القيادي */}
         {!warningHidden && (
@@ -1748,7 +1831,7 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* الجدول الخاص بالمرشحين (يتم إخفاؤه تماماً عن لجنة الجودة والتطوير لأنها لجنة إشرافية رقابية وليست لجنة تقديم) */}
+        {/* الجدول الخاص بالمرشحين */}
         {isCommitteeLeader && !isQualityTeam && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
@@ -1850,17 +1933,17 @@ export default function CommitteeDashboard() {
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
             <h3 className="text-xl font-black text-slate-900 border-b border-slate-100 pb-3">تأكيد القبول في {currentActiveComm}</h3>
             <div className="space-y-4">
-              <p className="text-xs text-slate-600">سيتم قبول الطالب رسمياً في هذه اللجنة وربطه برابط قروب الواتساب.</p>
+              <p className="text-xs text-slate-600">سيتم قبول الطالب رسمياً في هذه اللجنة وربطه برابط قروب الواتساب الخاص باللجنة.</p>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600">رابط قروب الواتساب:</label>
+                <label className="text-xs font-bold text-slate-600">رابط قروب الواتساب المحفوظ:</label>
                 <input
                   type="text"
-                  placeholder="https://chat.whatsapp.com/..."
-                  value={whatsappLink}
-                  onChange={(e) => setWhatsappLink(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-[#630517]"
+                  value={committeeWhatsappLinks[currentActiveComm] || whatsappLink || 'لم يتم تعيين رابط لهذه اللجنة بعد'}
+                  disabled
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-700 bg-slate-100 font-mono"
                   dir="ltr"
                 />
+                <p className="text-[10px] text-slate-400 mt-1">يمكنك تعديل رابط اللجنة مباشرة من حقل الإعدادات في أعلى اللوحة.</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
