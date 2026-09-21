@@ -26,6 +26,9 @@ export default function CommitteeDashboard() {
   // هل المستخدم قائد للجنة أم عضو عادي؟
   const [isCommitteeLeader, setIsCommitteeLeader] = useState(false);
 
+  // حالة التحكم بإظهار/إخفاء جدول الأعضاء المقبولين عند الضغط على البطاقة للقادة
+  const [showLeaderAcceptedMembersTable, setShowLeaderAcceptedMembersTable] = useState(false);
+
   const [allCommitteesList] = useState<string[]>([
     'لجنة التصميم',
     'لجنة الاعلام',
@@ -1728,7 +1731,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* إحصائيات فورية مستقلة وديناميكية لكل لجنة (للقادة فقط) */}
+        {/* إحصائيات فورية مستقلة وديناميكية لكل لجنة (للقادة فقط مع إمكانية الضغط لعرض المقبولين) */}
         {isCommitteeLeader && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-[#630517] to-[#80071D] text-white p-6 rounded-3xl shadow-xl space-y-2">
@@ -1737,10 +1740,17 @@ export default function CommitteeDashboard() {
               <p className="text-xs text-white/80">المتقدمون برغبتهم الأولى لهذه اللجنة</p>
             </div>
 
-            <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-2">
-              <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">عدد الأعضاء المقبولين</span>
+            {/* بطاقة عدد الأعضاء المقبولين القابلة للضغط لعرض القائمة */}
+            <div 
+              onClick={() => setShowLeaderAcceptedMembersTable(!showLeaderAcceptedMembersTable)}
+              className="bg-white border-2 border-emerald-500 p-6 rounded-3xl shadow-md space-y-2 cursor-pointer hover:bg-emerald-50/40 transition-all relative group"
+            >
+              <div className="absolute top-4 left-4 text-emerald-600 text-xs font-black bg-emerald-100 px-2.5 py-1 rounded-full">
+                {showLeaderAcceptedMembersTable ? 'إخفاء الجدول ▲' : 'اضغط للاستعراض ▼'}
+              </div>
+              <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">عدد الأعضاء المقبولين (اضغط للعرض)</span>
               <div className="text-3xl font-black text-slate-900">{acceptedMembersCount}</div>
-              <p className="text-xs text-slate-500">تم قبولهم وانضمامهم للجنة</p>
+              <p className="text-xs text-slate-500">تم قبولهم وانضمامهم للجنة (عرض قائمة التواصل)</p>
             </div>
 
             <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-2">
@@ -1749,6 +1759,71 @@ export default function CommitteeDashboard() {
                 {totalApplicantsCount > 0 ? Math.round((acceptedMembersCount / totalApplicantsCount) * 100) : 0}%
               </div>
               <p className="text-xs text-slate-500">معدل قبول المتقدمين المستقل</p>
+            </div>
+          </div>
+        )}
+
+        {/* جدول استعراض الأعضاء المقبولين الخاص برئيس اللجنة (يظهر عند الضغط على البطاقة) */}
+        {isCommitteeLeader && showLeaderAcceptedMembersTable && (
+          <div className="bg-white rounded-3xl p-6 border-2 border-emerald-400 shadow-lg space-y-4 animate-fadeIn">
+            <div className="flex justify-between items-center flex-wrap gap-3 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900">📋 الأعضاء المقبولون في لجنتك: <span className="text-emerald-700">({currentActiveComm})</span></h3>
+                <p className="text-xs text-slate-500">قائمة الأعضاء المنضمين رسمياً وطرق التواصل المباشر معهم:</p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowLeaderAcceptedMembersTable(false)}
+                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+              >
+                إخفاء القائمة ✕
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                    <th className="pb-3 pr-2">اسم العضو</th>
+                    <th className="pb-3">رقم الجوال</th>
+                    <th className="pb-3">الرقم الجامعي</th>
+                    <th className="pb-3">الحالة</th>
+                    <th className="pb-3 text-left pl-2">تواصل واتساب</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {requests.filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm))).length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد أعضاء مقبولين مسجلين في هذه اللجنة حتى الآن.</td>
+                    </tr>
+                  ) : (
+                    requests
+                      .filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm)))
+                      .map((member, mIdx) => (
+                        <tr key={mIdx} className="hover:bg-slate-50">
+                          <td className="py-3 pr-2 font-bold text-slate-900">{member.fullName}</td>
+                          <td className="py-3 font-mono text-slate-700" dir="ltr">{member.phone}</td>
+                          <td className="py-3 text-slate-600 font-mono">{member.universityId || '-'}</td>
+                          <td className="py-3">
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+                              {member.status || 'مقبول'}
+                            </span>
+                          </td>
+                          <td className="py-3 text-left pl-2">
+                            <a
+                              href={`https://wa.me/${member.phone?.startsWith('0') ? '966' + member.phone.substring(1) : member.phone}?text=مرحباً بك ${member.fullName}، يسعدنا انضمامك إلى (${currentActiveComm}) بنادي التمريض. 🚀`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-lg text-[11px] inline-flex items-center gap-1 shadow hover:bg-emerald-700"
+                            >
+                              💬 تواصل واتساب
+                            </a>
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
