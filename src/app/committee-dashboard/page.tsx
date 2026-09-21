@@ -448,8 +448,9 @@ export default function CommitteeDashboard() {
 
   const transferredRequestsList = (requests || []).filter(req => req.transferredToHR === true || req.status === 'محول للموارد البشرية');
 
-  const totalApplicantsCount = requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm) || matchesTargetCommittee(r.secondChoice, currentActiveComm) || matchesTargetCommittee(r.thirdChoice, currentActiveComm)).length;
-  const acceptedMembersCount = requests.filter(r => r.acceptedCommittee === currentActiveComm || r.status === 'مقبول').length;
+  // حساب دقيق ومستقل لكل لجنة بناءً على رغبة المتقدم الأولى أو مقبولي اللجنة فعلياً
+  const totalApplicantsCount = requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm)).length;
+  const acceptedMembersCount = requests.filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm))).length;
 
   const handleAcceptSubmit = async () => {
     if (!selectedReqId) return;
@@ -1463,7 +1464,7 @@ export default function CommitteeDashboard() {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {allCommitteesList.map((commName, idx) => {
-                const count = requests.filter(r => r.acceptedCommittee === commName).length;
+                const count = requests.filter(r => r.acceptedCommittee === commName || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, commName))).length;
                 return (
                   <div 
                     key={idx} 
@@ -1521,19 +1522,19 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* إحصائيات فورية (للقادة فقط) */}
+        {/* إحصائيات فورية مستقلة وديناميكية لكل لجنة (للقادة فقط) */}
         {isCommitteeLeader && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-[#630517] to-[#80071D] text-white p-6 rounded-3xl shadow-xl space-y-2">
               <span className="text-[11px] font-bold text-[#F5D061] uppercase tracking-wider">إجمالي المتقدمين للجنة ({currentActiveComm})</span>
               <div className="text-3xl font-black">{totalApplicantsCount}</div>
-              <p className="text-xs text-white/80">المتقدمون برغباتهم</p>
+              <p className="text-xs text-white/80">المتقدمون برغبتهم الأولى لهذه اللجنة</p>
             </div>
 
             <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-2">
               <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">عدد الأعضاء المقبولين</span>
               <div className="text-3xl font-black text-slate-900">{acceptedMembersCount}</div>
-              <p className="text-xs text-slate-500">تم قبولهم وانضمامهم</p>
+              <p className="text-xs text-slate-500">تم قبولهم وانضمامهم للجنة</p>
             </div>
 
             <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-2">
@@ -1541,7 +1542,7 @@ export default function CommitteeDashboard() {
               <div className="text-3xl font-black text-slate-900">
                 {totalApplicantsCount > 0 ? Math.round((acceptedMembersCount / totalApplicantsCount) * 100) : 0}%
               </div>
-              <p className="text-xs text-slate-500">معدل قبول المتقدمين</p>
+              <p className="text-xs text-slate-500">معدل قبول المتقدمين المستقل</p>
             </div>
           </div>
         )}
