@@ -63,7 +63,7 @@ export default function CommitteeDashboard() {
   const [warningReason, setWarningReason] = useState('');
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [targetCommitteeForWarning, setTargetCommitteeForWarning] = useState('');
-  const [warningStepType, setWarningStepType] = useState<'warn-leaders' | 'escalate-presidents'>('warn-leaders');
+  const [warningStepType, setWarningStepType] = useState<'warn-leaders' | 'warn-members' | 'escalate-presidents'>('warn-leaders');
 
   // حالات الرد والتبرير الخاصة بالقائد المنذَر
   const [showReplyModal, setShowReplyModal] = useState(false);
@@ -205,7 +205,6 @@ export default function CommitteeDashboard() {
         setTargetCommitteeForTask(resolvedComm);
       }
 
-      // جلب رابط الواتساب الخاص باللجنة الحالية تلقائياً إن وجد
       const linkSnap = await getDoc(doc(db, 'committee_whatsapp_links', resolvedComm));
       if (linkSnap.exists()) {
         const savedLink = linkSnap.data().link || '';
@@ -520,7 +519,7 @@ export default function CommitteeDashboard() {
         try {
           const userDocRef = doc(db, 'users', targetReq.phone);
           await updateDoc(userDocRef, {
-            latestNotification: `🎉 مبارك القبول النهائي في (${currentActiveComm})! رابط قروب الواتساب: ${activeWhatsapp}`
+            latestNotification: `🎉 مبارك القبول النهائي في (${currentActiveComm})! رابط قروب الواتساب: ${activeWhatsapp}, committee: ${currentActiveComm}, assignedCommittee: ${currentActiveComm}`
           });
         } catch (e) { console.error(e); }
       }
@@ -687,19 +686,47 @@ export default function CommitteeDashboard() {
     }
 
     try {
-      const alertMsg = warningStepType === 'warn-leaders' 
-        ? `⚠️ [إنذار رسمي من الجودة للجنة ${targetCommitteeForWarning}]: ${warningReason} (يُرجى إرسال الرد والتبرير خلال 24 ساعة)`
-        : `🚨 [إحالة عاجلة للرؤساء ضد لجنة ${targetCommitteeForWarning}]: ${warningReason}`;
+      let alertMsg = '';
+      if (warningStepType === 'warn-leaders') {
+        alertMsg = `⚠️ [إنذار رسمي من الجودة لقادة لجنة ${targetCommitteeForWarning}]: ${warningReason} (يُرجى إرسال الرد والتبرير خلال 24 ساعة)`;
+      } else if (warningStepType === 'warn-members') {
+        alertMsg = `⚠️ [تنبيه رسمي من الجودة لأعضاء لجنة ${targetCommitteeForWarning}]: ${warningReason}`;
+      } else {
+        alertMsg = `🚨 [إحالة عاجلة للرؤساء ضد لجنة ${targetCommitteeForWarning}]: ${warningReason}`;
+      }
 
       for (const usr of allUsersList) {
         const commStr = usr.assignedCommittee || usr.committee || '';
-        if (matchesTargetCommittee(commStr, targetCommitteeForWarning) || usr.role?.includes('رئيس')) {
-          try {
-            await updateDoc(doc(db, 'users', usr.id), {
-              latestNotification: alertMsg,
-              warningHidden: false
-            });
-          } catch (er) { console.error(er); }
+        const roleStr = usr.role || '';
+        
+        const isMatchComm = matchesTargetCommittee(commStr, targetCommitteeForWarning);
+        if (warningStepType === 'warn-members') {
+          if (isMatchComm) {
+            try {
+              await updateDoc(doc(db, 'users', usr.id), {
+                latestNotification: alertMsg,
+                warningHidden: false
+              });
+            } catch (er) { console.error(er); }
+          }
+        } else if (warningStepType === 'warn-leaders') {
+          if ((isMatchComm && (roleStr.includes('رئيس') || roleStr.includes('قائد') || roleStr.includes('مشرف'))) || roleStr.includes('System Admin')) {
+            try {
+              await updateDoc(doc(db, 'users', usr.id), {
+                latestNotification: alertMsg,
+                warningHidden: false
+              });
+            } catch (er) { console.error(er); }
+          }
+        } else {
+          if (isMatchComm || roleStr.includes('رئيس')) {
+            try {
+              await updateDoc(doc(db, 'users', usr.id), {
+                latestNotification: alertMsg,
+                warningHidden: false
+              });
+            } catch (er) { console.error(er); }
+          }
         }
       }
 
@@ -713,7 +740,17 @@ export default function CommitteeDashboard() {
           warningSentAt: Date.now(),
           createdAt: Date.now()
         });
-        alert(`📨 [تم إرسال الإنذار وتنبيه اللجنة]: تم توجيه إنذار تحذيري رسمي لقائد وقائدة (${targetCommitteeForWarning}) وإرسال الإشعار لحساباتهم.`);
+        alert(`📨 [تم إرسال الإنذار لقادة اللجنة]: تم توجيه إنذار تحذيري رسمي لقائد وقائدة (${targetCommitteeForWarning}).`);
+      } else if (warningStepType === 'warn-members') {
+        await addDoc(collection(db, 'escalated_reports'), {
+          targetCommittee: targetCommitteeForWarning,
+          reporter: userData?.fullName || 'لجنة الجودة والتطوير',
+          reason: `[تنبيه موجه لأعضاء اللجنة]: ${warningReason}`,
+          status: '⚠️ تم إرسال تنبيه رسمي لأعضاء اللجنة',
+          leaderDefenseReply: '',
+          createdAt: Date.now()
+        });
+        alert(`📢 [تم إرسال التحذير لكافة أعضاء لجنة (${targetCommitteeForWarning})] بنجاح.`);
       } else {
         await addDoc(collection(db, 'escalated_reports'), {
           targetCommittee: targetCommitteeForWarning,
@@ -1028,7 +1065,7 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* ربط رابط الواتساب الخاص باللجنة (جديد ومضاف للقادة) */}
+        {/* ربط رابط الواتساب الخاص باللجنة */}
         {isCommitteeLeader && !isQualityTeam && (
           <div className="bg-emerald-50 border-2 border-emerald-400 rounded-3xl p-6 space-y-4 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -1126,9 +1163,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* ======================================================== */}
         {/* نظام إفادة عدم المشاركة والاعتذار المباشر */}
-        {/* ======================================================== */}
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
@@ -1214,9 +1249,7 @@ export default function CommitteeDashboard() {
           )}
         </div>
 
-        {/* ======================================================== */}
         {/* 🤝 أداة لجنة العلاقات العامة */}
-        {/* ======================================================== */}
         {(currentActiveComm === 'لجنة العلاقات العامة' || currentActiveComm === 'لجنة العلاقات') && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
@@ -1539,9 +1572,9 @@ export default function CommitteeDashboard() {
         {isQualityTeam && (
           <div className="space-y-4">
             <div className="flex justify-between items-center flex-wrap gap-3">
-              <h3 className="font-black text-slate-900 text-sm">رادار متابعة وتقييم إنجازات اللجان السبع (تنبيه القادة أولاً ثم الإحالة):</h3>
+              <h3 className="font-black text-slate-900 text-sm">رادار متابعة وتقييم إنجازات اللجان السبع (تنبيه القادة والأعضاء أولاً ثم الإحالة):</h3>
               <span className="text-[11px] bg-red-100 text-red-700 font-bold px-3 py-1 rounded-xl">
-                ⚠️ آلية العمل: إرسال تنبيه للقادة بمهلة 24 ساعة للرد، وإذا لم يتجاوبوا يتم إحالة البلاغ للرؤساء
+                ⚠️ آلية العمل: إرسال تنبيه أو تحذير للقادة أو الأعضاء، وعند عدم التجاوب يتم إحالة البلاغ للرؤساء
               </span>
             </div>
             
@@ -1561,13 +1594,27 @@ export default function CommitteeDashboard() {
                   >
                     <div className="flex justify-between items-center">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${selectedManagedCommittee === commName ? 'bg-white/20 text-[#F5D061]' : 'bg-slate-100 text-slate-600'}`}>
-                        متابعة عليا
+                        متابعة عليا (اضغط للعرض)
                       </span>
                       <span className="text-lg font-black">{count} أعضاء</span>
                     </div>
                     <h4 className="font-extrabold text-sm">{commName}</h4>
 
                     <div className="pt-2 flex flex-col gap-1.5 border-t border-white/10 mt-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedMonitoredCommittee(commName);
+                          setSelectedManagedCommittee(commName);
+                        }}
+                        className={`w-full py-1.5 rounded-xl text-[10px] font-bold transition-all ${
+                          selectedManagedCommittee === commName ? 'bg-white text-[#630517]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        📂 استعراض الأعضاء المقبولين ({count})
+                      </button>
+
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1588,6 +1635,21 @@ export default function CommitteeDashboard() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setTargetCommitteeForWarning(commName);
+                          setWarningStepType('warn-members');
+                          setShowWarningModal(true);
+                        }}
+                        className={`w-full py-1.5 rounded-xl text-[10px] font-bold transition-all ${
+                          selectedManagedCommittee === commName ? 'bg-sky-500 text-white hover:bg-sky-600' : 'bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100'
+                        }`}
+                      >
+                        📢 إرسال تحذير لأعضاء اللجنة
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTargetCommitteeForWarning(commName);
                           setWarningStepType('escalate-presidents');
                           setShowWarningModal(true);
                         }}
@@ -1595,13 +1657,74 @@ export default function CommitteeDashboard() {
                           selectedManagedCommittee === commName ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
                         }`}
                       >
-                        🚨 إحالة البلاغ للرئيس ونائبة الرئيس
+                        🚨 إحالة البلاغ للرؤساء
                       </button>
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            {/* عرض جدول الأعضاء المقبولين للجنة المحددة حالياً بلجنة الجودة */}
+            {isQualityTeam && (
+              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 mt-6">
+                <div className="flex justify-between items-center flex-wrap gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">📋 الأعضاء المقبولون في: <span className="text-[#630517]">{currentActiveComm}</span></h3>
+                    <p className="text-xs text-slate-500">هنا يتم عرض كافة أعضاء هذه اللجنة المقبولين للتدقيق والمتابعة المباشرة:</p>
+                  </div>
+                  <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs">
+                    الإجمالي: {requests.filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm))).length} عضو
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                        <th className="pb-3 pr-2">اسم العضو</th>
+                        <th className="pb-3">رقم الجوال</th>
+                        <th className="pb-3">الرقم الجامعي</th>
+                        <th className="pb-3">الحالة</th>
+                        <th className="pb-3 text-left pl-2">إجراء سريع</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {requests.filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm))).length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد أعضاء مقبولين مسجلين في هذه اللجنة حالياً.</td>
+                        </tr>
+                      ) : (
+                        requests
+                          .filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm)))
+                          .map((member, mIdx) => (
+                            <tr key={mIdx} className="hover:bg-slate-50">
+                              <td className="py-3 pr-2 font-bold text-slate-900">{member.fullName}</td>
+                              <td className="py-3 font-mono text-slate-700" dir="ltr">{member.phone}</td>
+                              <td className="py-3 text-slate-600 font-mono">{member.universityId || '-'}</td>
+                              <td className="py-3">
+                                <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+                                  {member.status || 'مقبول'}
+                                </span>
+                              </td>
+                              <td className="py-3 text-left pl-2">
+                                <a
+                                  href={`https://wa.me/${member.phone?.startsWith('0') ? '966' + member.phone.substring(1) : member.phone}?text=مرحباً بك ${member.fullName}، بصفتنا لجنة الجودة والتطوير نتابع سير أعمالك في (${current.currentActiveComm || currentActiveComm}). نتمنى لك التوفيق! ⚡`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1 bg-emerald-600 text-white font-bold rounded-lg text-[11px] inline-flex items-center gap-1 shadow hover:bg-emerald-700"
+                                >
+                                  💬 تواصل
+                                </a>
+                              </td>
+                            </tr>
+                          ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2023,12 +2146,12 @@ export default function CommitteeDashboard() {
       {showWarningModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-500">
-            <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold text-white ${warningStepType === 'warn-leaders' ? 'bg-amber-500' : 'bg-red-600'}`}>
-              {warningStepType === 'warn-leaders' ? '⚠️' : '🚨'}
+            <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold text-white ${warningStepType === 'warn-leaders' ? 'bg-amber-500' : warningStepType === 'warn-members' ? 'bg-sky-500' : 'bg-red-600'}`}>
+              {warningStepType === 'warn-leaders' ? '⚠️' : warningStepType === 'warn-members' ? '📢' : '🚨'}
             </div>
             <div className="text-center space-y-1">
               <h3 className="text-xl font-black text-slate-900">
-                {warningStepType === 'warn-leaders' ? 'تنبيه قائد وقائدة اللجنة' : 'إحالة البلاغ للرئيس ونائبة الرئيس'}
+                {warningStepType === 'warn-leaders' ? 'تنبيه قائد وقائدة اللجنة' : warningStepType === 'warn-members' ? 'إرسال تحذير لكافة أعضاء اللجنة' : 'إحالة البلاغ للرئيس ونائبة الرئيس'}
               </h3>
             </div>
             <div className="space-y-2">
@@ -2047,10 +2170,10 @@ export default function CommitteeDashboard() {
                 type="button"
                 onClick={handleExecuteWarningOrEscalation}
                 className={`w-1/2 py-3 rounded-2xl text-white font-black text-xs shadow-lg cursor-pointer ${
-                  warningStepType === 'warn-leaders' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'
+                  warningStepType === 'warn-leaders' ? 'bg-amber-600 hover:bg-amber-700' : warningStepType === 'warn-members' ? 'bg-sky-600 hover:bg-sky-700' : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
-                {warningStepType === 'warn-leaders' ? 'إرسال التنبيه 📨' : 'إحالة البلاغ ⚖️'}
+                {warningStepType === 'warn-leaders' ? 'إرسال التنبيه 📨' : warningStepType === 'warn-members' ? 'إرسال التحذير للأعضاء 📢' : 'إحالة البلاغ ⚖️'}
               </button>
             </div>
           </div>
