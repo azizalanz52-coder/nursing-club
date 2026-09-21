@@ -251,7 +251,7 @@ export default function Navbar() {
             <Link href="/" className="hover:text-rose-900 transition-colors">الرئيسية</Link>
             <Link href="/check-status" className="hover:text-rose-900 transition-colors text-[#630517] font-black">🔍 استعلام عن القبول</Link>
             <Link href="/events" className="hover:text-rose-900 transition-colors">الفعاليات</Link>
-            <Link href="/team" className="hover:text-rose-900 transition-colors">أعضاء النادي</Link>
+            <Link href="/case-study" className="hover:text-rose-900 transition-colors text-[#630517] font-black">Case Study 🩺</Link>
             
             <button
               type="button"
@@ -372,7 +372,7 @@ export default function Navbar() {
               <Link href="/" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الرئيسية</Link>
               <Link href="/check-status" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">🔍 استعلام عن القبول</Link>
               <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الفعاليات</Link>
-              <Link href="/team" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">أعضاء النادي</Link>
+              <Link href="/case-study" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">Case Study 🩺</Link>
               
               {/* زر تقديم الانضمام المغلق داخل القائمة المنسدلة للجوال */}
               <div className="py-1">
