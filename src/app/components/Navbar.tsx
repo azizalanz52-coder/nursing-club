@@ -18,7 +18,7 @@ export default function Navbar() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // حالة فتح وإغلاق الانضمام من لوحة الأدمن سحابياً (مطابقة لـ isRegistrationClosed)
+  // حالة فتح وإغلاق الانضمام من لوحة الأدمن سحابياً
   const [isRegistrationClosed, setIsRegistrationClosed] = useState(false);
   
   // حالات نافذة الترقية والمباركة الاحتفالية المنفصلة
@@ -327,10 +327,10 @@ export default function Navbar() {
               </button>
             )}
 
-            {/* زر تقديم الانضمام (يتحكم به الأدمن سحابياً بناءً على إغلاق/فتح النموذج) */}
+            {/* زر تقديم الانضمام (موجه مباشرة إلى مجلد /join الصحيح) */}
             {!isRegistrationClosed ? (
               <Link
-                href="/register"
+                href="/join"
                 className="px-4 py-2.5 rounded-2xl bg-emerald-600 text-white font-bold text-xs shadow hover:bg-emerald-700 transition-all flex items-center gap-1.5"
               >
                 <span>✨</span>
@@ -401,11 +401,11 @@ export default function Navbar() {
               <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الفعاليات</Link>
               <Link href="/case-study" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">Case Study 🩺</Link>
               
-              {/* زر تقديم الانضمام داخل القائمة المنسدلة للجوال */}
+              {/* زر تقديم الانضمام للجوال (موجه إلى /join) */}
               <div className="py-1">
                 {!isRegistrationClosed ? (
                   <Link
-                    href="/register"
+                    href="/join"
                     onClick={() => setMobileMenuOpen(false)}
                     className="w-full text-right text-white font-bold py-2 px-3 rounded-xl bg-emerald-600 flex items-center gap-2"
                   >
