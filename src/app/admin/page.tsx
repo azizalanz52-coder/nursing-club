@@ -111,7 +111,7 @@ export default function AdminDashboard() {
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study'>('case-study');
 
-  // حالة التحكم بإغلاق وفتح التسجيل سحابياً 🚀
+  // حالة التحكم بإغلاق وفتح نموذج الانضمام للجان سحابياً 🚀
   const [isRegistrationClosed, setIsRegistrationClosed] = useState<boolean>(false);
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
@@ -215,7 +215,7 @@ export default function AdminDashboard() {
     fetchSiteSettings();
   }, [router]);
 
-  // دالة لجلب إعدادات الموقع العامة (مثل حالة إغلاق التسجيل)
+  // دالة لجلب إعدادات الموقع العامة (مثل حالة إغلاق نموذج الانضمام)
   const fetchSiteSettings = async () => {
     try {
       const settingsRef = doc(db, 'site_settings', 'general');
@@ -231,18 +231,18 @@ export default function AdminDashboard() {
     }
   };
 
-  // دالة تبديل حالة إغلاق/فتح التسجيل بنقرة زر سحابياً 🚀
+  // دالة تبديل حالة إغلاق/فتح نموذج الانضمام للجان بنقرة زر سحابياً 🚀
   const handleToggleRegistrationStatus = async () => {
     const newState = !isRegistrationClosed;
     try {
       const settingsRef = doc(db, 'site_settings', 'general');
       await setDoc(settingsRef, { isRegistrationClosed: newState }, { merge: true });
       setIsRegistrationClosed(newState);
-      setModalMessage(newState ? 'تم إغلاق باب التسجيل بنجاح سحابياً! 🔒🚫' : 'تم فتح باب التسجيل بنجاح سحابياً للجميع! 🔓✨');
+      setModalMessage(newState ? 'تم إغلاق نموذج الانضمام للجان بنجاح سحابياً! 🔒🚫' : 'تم فتح نموذج الانضمام للجان بنجاح سحابياً للجميع! 🔓✨');
       setModalType('success');
     } catch (err) {
       console.error(err);
-      setModalMessage('حدث خطأ أثناء تغيير حالة التسجيل.');
+      setModalMessage('حدث خطأ أثناء تغيير حالة نموذج الانضمام.');
       setModalType('success');
     }
   };
@@ -878,7 +878,7 @@ export default function AdminDashboard() {
         const existingPhones = new Set();
         const existingUnivIds = new Set();
         
-        existingDocsSnap.forEach((d) => {
+        existingDocsSnap.docs.forEach((d) => {
           const dat = d.data();
           if (dat.phone) existingPhones.add(String(dat.phone).trim());
           if (dat.universityId) existingUnivIds.add(String(dat.universityId).trim());
@@ -1529,7 +1529,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* زر فتح وإغلاق التسجيل السحابي الفوري 🚀 */}
+          {/* زر فتح وإغلاق نموذج الانضمام للجان السحابي الفوري 🚀 */}
           <button
             type="button"
             onClick={handleToggleRegistrationStatus}
@@ -1539,7 +1539,7 @@ export default function AdminDashboard() {
                 : 'bg-red-600 hover:bg-red-700 text-white'
             }`}
           >
-            {isRegistrationClosed ? '🟢 فتح التسجيل للزوار' : '🔴 إغلاق التسجيل الفوري'}
+            {isRegistrationClosed ? '🟢 فتح نموذج الانضمام' : '🔴 إغلاق نموذج الانضمام'}
           </button>
 
           <Link
@@ -1949,7 +1949,7 @@ export default function AdminDashboard() {
                   <h3 className="text-xl font-black text-amber-900">
                     {editingAchievementId ? '✏️ تعديل الإنجاز الجماعي أو الفردي' : '🏆 إضافة إنجاز جماعي أو فردي جديد من كلية التمريض'}
                   </h3>
-                  <p className="text-xs text-slate-500">أدخل أسماء الطلبة المشاركين (الفردي أو الجماعي)، اسم الجائزة أو التكريم، صورة التكريم، وتفاصيل الإنجاز لعرضها في الصفحة الرئيسية للموقع.</p>
+                  <p className="text-xs text-slate-500">أدخل أسماء الطلبة المشاركين (الفردي أو الجماعي), اسم الجائزة أو التكريم, صورة التكريم, وتفاصيل الإنجاز لعرضها في الصفحة الرئيسية للموقع.</p>
                 </div>
                 {editingAchievementId && (
                   <button
@@ -1973,7 +1973,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-700">أسماء الطلبة المشاركين (فردي أو جماعي)</label>
                   <input
                     type="text"
-                    placeholder="مثال: عبد العزيز العنزي، طارق الشمري، محمد القحطاني"
+                    placeholder="مثال: عبد العزيز العنزي, طارق الشمري, محمد القحطاني"
                     value={studentNameInput}
                     onChange={(e) => setStudentNameInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
@@ -2588,7 +2588,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-700">التصنيف</label>
                   <input
                     type="text"
-                    placeholder="مثال: أنشطة كبرى، خدمة المجتمع"
+                    placeholder="مثال: أنشطة كبرى, خدمة المجتمع"
                     value={newDiscCategory}
                     onChange={(e) => setNewDiscCategory(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
