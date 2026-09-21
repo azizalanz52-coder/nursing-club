@@ -327,11 +327,11 @@ export default function Navbar() {
               </button>
             )}
 
-            {/* زر تقديم الانضمام (موجه مباشرة إلى مجلد /join الصحيح) */}
+            {/* زر تقديم الانضمام باللون الذهبي الفاخر (موجه إلى /join) */}
             {!isRegistrationClosed ? (
               <Link
                 href="/join"
-                className="px-4 py-2.5 rounded-2xl bg-emerald-600 text-white font-bold text-xs shadow hover:bg-emerald-700 transition-all flex items-center gap-1.5"
+                className="px-4 py-2.5 rounded-2xl bg-[#F5D061] text-[#630517] font-black text-xs shadow-md hover:brightness-105 transition-all flex items-center gap-1.5"
               >
                 <span>✨</span>
                 <span>الانضمام للنادي</span>
@@ -401,13 +401,13 @@ export default function Navbar() {
               <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الفعاليات</Link>
               <Link href="/case-study" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">Case Study 🩺</Link>
               
-              {/* زر تقديم الانضمام للجوال (موجه إلى /join) */}
+              {/* زر تقديم الانضمام للجوال باللون الذهبي */}
               <div className="py-1">
                 {!isRegistrationClosed ? (
                   <Link
                     href="/join"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="w-full text-right text-white font-bold py-2 px-3 rounded-xl bg-emerald-600 flex items-center gap-2"
+                    className="w-full text-center text-[#630517] font-black py-2.5 px-3 rounded-xl bg-[#F5D061] flex items-center justify-center gap-2 shadow"
                   >
                     <span>✨</span> الانضمام للنادي
                   </Link>
