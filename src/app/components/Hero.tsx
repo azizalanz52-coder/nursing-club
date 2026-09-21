@@ -196,23 +196,6 @@ export default function Hero() {
           {currentBanner.description}
         </p>
 
-        {/* --- بطاقة دراسة الحالة الإكلينيكية (Case Study) لتوجيه الزوار للتبويب الآخر --- */}
-        <div className="w-full max-w-2xl bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-[#F5D061]/30 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 text-right">
-          <div className="space-y-1">
-            <span className="bg-[#F5D061] text-[#630517] font-black text-[10px] px-2.5 py-0.5 rounded-full">
-              تحدي كل 24 ساعة ⏱️
-            </span>
-            <h3 className="text-lg font-black text-white">دراسة الحالة الإكلينيكية (Case Study)</h3>
-            <p className="text-xs text-white/80">حالتان تمريضيتان بمستوى (سهل إلى متوسط) مع 4 خيارات لكل حالة. اختبر معلوماتك الآن!</p>
-          </div>
-          <Link
-            href="/case-study"
-            className="whitespace-nowrap bg-[#F5D061] text-[#630517] px-6 py-3 rounded-2xl font-black text-xs shadow-lg hover:scale-105 transition-all"
-          >
-            دخول التحدي 🩺
-          </Link>
-        </div>
-
         {/* الأزرار التفاعلية */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-5 w-full sm:w-auto pt-2">
           <Link
