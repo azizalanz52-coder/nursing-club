@@ -6,12 +6,22 @@ import Link from "next/link";
 import { db } from '../lib/firebase';
 import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 
+interface BannerItem {
+  id: string;
+  tag: string;
+  title: string;
+  description: string;
+  image: string;
+  buttonText: string;
+  buttonLink: string;
+}
+
 export default function Hero() {
-  const [banners, setBanners] = useState([
+  const [banners, setBanners] = useState<BannerItem[]>([
     {
       id: 'main',
-      tag: 'مرحباً بكم ',
-      title: 'نادي التمريض ',
+      tag: 'مرحباً بكم في نادي التمريض',
+      title: 'نادي التمريض',
       description: 'مجتمع طلابي يهدف إلى تطوير المعرفة، وبناء المهارات القيادية، وصناعة أثر في مجال التمريض بجامعة حفر الباطن.',
       image: '/header-banner.png',
       buttonText: 'اكتشف النادي',
@@ -35,6 +45,7 @@ export default function Hero() {
   const [showRoleCongratModal, setShowRoleCongratModal] = useState(false);
   const [myNewRole, setMyNewRole] = useState('');
   const [myPermissions, setMyPermissions] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     const savedBanners = localStorage.getItem('UHB_BANNERS');
@@ -47,6 +58,34 @@ export default function Hero() {
       } catch (e) {
         console.error(e);
       }
+    } else {
+      // جلب البانرات من سحابة فايربيس إن وجدت لتحديث العرض أمام الزوار
+      const fetchCloudBanners = async () => {
+        try {
+          const bannersSnap = await getDocs(collection(db, 'site_banners'));
+          if (!bannersSnap.empty) {
+            const cloudList: BannerItem[] = [];
+            bannersSnap.forEach((d) => {
+              const dat = d.data();
+              cloudList.push({
+                id: d.id,
+                tag: dat.tag || 'مناسبة خاصة',
+                title: dat.title || 'نادي التمريض',
+                description: dat.description || 'مجتمع طلابي متميز بجامعة حفر الباطن.',
+                image: dat.image || '/header-banner.png',
+                buttonText: dat.buttonText || 'اكتشف النادي',
+                buttonLink: dat.buttonLink || '/discover'
+              });
+            });
+            if (cloudList.length > 0) {
+              setBanners([...cloudList, ...banners]);
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching cloud banners:', err);
+        }
+      };
+      fetchCloudBanners();
     }
 
     // التحقق من حالة العضو وطلبات القبول وتحديثات الرتب من سحابة فايربيس
@@ -56,7 +95,6 @@ export default function Hero() {
     if (userPhone || userName) {
       const checkUserData = async () => {
         try {
-          // 1. التحقق من وجود ترقية ورتبة جديدة وإشعار معلق
           if (userPhone) {
             const userDocRef = doc(db, 'users', userPhone);
             const userSnap = await getDoc(userDocRef);
@@ -66,14 +104,11 @@ export default function Hero() {
                 setMyNewRole(uData.role || 'عضو أساسي');
                 setMyPermissions(uData.assignedPermissions || 'الصلاحيات العامة للنادي.');
                 setShowRoleCongratModal(true);
-
-                // إزالة علامة الانتظار لكي لا تظهر مجدداً في كل تحديث صفحة
                 await updateDoc(userDocRef, { pendingCongratulation: false });
               }
             }
           }
 
-          // 2. التحقق من قبول الطلب وانضمامه للجنة
           const querySnapshot = await getDocs(collection(db, 'applications'));
           querySnapshot.forEach((docSnap) => {
             const data = docSnap.data();
@@ -99,7 +134,15 @@ export default function Hero() {
     }
   }, []);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // --- الانتقال التلقائي (السلايدر السينمائي) بين البانرات كل 5 ثوانٍ ---
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % banners.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [banners.length]);
+
   const currentBanner = banners[currentIndex] || banners[0];
 
   return (
@@ -121,26 +164,30 @@ export default function Hero() {
           <span>✨ {currentBanner.tag}</span>
         </div>
 
-        {/* عنوان نادي التمريض (تم إصلاح تدرج الألوان ليكون الحرف متناسقاً ونقياً) */}
+        {/* عنوان نادي التمريض */}
         <div className="space-y-3">
           <h1 className="text-4xl sm:text-7xl font-black text-white tracking-tight drop-shadow-md transition-all duration-700">
             {currentBanner.title}
           </h1>
         </div>
 
-        {/* عرض تصميم البانر مع إطار أنيق وهادئ */}
-        <div className="relative w-full rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#F5D061]/30 group transition-all duration-700 hover:scale-[1.01] hover:border-[#F5D061]/70 bg-black/30">
+        {/* عرض تصميم البانر مع إطار أنيق وهادئ ومتكيف مع أي مقاس صورة أو بوستر */}
+        <div className="relative w-full max-w-3xl mx-auto rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#F5D061]/30 group transition-all duration-700 hover:scale-[1.01] hover:border-[#F5D061]/70 bg-black/30">
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-30 group-hover:opacity-60 transition-opacity pointer-events-none z-10" />
 
-          <div className="relative z-0">
-            <Image
-              src={currentBanner.image || '/header-banner.png'} 
-              alt="بانر نادي التمريض"
-              width={1200}
-              height={500}
-              className="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-105"
-              priority
-            />
+          <div className="relative z-0 w-full flex items-center justify-center bg-black/40">
+            {currentBanner.image?.startsWith('data:video') || currentBanner.image?.includes('.mp4') ? (
+              <video src={currentBanner.image} autoPlay loop muted className="w-full h-auto max-h-[480px] object-contain mx-auto" />
+            ) : (
+              <Image
+                src={currentBanner.image || '/header-banner.png'} 
+                alt="بانر نادي التمريض"
+                width={1200}
+                height={600}
+                className="w-full h-auto max-h-[480px] object-contain mx-auto transition-transform duration-700 group-hover:scale-105"
+                priority
+              />
+            )}
           </div>
         </div>
 
@@ -166,7 +213,7 @@ export default function Hero() {
               <button
                 key={b.id}
                 onClick={() => setCurrentIndex(idx)}
-                className={`h-2.5 rounded-full transition-all duration-500 ${
+                className={`h-2.5 rounded-full transition-all duration-500 cursor-pointer ${
                   currentIndex === idx ? 'w-8 bg-[#F5D061]' : 'w-2.5 bg-white/40 hover:bg-white/80'
                 }`}
                 title={b.tag}
