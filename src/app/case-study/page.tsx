@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
 
 interface CaseQuestion {
   id: number;
@@ -15,7 +15,13 @@ interface CaseQuestion {
   explanation: string;
 }
 
-// بنك شامل ومتنوع للحالات الإكلينيكية التمريضية
+interface LeaderboardItem {
+  id: string;
+  studentName: string;
+  score: number;
+  total: number;
+}
+
 const masterCasePool: Omit<CaseQuestion, 'id'>[] = [
   {
     difficulty: 'Easy',
@@ -94,32 +100,6 @@ const masterCasePool: Omit<CaseQuestion, 'id'>[] = [
     ],
     correctIndexString: 'Begin high-quality CPR immediately, charge and check rhythm for defibrillation as soon as the AED/Defibrillator is available, and establish emergency airway management',
     explanation: 'In cardiac arrest due to V-Fib, immediate high-quality CPR and rapid defibrillation are the primary determinants of survival under ACLS guidelines.'
-  } as any,
-  {
-    difficulty: 'Moderate',
-    title: 'Case: Diabetic Ketoacidosis (DKA)',
-    scenario: 'A type 1 diabetic patient presents with fruity breath odor, Kussmaul respirations, blood glucose of 480 mg/dL, and pH of 7.21. What is the initial priority fluid order?',
-    options: [
-      '5% Dextrose in water rapidly',
-      'Isotonic Normal Saline (0.9% NaCl) IV infusion for volume expansion',
-      'Hypotonic saline (0.45% NaCl) with high insulin bolus',
-      'Strict fluid restriction'
-    ],
-    correctIndexString: 'Isotonic Normal Saline (0.9% NaCl) IV infusion for volume expansion',
-    explanation: 'Initial management of DKA focuses on restoring intravascular volume and tissue perfusion with isotonic crystalloids before insulin therapy.'
-  } as any,
-  {
-    difficulty: 'Easy',
-    title: 'Case: Oxygen Therapy Safety',
-    scenario: 'A patient is receiving oxygen therapy via nasal cannula at 3 L/min. Which safety precaution is most critical for the nurse to enforce?',
-    options: [
-      'Prohibit smoking and open flames in and around the patient room',
-      'Remove the cannula every 30 minutes for 10 minutes of room air',
-      'Humidification is strictly required for any flow rate above 1 L/min',
-      'Apply petroleum jelly around the nostrils to prevent dryness'
-    ],
-    correctIndexString: 'Prohibit smoking and open flames in and around the patient room',
-    explanation: 'Oxygen supports combustion; hence, strict "No Smoking" and fire hazard precautions are mandatory.'
   } as any
 ];
 
@@ -134,8 +114,11 @@ export default function CaseStudyPage() {
   const [hasSubmittedToday, setHasSubmittedToday] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // حالات لوحة الصدارة
+  const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+
   useEffect(() => {
-    // توليد رقم عشوائي ثابت يعتمد على تاريخ اليوم (السنة + اليوم في السنة) ليتغير كل 24 ساعة بدقة لكل المستخدمين
     const now = new Date();
     const startOfYear = new Date(now.getFullYear(), 0, 0);
     const diff = now.getTime() - startOfYear.getTime();
@@ -143,45 +126,38 @@ export default function CaseStudyPage() {
     const dayOfYear = Math.floor(diff / oneDay);
     const seed = now.getFullYear() * 1000 + dayOfYear;
 
-    // دالة شبه عشوائية مبنية على الـ seed لتحديد 3 حالات مختلفة وخاصة بهذا اليوم
     const shuffledPool = [...masterCasePool];
-    // خلط البنك بناءً على الـ seed اليومي
     for (let i = shuffledPool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.abs(Math.sin(seed + i) * 10000)) % (i + 1);
       [shuffledPool[i], shuffledPool[j]] = [shuffledPool[j], shuffledPool[i]];
     }
 
-    // نختار أول 3 حالات لليوم ونقوم بخلط خياراتها عشوائياً بحيث تتغير أماكن الإجابات الصحيحة يومياً
     const selectedDaily = shuffledPool.slice(0, 3).map((item, index) => {
-      const optionsWithOriginalIndex = item.options.map((opt, idx) => ({
+      const optionsWithOriginalIndex = item.options.map((opt) => ({
         text: opt,
         isCorrect: opt === (item as any).correctIndexString
       }));
 
-      // خلط خيارات هذه الحالة بناءً على seed اليوم ورقم السؤال
       const optionSeed = seed + index;
       for (let i = optionsWithOriginalIndex.length - 1; i > 0; i--) {
         const j = Math.floor(Math.abs(Math.sin(optionSeed + i) * 10000)) % (i + 1);
         [optionsWithOriginalIndex[i], optionsWithOriginalIndex[j]] = [optionsWithOriginalIndex[j], optionsWithOriginalIndex[i]];
       }
 
-      const newOptions = optionsWithOriginalIndex.map(o => o.text);
-      const newCorrectIndex = optionsWithOriginalIndex.findIndex(o => o.isCorrect);
-
       return {
         id: index + 1,
         difficulty: item.difficulty,
         title: `Case ${index + 1}: ${item.title.split(': ')[1] || item.title}`,
         scenario: item.scenario,
-        options: newOptions,
-        correctIndex: newCorrectIndex,
+        options: optionsWithOriginalIndex.map(o => o.text),
+        correctIndex: optionsWithOriginalIndex.findIndex(o => o.isCorrect),
         explanation: item.explanation
       };
     });
 
     setActiveCases(selectedDaily);
+    fetchLeaderboard();
 
-    // ربط تلقائي ببيانات تسجيل الدخول المخزنة لجلسة الطالب
     const savedName = localStorage.getItem('userName') || localStorage.getItem('fullName');
     const savedPhone = localStorage.getItem('userPhone') || localStorage.getItem('phone');
     
@@ -200,6 +176,26 @@ export default function CaseStudyPage() {
 
     return () => clearInterval(timer);
   }, []);
+
+  const fetchLeaderboard = async () => {
+    try {
+      const q = query(collection(db, 'case_study_submissions'), orderBy('score', 'desc'), limit(10));
+      const snap = await getDocs(q);
+      const list: LeaderboardItem[] = [];
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          studentName: data.studentName || 'مشارك',
+          score: data.score || 0,
+          total: data.total || 3
+        });
+      });
+      setLeaderboard(list);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const checkIfAlreadySubmitted = async (phone: string) => {
     try {
@@ -263,6 +259,7 @@ export default function CaseStudyPage() {
 
       setHasSubmittedToday(true);
       setShowResults(true);
+      fetchLeaderboard(); // تحديث لوحة الصدارة فوراً
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء حفظ النتيجة، تأكد من الاتصال بقاعدة البيانات.');
@@ -272,8 +269,23 @@ export default function CaseStudyPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 pb-20" dir="ltr">
-      <div className="bg-[#630517] text-white py-12 px-6 text-center space-y-3 shadow-md">
+    <main className="min-h-screen bg-slate-50 text-slate-900 pb-20 relative" dir="ltr">
+      
+      {/* هيدر الصفحة مع أيقونة لوحة الصدارة في الزاوية */}
+      <div className="bg-[#630517] text-white py-12 px-6 text-center space-y-3 shadow-md relative">
+        
+        {/* زر لوحة الصدارة العائم في الزاوية */}
+        <div className="absolute top-6 right-6 z-20">
+          <button
+            type="button"
+            onClick={() => setShowLeaderboardModal(true)}
+            className="flex items-center gap-2 bg-[#F5D061] text-[#630517] px-4 py-2.5 rounded-2xl font-black text-xs shadow-lg hover:scale-105 transition-all cursor-pointer"
+          >
+            <span className="text-base">🏆</span>
+            <span>Leaderboard</span>
+          </button>
+        </div>
+
         <span className="bg-[#F5D061] text-[#630517] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider inline-block">
           ⏱️ Daily Advanced Clinical Challenge
         </span>
@@ -288,7 +300,62 @@ export default function CaseStudyPage() {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+      {/* مودل (نافذة منبثقة) لوحة الصدارة */}
+      {showLeaderboardModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-slate-200 text-right" dir="rtl">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <h3 className="text-xl font-black text-[#630517] flex items-center gap-2">
+                <span>🏆</span> لوحة صدارة المتطوعين والطلاب
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowLeaderboardModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500">أبرز الأسماء المتصدرة في تحدي الحالات الإكلينيكية التمريضية:</p>
+
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pl-1">
+              {leaderboard.length === 0 ? (
+                <p className="text-center text-xs text-slate-400 py-8 font-medium">لا توجد سجلات صدارة حتى الآن، كن أول المشاركين!</p>
+              ) : (
+                leaderboard.map((item, idx) => (
+                  <div key={item.id} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs font-bold">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black ${
+                        idx === 0 ? 'bg-amber-400 text-slate-900 shadow-sm' :
+                        idx === 1 ? 'bg-slate-300 text-slate-800' :
+                        idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {idx + 1}
+                      </span>
+                      <span className="text-slate-800">{item.studentName}</span>
+                    </div>
+                    <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-mono font-bold">
+                      ⭐ {item.score} / {item.total}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowLeaderboardModal(false)}
+              className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow-md cursor-pointer hover:brightness-110"
+            >
+              إغلاق
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* بقية محتوى الحالات الإكلينيكية */}
+      <div className="max-w-3xl mx-auto px-4 py-10 space-y-8" dir="ltr">
         {activeCases.map((item) => (
           <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
