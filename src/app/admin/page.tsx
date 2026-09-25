@@ -1686,7 +1686,7 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {activeTab ={activeTab === 'case-study' && (
+       {activeTab === 'case-study' && (
   <div className="bg-white rounded-3xl p-8 border border-emerald-300 shadow-sm space-y-6">
     <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
       <div>
