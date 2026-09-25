@@ -15,13 +15,23 @@ const COMMITTEES = [
   'لجنة تنظيم الفعاليات',
 ];
 
+const ACADEMIC_LEVELS = [
+  'المستوى الأول',
+  'المستوى الثاني',
+  'المستوى الثالث',
+  'المستوى الرابع',
+  'المستوى الخامس',
+  'المستوى السادس',
+  'المستوى السابع',
+  'المستوى الثامن',
+];
+
 export default function JoinPage() {
   const [formData, setFormData] = useState({
     fullName: '',
     universityId: '',
-    email: '',
+    academicLevel: 'المستوى الأول',
     phone: '',
-    major: '',
     firstChoice: 'لجنة التصميم',
     secondChoice: 'لجنة الإعلام',
     thirdChoice: 'لجنة العلاقات العامة',
@@ -89,9 +99,8 @@ export default function JoinPage() {
       setFormData({
         fullName: '',
         universityId: '',
-        email: '',
+        academicLevel: 'المستوى الأول',
         phone: '',
-        major: '',
         firstChoice: 'لجنة التصميم',
         secondChoice: 'لجنة الإعلام',
         thirdChoice: 'لجنة العلاقات العامة',
@@ -210,35 +219,21 @@ export default function JoinPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-black text-black mb-1.5">التخصص الدراسي</label>
-                <input
-                  type="text"
-                  name="major"
-                  required
-                  value={formData.major}
+                <label className="block text-sm font-black text-black mb-1.5">المستوى الدراسي</label>
+                <select
+                  name="academicLevel"
+                  value={formData.academicLevel}
                   onChange={handleChange}
-                  placeholder="مثال: التمريض"
-                  autoComplete="off"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-black font-medium focus:ring-2 focus:ring-rose-900 focus:outline-none text-sm placeholder:text-slate-400 bg-white"
-                />
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 font-bold text-black focus:ring-2 focus:ring-rose-900 focus:outline-none text-sm bg-white"
+                >
+                  {ACADEMIC_LEVELS.map((level) => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-black text-black mb-1.5">البريد الإلكتروني</label>
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="name@gmail.com"
-                  autoComplete="off"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-black font-medium focus:ring-2 focus:ring-rose-900 focus:outline-none text-sm placeholder:text-slate-400 bg-white"
-                  dir="ltr"
-                />
-              </div>
+            <div>
               <div>
                 <label className="block text-sm font-black text-black mb-1.5">رقم الجوال (واتساب)</label>
                 <input
