@@ -7,7 +7,7 @@ import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 
 interface CaseQuestion {
   id: number;
-  difficulty: 'Easy' | 'Moderate';
+  difficulty: 'Easy' | 'Moderate' | 'Hard';
   title: string;
   scenario: string;
   options: string[];
@@ -16,6 +16,7 @@ interface CaseQuestion {
 }
 
 export default function CaseStudyPage() {
+  // بنك الحالات السريرية المتجدد (مستويات: سهلة، متوسطة، ومتقدمة/صعبة جداً)
   const casePool: CaseQuestion[][] = [
     [
       {
@@ -45,6 +46,20 @@ export default function CaseStudyPage() {
         ],
         correctIndex: 2,
         explanation: 'These are classic signs of infiltration. The IV must be stopped and removed immediately to prevent tissue damage.'
+      },
+      {
+        id: 3,
+        difficulty: 'Hard',
+        title: 'Case 3: Advanced Hemodynamic Crisis (Sepsis)',
+        scenario: 'A postoperative patient develops a temperature of 39.2°C, blood pressure of 82/50 mmHg, heart rate of 135 bpm, and acute confusion. Serum lactate is 4.2 mmol/L. What is the priority nursing and medical intervention bundle within the first hour?',
+        options: [
+          'Administer scheduled oral antihypertensives and reassess in 2 hours',
+          'Initiate rapid IV fluid resuscitation (crystalloids 30 mL/kg), draw blood cultures, and administer broad-spectrum IV antibiotics immediately',
+          'Apply a cooling blanket and restrict fluid intake to prevent pulmonary edema',
+          'Prepare the patient for immediate emergency surgery'
+        ],
+        correctIndex: 1,
+        explanation: 'In septic shock, early goal-directed therapy requires immediate fluid resuscitation, obtaining blood cultures before antibiotics, and administering broad-spectrum IV antibiotics within the 1-hour bundle to prevent multi-organ failure.'
       }
     ],
     [
@@ -75,6 +90,20 @@ export default function CaseStudyPage() {
         ],
         correctIndex: 2,
         explanation: 'Medications should not be given to unresponsive or deeply sleeping patients to prevent aspiration risks.'
+      },
+      {
+        id: 3,
+        difficulty: 'Hard',
+        title: 'Case 3: Critical Arrhythmia & Cardiac Arrest Preparedness',
+        scenario: 'A telemetry-monitored patient suddenly exhibits ventricular fibrillation (V-Fib) on the monitor. The patient is unresponsive and pulseless. What is the immediate, non-negotiable sequence of actions?',
+        options: [
+          'Check patient pupillary response, administer IV atropine, and call family members',
+          'Begin high-quality CPR immediately, charge and check rhythm for defibrillation as soon as the AED/Defibrillator is available, and establish emergency airway management',
+          'Administer sublingual nitroglycerin and check blood pressure',
+          'Document the exact time of arrest in the chart and wait for the code team'
+        ],
+        correctIndex: 1,
+        explanation: 'In cardiac arrest due to V-Fib, immediate high-quality CPR and rapid defibrillation are the primary determinants of survival under ACLS guidelines.'
       }
     ]
   ];
@@ -90,11 +119,14 @@ export default function CaseStudyPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    // تحديث الحالات تلقائياً كل 24 ساعة بناءً على أيام السنة لمنع التكرار
     const dayIndex = Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % casePool.length;
     setActiveCases(casePool[dayIndex]);
 
-    const savedName = localStorage.getItem('userName');
-    const savedPhone = localStorage.getItem('userPhone');
+    // ربط تلقائي ببيانات تسجيل الدخول المخزنة لجلسة الطالب
+    const savedName = localStorage.getItem('userName') || localStorage.getItem('fullName');
+    const savedPhone = localStorage.getItem('userPhone') || localStorage.getItem('phone');
+    
     if (savedName) setStudentName(savedName);
     if (savedPhone) {
       setStudentPhone(savedPhone);
@@ -116,13 +148,15 @@ export default function CaseStudyPage() {
       const q = query(collection(db, 'case_study_submissions'), where('phone', '==', phone));
       const snap = await getDocs(q);
       if (!snap.empty) {
-        const data = snap.docs[0].data();
-        const submissionDate = new Date(data.timestamp).toDateString();
-        const todayDate = new Date().toDateString();
-        if (submissionDate === todayDate) {
-          setHasSubmittedToday(true);
-          setShowResults(true);
-        }
+        snap.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          const submissionDate = new Date(data.timestamp).toDateString();
+          const todayDate = new Date().toDateString();
+          if (submissionDate === todayDate) {
+            setHasSubmittedToday(true);
+            setShowResults(true);
+          }
+        });
       }
     } catch (err) {
       console.error(err);
@@ -145,31 +179,36 @@ export default function CaseStudyPage() {
   const handleSubmitAnswers = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentName.trim() || !studentPhone.trim()) {
-      alert('الرجاء إدخال الاسم ورقم الجوال لتسجيل النتيجة!');
+      alert('الرجاء التأكد من تسجيل الدخول أولاً ليتم توثيق اسمك ورقمك تلقائياً!');
+      return;
+    }
+
+    if (Object.keys(selectedAnswers).length < activeCases.length) {
+      alert('الرجاء الإجابة على جميع الحالات الإكلينيكية قبل الإرسال!');
       return;
     }
 
     setSubmitting(true);
     try {
       const score = calculateScore();
-      // تم تصحيح adddoc إلى addDoc هنا:
+      const now = new Date();
+      
+      // حفظ الحل في قاعدة البيانات مع الاسم، الرقم، التاريخ، والوقت بدقة لتظهر للأدمن
       await addDoc(collection(db, 'case_study_submissions'), {
-        studentName: studentName.trim(), // تم توحيد المفتاح ليتوافق مع لوحة التحكم
+        studentName: studentName.trim(),
         phone: studentPhone.trim(),
         score: score,
         total: activeCases.length,
         timestamp: Date.now(),
-        dateStr: new Date().toLocaleDateString()
+        dateStr: now.toLocaleDateString('ar-SA'),
+        timeStr: now.toLocaleTimeString('ar-SA')
       });
-
-      localStorage.setItem('userName', studentName.trim());
-      localStorage.setItem('userPhone', studentPhone.trim());
 
       setHasSubmittedToday(true);
       setShowResults(true);
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء حفظ النتيجة، تأكد من الاتصال.');
+      alert('حدث خطأ أثناء حفظ النتيجة، تأكد من الاتصال بقاعدة البيانات.');
     } finally {
       setSubmitting(false);
     }
@@ -179,11 +218,11 @@ export default function CaseStudyPage() {
     <main className="min-h-screen bg-slate-50 text-slate-900 pb-20" dir="ltr">
       <div className="bg-[#630517] text-white py-12 px-6 text-center space-y-3 shadow-md">
         <span className="bg-[#F5D061] text-[#630517] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider inline-block">
-          ⏱️ Daily Clinical Challenge
+          ⏱️ Daily Advanced Clinical Challenge
         </span>
         <h1 className="text-3xl sm:text-4xl font-black">Nursing Clinical Case Studies</h1>
         <p className="text-xs sm:text-sm text-white/80 max-w-xl mx-auto">
-          Test your knowledge. Next challenge refresh in: <span className="text-[#F5D061] font-bold">{timeLeft}</span>
+          Test your advanced knowledge. Next daily rotation in: <span className="text-[#F5D061] font-bold">{timeLeft}</span>
         </p>
         <div className="pt-2">
           <Link href="/" className="text-xs text-[#F5D061] underline font-bold">
@@ -197,7 +236,10 @@ export default function CaseStudyPage() {
           <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
               <span className="font-black text-[#630517] text-base">{item.title}</span>
-              <span className={`text-xs font-bold px-3 py-1 rounded-full ${item.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                item.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-800' : 
+                item.difficulty === 'Moderate' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+              }`}>
                 Level: {item.difficulty}
               </span>
             </div>
@@ -249,26 +291,10 @@ export default function CaseStudyPage() {
         ))}
 
         {!showResults ? (
-          <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="text-sm font-black text-slate-900">Enter your details to submit your score:</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="Full Name (الاسم الكامل)"
-                value={studentName}
-                onChange={(e) => setStudentName(e.target.value)}
-                className="p-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Phone Number (رقم الجوال 05XXXXXXXX)"
-                value={studentPhone}
-                onChange={(e) => setStudentPhone(e.target.value)}
-                className="p-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900"
-                dir="ltr"
-                required
-              />
+          <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 text-center">
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-700 font-medium">
+              🔒 Connected as: <strong className="text-[#630517]">{studentName || 'مستخدم مسجل'}</strong> (Phone: <span dir="ltr">{studentPhone || '---'}</span>)
+              <p className="text-[10px] text-slate-400 mt-1">Your submission will be recorded automatically with your profile credentials and timestamp.</p>
             </div>
             <button
               type="submit"
@@ -282,10 +308,10 @@ export default function CaseStudyPage() {
           <div className="bg-emerald-50 border-2 border-emerald-300 p-6 rounded-3xl space-y-3 text-center">
             <h3 className="text-xl font-black text-emerald-900">Your Score: {calculateScore()} / {activeCases.length} Correct! 🎉</h3>
             <p className="text-xs text-emerald-700 font-medium">
-              Thank you for participating. Your response has been recorded successfully.
+              Thank you for participating. Your response has been linked to your profile and recorded in the admin dashboard successfully.
             </p>
             <div className="bg-white/80 p-3 rounded-2xl border border-emerald-200 text-xs text-slate-700 font-bold">
-              ⏳ Next challenge available after: <span className="text-[#630517]">{timeLeft}</span>
+              ⏳ Next daily rotation available after: <span className="text-[#630517]">{timeLeft}</span>
             </div>
           </div>
         )}
