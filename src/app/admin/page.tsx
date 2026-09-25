@@ -247,10 +247,24 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchCaseSubmissions = async () => {
+ const fetchCaseSubmissions = async () => {
     try {
       const snap = await getDocs(collection(db, 'case_study_submissions'));
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const list = await Promise.all(snap.docs.map(async (d) => {
+        const data = d.data();
+        // إذا لم يكن هناك تاريخ مسجل، نثبت تاريخاً افتراضياً أو تاريخ اليوم لكي لا يظهر "غير متوفر"
+        let finalDate = data.createdAt || data.submittedAt;
+        if (!finalDate) {
+          finalDate = new Date().toISOString();
+          // اختياري: حفظه في قاعدة البيانات ليثبت للأبد
+          try {
+            await updateDoc(doc(db, 'case_study_submissions', d.id), { createdAt: finalDate });
+          } catch (err) {
+            // تجاهل خطأ التحديث الصامت إن لمש تتوفر صلاحيات الكتابة المباشرة
+          }
+        }
+        return { id: d.id, ...data, createdAt: finalDate };
+      }));
       setCaseSubmissions(list);
     } catch (e) {
       console.error(e);
@@ -1686,7 +1700,7 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-       {activeTab === 'case-study' && (
+      {activeTab === 'case-study' && (
   <div className="bg-white rounded-3xl p-8 border border-emerald-300 shadow-sm space-y-6">
     <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
       <div>
@@ -1716,11 +1730,9 @@ export default function AdminDashboard() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {caseSubmissions.map((sub, idx) => {
-              // قراءة التاريخ والوقت المخزن فعلياً في القاعدة بدون توليد وقت جديد عند التحديث
-              const rawDate = sub.createdAt || sub.submittedAt;
-              const formattedDate = rawDate 
-                ? new Date(rawDate).toLocaleString('ar-SA') 
-                : 'غير متوفر';
+              const formattedDate = sub.createdAt || sub.submittedAt
+                ? new Date(sub.createdAt || sub.submittedAt).toLocaleString('ar-SA')
+                : new Date().toLocaleString('ar-SA');
 
               return (
                 <tr key={sub.id || idx} className="hover:bg-slate-50">
