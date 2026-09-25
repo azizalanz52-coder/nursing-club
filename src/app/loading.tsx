@@ -4,59 +4,53 @@ import React from 'react';
 import Image from 'next/image';
 
 export default function LoadingScreen() {
-  return (
-    <div className="fixed inset-0 z-[99999] bg-[#020001] flex items-center justify-center px-4 overflow-hidden" dir="rtl">
-      
-       {/* تأثيرات خلفية نارية وذهبية متوهجة */}
-       <div className="absolute w-[600px] h-[600px] bg-gradient-to-r from-red-900/40 via-amber-600/20 to-transparent rounded-full blur-[160px] pointer-events-none animate-pulse"></div>
+  return (
+    <main className="min-h-screen bg-[#630517] flex items-center justify-center px-4 relative overflow-hidden" dir="rtl">
+      
+      {/* تأثيرات جمالية في الخلفية */}
+      <div className="absolute w-96 h-96 bg-[#F5D061]/10 rounded-full blur-3xl pointer-events-none"></div>
 
-       {/* البوكس الرئيسي الفخم جداً */}
-       <div className="relative max-w-md w-full bg-[#120205] border-2 border-amber-400/60 rounded-[48px] p-8 sm:p-12 shadow-[0_0_100px_rgba(245,208,97,0.3)] text-center space-y-8">
-          
-          {/* دائرة الشعار المتحركة */}
-          <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
-             <div className="absolute inset-0 rounded-full border-4 border-amber-400/30 border-t-amber-400 animate-spin"></div>
-             <div className="relative w-20 h-20 bg-[#24040a] border border-amber-400/80 rounded-3xl flex items-center justify-center shadow-2xl">
-                <Image
-                  src="/logo.png"
-                  alt="شعار نادي التمريض"
-                  width={52}
-                  height={52}
-                  className="object-contain"
-                />
-             </div>
-          </div>
+      {/* البوكس الزجاجي */}
+      <div className="max-w-md w-full bg-black/40 backdrop-blur-xl border border-[#F5D061]/30 p-8 rounded-3xl shadow-2xl text-center space-y-6 text-white relative z-10">
+        
+        {/* أيقونة أو شعار النادي */}
+        <div className="relative w-20 h-20 mx-auto bg-[#630517]/80 border border-[#F5D061]/40 rounded-2xl flex items-center justify-center shadow-inner overflow-hidden">
+          <Image
+            src="/logo.png"
+            alt="شعار نادي التمريض"
+            width={50}
+            height={50}
+            className="object-contain drop-shadow"
+          />
+        </div>
 
-          {/* نص الصلاة على النبي (العنصر الأساسي اللي طلبته) */}
-          <div className="space-y-3">
-             <div className="inline-block px-4 py-1.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-black tracking-widest uppercase">
-                ⚡ إطلاق منصة نادي التمريض 2026
-             </div>
-             <h2 className="text-xl sm:text-2xl font-black text-white leading-relaxed">
-                اللهم صل وسلم على نبينا محمد
-             </h2>
-             <p className="text-amber-100/60 text-xs font-medium">
-                نصنع لك تجربة رقمية استثنائية.. ثوانٍ المعدودة ويبدأ العرض
-             </p>
-          </div>
+        {/* شارة علوية */}
+        <div className="inline-flex items-center gap-1.5 px-4 py-1 rounded-full bg-[#F5D061]/10 border border-[#F5D061]/30 text-[#F5D061] text-xs font-bold tracking-wider uppercase">
+          <span>✨</span>
+          <span>جاري تجهيز التجربة</span>
+        </div>
 
-          {/* شريط تحميل فخم ومختلف كلياً */}
-          <div className="space-y-2.5">
-             <div className="w-full h-3 bg-black rounded-full overflow-hidden border border-amber-400/40 p-0.5">
-                <div className="h-full bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-200 rounded-full animate-pulse w-4/5 shadow-[0_0_20px_#F5D061]"></div>
-             </div>
-             <div className="flex justify-between items-center text-[10px] text-amber-300/80 font-mono font-bold">
-                <span>LOADING ASSETS</span>
-                <span>جامعة حفر الباطن</span>
-             </div>
-          </div>
+        {/* الصلاة على النبي */}
+        <div className="space-y-2">
+          <h2 className="text-xl sm:text-2xl font-black text-[#FFFDF7] leading-relaxed">
+            اللهم صل وسلم على نبينا محمد
+          </h2>
+          <p className="text-amber-50/70 text-xs sm:text-sm">
+            لحظات بسيطة ونجهز لك محتوى نادي التمريض
+          </p>
+        </div>
 
-          {/* التوقيع السفلي */}
-          <div className="pt-4 border-t border-white/10 text-[11px] text-amber-400 font-extrabold tracking-widest">
-             نادي التمريض • حفر الباطن
-          </div>
+        {/* شريط التحميل (Progress Bar) */}
+        <div className="w-full bg-black/60 rounded-full h-2.5 p-0.5 border border-[#F5D061]/20 overflow-hidden">
+          <div className="bg-gradient-to-r from-[#F5D061] to-[#E2B739] h-full rounded-full animate-pulse w-3/4"></div>
+        </div>
 
-       </div>
-    </div>
-  );
+        {/* التوقيع السفلي */}
+        <div className="text-[11px] text-[#F5D061]/70 font-semibold tracking-wider uppercase">
+          نادي التمريض • جامعة حفر الباطن
+        </div>
+
+      </div>
+    </main>
+  );
 }
