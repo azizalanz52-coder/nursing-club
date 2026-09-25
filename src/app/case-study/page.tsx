@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
-import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query } from 'firebase/firestore';
 
 interface CaseQuestion {
   id: number;
@@ -16,10 +16,8 @@ interface CaseQuestion {
 }
 
 interface LeaderboardItem {
-  id: string;
   studentName: string;
-  score: number;
-  total: number;
+  totalScore: number;
 }
 
 const masterCasePool: Omit<CaseQuestion, 'id'>[] = [
@@ -114,7 +112,6 @@ export default function CaseStudyPage() {
   const [hasSubmittedToday, setHasSubmittedToday] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // حالات لوحة الصدارة
   const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
 
@@ -177,21 +174,34 @@ export default function CaseStudyPage() {
     return () => clearInterval(timer);
   }, []);
 
+  // دمج تجميع النقاط التراكمية لكل طالب بحيث يظهر اسمه مرة واحدة فقط مرتباً تنازلياً
   const fetchLeaderboard = async () => {
     try {
-      const q = query(collection(db, 'case_study_submissions'), orderBy('score', 'desc'), limit(10));
+      const q = query(collection(db, 'case_study_submissions'));
       const snap = await getDocs(q);
-      const list: LeaderboardItem[] = [];
+      const scoreMap: Record<string, number> = {};
+
       snap.forEach(docSnap => {
         const data = docSnap.data();
-        list.push({
-          id: docSnap.id,
-          studentName: data.studentName || 'مشارك',
-          score: data.score || 0,
-          total: data.total || 3
-        });
+        const name = (data.studentName || 'مشارك').trim();
+        const score = Number(data.score) || 0;
+        
+        if (scoreMap[name]) {
+          scoreMap[name] += score; // تجميع النقاط تراكمياً
+        } else {
+          scoreMap[name] = score;
+        }
       });
-      setLeaderboard(list);
+
+      const list: LeaderboardItem[] = Object.keys(scoreMap).map(name => ({
+        studentName: name,
+        totalScore: scoreMap[name]
+      }));
+
+      // ترتيب تنازلي حسب مجموع النقاط التراكمية
+      list.sort((a, b) => b.totalScore - a.totalScore);
+
+      setLeaderboard(list.slice(0, 10)); // أعلى 10 متصدرين
     } catch (err) {
       console.error(err);
     }
@@ -199,16 +209,18 @@ export default function CaseStudyPage() {
 
   const checkIfAlreadySubmitted = async (phone: string) => {
     try {
-      const q = query(collection(db, 'case_study_submissions'), where('phone', '==', phone));
+      const q = query(collection(db, 'case_study_submissions'));
       const snap = await getDocs(q);
       if (!snap.empty) {
         snap.docs.forEach(docSnap => {
           const data = docSnap.data();
-          const submissionDate = new Date(data.timestamp).toDateString();
-          const todayDate = new Date().toDateString();
-          if (submissionDate === todayDate) {
-            setHasSubmittedToday(true);
-            setShowResults(true);
+          if (data.phone === phone) {
+            const submissionDate = new Date(data.timestamp).toDateString();
+            const todayDate = new Date().toDateString();
+            if (submissionDate === todayDate) {
+              setHasSubmittedToday(true);
+              setShowResults(true);
+            }
           }
         });
       }
@@ -259,7 +271,7 @@ export default function CaseStudyPage() {
 
       setHasSubmittedToday(true);
       setShowResults(true);
-      fetchLeaderboard(); // تحديث لوحة الصدارة فوراً
+      fetchLeaderboard();
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء حفظ النتيجة، تأكد من الاتصال بقاعدة البيانات.');
@@ -271,10 +283,8 @@ export default function CaseStudyPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 pb-20 relative" dir="ltr">
       
-      {/* هيدر الصفحة مع أيقونة لوحة الصدارة في الزاوية */}
       <div className="bg-[#630517] text-white py-12 px-6 text-center space-y-3 shadow-md relative">
         
-        {/* زر لوحة الصدارة العائم في الزاوية */}
         <div className="absolute top-6 right-6 z-20">
           <button
             type="button"
@@ -282,7 +292,7 @@ export default function CaseStudyPage() {
             className="flex items-center gap-2 bg-[#F5D061] text-[#630517] px-4 py-2.5 rounded-2xl font-black text-xs shadow-lg hover:scale-105 transition-all cursor-pointer"
           >
             <span className="text-base">🏆</span>
-            <span>Leaderboard</span>
+            <span>لوحة الصدارة</span>
           </button>
         </div>
 
@@ -300,13 +310,12 @@ export default function CaseStudyPage() {
         </div>
       </div>
 
-      {/* مودل (نافذة منبثقة) لوحة الصدارة */}
       {showLeaderboardModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-slate-200 text-right" dir="rtl">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <h3 className="text-xl font-black text-[#630517] flex items-center gap-2">
-                <span>🏆</span> لوحة صدارة المتطوعين والطلاب
+                <span>🏆</span> لوحة الصدارة
               </h3>
               <button
                 type="button"
@@ -317,14 +326,12 @@ export default function CaseStudyPage() {
               </button>
             </div>
 
-            <p className="text-xs text-slate-500">أبرز الأسماء المتصدرة في تحدي الحالات الإكلينيكية التمريضية:</p>
-
             <div className="space-y-2.5 max-h-72 overflow-y-auto pl-1">
               {leaderboard.length === 0 ? (
                 <p className="text-center text-xs text-slate-400 py-8 font-medium">لا توجد سجلات صدارة حتى الآن، كن أول المشاركين!</p>
               ) : (
                 leaderboard.map((item, idx) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs font-bold">
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs font-bold">
                     <div className="flex items-center gap-3">
                       <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black ${
                         idx === 0 ? 'bg-amber-400 text-slate-900 shadow-sm' :
@@ -336,7 +343,7 @@ export default function CaseStudyPage() {
                       <span className="text-slate-800">{item.studentName}</span>
                     </div>
                     <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-mono font-bold">
-                      ⭐ {item.score} / {item.total}
+                      ⭐ {item.totalScore} نقطة
                     </span>
                   </div>
                 ))
@@ -354,7 +361,6 @@ export default function CaseStudyPage() {
         </div>
       )}
 
-      {/* بقية محتوى الحالات الإكلينيكية */}
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8" dir="ltr">
         {activeCases.map((item) => (
           <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
