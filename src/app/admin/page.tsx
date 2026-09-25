@@ -1622,115 +1622,18 @@ const handleUpdateCaseScore = async (id: string, currentScore: number, delta: nu
             🩺 دراسة الحالة ({caseSubmissions.length})
           </button>
 
-         {/* تبويب الحسابات والرتب والصلاحيات (محمي وآمن تماماً من الأخطاء) */}
-{activeTab === 'users-manager' && isSystemAdminUser && (
-  <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-    <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
-      <div>
-        <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين والأسماء وكلمات المرور والرتب</h3>
-        <p className="text-xs text-slate-500">يمكنك تعديل اسم المستخدم، رقم الجوال، كلمة المرور، أو الرتبة وتحديثها سحابياً في أي وقت.</p>
-      </div>
-      <span className="px-3 py-1 rounded-full bg-rose-100 text-rose-900 font-bold text-xs">
-        إجمالي الحسابات: {usersList?.length || 0}
-      </span>
-    </div>
-
-    {!usersList || usersList.length === 0 ? (
-      <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-        <p className="text-sm font-bold">لا توجد حسابات مسجلة حالياً أو جاري التحميل...</p>
-      </div>
-    ) : (
-      <div className="overflow-x-auto">
-        <table className="w-full text-right text-xs">
-          <thead>
-            <tr className="border-b border-slate-200 text-slate-400 font-bold">
-              <th className="pb-3 pr-2">اسم المستخدم وحالة الاتصال</th>
-              <th className="pb-3">رقم الجوال (اسم الدخول)</th>
-              <th className="pb-3">كلمة المرور</th>
-              <th className="pb-3">الرتبة الصلاحية</th>
-              <th className="pb-3">اللجنة المعينة (لرئيس اللجنة)</th>
-              <th className="pb-3 text-left pl-2">إجراءات التعديل</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {usersList.map((user, idx) => {
-              if (!user) return null;
-              const phoneKey = user.phone || `user_${idx}`;
-              const isPassShown = showPasswords[phoneKey] || false;
-
-              return (
-                <tr key={phoneKey} className="hover:bg-slate-50">
-                  <td className="py-4 pr-2 font-bold text-slate-900">
-                    {user.fullName || 'مستخدم بدون اسم'}
-                    <div className="text-[10px] text-emerald-600 font-normal">
-                      {user.phone === '0553731265' ? '👑 مشرف النظام الأعلى' : '🟢 مسجل بالسحابة'}
-                    </div>
-                  </td>
-                  <td className="py-4 text-slate-600 font-mono" dir="ltr">
-                    {user.phone || 'غير متوفر'}
-                  </td>
-                  <td className="py-4 font-mono text-slate-600 flex items-center gap-2">
-                    <span>{isPassShown ? (user.password || '123456') : '••••••••'}</span>
-                    <button
-                      type="button"
-                      onClick={() => togglePasswordVisibility(phoneKey)}
-                      className="text-slate-400 hover:text-slate-700 cursor-pointer text-xs"
-                      title="إظهار / إخفاء كلمة المرور"
-                    >
-                      {isPassShown ? '🙈' : '👁️'}
-                    </button>
-                  </td>
-                  <td className="py-4">
-                    <select
-                      value={user.role || 'عضو أساسي'}
-                      onChange={(e) => handleRoleChange(user.phone, e.target.value)}
-                      className="px-3 py-1.5 rounded-xl border border-slate-300 font-bold text-xs bg-white text-slate-800"
-                    >
-                      <option value="System Admin">System Admin (مدير النظام)</option>
-                      <option value="General Supervisor">General Supervisor (مشرف عام)</option>
-                      <option value="رئيس النادي">رئيس النادي</option>
-                      <option value="نائبة الرئيس">نائبة الرئيس</option>
-                      <option value="رئيس لجنة">رئيس لجنة</option>
-                      <option value="عضو مميز">عضو مميز</option>
-                      <option value="الجندي الخفي">الجندي الخفي 🛡️</option>
-                      <option value="عضو أساسي">عضو أساسي</option>
-                    </select>
-                  </td>
-                  <td className="py-4">
-                    <select
-                      value={user.assignedCommittee || 'لجنة التصميم'}
-                      onChange={(e) => handleAssignedCommitteeChange(user.phone, e.target.value)}
-                      className="px-3 py-1.5 rounded-xl border border-slate-300 font-bold text-xs bg-white text-slate-800"
-                    >
-                      {committeeNamesList.map((comm) => (
-                        <option key={comm} value={comm}>{comm}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-4 text-left pl-2 space-x-1 space-x-reverse">
-                    <button
-                      type="button"
-                      onClick={() => openNameModal(user.phone, user.fullName || '')}
-                      className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer text-[11px]"
-                    >
-                      تعديل الاسم ✏️
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openPasswordModal(user.phone)}
-                      className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer text-[11px]"
-                    >
-                      تعديل الرمز 🔒
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </div>
+         {isSystemAdminUser && (
+  <button
+    type="button"
+    onClick={() => setActiveTab('users-manager')}
+    className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+      activeTab === 'users-manager' 
+        ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105' 
+        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+    }`}
+  >
+    🔑 الحسابات والرتب والصلاحيات
+  </button>
 )}
 
           <button
