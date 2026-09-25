@@ -29,7 +29,7 @@ export default function LoadingScreen() {
              </div>
           </div>
 
-          {/* نص الصلاة على النبي (العنصر الأساسي المطلوب) */}
+          {/* نص الصلاة على النبي */}
           <div className="space-y-3">
              <span className="inline-block px-3.5 py-1 rounded-full bg-[#F5D061]/10 border border-[#F5D061]/30 text-[#F5D061] text-[11px] font-bold tracking-widest uppercase">
                 بوابة نادي التمريض
@@ -42,7 +42,7 @@ export default function LoadingScreen() {
              </p>
           </div>
 
-          {/* شريط تحميل ناري متحرك */}
+          {/* شريط التحميل */}
           <div className="space-y-2">
              <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden border border-white/10 p-0.5">
                 <div className="h-full bg-gradient-to-r from-amber-500 via-[#F5D061] to-yellow-200 rounded-full animate-pulse w-3/4 shadow-[0_0_15px_#F5D061]"></div>
