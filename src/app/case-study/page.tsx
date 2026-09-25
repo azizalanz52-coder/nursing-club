@@ -15,100 +15,116 @@ interface CaseQuestion {
   explanation: string;
 }
 
-export default function CaseStudyPage() {
-  // بنك الحالات السريرية المتجدد (مستويات: سهلة، متوسطة، ومتقدمة/صعبة جداً)
-  const casePool: CaseQuestion[][] = [
-    [
-      {
-        id: 1,
-        difficulty: 'Easy',
-        title: 'Case 1: Vital Signs Assessment',
-        scenario: 'A 45-year-old admitted patient has a body temperature of 38.5°C, HR 110 bpm, and RR 22 breaths/min. What is the most appropriate initial nursing intervention?',
-        options: [
-          'Administer antipyretic medication immediately without notifying the physician',
-          'Notify the physician and document the vital signs accurately in the patient chart',
-          'Cover the patient with heavy blankets to induce sweating',
-          'Wait for 4 hours and recheck the temperature'
-        ],
-        correctIndex: 1,
-        explanation: 'The correct action is to notify the physician and document findings for prompt medical collaboration.'
-      },
-      {
-        id: 2,
-        difficulty: 'Moderate',
-        title: 'Case 2: IV Fluid Management',
-        scenario: 'A nurse notices swelling, coolness, and pain around an intravenous (IV) insertion site. What is the immediate nursing action?',
-        options: [
-          'Slow down the infusion rate and continue monitoring',
-          'Apply a hot compress directly over the site',
-          'Stop the infusion immediately, remove the IV catheter, and elevate the limb',
-          'Administer an analgesic through the same IV line'
-        ],
-        correctIndex: 2,
-        explanation: 'These are classic signs of infiltration. The IV must be stopped and removed immediately to prevent tissue damage.'
-      },
-      {
-        id: 3,
-        difficulty: 'Hard',
-        title: 'Case 3: Advanced Hemodynamic Crisis (Sepsis)',
-        scenario: 'A postoperative patient develops a temperature of 39.2°C, blood pressure of 82/50 mmHg, heart rate of 135 bpm, and acute confusion. Serum lactate is 4.2 mmol/L. What is the priority nursing and medical intervention bundle within the first hour?',
-        options: [
-          'Administer scheduled oral antihypertensives and reassess in 2 hours',
-          'Initiate rapid IV fluid resuscitation (crystalloids 30 mL/kg), draw blood cultures, and administer broad-spectrum IV antibiotics immediately',
-          'Apply a cooling blanket and restrict fluid intake to prevent pulmonary edema',
-          'Prepare the patient for immediate emergency surgery'
-        ],
-        correctIndex: 1,
-        explanation: 'In septic shock, early goal-directed therapy requires immediate fluid resuscitation, obtaining blood cultures before antibiotics, and administering broad-spectrum IV antibiotics within the 1-hour bundle to prevent multi-organ failure.'
-      }
+// بنك شامل ومتنوع للحالات الإكلينيكية التمريضية
+const masterCasePool: Omit<CaseQuestion, 'id'>[] = [
+  {
+    difficulty: 'Easy',
+    title: 'Case: Vital Signs Assessment',
+    scenario: 'A 45-year-old admitted patient has a body temperature of 38.5°C, HR 110 bpm, and RR 22 breaths/min. What is the most appropriate initial nursing intervention?',
+    options: [
+      'Administer antipyretic medication immediately without notifying the physician',
+      'Notify the physician and document the vital signs accurately in the patient chart',
+      'Cover the patient with heavy blankets to induce sweating',
+      'Wait for 4 hours and recheck the temperature'
     ],
-    [
-      {
-        id: 1,
-        difficulty: 'Easy',
-        title: 'Case 1: Wound Care Evaluation',
-        scenario: 'While changing a surgical dressing, the nurse observes mild erythema and well-approximated wound edges with no drainage. How should this be classified?',
-        options: [
-          'An infected wound requiring immediate antibiotic therapy',
-          'A normal wound in the primary intention healing stage',
-          'A dehisced wound requiring surgical re-suturing',
-          'A chronic non-healing ulcer'
-        ],
-        correctIndex: 1,
-        explanation: 'Mild erythema with well-approximated edges is a normal presentation in primary intention healing.'
-      },
-      {
-        id: 2,
-        difficulty: 'Moderate',
-        title: 'Case 2: Medication Safety',
-        scenario: 'The nurse is scheduled to administer an oral medication to a patient, but the patient is found sleeping deeply. What is the correct protocol?',
-        options: [
-          'Wake the patient forcefully to take the medication',
-          'Crush the medication in water and leave it on the bedside table',
-          'Hold the medication temporarily and notify the charge nurse or physician',
-          'Administer the medication via feeding tube without checking'
-        ],
-        correctIndex: 2,
-        explanation: 'Medications should not be given to unresponsive or deeply sleeping patients to prevent aspiration risks.'
-      },
-      {
-        id: 3,
-        difficulty: 'Hard',
-        title: 'Case 3: Critical Arrhythmia & Cardiac Arrest Preparedness',
-        scenario: 'A telemetry-monitored patient suddenly exhibits ventricular fibrillation (V-Fib) on the monitor. The patient is unresponsive and pulseless. What is the immediate, non-negotiable sequence of actions?',
-        options: [
-          'Check patient pupillary response, administer IV atropine, and call family members',
-          'Begin high-quality CPR immediately, charge and check rhythm for defibrillation as soon as the AED/Defibrillator is available, and establish emergency airway management',
-          'Administer sublingual nitroglycerin and check blood pressure',
-          'Document the exact time of arrest in the chart and wait for the code team'
-        ],
-        correctIndex: 1,
-        explanation: 'In cardiac arrest due to V-Fib, immediate high-quality CPR and rapid defibrillation are the primary determinants of survival under ACLS guidelines.'
-      }
-    ]
-  ];
+    correctIndexString: 'Notify the physician and document the vital signs accurately in the patient chart',
+    explanation: 'The correct action is to notify the physician and document findings for prompt medical collaboration.'
+  } as any,
+  {
+    difficulty: 'Moderate',
+    title: 'Case: IV Fluid Management',
+    scenario: 'A nurse notices swelling, coolness, and pain around an intravenous (IV) insertion site. What is the immediate nursing action?',
+    options: [
+      'Slow down the infusion rate and continue monitoring',
+      'Apply a hot compress directly over the site',
+      'Stop the infusion immediately, remove the IV catheter, and elevate the limb',
+      'Administer an analgesic through the same IV line'
+    ],
+    correctIndexString: 'Stop the infusion immediately, remove the IV catheter, and elevate the limb',
+    explanation: 'These are classic signs of infiltration. The IV must be stopped and removed immediately to prevent tissue damage.'
+  } as any,
+  {
+    difficulty: 'Hard',
+    title: 'Case: Advanced Hemodynamic Crisis (Sepsis)',
+    scenario: 'A postoperative patient develops a temperature of 39.2°C, blood pressure of 82/50 mmHg, heart rate of 135 bpm, and acute confusion. Serum lactate is 4.2 mmol/L. What is the priority nursing and medical intervention bundle within the first hour?',
+    options: [
+      'Administer scheduled oral antihypertensives and reassess in 2 hours',
+      'Initiate rapid IV fluid resuscitation (crystalloids 30 mL/kg), draw blood cultures, and administer broad-spectrum IV antibiotics immediately',
+      'Apply a cooling blanket and restrict fluid intake to prevent pulmonary edema',
+      'Prepare the patient for immediate emergency surgery'
+    ],
+    correctIndexString: 'Initiate rapid IV fluid resuscitation (crystalloids 30 mL/kg), draw blood cultures, and administer broad-spectrum IV antibiotics immediately',
+    explanation: 'In septic shock, early goal-directed therapy requires immediate fluid resuscitation, obtaining blood cultures before antibiotics, and administering broad-spectrum IV antibiotics within the 1-hour bundle to prevent multi-organ failure.'
+  } as any,
+  {
+    difficulty: 'Easy',
+    title: 'Case: Wound Care Evaluation',
+    scenario: 'While changing a surgical dressing, the nurse observes mild erythema and well-approximated wound edges with no drainage. How should this be classified?',
+    options: [
+      'An infected wound requiring immediate antibiotic therapy',
+      'A normal wound in the primary intention healing stage',
+      'A dehisced wound requiring surgical re-suturing',
+      'A chronic non-healing ulcer'
+    ],
+    correctIndexString: 'A normal wound in the primary intention healing stage',
+    explanation: 'Mild erythema with well-approximated edges is a normal presentation in primary intention healing.'
+  } as any,
+  {
+    difficulty: 'Moderate',
+    title: 'Case: Medication Safety',
+    scenario: 'The nurse is scheduled to administer an oral medication to a patient, but the patient is found sleeping deeply. What is the correct protocol?',
+    options: [
+      'Wake the patient forcefully to take the medication',
+      'Crush the medication in water and leave it on the bedside table',
+      'Hold the medication temporarily and notify the charge nurse or physician',
+      'Administer the medication via feeding tube without checking'
+    ],
+    correctIndexString: 'Hold the medication temporarily and notify the charge nurse or physician',
+    explanation: 'Medications should not be given to unresponsive or deeply sleeping patients to prevent aspiration risks.'
+  } as any,
+  {
+    difficulty: 'Hard',
+    title: 'Case: Critical Arrhythmia & Cardiac Arrest',
+    scenario: 'A telemetry-monitored patient suddenly exhibits ventricular fibrillation (V-Fib) on the monitor. The patient is unresponsive and pulseless. What is the immediate, non-negotiable sequence of actions?',
+    options: [
+      'Check patient pupillary response, administer IV atropine, and call family members',
+      'Begin high-quality CPR immediately, charge and check rhythm for defibrillation as soon as the AED/Defibrillator is available, and establish emergency airway management',
+      'Administer sublingual nitroglycerin and check blood pressure',
+      'Document the exact time of arrest in the chart and wait for the code team'
+    ],
+    correctIndexString: 'Begin high-quality CPR immediately, charge and check rhythm for defibrillation as soon as the AED/Defibrillator is available, and establish emergency airway management',
+    explanation: 'In cardiac arrest due to V-Fib, immediate high-quality CPR and rapid defibrillation are the primary determinants of survival under ACLS guidelines.'
+  } as any,
+  {
+    difficulty: 'Moderate',
+    title: 'Case: Diabetic Ketoacidosis (DKA)',
+    scenario: 'A type 1 diabetic patient presents with fruity breath odor, Kussmaul respirations, blood glucose of 480 mg/dL, and pH of 7.21. What is the initial priority fluid order?',
+    options: [
+      '5% Dextrose in water rapidly',
+      'Isotonic Normal Saline (0.9% NaCl) IV infusion for volume expansion',
+      'Hypotonic saline (0.45% NaCl) with high insulin bolus',
+      'Strict fluid restriction'
+    ],
+    correctIndexString: 'Isotonic Normal Saline (0.9% NaCl) IV infusion for volume expansion',
+    explanation: 'Initial management of DKA focuses on restoring intravascular volume and tissue perfusion with isotonic crystalloids before insulin therapy.'
+  } as any,
+  {
+    difficulty: 'Easy',
+    title: 'Case: Oxygen Therapy Safety',
+    scenario: 'A patient is receiving oxygen therapy via nasal cannula at 3 L/min. Which safety precaution is most critical for the nurse to enforce?',
+    options: [
+      'Prohibit smoking and open flames in and around the patient room',
+      'Remove the cannula every 30 minutes for 10 minutes of room air',
+      'Humidification is strictly required for any flow rate above 1 L/min',
+      'Apply petroleum jelly around the nostrils to prevent dryness'
+    ],
+    correctIndexString: 'Prohibit smoking and open flames in and around the patient room',
+    explanation: 'Oxygen supports combustion; hence, strict "No Smoking" and fire hazard precautions are mandatory.'
+  } as any
+];
 
-  const [activeCases, setActiveCases] = useState<CaseQuestion[]>(casePool[0]);
+export default function CaseStudyPage() {
+  const [activeCases, setActiveCases] = useState<CaseQuestion[]>([]);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [showResults, setShowResults] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
@@ -119,9 +135,51 @@ export default function CaseStudyPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    // تحديث الحالات تلقائياً كل 24 ساعة بناءً على أيام السنة لمنع التكرار
-    const dayIndex = Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % casePool.length;
-    setActiveCases(casePool[dayIndex]);
+    // توليد رقم عشوائي ثابت يعتمد على تاريخ اليوم (السنة + اليوم في السنة) ليتغير كل 24 ساعة بدقة لكل المستخدمين
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 0);
+    const diff = now.getTime() - startOfYear.getTime();
+    const oneDay = 1000 * 60 * 60 * 24;
+    const dayOfYear = Math.floor(diff / oneDay);
+    const seed = now.getFullYear() * 1000 + dayOfYear;
+
+    // دالة شبه عشوائية مبنية على الـ seed لتحديد 3 حالات مختلفة وخاصة بهذا اليوم
+    const shuffledPool = [...masterCasePool];
+    // خلط البنك بناءً على الـ seed اليومي
+    for (let i = shuffledPool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.abs(Math.sin(seed + i) * 10000)) % (i + 1);
+      [shuffledPool[i], shuffledPool[j]] = [shuffledPool[j], shuffledPool[i]];
+    }
+
+    // نختار أول 3 حالات لليوم ونقوم بخلط خياراتها عشوائياً بحيث تتغير أماكن الإجابات الصحيحة يومياً
+    const selectedDaily = shuffledPool.slice(0, 3).map((item, index) => {
+      const optionsWithOriginalIndex = item.options.map((opt, idx) => ({
+        text: opt,
+        isCorrect: opt === (item as any).correctIndexString
+      }));
+
+      // خلط خيارات هذه الحالة بناءً على seed اليوم ورقم السؤال
+      const optionSeed = seed + index;
+      for (let i = optionsWithOriginalIndex.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.abs(Math.sin(optionSeed + i) * 10000)) % (i + 1);
+        [optionsWithOriginalIndex[i], optionsWithOriginalIndex[j]] = [optionsWithOriginalIndex[j], optionsWithOriginalIndex[i]];
+      }
+
+      const newOptions = optionsWithOriginalIndex.map(o => o.text);
+      const newCorrectIndex = optionsWithOriginalIndex.findIndex(o => o.isCorrect);
+
+      return {
+        id: index + 1,
+        difficulty: item.difficulty,
+        title: `Case ${index + 1}: ${item.title.split(': ')[1] || item.title}`,
+        scenario: item.scenario,
+        options: newOptions,
+        correctIndex: newCorrectIndex,
+        explanation: item.explanation
+      };
+    });
+
+    setActiveCases(selectedDaily);
 
     // ربط تلقائي ببيانات تسجيل الدخول المخزنة لجلسة الطالب
     const savedName = localStorage.getItem('userName') || localStorage.getItem('fullName');
@@ -134,9 +192,9 @@ export default function CaseStudyPage() {
     }
 
     const timer = setInterval(() => {
-      const now = new Date();
-      const hoursLeft = 23 - now.getHours();
-      const minsLeft = 59 - now.getMinutes();
+      const currentTime = new Date();
+      const hoursLeft = 23 - currentTime.getHours();
+      const minsLeft = 59 - currentTime.getMinutes();
       setTimeLeft(`${hoursLeft} hours and ${minsLeft} minutes`);
     }, 1000);
 
@@ -193,7 +251,6 @@ export default function CaseStudyPage() {
       const score = calculateScore();
       const now = new Date();
       
-      // حفظ الحل في قاعدة البيانات مع الاسم، الرقم، التاريخ، والوقت بدقة لتظهر للأدمن
       await addDoc(collection(db, 'case_study_submissions'), {
         studentName: studentName.trim(),
         phone: studentPhone.trim(),
