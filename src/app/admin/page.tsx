@@ -111,7 +111,6 @@ export default function AdminDashboard() {
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study'>('case-study');
 
-  // حالة التحكم بإغلاق وفتح نموذج الانضمام للجان سحابياً 🚀
   const [isRegistrationClosed, setIsRegistrationClosed] = useState<boolean>(false);
 
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
@@ -215,7 +214,6 @@ export default function AdminDashboard() {
     fetchSiteSettings();
   }, [router]);
 
-  // دالة لجلب إعدادات الموقع العامة (مثل حالة إغلاق نموذج الانضمام)
   const fetchSiteSettings = async () => {
     try {
       const settingsRef = doc(db, 'site_settings', 'general');
@@ -231,7 +229,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // دالة تبديل حالة إغلاق/فتح نموذج الانضمام للجان بنقرة زر سحابياً 🚀
   const handleToggleRegistrationStatus = async () => {
     const newState = !isRegistrationClosed;
     try {
@@ -247,20 +244,18 @@ export default function AdminDashboard() {
     }
   };
 
- const fetchCaseSubmissions = async () => {
+  const fetchCaseSubmissions = async () => {
     try {
       const snap = await getDocs(collection(db, 'case_study_submissions'));
       const list = await Promise.all(snap.docs.map(async (d) => {
         const data = d.data();
-        // إذا لم يكن هناك تاريخ مسجل، نثبت تاريخاً افتراضياً أو تاريخ اليوم لكي لا يظهر "غير متوفر"
         let finalDate = data.createdAt || data.submittedAt;
         if (!finalDate) {
           finalDate = new Date().toISOString();
-          // اختياري: حفظه في قاعدة البيانات ليثبت للأبد
           try {
             await updateDoc(doc(db, 'case_study_submissions', d.id), { createdAt: finalDate });
           } catch (err) {
-            // تجاهل خطأ التحديث الصامت إن لمש تتوفر صلاحيات الكتابة المباشرة
+            // تجاهل خطأ التحديث الصامت
           }
         }
         return { id: d.id, ...data, createdAt: finalDate };
@@ -356,18 +351,20 @@ export default function AdminDashboard() {
       }
     });
   };
-const handleDeleteCaseSubmission = async (id: string) => {
-  if (!confirm('هل أنت متأكد من حذف هذه المشاركة وإزالتها نهائياً من لوحة الصدارة؟')) return;
-  
-  try {
-    await deleteDoc(doc(db, 'case_study_submissions', id));
-    setCaseSubmissions(caseSubmissions.filter(sub => sub.id !== id));
-    setModalMessage('تمت الإزالة من لوحة الصدارة بنجاح.');
-    setModalType('success');
-  } catch (err) {
-    console.error(err);
-  }
-};
+
+  const handleDeleteCaseSubmission = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذه المشاركة وإزالتها نهائياً من لوحة الصدارة؟')) return;
+    
+    try {
+      await deleteDoc(doc(db, 'case_study_submissions', id));
+      setCaseSubmissions(caseSubmissions.filter(sub => sub.id !== id));
+      setModalMessage('تمت الإزالة من لوحة الصدارة بنجاح.');
+      setModalType('success');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleSaveStudentAchievement = async (e: FormEvent) => {
     e.preventDefault();
     if (!studentNameInput.trim() || !awardNameInput.trim()) return;
@@ -698,15 +695,17 @@ const handleDeleteCaseSubmission = async (id: string) => {
       setModalType('success');
     }
   };
-const handleUpdateCaseScore = async (id: string, currentScore: number, delta: number) => {
-  const newScore = Math.max(0, currentScore + delta);
-  try {
-    await updateDoc(doc(db, 'case_study_submissions', id), { score: newScore });
-    setCaseSubmissions(caseSubmissions.map(sub => sub.id === id ? { ...sub, score: newScore } : sub));
-  } catch (err) {
-    console.error(err);
-  }
-};
+
+  const handleUpdateCaseScore = async (id: string, currentScore: number, delta: number) => {
+    const newScore = Math.max(0, currentScore + delta);
+    try {
+      await updateDoc(doc(db, 'case_study_submissions', id), { score: newScore });
+      setCaseSubmissions(caseSubmissions.map(sub => sub.id === id ? { ...sub, score: newScore } : sub));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const openPasswordModal = (phone: string) => {
     setActiveUserPhoneForAction(phone);
     setModalInputVal('');
@@ -1562,7 +1561,6 @@ const handleUpdateCaseScore = async (id: string, currentScore: number, delta: nu
         </div>
 
         <div className="flex items-center gap-3">
-          {/* زر فتح وإغلاق نموذج الانضمام للجان السحابي الفوري 🚀 */}
           <button
             type="button"
             onClick={handleToggleRegistrationStatus}
@@ -1622,19 +1620,19 @@ const handleUpdateCaseScore = async (id: string, currentScore: number, delta: nu
             🩺 دراسة الحالة ({caseSubmissions.length})
           </button>
 
-         {isSystemAdminUser && (
-  <button
-    type="button"
-    onClick={() => setActiveTab('users-manager')}
-    className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
-      activeTab === 'users-manager' 
-        ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105' 
-        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-    }`}
-  >
-    🔑 الحسابات والرتب والصلاحيات
-  </button>
-)}
+          {isSystemAdminUser && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('users-manager')}
+              className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+                activeTab === 'users-manager' 
+                  ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105' 
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              🔑 الحسابات والرتب والصلاحيات
+            </button>
+          )}
 
           <button
             type="button"
@@ -1721,111 +1719,106 @@ const handleUpdateCaseScore = async (id: string, currentScore: number, delta: nu
           ))}
         </div>
 
-     {/* تبويب دراسة الحالة (مع صلاحيات خصم نقاط، بونص، وحذف الشخص) */}
-{activeTab === 'case-study' && (
-  <div className="bg-white rounded-3xl p-8 border border-emerald-300 shadow-sm space-y-6">
-    <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
-      <div>
-        <h3 className="text-xl font-black text-emerald-900">🩺 دراسة الحالة والطلاب المتفاعلون (Case Study Submissions)</h3>
-        <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين، درجاتهم أو نقاطهم، وأرقام جوالاتهم مع إمكانية إضافة بونص، خصم نقاط، أو حذف الشخص من القائمة.</p>
-      </div>
-      <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
-        إجمالي المشاركات: {caseSubmissions.length}
-      </span>
-    </div>
+        {activeTab === 'case-study' && (
+          <div className="bg-white rounded-3xl p-8 border border-emerald-300 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black text-emerald-900">🩺 دراسة الحالة والطلاب المتفاعلون (Case Study Submissions)</h3>
+                <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين، درجاتهم أو نقاطهم، وأرقام جوالاتهم مع إمكانية إضافة بونص، خصم نقاط، أو حذف الشخص من القائمة.</p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
+                إجمالي المشاركات: {caseSubmissions.length}
+              </span>
+            </div>
 
-    {caseSubmissions.length === 0 ? (
-      <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-        <p className="text-sm font-bold">لم يتم تسجيل أي مشاركات في دراسة الحالة حتى الآن.</p>
-      </div>
-    ) : (
-      <div className="overflow-x-auto">
-        <table className="w-full text-right text-xs">
-          <thead>
-            <tr className="border-b border-slate-200 text-slate-400 font-bold">
-              <th className="pb-3 pr-2">اسم الطالب / المشارك</th>
-              <th className="pb-3">رقم الجوال</th>
-              <th className="pb-3">الدرجة / النقاط</th>
-              <th className="pb-3">تاريخ ووقت المشاركة</th>
-              <th className="pb-3 text-left pl-2">الإجراءات وصلاحيات النقاط (بونص / خصم / حذف)</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {caseSubmissions.map((sub, idx) => {
-              const formattedDate = sub.createdAt || sub.submittedAt
-                ? new Date(sub.createdAt || sub.submittedAt).toLocaleString('ar-SA')
-                : new Date().toLocaleString('ar-SA');
+            {caseSubmissions.length === 0 ? (
+              <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-sm font-bold">لم يتم تسجيل أي مشاركات في دراسة الحالة حتى الآن.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400 font-bold">
+                      <th className="pb-3 pr-2">اسم الطالب / المشارك</th>
+                      <th className="pb-3">رقم الجوال</th>
+                      <th className="pb-3">الدرجة / النقاط</th>
+                      <th className="pb-3">تاريخ ووقت المشاركة</th>
+                      <th className="pb-3 text-left pl-2">الإجراءات وصلاحيات النقاط (بونص / خصم / حذف)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {caseSubmissions.map((sub, idx) => {
+                      const formattedDate = sub.createdAt || sub.submittedAt
+                        ? new Date(sub.createdAt || sub.submittedAt).toLocaleString('ar-SA')
+                        : new Date().toLocaleString('ar-SA');
 
-              return (
-                <tr key={sub.id || idx} className="hover:bg-slate-50">
-                  <td className="py-4 pr-2 font-bold text-slate-900">
-                    👤 {sub.studentName || sub.fullName || sub.name || 'مشارك كريم'}
-                  </td>
-                  <td className="py-4 text-slate-600 font-mono" dir="ltr">
-                    📞 {sub.phone || sub.phoneNumber || 'غير متوفر'}
-                  </td>
-                  <td className="py-4">
-                    <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs font-mono">
-                      ⭐ {sub.score || 0} نقطة
-                    </span>
-                  </td>
-                  <td className="py-4 text-slate-500 font-mono" dir="ltr">
-                    🕒 {formattedDate}
-                  </td>
-                  <td className="py-4 text-left pl-2 flex items-center gap-1.5 justify-end flex-wrap">
-                  {/* زر إضافة بونص (+1) */}
-<button
-  type="button"
-  onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, 1)}
-  className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer text-[11px]"
->
-  + بونص 🟢
-</button>
+                      return (
+                        <tr key={sub.id || idx} className="hover:bg-slate-50">
+                          <td className="py-4 pr-2 font-bold text-slate-900">
+                            👤 {sub.studentName || sub.fullName || sub.name || 'مشارك كريم'}
+                          </td>
+                          <td className="py-4 text-slate-600 font-mono" dir="ltr">
+                            📞 {sub.phone || sub.phoneNumber || 'غير متوفر'}
+                          </td>
+                          <td className="py-4">
+                            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs font-mono">
+                              ⭐ {sub.score || 0} نقطة
+                            </span>
+                          </td>
+                          <td className="py-4 text-slate-500 font-mono" dir="ltr">
+                            🕒 {formattedDate}
+                          </td>
+                          <td className="py-4 text-left pl-2 flex items-center gap-1.5 justify-end flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, 1)}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer text-[11px]"
+                            >
+                              + بونص 🟢
+                            </button>
 
-{/* زر خصم نقاط (-1) */}
-<button
-  type="button"
-  onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, -1)}
-  className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer text-[11px]"
->
-  - خصم 🟠
-</button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, -1)}
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer text-[11px]"
+                            >
+                              - خصم 🟠
+                            </button>
 
-                    {/* زر إصدار شهادة */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCertRecipientInput(sub.studentName || sub.fullName || sub.name || '');
-                        setCertPhoneInput(sub.phone || sub.phoneNumber || '');
-                        setCertTitleInput('شهادة مشاركة في دراسة الحالة الطبية');
-                        setCertCategoryInput('شهادة اجتياز دورة');
-                        setActiveTab('certificates');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer text-[11px]"
-                    >
-                      إصدار شهادة 📜
-                    </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCertRecipientInput(sub.studentName || sub.fullName || sub.name || '');
+                                setCertPhoneInput(sub.phone || sub.phoneNumber || '');
+                                setCertTitleInput('شهادة مشاركة في دراسة الحالة الطبية');
+                                setCertCategoryInput('شهادة اجتياز دورة');
+                                setActiveTab('certificates');
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer text-[11px]"
+                            >
+                              إصدار شهادة 📜
+                            </button>
 
-                    {/* زر حذف الشخص من لوحة الصدارة */}
-                    <button
-  type="button"
-  onClick={() => handleDeleteCaseSubmission(sub.id)}
-  className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-[11px]"
-  title="إزالة من لوحة الصدارة"
->
-  حذف من الصدارة 🗑️
-</button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </div>
-)}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCaseSubmission(sub.id)}
+                              className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-[11px]"
+                              title="إزالة من لوحة الصدارة"
+                            >
+                              حذف من الصدارة 🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {activeTab === 'certificates' && (
           <div className="space-y-8">
@@ -2549,21 +2542,20 @@ const handleUpdateCaseScore = async (id: string, currentScore: number, delta: nu
                           </div>
                         </td>
                         <td className="py-4">
-                         {/* خيارات الرتب المتاحة للمستخدمين */}
-<select
-  value={user.role || 'عضو أساسي'}
-  onChange={(e) => handleRoleChange(user.phone, e.target.value)}
-  className="px-3 py-1.5 rounded-xl border border-slate-300 font-bold text-xs bg-white text-slate-800"
->
-  <option value="System Admin">System Admin (مدير النظام)</option>
-  <option value="General Supervisor">General Supervisor (مشرف عام)</option>
-  <option value="رئيس النادي">رئيس النادي</option>
-  <option value="نائبة الرئيس">نائبة الرئيس</option>
-  <option value="رئيس لجنة">رئيس لجنة</option>
-  <option value="عضو مميز">عضو مميز</option>
-  <option value="الجندي الخفي">الجندي الخفي 🛡️</option>
-  <option value="عضو أساسي">عضو أساسي</option>
-</select>
+                          <select
+                            value={usr.role || 'عضو أساسي'}
+                            onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
+                            className="px-3 py-1.5 rounded-xl border border-slate-300 font-bold text-xs bg-white text-slate-800"
+                          >
+                            <option value="System Admin">System Admin (مدير النظام)</option>
+                            <option value="General Supervisor">General Supervisor (مشرف عام)</option>
+                            <option value="رئيس النادي">رئيس النادي</option>
+                            <option value="نائبة الرئيس">نائبة الرئيس</option>
+                            <option value="رئيس لجنة">رئيس لجنة</option>
+                            <option value="عضو مميز">عضو مميز</option>
+                            <option value="الجندي الخفي">الجندي الخفي 🛡️</option>
+                            <option value="عضو أساسي">عضو أساسي</option>
+                          </select>
                         </td>
                         <td className="py-4">
                           {(usr.role?.includes('رئيس لجنة') || usr.role?.includes('مشرف')) ? (
