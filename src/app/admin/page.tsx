@@ -1622,17 +1622,18 @@ const handleUpdateCaseScore = async (id: string, currentScore: number, delta: nu
             🩺 دراسة الحالة ({caseSubmissions.length})
           </button>
 
-          {(isSystemAdminUser || isPresidentsRole) && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('users-manager')}
-              className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
-                activeTab === 'users-manager' ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              🔑 الحسابات والرتب والصلاحيات
-            </button>
-          )}
+         {/* تبويب الحسابات والرتب والصلاحيات (يظهر لمدير النظام فقط System Admin) */}
+{isSystemAdminUser && (
+  <button
+    type="button"
+    onClick={() => setActiveTab('users-manager')}
+    className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+      activeTab === 'users-manager' ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+    }`}
+  >
+    🔑 الحسابات والرتب والصلاحيات
+  </button>
+)}
 
           <button
             type="button"
@@ -2547,19 +2548,21 @@ const handleUpdateCaseScore = async (id: string, currentScore: number, delta: nu
                           </div>
                         </td>
                         <td className="py-4">
-                          <select
-                            value={usr.role || 'عضو أساسي'}
-                            onChange={(e) => handleRoleChange(usr.phone, e.target.value)}
-                            className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white shadow-sm focus:outline-none focus:border-[#630517]"
-                          >
-                            <option value="System Admin">System Admin (مدير النظام)</option>
-                            <option value="General Supervisor">General Supervisor (مشرف عام)</option>
-                            <option value="رئيس النادي">رئيس النادي</option>
-                            <option value="نائبة الرئيس">نائبة الرئيس</option>
-                            <option value="رئيس لجنة / مشرف قسم">رئيس لجنة</option>
-                            <option value="عضو مميز / منسق">عضو مميز</option>
-                            <option value="عضو أساسي">عضو أساسي</option>
-                          </select>
+                         {/* خيارات الرتب المتاحة للمستخدمين */}
+<select
+  value={user.role || 'عضو أساسي'}
+  onChange={(e) => handleRoleChange(user.phone, e.target.value)}
+  className="px-3 py-1.5 rounded-xl border border-slate-300 font-bold text-xs bg-white text-slate-800"
+>
+  <option value="System Admin">System Admin (مدير النظام)</option>
+  <option value="General Supervisor">General Supervisor (مشرف عام)</option>
+  <option value="رئيس النادي">رئيس النادي</option>
+  <option value="نائبة الرئيس">نائبة الرئيس</option>
+  <option value="رئيس لجنة">رئيس لجنة</option>
+  <option value="عضو مميز">عضو مميز</option>
+  <option value="الجندي الخفي">الجندي الخفي 🛡️</option>
+  <option value="عضو أساسي">عضو أساسي</option>
+</select>
                         </td>
                         <td className="py-4">
                           {(usr.role?.includes('رئيس لجنة') || usr.role?.includes('مشرف')) ? (
