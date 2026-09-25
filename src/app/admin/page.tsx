@@ -1686,75 +1686,83 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {activeTab === 'case-study' && (
-          <div className="bg-white rounded-3xl p-8 border border-emerald-300 shadow-sm space-y-6">
-            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
-              <div>
-                <h3 className="text-xl font-black text-emerald-900">🩺 دراسة الحالة والطلاب المتفاعلون (Case Study Submissions)</h3>
-                <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين، درجاتهم أو نقاطهم، وأرقام جوالاتهم (يمكنك الاعتماد عليها لإصدار الشهادات).</p>
-              </div>
-              <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
-                إجمالي المشاركات: {caseSubmissions.length}
-              </span>
-            </div>
+        {activeTab ={activeTab === 'case-study' && (
+  <div className="bg-white rounded-3xl p-8 border border-emerald-300 shadow-sm space-y-6">
+    <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+      <div>
+        <h3 className="text-xl font-black text-emerald-900">🩺 دراسة الحالة والطلاب المتفاعلون (Case Study Submissions)</h3>
+        <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين، درجاتهم أو نقاطهم، وأرقام جوالاتهم (يمكنك الاعتماد عليها لإصدار الشهادات).</p>
+      </div>
+      <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
+        إجمالي المشاركات: {caseSubmissions.length}
+      </span>
+    </div>
 
-            {caseSubmissions.length === 0 ? (
-              <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <p className="text-sm font-bold">لم يتم تسجيل أي مشاركات في دراسة الحالة حتى الآن من جدول `case_study_submissions`.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                      <th className="pb-3 pr-2">اسم الطالب / المشارك</th>
-                      <th className="pb-3">رقم الجوال</th>
-                      <th className="pb-3">الدرجة / النقاط</th>
-                      <th className="pb-3">تاريخ ووقت المشاركة</th>
-                      <th className="pb-3 text-left pl-2">إجراء سريع</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {caseSubmissions.map((sub, idx) => (
-                      <tr key={sub.id || idx} className="hover:bg-slate-50">
-                        <td className="py-4 pr-2 font-bold text-slate-900">
-                          👤 {sub.studentName || sub.fullName || sub.name || 'مشارك كريم'}
-                        </td>
-                        <td className="py-4 text-slate-600 font-mono" dir="ltr">
-                          📞 {sub.phone || sub.phoneNumber || 'غير متوفر'}
-                        </td>
-                        <td className="py-4">
-                          <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs font-mono">
-                            ⭐ {sub.score || sub.points || sub.grade || '0'} نقاط / درجة
-                          </span>
-                        </td>
-                        <td className="py-4 text-slate-500 font-mono" dir="ltr">
-                          🕒 {sub.createdAt || sub.submittedAt ? new Date(sub.createdAt || sub.submittedAt).toLocaleString('ar-SA') : new Date().toLocaleString('ar-SA')}
-                        </td>
-                        <td className="py-4 text-left pl-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCertRecipientInput(sub.studentName || sub.fullName || sub.name || '');
-                              setCertPhoneInput(sub.phone || sub.phoneNumber || '');
-                              setCertTitleInput('شهادة مشاركة وإنجاز في دراسة الحالة الطبية');
-                              setCertCategoryInput('شهادة اجتياز دورة');
-                              setActiveTab('certificates');
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer shadow-sm"
-                          >
-                            إصدار شهادة له 📜
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+    {caseSubmissions.length === 0 ? (
+      <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+        <p className="text-sm font-bold">لم يتم تسجيل أي مشاركات في دراسة الحالة حتى الآن من جدول `case_study_submissions`.</p>
+      </div>
+    ) : (
+      <div className="overflow-x-auto">
+        <table className="w-full text-right text-xs">
+          <thead>
+            <tr className="border-b border-slate-200 text-slate-400 font-bold">
+              <th className="pb-3 pr-2">اسم الطالب / المشارك</th>
+              <th className="pb-3">رقم الجوال</th>
+              <th className="pb-3">الدرجة / النقاط</th>
+              <th className="pb-3">تاريخ ووقت المشاركة</th>
+              <th className="pb-3 text-left pl-2">إجراء سريع</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {caseSubmissions.map((sub, idx) => {
+              // قراءة التاريخ والوقت المخزن فعلياً في القاعدة بدون توليد وقت جديد عند التحديث
+              const rawDate = sub.createdAt || sub.submittedAt;
+              const formattedDate = rawDate 
+                ? new Date(rawDate).toLocaleString('ar-SA') 
+                : 'غير متوفر';
+
+              return (
+                <tr key={sub.id || idx} className="hover:bg-slate-50">
+                  <td className="py-4 pr-2 font-bold text-slate-900">
+                    👤 {sub.studentName || sub.fullName || sub.name || 'مشارك كريم'}
+                  </td>
+                  <td className="py-4 text-slate-600 font-mono" dir="ltr">
+                    📞 {sub.phone || sub.phoneNumber || 'غير متوفر'}
+                  </td>
+                  <td className="py-4">
+                    <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs font-mono">
+                      ⭐ {sub.score || sub.points || sub.grade || '0'} نقاط / درجة
+                    </span>
+                  </td>
+                  <td className="py-4 text-slate-500 font-mono" dir="ltr">
+                    🕒 {formattedDate}
+                  </td>
+                  <td className="py-4 text-left pl-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCertRecipientInput(sub.studentName || sub.fullName || sub.name || '');
+                        setCertPhoneInput(sub.phone || sub.phoneNumber || '');
+                        setCertTitleInput('شهادة مشاركة وإنجاز في دراسة الحالة الطبية');
+                        setCertCategoryInput('شهادة اجتياز دورة');
+                        setActiveTab('certificates');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer shadow-sm"
+                    >
+                      إصدار شهادة له 📜
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+)}
 
         {activeTab === 'certificates' && (
           <div className="space-y-8">
