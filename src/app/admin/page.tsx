@@ -1729,7 +1729,7 @@ export default function AdminDashboard() {
                           </span>
                         </td>
                         <td className="py-4 text-slate-500 font-mono" dir="ltr">
-                          🕒 {sub.createdAt || sub.submittedAt ? new Date(sub.createdAt || sub.submittedAt).toLocaleString('ar-SA') : 'حديث'}
+                          🕒 {sub.createdAt || sub.submittedAt ? new Date(sub.createdAt || sub.submittedAt).toLocaleString('ar-SA') : new Date().toLocaleString('ar-SA')}
                         </td>
                         <td className="py-4 text-left pl-2">
                           <button
