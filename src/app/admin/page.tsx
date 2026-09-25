@@ -356,7 +356,18 @@ export default function AdminDashboard() {
       }
     });
   };
-
+const handleDeleteCaseSubmission = async (id: string) => {
+  if (!confirm('هل أنت متأكد من حذف هذه المشاركة وإزالتها نهائياً من لوحة الصدارة؟')) return;
+  
+  try {
+    await deleteDoc(doc(db, 'case_study_submissions', id));
+    setCaseSubmissions(caseSubmissions.filter(sub => sub.id !== id));
+    setModalMessage('تمت الإزالة من لوحة الصدارة بنجاح.');
+    setModalType('success');
+  } catch (err) {
+    console.error(err);
+  }
+};
   const handleSaveStudentAchievement = async (e: FormEvent) => {
     e.preventDefault();
     if (!studentNameInput.trim() || !awardNameInput.trim()) return;
@@ -1796,13 +1807,13 @@ const handleUpdateCaseScore = async (id: string, currentScore: number, delta: nu
 
                     {/* زر حذف الشخص من لوحة الصدارة */}
                     <button
-                      type="button"
-                      onClick={() => handleDeleteCaseSubmission(sub.id)}
-                      className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-[11px]"
-                      title="إزالة من لوحة الصدارة"
-                    >
-                      حذف من الصدارة 🗑️
-                    </button>
+  type="button"
+  onClick={() => handleDeleteCaseSubmission(sub.id)}
+  className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-[11px]"
+  title="إزالة من لوحة الصدارة"
+>
+  حذف من الصدارة 🗑️
+</button>
                   </td>
                 </tr>
               );
