@@ -687,7 +687,15 @@ export default function AdminDashboard() {
       setModalType('success');
     }
   };
-
+const handleUpdateCaseScore = async (id: string, currentScore: number, delta: number) => {
+  const newScore = Math.max(0, currentScore + delta);
+  try {
+    await updateDoc(doc(db, 'case_study_submissions', id), { score: newScore });
+    setCaseSubmissions(caseSubmissions.map(sub => sub.id === id ? { ...sub, score: newScore } : sub));
+  } catch (err) {
+    console.error(err);
+  }
+};
   const openPasswordModal = (phone: string) => {
     setActiveUserPhoneForAction(phone);
     setModalInputVal('');
@@ -1752,25 +1760,23 @@ export default function AdminDashboard() {
                     🕒 {formattedDate}
                   </td>
                   <td className="py-4 text-left pl-2 flex items-center gap-1.5 justify-end flex-wrap">
-                    {/* زر إضافة بونص */}
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, +1)}
-                      className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer text-[11px]"
-                      title="إضافة نقطة بونص (+1)"
-                    >
-                      + بونص 🟢
-                    </button>
+                  {/* زر إضافة بونص (+1) */}
+<button
+  type="button"
+  onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, 1)}
+  className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer text-[11px]"
+>
+  + بونص 🟢
+</button>
 
-                    {/* زر خصم نقاط */}
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, -1)}
-                      className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer text-[11px]"
-                      title="خصم نقطة (-1)"
-                    >
-                      - خصم 🟠
-                    </button>
+{/* زر خصم نقاط (-1) */}
+<button
+  type="button"
+  onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, -1)}
+  className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer text-[11px]"
+>
+  - خصم 🟠
+</button>
 
                     {/* زر إصدار شهادة */}
                     <button
