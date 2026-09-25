@@ -1700,12 +1700,13 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-      {activeTab === 'case-study' && (
+     {/* تبويب دراسة الحالة (مع صلاحيات خصم نقاط، بونص، وحذف الشخص) */}
+{activeTab === 'case-study' && (
   <div className="bg-white rounded-3xl p-8 border border-emerald-300 shadow-sm space-y-6">
     <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
       <div>
         <h3 className="text-xl font-black text-emerald-900">🩺 دراسة الحالة والطلاب المتفاعلون (Case Study Submissions)</h3>
-        <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين، درجاتهم أو نقاطهم، وأرقام جوالاتهم (يمكنك الاعتماد عليها لإصدار الشهادات).</p>
+        <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين، درجاتهم أو نقاطهم، وأرقام جوالاتهم مع إمكانية إضافة بونص، خصم نقاط، أو حذف الشخص من القائمة.</p>
       </div>
       <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
         إجمالي المشاركات: {caseSubmissions.length}
@@ -1714,7 +1715,7 @@ export default function AdminDashboard() {
 
     {caseSubmissions.length === 0 ? (
       <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-        <p className="text-sm font-bold">لم يتم تسجيل أي مشاركات في دراسة الحالة حتى الآن من جدول `case_study_submissions`.</p>
+        <p className="text-sm font-bold">لم يتم تسجيل أي مشاركات في دراسة الحالة حتى الآن.</p>
       </div>
     ) : (
       <div className="overflow-x-auto">
@@ -1725,7 +1726,7 @@ export default function AdminDashboard() {
               <th className="pb-3">رقم الجوال</th>
               <th className="pb-3">الدرجة / النقاط</th>
               <th className="pb-3">تاريخ ووقت المشاركة</th>
-              <th className="pb-3 text-left pl-2">إجراء سريع</th>
+              <th className="pb-3 text-left pl-2">الإجراءات وصلاحيات النقاط (بونص / خصم / حذف)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -1744,26 +1745,57 @@ export default function AdminDashboard() {
                   </td>
                   <td className="py-4">
                     <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs font-mono">
-                      ⭐ {sub.score || sub.points || sub.grade || '0'} نقاط / درجة
+                      ⭐ {sub.score || 0} نقطة
                     </span>
                   </td>
                   <td className="py-4 text-slate-500 font-mono" dir="ltr">
                     🕒 {formattedDate}
                   </td>
-                  <td className="py-4 text-left pl-2">
+                  <td className="py-4 text-left pl-2 flex items-center gap-1.5 justify-end flex-wrap">
+                    {/* زر إضافة بونص */}
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, +1)}
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer text-[11px]"
+                      title="إضافة نقطة بونص (+1)"
+                    >
+                      + بونص 🟢
+                    </button>
+
+                    {/* زر خصم نقاط */}
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, -1)}
+                      className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer text-[11px]"
+                      title="خصم نقطة (-1)"
+                    >
+                      - خصم 🟠
+                    </button>
+
+                    {/* زر إصدار شهادة */}
                     <button
                       type="button"
                       onClick={() => {
                         setCertRecipientInput(sub.studentName || sub.fullName || sub.name || '');
                         setCertPhoneInput(sub.phone || sub.phoneNumber || '');
-                        setCertTitleInput('شهادة مشاركة وإنجاز في دراسة الحالة الطبية');
+                        setCertTitleInput('شهادة مشاركة في دراسة الحالة الطبية');
                         setCertCategoryInput('شهادة اجتياز دورة');
                         setActiveTab('certificates');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer shadow-sm"
+                      className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer text-[11px]"
                     >
-                      إصدار شهادة له 📜
+                      إصدار شهادة 📜
+                    </button>
+
+                    {/* زر حذف الشخص من لوحة الصدارة */}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCaseSubmission(sub.id)}
+                      className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-[11px]"
+                      title="إزالة من لوحة الصدارة"
+                    >
+                      حذف من الصدارة 🗑️
                     </button>
                   </td>
                 </tr>
