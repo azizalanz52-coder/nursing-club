@@ -40,6 +40,12 @@ export default function Hero() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
+    // 1. التحقق الفوري محلياً هل سبق إغلاق النافذة لعدم تكرارها نهائياً
+    const hasSeenLocal = localStorage.getItem('hasSeenAcceptanceModal');
+    if (hasSeenLocal === 'true') {
+      setShowModal(false);
+    }
+
     const savedBanners = localStorage.getItem('UHB_BANNERS');
     if (savedBanners) {
       try {
@@ -98,8 +104,12 @@ export default function Hero() {
                 await updateDoc(userDocRef, { pendingCongratulation: false });
               }
 
-              // الشرط المباشر والواضح لإظهار نافذة القبول مرة واحدة فقط
-              if (uData.status === 'مقبول' && uData.hasSeenCongrats !== true) {
+              // إذا سبق ورأاها سحابياً أو محلياً، لا تظهر
+              if (uData.hasSeenCongrats === true || hasSeenLocal === 'true') {
+                return;
+              }
+
+              if (uData.status === 'مقبول') {
                 setAcceptedData({
                   committee: uData.assignedCommittee || uData.firstChoice || 'اللجنة',
                   whatsapp: uData.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
@@ -110,23 +120,25 @@ export default function Hero() {
             }
           }
 
-          // فحص احتياطي من جدول applications إذا لم توجد في users
-          const querySnapshot = await getDocs(collection(db, 'applications'));
-          querySnapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            if (
-              (userPhone && data.phone === userPhone) ||
-              (userName && data.fullName === userName)
-            ) {
-              if (data.status === 'مقبول') {
-                setAcceptedData({
-                  committee: data.acceptedCommittee || data.firstChoice || 'اللجنة',
-                  whatsapp: data.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
-                });
-                setShowModal(true);
+          // فحص applications فقط إذا لم يتم إغلاقها مسبقاً
+          if (hasSeenLocal !== 'true') {
+            const querySnapshot = await getDocs(collection(db, 'applications'));
+            querySnapshot.forEach((docSnap) => {
+              const data = docSnap.data();
+              if (
+                (userPhone && data.phone === userPhone) ||
+                (userName && data.fullName === userName)
+              ) {
+                if (data.status === 'مقبول') {
+                  setAcceptedData({
+                    committee: data.acceptedCommittee || data.firstChoice || 'اللجنة',
+                    whatsapp: data.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
+                  });
+                  setShowModal(true);
+                }
               }
-            }
-          });
+            });
+          }
 
         } catch (err) {
           console.error('Error checking user acceptance or role update:', err);
@@ -137,9 +149,11 @@ export default function Hero() {
     }
   }, []);
 
-  // دالة إغلاق نافذة القبول وتحديث السحابة فوراً
+  // دالة إغلاق نافذة القبول (تحفظ محلياً وسحابياً لتختفي بلا رجعة)
   const handleCloseAcceptanceModal = async () => {
     setShowModal(false);
+    localStorage.setItem('hasSeenAcceptanceModal', 'true');
+
     const phone = currentUserPhone || localStorage.getItem('userPhone');
     if (!phone) return;
     try {
@@ -265,7 +279,7 @@ export default function Hero() {
         </div>
       )}
 
-      {/* نافذة التهنئة بالقبول (تظهر مرة واحدة فقط وتختفي للأبد عند إغلاقها) */}
+      {/* نافذة التهنئة بالقبول (تظهر مرة واحدة وتختفي للأبد عند الإغلاق) */}
       {showModal && acceptedData && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300" dir="rtl">
           <div className="bg-gradient-to-br from-[#F5D061] via-[#dfb64d] to-[#630517] rounded-[32px] p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative text-slate-900">
