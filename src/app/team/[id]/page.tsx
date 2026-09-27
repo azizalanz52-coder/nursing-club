@@ -178,6 +178,9 @@ export default function CommitteeDetailPage() {
         return matchPhone || matchName;
       });
 
+  // التحقق مما إذا كان المستخدم الحالي عضواً في هذه اللجنة أو مديراً
+  const isMemberOfThisCommittee = isAdmin || displayedMembers.length > 0;
+
   const handleUploadExcuseSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!excuseText.trim() || !selectedEventTitle) return;
@@ -287,58 +290,66 @@ export default function CommitteeDetailPage() {
           </div>
         </div>
 
-        {/* قسم استعراض المهام المعطاة من اللجنة أو من لجنة الجودة */}
-        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
-          <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
-            <div>
-              <h2 className="text-xl font-black text-slate-900">📌 مهام اللجنة ومهام لجنة الجودة والتطوير</h2>
-              <p className="text-xs text-slate-500 mt-1">تابع المهام والفعاليات المسندة للجن أو الموجهة من الجودة وقم بتحديث إنجازها:</p>
+        {/* قسم استعراض المهام (لا يظهر إلا إذا كان المستخدم عضواً في اللجنة أو مديراً للأمان والخصوصية) */}
+        {isMemberOfThisCommittee ? (
+          <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
+            <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">📌 مهام اللجنة ومهام لجنة الجودة والتطوير</h2>
+                <p className="text-xs text-slate-500 mt-1">تابع المهام والفعاليات المسندة للجن أو الموجهة من الجودة وقم بتحديث إنجازها:</p>
+              </div>
+              <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-xl text-xs font-bold">
+                {relevantTasks.length} مهام متاحة
+              </span>
             </div>
-            <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-xl text-xs font-bold">
-              {relevantTasks.length} مهام متاحة
-            </span>
-          </div>
 
-          {relevantTasks.length === 0 ? (
-            <p className="text-center py-8 text-slate-400 text-xs bg-slate-50 rounded-2xl">لا توجد مهام أو فعاليات معتمدة لهذه اللجنة حتى الآن.</p>
-          ) : (
-            <div className="space-y-6">
-              {relevantTasks.map((taskGroup) => (
-                <div key={taskGroup.id} className="p-6 rounded-3xl border border-slate-200 bg-slate-50/50 shadow-sm space-y-4">
-                  <div className="flex justify-between items-center flex-wrap gap-2">
-                    <div>
-                      <span className="text-[10px] bg-[#630517]/10 text-[#630517] font-bold px-2.5 py-1 rounded-md">لجنة: {taskGroup.committee}</span>
-                      <h4 className="font-extrabold text-slate-900 text-sm mt-2">فعالية: {taskGroup.eventTitle}</h4>
-                    </div>
-                    <span className="text-xs font-bold text-slate-500">الموعد: {taskGroup.dueDate}</span>
-                  </div>
-
-                  <div className="space-y-2 pt-2 border-t border-slate-200">
-                    {(taskGroup.subTasks || []).map((st: any, idx: number) => (
-                      <div
-                        key={idx}
-                        onClick={() => handleToggleSubTask(taskGroup.id, idx)}
-                        className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
-                          st.completed ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs border ${
-                            st.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
-                          }`}>
-                            {st.completed ? '✓' : ''}
-                          </div>
-                          <span className={`text-xs font-bold ${st.completed ? 'line-through' : ''}`}>{st.text}</span>
-                        </div>
-                        {st.completedBy && (<span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">بإنجاز: {st.completedBy}</span>)}
+            {relevantTasks.length === 0 ? (
+              <p className="text-center py-8 text-slate-400 text-xs bg-slate-50 rounded-2xl">لا توجد مهام أو فعاليات معتمدة لهذه اللجنة حتى الآن.</p>
+            ) : (
+              <div className="space-y-6">
+                {relevantTasks.map((taskGroup) => (
+                  <div key={taskGroup.id} className="p-6 rounded-3xl border border-slate-200 bg-slate-50/50 shadow-sm space-y-4">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <span className="text-[10px] bg-[#630517]/10 text-[#630517] font-bold px-2.5 py-1 rounded-md">لجنة: {taskGroup.committee}</span>
+                        <h4 className="font-extrabold text-slate-900 text-sm mt-2">فعالية: {taskGroup.eventTitle}</h4>
                       </div>
-                    ))}
+                      <span className="text-xs font-bold text-slate-500">الموعد: {taskGroup.dueDate}</span>
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t border-slate-200">
+                      {(taskGroup.subTasks || []).map((st: any, idx: number) => (
+                        <div
+                          key={idx}
+                          onClick={() => handleToggleSubTask(taskGroup.id, idx)}
+                          className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                            st.completed ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs border ${
+                              st.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
+                            }`}>
+                              {st.completed ? '✓' : ''}
+                            </div>
+                            <span className={`text-xs font-bold ${st.completed ? 'line-through' : ''}`}>{st.text}</span>
+                          </div>
+                          {st.completedBy && (<span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">بإنجاز: {st.completedBy}</span>)}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm text-center space-y-3">
+            <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center font-black text-lg">🔒</div>
+            <h3 className="text-base font-extrabold text-slate-800">قائمة المهام والفعاليات مؤمنة</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">هذه القائمة مخصصة للأعضاء المقبولين والمنضمين رسمياً لهذه اللجنة فقط حفاظاً على السرية وأمان التنظيم.</p>
+          </div>
+        )}
 
         {/* جدول الأعضاء */}
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-8">
