@@ -31,6 +31,7 @@ export default function Hero() {
 
   const [acceptedData, setAcceptedData] = useState<{ committee: string; whatsapp: string } | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [currentUserPhone, setCurrentUserPhone] = useState<string | null>(null);
 
   // --- States خاصة بتهنئة الترقية والصلاحيات القيادية ---
   const [showRoleCongratModal, setShowRoleCongratModal] = useState(false);
@@ -50,7 +51,6 @@ export default function Hero() {
         console.error(e);
       }
     } else {
-      // جلب البانرات من سحابة فايربيس إن وجدت لتحديث العرض أمام الزوار
       const fetchCloudBanners = async () => {
         try {
           const bannersSnap = await getDocs(collection(db, 'site_banners'));
@@ -79,9 +79,9 @@ export default function Hero() {
       fetchCloudBanners();
     }
 
-    // التحقق من حالة العضو وطلبات القبول وتحديثات الرتب من سحابة فايربيس
     const userPhone = localStorage.getItem('userPhone');
     const userName = localStorage.getItem('userName');
+    if (userPhone) setCurrentUserPhone(userPhone);
 
     if (userPhone || userName) {
       const checkUserData = async () => {
@@ -97,25 +97,36 @@ export default function Hero() {
                 setShowRoleCongratModal(true);
                 await updateDoc(userDocRef, { pendingCongratulation: false });
               }
-            }
-          }
 
-          const querySnapshot = await getDocs(collection(db, 'applications'));
-          querySnapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            if (
-              (userPhone && data.phone === userPhone) ||
-              (userName && data.fullName === userName)
-            ) {
-              if (data.status === 'مقبول') {
+              // التحقق من الحقل السحابي hasSeenCongrats لعدم تكرار نافذة القبول أبداً
+              if (uData.status === 'مقبول' && !uData.hasSeenCongrats) {
                 setAcceptedData({
-                  committee: data.acceptedCommittee || data.firstChoice || 'اللجنة',
-                  whatsapp: data.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
+                  committee: uData.assignedCommittee || uData.firstChoice || 'اللجنة',
+                  whatsapp: uData.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
                 });
                 setShowModal(true);
               }
             }
-          });
+          }
+
+          if (!acceptedData) {
+            const querySnapshot = await getDocs(collection(db, 'applications'));
+            querySnapshot.forEach((docSnap) => {
+              const data = docSnap.data();
+              if (
+                (userPhone && data.phone === userPhone) ||
+                (userName && data.fullName === userName)
+              ) {
+                if (data.status === 'مقبول') {
+                  setAcceptedData({
+                    committee: data.acceptedCommittee || data.firstChoice || 'اللجنة',
+                    whatsapp: data.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
+                  });
+                  setShowModal(true);
+                }
+              }
+            });
+          }
         } catch (err) {
           console.error('Error checking user acceptance or role update:', err);
         }
@@ -125,7 +136,18 @@ export default function Hero() {
     }
   }, []);
 
-  // --- الانتقال التلقائي (السلايدر السينمائي) بين البانرات كل 5 ثوانٍ ---
+  // دالة إغلاق نافذة القبول وتحديث السحابة لئلا تظهر مجدداً
+  const handleCloseAcceptanceModal = async () => {
+    setShowModal(false);
+    if (!currentUserPhone) return;
+    try {
+      const userDocRef = doc(db, 'users', currentUserPhone);
+      await updateDoc(userDocRef, { hasSeenCongrats: true });
+    } catch (err) {
+      console.error('Error updating hasSeenCongrats in cloud:', err);
+    }
+  };
+
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
@@ -141,28 +163,21 @@ export default function Hero() {
       className="relative min-h-[92vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#3b020b] via-[#630517] to-[#4a030f] px-4 sm:px-6 lg:px-8 text-white pt-36 pb-20"
       dir="rtl"
     >
-      {/* خلفية تفاعلية ناعمة وخفيفة */}
       <div className="absolute inset-0 opacity-10 bg-[url('/grid.svg')] bg-center pointer-events-none mix-blend-overlay" />
-
-      {/* إضاءة خلفية هادئة وخفيفة جداً مريحة للعين */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-[#F5D061]/10 rounded-full blur-[160px] pointer-events-none" />
 
-      {/* الحاوية الرئيسية */}
       <div className="relative z-10 max-w-5xl mx-auto text-center flex flex-col items-center justify-center space-y-8">
         
-        {/* شارة المناسبة بتصميم زجاجي هادئ */}
         <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/10 backdrop-blur-xl border border-[#F5D061]/30 text-[#F5D061] text-xs sm:text-sm font-bold tracking-wider uppercase shadow-sm">
           <span>✨ {currentBanner.tag}</span>
         </div>
 
-        {/* عنوان نادي التمريض */}
         <div className="space-y-3">
           <h1 className="text-4xl sm:text-7xl font-black text-white tracking-tight drop-shadow-md transition-all duration-700">
             {currentBanner.title}
           </h1>
         </div>
 
-        {/* عرض تصميم البانر مع إطار أنيق وهادئ ومتكيف مع أي مقاس صورة أو بوستر */}
         <div className="relative w-full max-w-3xl mx-auto rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#F5D061]/30 group transition-all duration-700 hover:scale-[1.01] hover:border-[#F5D061]/70 bg-black/30">
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-30 group-hover:opacity-60 transition-opacity pointer-events-none z-10" />
 
@@ -182,12 +197,10 @@ export default function Hero() {
           </div>
         </div>
 
-        {/* النص الوصفي المتناسق */}
         <p className="max-w-2xl mx-auto text-base sm:text-lg text-amber-50/90 leading-relaxed text-center font-medium px-6 py-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-inner">
           {currentBanner.description}
         </p>
 
-        {/* الأزرار التفاعلية */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-5 w-full sm:w-auto pt-2">
           <Link
             href={currentBanner.buttonLink || '/discover'}
@@ -197,7 +210,6 @@ export default function Hero() {
           </Link>
         </div>
 
-        {/* أزرار التنقل (النقاط) بين البانرات */}
         {banners.length > 1 && (
           <div className="flex items-center justify-center gap-2.5 pt-4 bg-black/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/10">
             {banners.map((b, idx) => (
@@ -251,15 +263,19 @@ export default function Hero() {
         </div>
       )}
 
-      {/* نافذة التهنئة بالقبول ورابط الواتساب */}
+      {/* نافذة التهنئة بالقبول ورابط الواتساب (بالتدرج الذهبي الفاخر لصندوق المقترحات - وتظهر مرة واحدة سحابياً) */}
       {showModal && acceptedData && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-300">
-          <div className="bg-gradient-to-b from-slate-900 to-[#630517] border-2 border-[#F5D061] rounded-3xl p-8 max-w-lg w-full shadow-2xl text-center space-y-6 text-white relative">
-            <span className="text-5xl animate-bounce inline-block">🎉</span>
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300" dir="rtl">
+          <div className="bg-gradient-to-br from-[#F5D061] via-[#dfb64d] to-[#630517] rounded-[32px] p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative text-slate-900">
+            
+            <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl border-4 border-white/20">
+              🎉
+            </div>
+
             <div className="space-y-2">
-              <h3 className="text-2xl sm:text-3xl font-black text-[#F5D061]">مبروك تم قبولك!</h3>
-              <p className="text-sm sm:text-base text-slate-200 leading-relaxed">
-                يسعدنا انضمامك إلى <span className="font-extrabold text-[#F5D061]">{acceptedData.committee}</span> في نادي التمريض 
+              <h3 className="text-2xl font-black text-rose-950">مبروك تم قبولك!</h3>
+              <p className="text-xs font-bold text-slate-800 leading-relaxed">
+                يسعدنا انضمامك إلى <span className="text-[#630517] font-black underline">{acceptedData.committee}</span> في نادي التمريض 🌟
               </p>
             </div>
 
@@ -268,7 +284,7 @@ export default function Hero() {
                 href={acceptedData.whatsapp}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 px-6 rounded-2xl shadow-xl transition-all text-base"
+                className="inline-flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 px-6 rounded-2xl shadow-xl transition-all text-xs"
               >
                 <span>💬</span>
                 <span>الانضمام إلى قروب اللجنة عبر واتساب</span>
@@ -277,10 +293,10 @@ export default function Hero() {
 
             <button
               type="button"
-              onClick={() => setShowModal(false)}
-              className="text-xs text-slate-300 hover:text-white underline pt-2 cursor-pointer"
+              onClick={handleCloseAcceptanceModal}
+              className="text-xs font-extrabold text-rose-950 hover:text-rose-900 underline cursor-pointer pt-1 block mx-auto"
             >
-              إغلاق النافذة
+              إغلاق النافذة ✕
             </button>
           </div>
         </div>

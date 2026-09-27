@@ -104,8 +104,7 @@ export default function Navbar() {
           setAssignedCommittee(data.assignedCommittee);
         }
 
-        // إظهار التهنئة سحابياً فقط إذا لم يتم رؤيتها من قبل (hasSeenCongrats ليس true) ولم يتم تفريغ latestNotification
-        if (data.latestNotification && !data.hasSeenCongrats) {
+        if (data.latestNotification) {
           const notifText = data.latestNotification;
           
           if (notifText.includes('إنذار') || notifText.includes('تنبيه') || notifText.includes('تصعيد') || notifText.includes('الإحالة')) {
@@ -133,16 +132,12 @@ export default function Navbar() {
     }
   };
 
-  // تحديث السحابة عند إغلاق النافذة لكي لا تظهر مجدداً أبداً
   const handleDismissPromotion = async () => {
-    setShowPromotionModal(false);
     if (!userPhone) return;
     try {
       const userRef = doc(db, 'users', userPhone);
-      await updateDoc(userRef, { 
-        latestNotification: null,
-        hasSeenCongrats: true 
-      });
+      await updateDoc(userRef, { latestNotification: null });
+      setShowPromotionModal(false);
       setPromotionMessage(null);
     } catch (err) {
       console.error(err);
@@ -208,6 +203,7 @@ export default function Navbar() {
 
   if (!mounted) return null;
 
+  // التحقق الشامل للأدمن ورئاسة النادي والنائبات
   const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026') || (userRole === 'System Admin') || (userRole === 'رئيس النادي') || (userRole === 'رئيسة النادي') || (userRole === 'نائب رئيس النادي') || (userRole === 'نائبة رئيس النادي');
   const isCommitteeLeader = userRole && (userRole.includes('رئيس لجنة') || userRole.includes('مشرف') || userRole.includes('General Supervisor'));
   const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || isAdmin;
@@ -216,43 +212,36 @@ export default function Navbar() {
 
   return (
     <>
-      {/* نافذة التهنئة والتبريكات بالتصميم الذهبي الفاخر (تظهر مرة واحدة فقط سحابياً) */}
       {showPromotionModal && promotionMessage && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
-          <div className="bg-gradient-to-br from-[#F5D061] via-[#dfb64d] to-[#630517] rounded-[32px] p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative text-slate-900">
-            
-            <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl border-4 border-white/20">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
+          <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative">
+            <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl border-4 border-white -mt-14">
               🎉
             </div>
-
-            <div className="space-y-2">
-              <h3 className="text-2xl font-black text-rose-950">مبروك تم قبولك!</h3>
-              <p className="text-xs font-bold text-slate-800 leading-relaxed">
-                {promotionMessage}
-              </p>
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-black text-slate-900">مبارك لك الثقة القيادية!</h3>
+              <p className="text-xs text-slate-500 font-medium">{promotionMessage}</p>
             </div>
-
-            <div className="bg-white/40 border border-white/60 rounded-2xl p-4 space-y-1.5 text-right shadow-inner">
-              <span className="text-[11px] font-extrabold text-rose-950 block">رتبتك المعتمدة:</span>
-              <div className="bg-white/60 rounded-xl py-2 px-4 text-center">
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-1.5 text-right shadow-inner">
+              <span className="text-[11px] font-bold text-slate-400 block">رتبتك القيادية الحالية:</span>
+              <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl py-2 px-4 text-center">
                 <span className="text-base font-black text-[#630517]">{userRole || 'عضو أساسي'}</span>
               </div>
             </div>
-
+            <div className="bg-amber-50/30 border border-amber-200/50 rounded-2xl p-4 space-y-1.5 text-right shadow-sm">
+              <span className="text-[11px] font-bold text-amber-900 block flex items-center gap-1">
+                <span>📜</span> صلاحياتك ومهامك القيادية المعتمدة:
+              </span>
+              <p className="text-xs text-slate-700 font-semibold leading-relaxed">
+                {getRolePermissions(userRole || 'عضو أساسي')}
+              </p>
+            </div>
             <button
               type="button"
               onClick={handleDismissPromotion}
-              className="w-full py-3.5 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow-lg hover:brightness-110 cursor-pointer transition-all flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-sm shadow-lg hover:brightness-110 cursor-pointer transition-all flex items-center justify-center gap-2"
             >
-              <span>🚀</span> بدء مهام العمل القيادي والانضمام
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDismissPromotion}
-              className="text-xs font-extrabold text-rose-950 hover:text-rose-900 underline cursor-pointer pt-1 block mx-auto"
-            >
-              إغلاق النافذة ✕
+              <span>بدء مهام العمل القيادي 🚀</span>
             </button>
           </div>
         </div>
@@ -262,6 +251,7 @@ export default function Navbar() {
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between" dir="rtl">
           
+          {/* شعارات النادي والجامعة بجانب بعضها */}
           <Link href="/" className="flex items-center gap-3 shrink-0" onClick={() => setMobileMenuOpen(false)}>
             <div className="flex items-center gap-2">
               <Image
@@ -351,6 +341,7 @@ export default function Navbar() {
               </button>
             )}
 
+            {/* زر تقديم الانضمام باللون الذهبي الفاخر (موجه إلى /join) */}
             {!isRegistrationClosed ? (
               <Link
                 href="/join"
