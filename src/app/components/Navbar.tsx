@@ -46,6 +46,8 @@ export default function Navbar() {
         return 'صلاحيات الإشراف العام على الأنشطة والفعاليات ومتابعة سير العمل في لجان النادي ومراجعة طلبات الأعضاء.';
       case 'رئيس النادي':
       case 'رئيسة النادي':
+      case 'نائب رئيس النادي':
+      case 'نائبة رئيس النادي':
         return 'إدارة شاملة لجميع لجان النادي، متابعة الفعاليات، واعتماد وقبول الأعضاء بكامل الصلاحيات القيادية.';
       case 'رئيس لجنة / مشرف قسم':
         return 'إدارة أعضاء اللجنة الخاصة به، متابعة المهام المسندة للجنة، ورفع التقارير والمقترحات.';
@@ -201,9 +203,10 @@ export default function Navbar() {
 
   if (!mounted) return null;
 
-  const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026') || (userRole === 'System Admin') || (userRole === 'رئيس النادي') || (userRole === 'رئيسة النادي');
+  // التحقق الشامل للأدمن ورئاسة النادي والنائبات
+  const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026') || (userRole === 'System Admin') || (userRole === 'رئيس النادي') || (userRole === 'رئيسة النادي') || (userRole === 'نائب رئيس النادي') || (userRole === 'نائبة رئيس النادي');
   const isCommitteeLeader = userRole && (userRole.includes('رئيس لجنة') || userRole.includes('مشرف') || userRole.includes('General Supervisor'));
-  const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || userRole === 'System Admin' || userRole === 'رئيس النادي' || userRole === 'رئيسة النادي';
+  const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || isAdmin;
 
   const showLeaderAlertInNavbar = (isCommitteeLeader || isQualityOperationsRoom || isAdmin) && leaderAlertMsg && showLeaderAlertBar;
 
@@ -248,14 +251,25 @@ export default function Navbar() {
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between" dir="rtl">
           
-          <Link href="/" className="flex items-center gap-2.5 shrink-0" onClick={() => setMobileMenuOpen(false)}>
-            <Image
-              src="/logo.png"
-              alt="شعار نادي التمريض"
-              width={40}
-              height={40}
-              className="object-contain"
-            />
+          {/* شعارات النادي والجامعة بجانب بعضها */}
+          <Link href="/" className="flex items-center gap-3 shrink-0" onClick={() => setMobileMenuOpen(false)}>
+            <div className="flex items-center gap-2">
+              <Image
+                src="/logo.png"
+                alt="شعار نادي التمريض"
+                width={36}
+                height={36}
+                className="object-contain"
+              />
+              <div className="w-[1px] h-8 bg-slate-200"></div>
+              <Image
+                src="/uhb-logo.jpeg"
+                alt="شعار جامعة حفر الباطن"
+                width={36}
+                height={36}
+                className="object-contain rounded-lg"
+              />
+            </div>
             <div>
               <h1 className="font-bold text-rose-950 text-sm sm:text-base leading-tight">نادي التمريض</h1>
               <p className="text-[11px] text-slate-500">جامعة حفر الباطن</p>
@@ -401,7 +415,6 @@ export default function Navbar() {
               <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الفعاليات</Link>
               <Link href="/case-study" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">Case Study 🩺</Link>
               
-              {/* زر تقديم الانضمام للجوال باللون الذهبي */}
               <div className="py-1">
                 {!isRegistrationClosed ? (
                   <Link
