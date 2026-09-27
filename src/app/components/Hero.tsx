@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from "next/image";
 import Link from "next/link";
-import { db } from '../lib/firebase';
+import { db } from '../../lib/firebase';
 import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 interface BannerItem {
@@ -98,19 +98,36 @@ export default function Hero() {
                 await updateDoc(userDocRef, { pendingCongratulation: false });
               }
 
-              // التحقق الدقيق: هل العضو مقبول ولم يره مسبقاً سحابياً؟
-              if (uData.status === 'مقبول' && !uData.hasSeenCongrats) {
+              // الشرط المباشر والواضح لإظهار نافذة القبول مرة واحدة فقط
+              if (uData.status === 'مقبول' && uData.hasSeenCongrats !== true) {
                 setAcceptedData({
                   committee: uData.assignedCommittee || uData.firstChoice || 'اللجنة',
                   whatsapp: uData.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
                 });
                 setShowModal(true);
-                return; // وجدناه في مستند المستخدم ولا داعي للبحث العشوائي
+                return;
               }
             }
           }
 
-          // إذا لم يكن موجوداً في مستند users أو سبق رؤيتها، لن نظهرها نهائياً
+          // فحص احتياطي من جدول applications إذا لم توجد في users
+          const querySnapshot = await getDocs(collection(db, 'applications'));
+          querySnapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (
+              (userPhone && data.phone === userPhone) ||
+              (userName && data.fullName === userName)
+            ) {
+              if (data.status === 'مقبول') {
+                setAcceptedData({
+                  committee: data.acceptedCommittee || data.firstChoice || 'اللجنة',
+                  whatsapp: data.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
+                });
+                setShowModal(true);
+              }
+            }
+          });
+
         } catch (err) {
           console.error('Error checking user acceptance or role update:', err);
         }
@@ -120,7 +137,7 @@ export default function Hero() {
     }
   }, []);
 
-  // دالة إغلاق نافذة القبول وحفظها سحابياً في مستند المستخدم لكي لا تتكرر أبداً
+  // دالة إغلاق نافذة القبول وتحديث السحابة فوراً
   const handleCloseAcceptanceModal = async () => {
     setShowModal(false);
     const phone = currentUserPhone || localStorage.getItem('userPhone');
@@ -248,17 +265,17 @@ export default function Hero() {
         </div>
       )}
 
-      {/* نافذة التهنئة بالقبول (بتدرج ألوان صندوق المقترحات اللطيف والفخم، وتظهر مرة واحدة فقط سحابياً) */}
+      {/* نافذة التهنئة بالقبول (تظهر مرة واحدة فقط وتختفي للأبد عند إغلاقها) */}
       {showModal && acceptedData && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300" dir="rtl">
-          <div className="bg-gradient-to-b from-[#fef3c7] via-[#fde047] to-[#eab308]/90 rounded-[32px] p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-amber-200/80 relative text-slate-900">
+          <div className="bg-gradient-to-br from-[#F5D061] via-[#dfb64d] to-[#630517] rounded-[32px] p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative text-slate-900">
             
-            <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl border-4 border-white/30">
+            <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl border-4 border-white/20">
               🎉
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-2xl font-black text-[#630517]">مبروك تم قبولك!</h3>
+              <h3 className="text-2xl font-black text-rose-950">مبروك تم قبولك!</h3>
               <p className="text-xs font-bold text-slate-800 leading-relaxed">
                 يسعدنا انضمامك إلى <span className="text-[#630517] font-black underline">{acceptedData.committee}</span> في نادي التمريض 🌟
               </p>
@@ -279,7 +296,7 @@ export default function Hero() {
             <button
               type="button"
               onClick={handleCloseAcceptanceModal}
-              className="text-xs font-extrabold text-[#630517] hover:text-black underline cursor-pointer pt-1 block mx-auto"
+              className="text-xs font-extrabold text-rose-950 hover:text-rose-900 underline cursor-pointer pt-1 block mx-auto"
             >
               إغلاق النافذة ✕
             </button>
