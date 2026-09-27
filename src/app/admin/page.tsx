@@ -557,7 +557,7 @@ export default function AdminDashboard() {
   const [acceptedCommittee, setAcceptedCommittee] = useState<string>('لجنة التصميم');
   const [whatsappLink, setWhatsappLink] = useState<string>('');
 
-  const [requestSubTab, setRequestSubTab] = useState<'all' | 'accepted' | 'pref-1' | 'pref-2' | 'pref-3'>('all');
+  const [requestSubTab, setRequestSubTab] = useState<'all' | 'accepted' | 'pending' | 'pref-1' | 'pref-2' | 'pref-3'>('all');
   const [selectedCommitteeFilter, setSelectedCommitteeFilter] = useState<string>('لجنة التصميم');
 
   const [committees, setCommittees] = useState<Committee[]>([
@@ -1525,6 +1525,7 @@ export default function AdminDashboard() {
   const filteredRequests = requests.filter(req => {
     let matchesSubTab = true;
     if (requestSubTab === 'accepted') matchesSubTab = req.status === 'مقبول';
+    else if (requestSubTab === 'pending') matchesSubTab = req.status === 'معلق' || !req.status || req.status === 'قيد المراجعة';
     else if (requestSubTab === 'pref-1') matchesSubTab = matchesCommittee(req.firstChoice, selectedCommitteeFilter);
     else if (requestSubTab === 'pref-2') matchesSubTab = matchesCommittee(req.secondChoice, selectedCommitteeFilter);
     else if (requestSubTab === 'pref-3') matchesSubTab = matchesCommittee(req.thirdChoice, selectedCommitteeFilter);
@@ -2265,7 +2266,7 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {committees.map((comm) => {
-                const acceptedCommMembers = requests.filter(r => r.acceptedCommittee === comm.name || r.status === 'مقبول').length;
+                const acceptedCommMembers = requests.filter(r => (r.acceptedCommittee === comm.name || matchesCommittee(r.acceptedCommittee, comm.name)) && r.status === 'مقبول').length;
                 const membersListCount = comm.members?.length || 0;
                 const totalActiveCount = Math.max(acceptedCommMembers, membersListCount);
                 const performanceScore = Math.min(100, totalActiveCount * 12 + 45);
@@ -3197,7 +3198,7 @@ export default function AdminDashboard() {
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
                 <h3 className="text-xl font-black text-slate-900">إدارة قادة ورابط واتساب {currentCommittee.name}</h3>
                 <span className="text-xs bg-[#630517]/10 text-[#630517] font-bold px-3 py-1 rounded-full">
-                  {((currentCommittee.members || []).length + requests.filter(r => r.status === 'مقبول' && matchesCommittee(r.acceptedCommittee || r.firstChoice, currentCommittee.name)).length)} أعضاء
+                  {((currentCommittee.members || []).length + requests.filter(r => r.status === 'مقبول' && matchesCommittee(r.acceptedCommittee, currentCommittee.name)).length)} أعضاء
                 </span>
               </div>
 
@@ -3255,12 +3256,12 @@ export default function AdminDashboard() {
             </form>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة (تشمل المقبولين تلقائياً والأعضاء المضافين)</h4>
+              <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة (تشمل المقبولين في هذه اللجنة تحديداً والأعضاء المضافين)</h4>
               
               {(() => {
                 const manualMembers = currentCommittee.members || [];
                 const acceptedFromRequests = requests
-                  .filter(r => r.status === 'مقبول' && matchesCommittee(r.acceptedCommittee || r.firstChoice, currentCommittee.name))
+                  .filter(r => r.status === 'مقبول' && matchesCommittee(r.acceptedCommittee, currentCommittee.name))
                   .map(r => ({
                     name: r.fullName,
                     role: r.major || 'عضو منضم',
@@ -3383,7 +3384,14 @@ export default function AdminDashboard() {
                   onClick={() => setRequestSubTab('accepted')}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'accepted' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                 >
-                  ✅ قائمة المقبولين ({requests.filter(r => r.status === 'مقبول').length})
+                  ✅ المقبولون ({requests.filter(r => r.status === 'مقبول').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRequestSubTab('pending')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'pending' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                >
+                  ⏳ المعلقون (لم يقبلوا بعد) ({requests.filter(r => r.status === 'معلق' || !r.status || r.status === 'قيد المراجعة').length})
                 </button>
                 <button
                   type="button"
@@ -3433,7 +3441,7 @@ export default function AdminDashboard() {
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h3 className="text-xl font-black text-slate-900">
-                {requestSubTab === 'accepted' ? 'قائمة الأعضاء المقبولين وإدارتهم' : 'طلبات انضمام الأعضاء (مرتبة أبجدياً 🔤)'} ({filteredRequests.length})
+                {requestSubTab === 'accepted' ? 'قائمة الأعضاء المقبولين' : requestSubTab === 'pending' ? 'قائمة الأعضاء المعلقين (الذين لم يقبلوا بعد)' : 'طلبات انضمام الأعضاء (مرتبة أبجدياً 🔤)'} ({filteredRequests.length})
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs">
