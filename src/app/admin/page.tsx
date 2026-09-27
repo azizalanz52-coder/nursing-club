@@ -46,6 +46,7 @@ interface PartnerItem {
   name: string;
   category: string;
   logo: string;
+  websiteUrl?: string; // أُضيف لدعم رابط الشريك أو الراعي
 }
 
 interface SuggestionItem {
@@ -544,10 +545,12 @@ export default function AdminDashboard() {
   const [bannerTitle, setBannerTitle] = useState<string>('');
   const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
 
+  // تعريفات الشركاء مع حقل رابط الموقع
   const [partners, setPartners] = useState<PartnerItem[]>([]);
   const [partnerName, setPartnerName] = useState<string>('');
   const [partnerCategory, setPartnerCategory] = useState<string>('شريك إستراتيجي');
   const [partnerLogo, setPartnerLogo] = useState<string>('/logo.png');
+  const [partnerWebsiteUrl, setPartnerWebsiteUrl] = useState<string>(''); // حقل الرابط الجديد
 
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [requests, setRequests] = useState<Record<string, any>[]>([]);
@@ -1254,6 +1257,7 @@ export default function AdminDashboard() {
     });
   };
 
+  // دالة حفظ الشريك مع دعم رابط الموقع/السوشيال ميديا
   const handleAddPartner = async (e: FormEvent) => {
     e.preventDefault();
     if (!partnerName.trim()) return;
@@ -1262,7 +1266,8 @@ export default function AdminDashboard() {
       id: partnerId,
       name: partnerName.trim(),
       category: partnerCategory,
-      logo: partnerLogo
+      logo: partnerLogo,
+      websiteUrl: partnerWebsiteUrl.trim() // تخزين الرابط
     };
 
     try {
@@ -1271,6 +1276,7 @@ export default function AdminDashboard() {
       setPartnerName('');
       setPartnerCategory('شريك إستراتيجي');
       setPartnerLogo('/logo.png');
+      setPartnerWebsiteUrl('');
       setModalMessage('تم إضافة شريك النجاح بنجاح سحابياً! 🤝');
       setModalType('success');
     } catch (err) {
@@ -3109,6 +3115,19 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
+                {/* حقل رابط الموقع أو السوشيال ميديا الجديد */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-600">رابط الموقع أو السوشيال ميديا (انستغرام / تويتر / موقع إلكتروني)</label>
+                  <input
+                    type="text"
+                    placeholder="https://instagram.com/... أو https://..."
+                    value={partnerWebsiteUrl}
+                    onChange={(e) => setPartnerWebsiteUrl(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 font-mono focus:outline-none focus:border-[#630517]"
+                    dir="ltr"
+                  />
+                </div>
+
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-600">اختر شعار أو فيديو الشريك من جهازك</label>
                   <input
@@ -3150,6 +3169,17 @@ export default function AdminDashboard() {
                       <div>
                         <h4 className="font-extrabold text-slate-900 text-xs">{p.name}</h4>
                         <span className="text-[10px] text-[#630517] font-bold bg-[#630517]/10 px-2 py-0.5 rounded-md mt-1 inline-block">{p.category}</span>
+                        {p.websiteUrl && (
+                          <a 
+                            href={p.websiteUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="block text-[10px] text-sky-600 hover:underline mt-1 font-mono truncate max-w-[140px]"
+                            dir="ltr"
+                          >
+                            🔗 {p.websiteUrl}
+                          </a>
+                        )}
                       </div>
                       <button
                         type="button"

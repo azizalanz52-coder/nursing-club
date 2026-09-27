@@ -48,25 +48,33 @@ const DEFAULT_DISCOVER_EVENTS = [
 ];
 
 const DEFAULT_PARTNERS = [
-  { id: '1', name: 'وبل', category: 'شريك إستراتيجي', logo: '/wabal.png' },
-  { id: '2', name: 'كوفي غاء', category: 'شريك إستراتيجي', logo: '/ghaa.png' }
+  { id: '1', name: 'وبل', category: 'شريك إستراتيجي', logo: '/wabal.png', websiteUrl: '' },
+  { id: '2', name: 'كوفي غاء', category: 'شريك إستراتيجي', logo: '/ghaa.png', websiteUrl: '' }
 ];
 
 interface StudentAchievement {
   id: string;
-  studentName?: string; // يدعم النص القديم
-  studentNames?: string[]; // يدعم الأسماء المتعددة الجماعية الجديدة
+  studentName?: string;
+  studentNames?: string[];
   awardName: string;
   image: string;
   description: string;
   createdAt: string;
 }
 
+interface PartnerItem {
+  id: string;
+  name: string;
+  category: string;
+  logo: string;
+  websiteUrl?: string; // أُضيف لدعم رابط الشريك أو الراعي
+}
+
 export default function DiscoverPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [passionSlides, setPassionSlides] = useState(DEFAULT_PASSION_SLIDES);
   const [discoverEvents, setDiscoverEvents] = useState(DEFAULT_DISCOVER_EVENTS);
-  const [partners, setPartners] = useState(DEFAULT_PARTNERS);
+  const [partners, setPartners] = useState<PartnerItem[]>(DEFAULT_PARTNERS);
   const [studentAchievements, setStudentAchievements] = useState<StudentAchievement[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
 
@@ -80,7 +88,6 @@ export default function DiscoverPage() {
   useEffect(() => {
     const fetchCloudContent = async () => {
       try {
-        // Fetch Passion Slides
         const passionSnap = await getDocs(collection(db, 'site_passion_slides'));
         if (!passionSnap.empty) {
           const slides: any[] = [];
@@ -92,7 +99,6 @@ export default function DiscoverPage() {
           }
         }
 
-        // Fetch Discover Events
         const discoverSnap = await getDocs(collection(db, 'site_discover_events'));
         if (!discoverSnap.empty) {
           const eventsList: any[] = [];
@@ -104,19 +110,17 @@ export default function DiscoverPage() {
           }
         }
 
-        // Fetch Partners & Sponsors from Cloud (Linked with Admin Dashboard)
         const partnersSnap = await getDocs(collection(db, 'site_partners'));
         if (!partnersSnap.empty) {
-          const partnersList: any[] = [];
+          const partnersList: PartnerItem[] = [];
           partnersSnap.forEach((d) => {
-            partnersList.push({ id: d.id, ...d.data() });
+            partnersList.push({ id: d.id, ...d.data() } as PartnerItem);
           });
           if (partnersList.length > 0) {
             setPartners(partnersList);
           }
         }
 
-        // Fetch Student Achievements
         const achievementsSnap = await getDocs(collection(db, 'student_achievements'));
         if (!achievementsSnap.empty) {
           const achievementsList: StudentAchievement[] = [];
@@ -167,7 +171,6 @@ export default function DiscoverPage() {
         </div>
       </section>
 
-      {/* قسم إنجازات طلبة كلية التمريض (الجديد كلياً - تصميم فاخر ومتجاوب) */}
       {studentAchievements.length > 0 && (
         <section className="py-20 bg-gradient-to-b from-amber-50/60 via-white to-slate-50 border-b border-amber-200/50">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
@@ -180,13 +183,12 @@ export default function DiscoverPage() {
                 إنجازات طلبة كلية التمريض
               </h2>
               <p className="text-slate-600 text-sm sm:text-base font-medium">
-                نحتفي بنخبة من طلاب وطالبات كلية التمريض بجامعة حفر الباطن الحاصلين على جوائز ومراكز متقدمة تشرف الكلية والنادي.
+                نحتهبي بنخبة من طلاب وطالبات كلية التمريض بجامعة حفر الباطن الحاصلين على جوائز ومراكز متقدمة تشرف الكلية والنادي.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {studentAchievements.map((ach) => {
-                // معالجة عرض الأسماء سواء كانت مصفوفة أسماء متعددة أو نص عادي مفصول
                 const namesList = ach.studentNames && ach.studentNames.length > 0 
                   ? ach.studentNames 
                   : (ach.studentName ? ach.studentName.split(/[\n,]+/).map(n => n.trim()).filter(Boolean) : []);
@@ -219,7 +221,6 @@ export default function DiscoverPage() {
                             {ach.awardName}
                           </span>
                           
-                          {/* عرض أسماء الطلبة (فردي أو جماعي لفريق العمل) */}
                           <div className="space-y-1 pt-1">
                             {namesList.length > 0 ? (
                               namesList.map((name, idx) => (
@@ -439,7 +440,7 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      {/* قسم شركاء النجاح والرعاة (مرتبط سحابياً بلوحة التحكم) */}
+      {/* قسم شركاء النجاح والرعاة (مرتبط سحابياً لوحة التحكم مع تفعيل روابط الـ <a>) */}
       <section className="py-16 border-t border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-10">
           <div className="space-y-3">
@@ -452,27 +453,45 @@ export default function DiscoverPage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
-            {partners.map((partner) => (
-              <div 
-                key={partner.id || partner.name} 
-                className="p-6 rounded-3xl bg-slate-50 border border-slate-200 shadow-md flex flex-col items-center justify-center w-60 h-52 hover:border-[#630517] hover:scale-105 transition-all overflow-hidden space-y-3 group"
-              >
-                <div className="w-28 h-28 bg-white rounded-2xl p-2.5 shadow-inner flex items-center justify-center overflow-hidden border border-slate-100">
-                  <img 
-                    src={partner.logo && partner.logo.trim() !== '' ? partner.logo : '/logo.png'} 
-                    alt={partner.name} 
-                    className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/logo.png';
-                    }}
-                  />
+            {partners.map((partner) => {
+              const partnerContent = (
+                <div 
+                  className="p-6 rounded-3xl bg-slate-50 border border-slate-200 shadow-md flex flex-col items-center justify-center w-60 h-52 hover:border-[#630517] hover:scale-105 transition-all overflow-hidden space-y-3 group cursor-pointer"
+                >
+                  <div className="w-28 h-28 bg-white rounded-2xl p-2.5 shadow-inner flex items-center justify-center overflow-hidden border border-slate-100">
+                    <img 
+                      src={partner.logo && partner.logo.trim() !== '' ? partner.logo : '/logo.png'} 
+                      alt={partner.name} 
+                      className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/logo.png';
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-900 text-sm truncate max-w-[180px]">{partner.name}</h4>
+                    <span className="text-xs text-[#630517] font-bold">{partner.category || 'شريك إستراتيجي'}</span>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-extrabold text-slate-900 text-sm truncate max-w-[180px]">{partner.name}</h4>
-                  <span className="text-xs text-[#630517] font-bold">{partner.category || 'شريك إستراتيجي'}</span>
+              );
+
+              return partner.websiteUrl ? (
+                <a
+                  key={partner.id || partner.name}
+                  href={partner.websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block transition-transform"
+                  title={`زيارة صفحة أو موقع ${partner.name}`}
+                >
+                  {partnerContent}
+                </a>
+              ) : (
+                <div key={partner.id || partner.name}>
+                  {partnerContent}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
