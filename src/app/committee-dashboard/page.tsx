@@ -489,7 +489,14 @@ export default function CommitteeDashboard() {
   };
 
   const currentActiveComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
+  
+  // 🛡️ [تعديل جذري لمنع ظهور العضو المقبول في رغبات اللجان الأخرى]:
   const filteredRequests = (requests || []).filter(req => {
+    // إذا كان العضو تم قبوله رسمياً في لجنة أخرى غير اللجنة الحالية، يتم حجبه نهائياً من هذه القائمة
+    if (req.acceptedCommittee && req.acceptedCommittee !== currentActiveComm) {
+      return false;
+    }
+
     const targetKey = preferenceFilterTab === 'pref-1' ? 'firstChoice' : preferenceFilterTab === 'pref-2' ? 'secondChoice' : 'thirdChoice';
     const choiceValue = req[targetKey] || '';
     return matchesTargetCommittee(choiceValue, currentActiveComm) || req.acceptedCommittee === currentActiveComm;
@@ -497,8 +504,8 @@ export default function CommitteeDashboard() {
 
   const transferredRequestsList = (requests || []).filter(req => req.transferredToHR === true || req.status === 'محول للموارد البشرية');
 
-  const totalApplicantsCount = requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm)).length;
-  const acceptedMembersCount = requests.filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm))).length;
+  const totalApplicantsCount = requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm) && (!r.acceptedCommittee || r.acceptedCommittee === currentActiveComm)).length;
+  const acceptedMembersCount = requests.filter(r => r.acceptedCommittee === currentActiveComm).length;
 
   const handleAcceptSubmit = async () => {
     if (!selectedReqId) return;
@@ -511,6 +518,8 @@ export default function CommitteeDashboard() {
     try {
       const targetReq = requests.find(r => r.id === selectedReqId);
       const docRef = doc(db, 'applications', selectedReqId);
+      
+      // 1. تحديث الطلب ليقفل على لجنته المقبولة فقط
       await updateDoc(docRef, {
         status: 'مقبول',
         acceptedCommittee: currentActiveComm,
@@ -518,18 +527,21 @@ export default function CommitteeDashboard() {
         latestNotification: `مبروك! تم قبولك رسمياً في (${currentActiveComm}) 🎉. انضم لقروب الواتساب: ${activeWhatsapp}`
       });
 
+      // 2. تحديث ملف المستخدم لربطه حصرياً بهذه اللجنة وتحديث البروفايل
       if (targetReq?.phone) {
         try {
           const userDocRef = doc(db, 'users', targetReq.phone);
           await updateDoc(userDocRef, {
-            latestNotification: `🎉 مبارك القبول النهائي في (${currentActiveComm})! رابط قروب الواتساب: ${activeWhatsapp}, committee: ${currentActiveComm}, assignedCommittee: ${currentActiveComm}`
+            latestNotification: `🎉 مبارك القبول النهائي في (${currentActiveComm})! رابط قروب الواتساب: ${activeWhatsapp}`,
+            assignedCommittee: currentActiveComm,
+            committee: currentActiveComm
           });
         } catch (e) { console.error(e); }
       }
 
       setRequests((requests || []).map(r => r.id === selectedReqId ? { ...r, status: 'مقبول', acceptedCommittee: currentActiveComm, whatsappLink: activeWhatsapp } : r));
       setShowAcceptModal(false);
-      alert(`تم قبول المتقدم في (${currentActiveComm}) بنجاح وإرسال رابط الواتساب تلقائياً! 🎉`);
+      alert(`تم قبول المتقدم في (${currentActiveComm}) وتثبيته كعضو أساسي في هذه اللجنة فقط! 🎉`);
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء قبول الطلب.');
@@ -583,7 +595,7 @@ export default function CommitteeDashboard() {
 
     try {
       const targetComm = currentActiveComm;
-      const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm || r.status === 'مقبول');
+      const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm);
       for (const mem of acceptedList) {
         if (mem.phone) {
           const uRef = doc(db, 'users', mem.phone);
@@ -592,7 +604,7 @@ export default function CommitteeDashboard() {
           });
         }
       }
-      alert('تم إرسال التعميم والإشعار لجميع أعضاء اللجنة بنجاح! 🚀');
+      alert('تم إرسال التعميم والإشعار لجميع أعضاء اللجنة المقبولين فقط بنجاح! 🚀');
       setAnnouncementText('');
     } catch (err) {
       console.error(err);
@@ -636,7 +648,7 @@ export default function CommitteeDashboard() {
       const docRef = await addDoc(collection(db, 'committee_tasks'), newTaskObj);
       setCommitteeTasks([{ id: docRef.id, ...newTaskObj }, ...committeeTasks]);
 
-      const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm || r.status === 'مقبول');
+      const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm);
       for (const mem of acceptedList) {
         if (mem.phone) {
           const uRef = doc(db, 'users', mem.phone);
@@ -813,7 +825,7 @@ export default function CommitteeDashboard() {
 
   const handleExportCommitteeExcel = () => {
     const targetComm = currentActiveComm;
-    const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm || r.status === 'مقبول');
+    const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm);
     if (acceptedList.length === 0) {
       alert('لا توجد بيانات لأعضاء مقبولين للتصدير حالياً.');
       return;
@@ -885,11 +897,11 @@ export default function CommitteeDashboard() {
       return;
     }
 
-    const totalAcceptedAll = requests.filter(r => r.status === 'مقبول' || r.acceptedCommittee).length;
+    const totalAcceptedAll = requests.filter(r => r.acceptedCommittee).length;
     let topCommName = 'لجنة التصميم';
     let maxMembers = -1;
     allCommitteesList.forEach(c => {
-      const cnt = requests.filter(r => r.acceptedCommittee === c || r.status === 'مقبول').length;
+      const cnt = requests.filter(r => r.acceptedCommittee === c).length;
       if (cnt > maxMembers) {
         maxMembers = cnt;
         topCommName = c;
@@ -942,7 +954,7 @@ export default function CommitteeDashboard() {
     `;
 
     allCommitteesList.forEach(comm => {
-      const commMembers = requests.filter(r => r.acceptedCommittee === comm || r.status === 'مقبول').length;
+      const commMembers = requests.filter(r => r.acceptedCommittee === comm).length;
       htmlContent += `
         <tr>
           <td><strong>${comm}</strong></td>
@@ -1583,7 +1595,7 @@ export default function CommitteeDashboard() {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {allCommitteesList.map((commName, idx) => {
-                const count = requests.filter(r => r.acceptedCommittee === commName || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, commName))).length;
+                const count = requests.filter(r => r.acceptedCommittee === commName).length;
                 return (
                   <div 
                     key={idx} 
@@ -1677,7 +1689,7 @@ export default function CommitteeDashboard() {
                     <p className="text-xs text-slate-500">هنا يتم عرض كافة أعضاء هذه اللجنة المقبولين للتدقيق والمتابعة المباشرة:</p>
                   </div>
                   <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs">
-                    الإجمالي: {requests.filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm))).length} عضو
+                    الإجمالي: {requests.filter(r => r.acceptedCommittee === currentActiveComm).length} عضو
                   </span>
                 </div>
 
@@ -1693,13 +1705,13 @@ export default function CommitteeDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {requests.filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm))).length === 0 ? (
+                      {requests.filter(r => r.acceptedCommittee === currentActiveComm).length === 0 ? (
                         <tr>
                           <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد أعضاء مقبولين مسجلين في هذه اللجنة حالياً.</td>
                         </tr>
                       ) : (
                         requests
-                          .filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm)))
+                          .filter(r => r.acceptedCommittee === currentActiveComm)
                           .map((member, mIdx) => (
                             <tr key={mIdx} className="hover:bg-slate-50">
                               <td className="py-3 pr-2 font-bold text-slate-900">{member.fullName}</td>
@@ -1792,13 +1804,13 @@ export default function CommitteeDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {requests.filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm))).length === 0 ? (
+                  {requests.filter(r => r.acceptedCommittee === currentActiveComm).length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد أعضاء مقبولين مسجلين في هذه اللجنة حتى الآن.</td>
                     </tr>
                   ) : (
                     requests
-                      .filter(r => r.acceptedCommittee === currentActiveComm || (r.status === 'مقبول' && matchesTargetCommittee(r.firstChoice, currentActiveComm)))
+                      .filter(r => r.acceptedCommittee === currentActiveComm)
                       .map((member, mIdx) => (
                         <tr key={mIdx} className="hover:bg-slate-50">
                           <td className="py-3 pr-2 font-bold text-slate-900">{member.fullName}</td>
@@ -2035,18 +2047,18 @@ export default function CommitteeDashboard() {
             <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-lg font-black text-slate-900">المتقدمون ({currentActiveComm})</h3>
-                <p className="text-xs text-slate-500">اختر الرغبة لعرض المتقدمين بدقة وقبولهم برابط قروب الواتساب:</p>
+                <p className="text-xs text-slate-500">اختر الرغبة لعرض المتقدمين بدقة وقبولهم برابط قروب الواتساب (المقبولون في لجان أخرى محجوبون تلقائياً):</p>
               </div>
               
               <div className="flex gap-2">
                 <button type="button" onClick={() => setPreferenceFilterTab('pref-1')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-1' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                  🎯 الرغبة الأولى ({requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm)).length})
+                  🎯 الرغبة الأولى ({requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm) && (!r.acceptedCommittee || r.acceptedCommittee === currentActiveComm)).length})
                 </button>
                 <button type="button" onClick={() => setPreferenceFilterTab('pref-2')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-2' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                  🥈 الرغبة الثانية ({requests.filter(r => matchesTargetCommittee(r.secondChoice, currentActiveComm)).length})
+                  🥈 الرغبة الثانية ({requests.filter(r => matchesTargetCommittee(r.secondChoice, currentActiveComm) && (!r.acceptedCommittee || r.acceptedCommittee === currentActiveComm)).length})
                 </button>
                 <button type="button" onClick={() => setPreferenceFilterTab('pref-3')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-3' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                  🥉 الرغبة الثالثة ({requests.filter(r => matchesTargetCommittee(r.thirdChoice, currentActiveComm)).length})
+                  🥉 الرغبة الثالثة ({requests.filter(r => matchesTargetCommittee(r.thirdChoice, currentActiveComm) && (!r.acceptedCommittee || r.acceptedCommittee === currentActiveComm)).length})
                 </button>
               </div>
             </div>
@@ -2131,7 +2143,7 @@ export default function CommitteeDashboard() {
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
             <h3 className="text-xl font-black text-slate-900 border-b border-slate-100 pb-3">تأكيد القبول في {currentActiveComm}</h3>
             <div className="space-y-4">
-              <p className="text-xs text-slate-600">سيتم قبول الطالب رسمياً في هذه اللجنة وربطه برابط قروب الواتساب الخاص باللجنة.</p>
+              <p className="text-xs text-slate-600">سيتم قبول الطالب رسمياً في هذه اللجنة وربطه برابط قروب الواتساب الخاص باللجنة حصرياً ولن يظهر في رغبات اللجان الأخرى بعد اليوم.</p>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-600">رابط قروب الواتساب المحفوظ:</label>
                 <input
