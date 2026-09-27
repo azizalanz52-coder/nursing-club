@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 
 interface CommitteeData {
   id: string;
@@ -42,7 +42,7 @@ export default function MemberSmartDashboard() {
     setCurrentUserPhone(phone);
     setCurrentUserName(name);
 
-    const fetchSmartData = async () => {
+    const fetchLinkedData = async () => {
       try {
         let activeRole = 'عضو أساسي';
         let activeComm = '';
@@ -59,7 +59,6 @@ export default function MemberSmartDashboard() {
             if (uData.latestNotification) notification = uData.latestNotification;
           }
 
-          // إذا لم يتم العثور على اللجنة في جدول المستخدمين، نبحث عنها في جدول الطلبات المقبولة (applications)
           if (!activeComm) {
             const appsSnap = await getDocs(collection(db, 'applications'));
             appsSnap.forEach(d => {
@@ -76,7 +75,6 @@ export default function MemberSmartDashboard() {
         setAssignedCommittee(activeComm);
         setUserNotification(notification);
 
-        // العثور على مفتاح اللجنة المطابق لاسم اللجنة المقبول فيها العضو
         let targetKey = 'design';
         for (const key of Object.keys(committeesMeta)) {
           if (activeComm.includes(committeesMeta[key].name) || activeComm.includes(key)) {
@@ -114,31 +112,31 @@ export default function MemberSmartDashboard() {
         });
 
       } catch (err) {
-        console.error('Error fetching smart dashboard data:', err);
+        console.error('Error fetching linked system data:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSmartData();
+    fetchLinkedData();
   }, []);
 
-  const isAdmin = currentUserPhone === '0553731265' || userRole === 'System Admin' || userRole === 'رئيس النادي';
+  const isAdmin = currentUserPhone === '0553731265' || userRole === 'System Admin' || userRole === 'رئيس النادي' || userRole === 'رئيسة النادي' || userRole === 'نائب رئيس النادي' || userRole === 'نائبة رئيس النادي';
   const isLeader = userRole.includes('رئيس لجنة') || userRole.includes('مشرف');
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         
-        {/* شريط التنقل العلوي */}
+        {/* شريط التنقل العلوي المرتبط بالنظام */}
         <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3">
             <span className="w-10 h-10 rounded-xl bg-[#630517] text-[#F5D061] flex items-center justify-center font-black text-lg">
               UHB
             </span>
             <div>
-              <h1 className="text-base font-black text-slate-900">لوحة تحكم العضو الذكية 🛡️</h1>
-              <p className="text-xs text-slate-500">منصة آمنة ومخصصة لعرض لجتك ومهامك الخاصة فقط</p>
+              <h1 className="text-base font-black text-slate-900">بوابة العضو المرتبطة سحابياً 🛡️</h1>
+              <p className="text-xs text-slate-500">منصة موحدة تتصل مباشرة بلوحة الأدمن وقادة اللجان</p>
             </div>
           </div>
           <Link
@@ -149,36 +147,36 @@ export default function MemberSmartDashboard() {
           </Link>
         </div>
 
-        {/* بطاقة الترحيب والإشعارات */}
+        {/* لوحة الترحيب الذكية */}
         <div className="bg-gradient-to-r from-[#630517] to-[#80071D] rounded-3xl p-8 text-white shadow-xl space-y-6">
           <div className="flex justify-between items-start flex-wrap gap-4">
             <div className="space-y-2">
               <span className="bg-[#F5D061] text-[#630517] font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider">
-                {isAdmin ? 'مدير النظام' : isLeader ? 'قائد لجنة' : 'عضو أساسي مسجل'}
+                {isAdmin ? 'إدارة عليا للنادي' : isLeader ? 'قائد لجنة' : 'عضو أساسي معتمد'}
               </span>
-              <h2 className="text-2xl font-black">أهلاً بك، {currentUserName || 'عضونا الكريم'} 👋</h2>
+              <h2 className="text-2xl font-black">أهلاً بك، {currentUserName || 'زميلنا العزيز'} 👋</h2>
               <p className="text-xs text-white/80 max-w-lg leading-relaxed">
-                هذه لوحتك الخاصة المربوطة سحابياً. لا يظهر هنا سوى لجنادتك المقبول فيها ومهامك الخاصة لضمان الخصوصية التامة.
+                النظام مرتبط بالكامل: صلاحياتك معتمدة من الإدارة، ومهامك من لجنة الجودة وقائدك المباشر.
               </p>
             </div>
 
             <div className="bg-white/10 backdrop-blur-md px-5 py-4 rounded-2xl border border-white/20 text-center space-y-1">
-              <span className="block text-xs text-white/70">اللجنة المعينة</span>
-              <span className="text-sm font-black text-[#F5D061]">{assignedCommittee || userCommitteeData?.name || 'قيد المعالجة'}</span>
+              <span className="block text-xs text-white/70">رتبتك في النظام</span>
+              <span className="text-sm font-black text-[#F5D061]">{userRole}</span>
             </div>
           </div>
 
           {userNotification && (
             <div className="bg-amber-400 text-slate-900 p-4 rounded-2xl text-xs font-black shadow-md flex items-center gap-3">
-              <span>🔔 إشعار إداري:</span>
+              <span>🔔 تنبيه من الإدارة:</span>
               <span>{userNotification}</span>
             </div>
           )}
         </div>
 
-        {/* بطاقة اللجنة المخصصة للعضو فقط (بدون تكرار اللجان الأخرى) */}
+        {/* بطاقة اللجنة المرتبطة */}
         {loading ? (
-          <div className="py-20 text-center text-slate-400 bg-white rounded-3xl border border-slate-200">جاري مطابقة بيانات لجنتك من السحابة... ⏳</div>
+          <div className="py-20 text-center text-slate-400 bg-white rounded-3xl border border-slate-200">جاري مزامنة بيانات النظام السحابي... ⏳</div>
         ) : userCommitteeData ? (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6">
             <div className="flex items-center gap-4 border-b border-slate-100 pb-6">
@@ -186,7 +184,7 @@ export default function MemberSmartDashboard() {
                 {userCommitteeData.icon}
               </span>
               <div>
-                <span className="text-xs font-bold text-[#630517] bg-[#630517]/10 px-3 py-1 rounded-full">لجنتك المعتمدة</span>
+                <span className="text-xs font-bold text-[#630517] bg-[#630517]/10 px-3 py-1 rounded-full">لجنتك المعتمدة سحابياً</span>
                 <h3 className="text-2xl font-black text-slate-900 mt-1">{userCommitteeData.name}</h3>
                 <p className="text-xs text-slate-600 mt-1">{userCommitteeData.description}</p>
               </div>
@@ -208,7 +206,7 @@ export default function MemberSmartDashboard() {
                 href={`/team/${userCommitteeData.id}`}
                 className="flex-1 py-3 px-6 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs text-center shadow-md hover:brightness-110 transition-all"
               >
-                الدخول لبوابة مهام اللجنة واعتذارات الحضور ➔
+                الدخول لصفحة المهام واعتذارات الحضور ➔
               </Link>
 
               {userCommitteeData.whatsappLink && (
@@ -218,14 +216,14 @@ export default function MemberSmartDashboard() {
                   rel="noopener noreferrer"
                   className="py-3 px-6 rounded-2xl bg-emerald-600 text-white font-bold text-xs shadow-md hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
                 >
-                  💬 الانضمام لقروب واتساب اللجنة
+                  💬 قروب واتساب اللجنة
                 </a>
               )}
             </div>
           </div>
         ) : (
           <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-3">
-            <p className="text-slate-500 text-sm font-bold">لم يتم رصد قبولك في أي لجنة حتى الآن، أو أن حسابك غير مرتبط بلجنة.</p>
+            <p className="text-slate-500 text-sm font-bold">لم يتم ربط حسابك بأي لجنة حتى الآن من قبل لوحة التحكم.</p>
           </div>
         )}
 
