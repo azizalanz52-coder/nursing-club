@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from "next/image";
 import Link from "next/link";
-import { db } from '../../lib/firebase';
+import { db } from './../lib/firebase';
 import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 interface BannerItem {
