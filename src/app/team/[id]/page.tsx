@@ -81,12 +81,12 @@ export default function CommitteeDetailPage() {
   const [currentUserPhone, setCurrentUserPhone] = useState<string>('');
   const [currentUserName, setCurrentUserName] = useState<string>('');
   const [eventsList, setEventsList] = useState<any[]>([]);
+  const [committeeTasks, setCommitteeTasks] = useState<any[]>([]);
 
-  // حالات نافذة رفع العذر للفعالية
+  // حالات نافذة رفع الاعتذار المرن البسيط
   const [showExcuseModal, setShowExcuseModal] = useState<boolean>(false);
   const [selectedEventTitle, setSelectedEventTitle] = useState<string>('');
   const [excuseText, setExcuseText] = useState<string>('');
-  const [excuseFile, setExcuseFile] = useState<string>('');
   const [modalMessage, setModalMessage] = useState<string>('');
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
 
@@ -98,26 +98,65 @@ export default function CommitteeDetailPage() {
 
     const fetchCloudData = async () => {
       try {
-        // جلب تفاصيل اللجنة
         const docRef = doc(db, 'committees', id);
         const docSnap = await getDoc(docRef);
+        
+        let mergedMembers = baseDetails.members || [];
         if (docSnap.exists()) {
           const cloudData = docSnap.data();
-          setCommittee({
-            ...baseDetails,
-            maleLeader: cloudData.maleLeader || baseDetails.maleLeader,
-            femaleLeader: cloudData.femaleLeader || baseDetails.femaleLeader,
-            members: cloudData.members && cloudData.members.length > 0 ? cloudData.members : baseDetails.members
-          });
+          if (cloudData.members && cloudData.members.length > 0) {
+            mergedMembers = cloudData.members;
+          }
+          setCommittee(prev => ({
+            ...prev,
+            maleLeader: cloudData.maleLeader || prev.maleLeader,
+            femaleLeader: cloudData.femaleLeader || prev.femaleLeader,
+          }));
         }
 
-        // جلب قائمة الفعاليات المتاحة ليختار العضو الفعالية التي يعتذر عنها
+        // جلب الأعضاء المقبولين من جدول applications
+        const appsSnap = await getDocs(collection(db, 'applications'));
+        if (!appsSnap.empty) {
+          const acceptedFromApps: any[] = [];
+          appsSnap.forEach((d) => {
+            const data = d.data();
+            const acceptedComm = data.acceptedCommittee || '';
+            const matchesId = acceptedComm.includes(baseDetails.name) || acceptedComm.includes(id) || baseDetails.name.includes(acceptedComm);
+            if (data.status === 'مقبول' && matchesId) {
+              acceptedFromApps.push({
+                name: data.fullName,
+                phone: data.phone,
+                role: 'عضو أساسي',
+                status: 'نشط ✓',
+                universityId: data.universityId || ''
+              });
+            }
+          });
+
+          if (acceptedFromApps.length > 0) {
+            const existingPhones = new Set(mergedMembers.map((m: any) => m.phone));
+            const uniqueNew = acceptedFromApps.filter(m => !existingPhones.has(m.phone));
+            mergedMembers = [...mergedMembers, ...uniqueNew];
+          }
+        }
+
+        setCommittee(prev => ({ ...prev, members: mergedMembers }));
+
+        // جلب قائمة الفعاليات
         const eventsSnap = await getDocs(collection(db, 'site_events'));
         if (!eventsSnap.empty) {
           const evs: any[] = [];
           eventsSnap.forEach((d) => { evs.push({ id: d.id, ...d.data() }); });
           setEventsList(evs);
           if (evs.length > 0) setSelectedEventTitle(evs[0].title);
+        }
+
+        // جلب المهام الخاصة بهذه اللجنة أو من لجنة الجودة
+        const tasksSnap = await getDocs(collection(db, 'committee_tasks'));
+        if (!tasksSnap.empty) {
+          const tasks: any[] = [];
+          tasksSnap.forEach((d) => { tasks.push({ id: d.id, ...d.data() }); });
+          setCommitteeTasks(tasks);
         }
       } catch (err) {
         console.error('Error fetching cloud data:', err);
@@ -127,32 +166,17 @@ export default function CommitteeDetailPage() {
     fetchCloudData();
   }, [id, baseDetails]);
 
-  // التحقق هل المستخدم الحالي هو المدير العام
   const isAdmin = currentUserPhone === '0553731265';
 
-  // فلترة أمنية مشددة:
-  // - المدير يرى الجميع.
-  // - العضو العادي لا يرى سوى اسمه فقط إذا طابق رقم جواله أو اسمه المسجل.
   const displayedMembers = isAdmin 
     ? (committee.members || [])
     : (committee.members || []).filter((m: any) => {
         const memberPhone = m.phone ? String(m.phone).trim() : '';
         const memberName = m.name ? String(m.name).trim() : '';
-
         const matchPhone = currentUserPhone !== '' && memberPhone === currentUserPhone;
         const matchName = currentUserName !== '' && memberName === currentUserName;
-
         return matchPhone || matchName;
       });
-
-  const convertFileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
 
   const handleUploadExcuseSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -166,14 +190,12 @@ export default function CommitteeDetailPage() {
         const matchName = currentUserName !== '' && memberName === currentUserName;
 
         if (matchPhone || matchName) {
-          // نخزن الاعتذار مع تحديد الفعالية المحددة ليتم رفعه للجنة الموارد البشرية (HR) وباقي اللجان
           return {
             ...m,
             targetEvent: selectedEventTitle,
             excuseText: excuseText.trim(),
-            excuseFile: excuseFile || '',
-            excuseStatus: 'مُرفع للـ HR (قيد المراجعة ⏳)',
-            excuseDate: new Date().toISOString()
+            excuseStatus: 'تم تسجيل الاعتذار عن الحضور بمرونة ✓',
+            excuseDate: new Date().toLocaleDateString('ar-SA')
           };
         }
         return m;
@@ -185,14 +207,36 @@ export default function CommitteeDetailPage() {
       setCommittee({ ...committee, members: updatedMembers });
       setShowExcuseModal(false);
       setExcuseText('');
-      setExcuseFile('');
-      setModalMessage(`تم رفع اعتذارك عن فعالية (${selectedEventTitle}) بنجاح وإرساله إلى لجنة الموارد البشرية وقادة اللجنة 📋✨`);
+      setModalMessage(`تم إرسال اعتذارك عن فعالية (${selectedEventTitle}) بنجاح وبدون تعقيد 📋✨`);
       setShowSuccessModal(true);
     } catch (err) {
       console.error('Error uploading excuse:', err);
-      setModalMessage('حدث خطأ أثناء رفع الاعتذار، يرجى المحاولة مرة أخرى.');
+      setModalMessage('حدث خطأ أثناء إرسال الاعتذار، يرجى المحاولة مرة أخرى.');
       setShowSuccessModal(true);
     }
+  };
+
+  // فلترة المهام الخاصة بلجنة العضو أو مهام لجنة الجودة
+  const relevantTasks = committeeTasks.filter(t => {
+    const cName = t.committee || '';
+    return cName.includes(committee.name) || cName.includes('الجودة') || cName.includes('التطوير');
+  });
+
+  const handleToggleSubTask = async (taskId: string, subTaskIdx: number) => {
+    try {
+      const taskItem = committeeTasks.find(t => t.id === taskId);
+      if (!taskItem) return;
+
+      const updatedSubTasks = [...taskItem.subTasks];
+      const isNowCompleted = !updatedSubTasks[subTaskIdx].completed;
+      updatedSubTasks[subTaskIdx].completed = isNowCompleted;
+      updatedSubTasks[subTaskIdx].completedBy = isNowCompleted ? (currentUserName || 'عضو نشط') : '';
+
+      const taskRef = doc(db, 'committee_tasks', taskId);
+      await updateDoc(taskRef, { subTasks: updatedSubTasks });
+
+      setCommitteeTasks(committeeTasks.map(t => t.id === taskId ? { ...t, subTasks: updatedSubTasks } : t));
+    } catch (e) { console.error(e); }
   };
 
   return (
@@ -210,15 +254,16 @@ export default function CommitteeDetailPage() {
                 onClick={() => setShowExcuseModal(true)}
                 className="px-4 py-2 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow-md hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
               >
-                📄 اعتذار عن فعالية (لـ HR)
+                🙋‍♂️ أنا أعتذر عن حضور فعالية
               </button>
             )}
             <span className="px-4 py-1 rounded-full bg-[#630517]/10 text-[#630517] text-xs font-extrabold tracking-wider uppercase border border-[#630517]/20">
-              بوابة الأعضاء والقادة
+              بوابة الأعضاء
             </span>
           </div>
         </div>
 
+        {/* رأس اللجنة */}
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-[#630517]/10 border border-[#630517]/20 flex items-center justify-center text-3xl shadow-sm">
@@ -242,12 +287,66 @@ export default function CommitteeDetailPage() {
           </div>
         </div>
 
+        {/* قسم استعراض المهام المعطاة من اللجنة أو من لجنة الجودة */}
+        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
+          <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-xl font-black text-slate-900">📌 مهام اللجنة ومهام لجنة الجودة والتطوير</h2>
+              <p className="text-xs text-slate-500 mt-1">تابع المهام والفعاليات المسندة للجن أو الموجهة من الجودة وقم بتحديث إنجازها:</p>
+            </div>
+            <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-xl text-xs font-bold">
+              {relevantTasks.length} مهام متاحة
+            </span>
+          </div>
+
+          {relevantTasks.length === 0 ? (
+            <p className="text-center py-8 text-slate-400 text-xs bg-slate-50 rounded-2xl">لا توجد مهام أو فعاليات معتمدة لهذه اللجنة حتى الآن.</p>
+          ) : (
+            <div className="space-y-6">
+              {relevantTasks.map((taskGroup) => (
+                <div key={taskGroup.id} className="p-6 rounded-3xl border border-slate-200 bg-slate-50/50 shadow-sm space-y-4">
+                  <div className="flex justify-between items-center flex-wrap gap-2">
+                    <div>
+                      <span className="text-[10px] bg-[#630517]/10 text-[#630517] font-bold px-2.5 py-1 rounded-md">لجنة: {taskGroup.committee}</span>
+                      <h4 className="font-extrabold text-slate-900 text-sm mt-2">فعالية: {taskGroup.eventTitle}</h4>
+                    </div>
+                    <span className="text-xs font-bold text-slate-500">الموعد: {taskGroup.dueDate}</span>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-slate-200">
+                    {(taskGroup.subTasks || []).map((st: any, idx: number) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleToggleSubTask(taskGroup.id, idx)}
+                        className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                          st.completed ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs border ${
+                            st.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
+                          }`}>
+                            {st.completed ? '✓' : ''}
+                          </div>
+                          <span className={`text-xs font-bold ${st.completed ? 'line-through' : ''}`}>{st.text}</span>
+                        </div>
+                        {st.completedBy && (<span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">بإنجاز: {st.completedBy}</span>)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* جدول الأعضاء */}
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-8">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-black text-slate-900">أعضاء {committee.name}</h2>
               <p className="text-xs text-slate-500 mt-1">
-                {isAdmin ? 'عرض لوحة التحكم (جميع الأعضاء وسجلات اعتذاراتهم للـ HR)' : 'عرض خاص: يظهر اسمك واعتذارك المرفوع لضمان الخصوصية'}
+                {isAdmin ? 'عرض لوحة التحكم (جميع الأعضاء وسجلات اعتذاراتهم)' : 'عرض خاص: يظهر اسمك واعتذارك المرفوع لضمان الخصوصية'}
               </p>
             </div>
             <span className="px-3 py-1 bg-[#630517] text-[#F5D061] rounded-xl text-xs font-bold shadow">
@@ -261,7 +360,7 @@ export default function CommitteeDetailPage() {
                 <tr className="border-b border-slate-200 text-slate-400 text-xs font-bold">
                   <th className="pb-3 pr-4">اسم العضو</th>
                   <th className="pb-3">المهمة / الدور</th>
-                  <th className="pb-3">الحالة وسجل الاعتذارات (HR)</th>
+                  <th className="pb-3">حالة الحضور والاعتذارات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -280,7 +379,7 @@ export default function CommitteeDetailPage() {
                         </span>
                         {m.name}
                       </td>
-                      <td className="py-4 text-slate-600 font-medium">{m.role}</td>
+                      <td className="py-4 text-slate-600 font-medium">{m.role || 'عضو أساسي'}</td>
                       <td className="py-4 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
@@ -293,19 +392,9 @@ export default function CommitteeDetailPage() {
                           )}
                         </div>
                         {m.excuseText && (
-                          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700 space-y-1.5 shadow-inner">
-                            <p className="font-black text-[#630517]">📅 الاعتذار عن فعالية: "{m.targetEvent || 'فعالية عامة'}"</p>
-                            <p><strong>📝 سبب الاعتذار:</strong> {m.excuseText}</p>
-                            {m.excuseFile && (
-                              <a
-                                href={m.excuseFile}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[#630517] font-bold underline block mt-1"
-                              >
-                                📎 عرض المرفق / العذر الطبي المرفوع
-                              </a>
-                            )}
+                          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700 space-y-1 shadow-inner">
+                            <p className="font-black text-[#630517]">🙋‍♂️ اعتذار عن فعالية: "{m.targetEvent || 'فعالية عامة'}"</p>
+                            <p><strong>السبب:</strong> {m.excuseText}</p>
                           </div>
                         )}
                       </td>
@@ -319,15 +408,16 @@ export default function CommitteeDetailPage() {
 
       </div>
 
+      {/* نافذة رفع الاعتذار المرن البسيط */}
       {showExcuseModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={handleUploadExcuseSubmit} className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 border-2 border-[#630517]/20">
             <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
-              📄
+              🙋‍♂️
             </div>
             <div className="space-y-1 text-center">
-              <h3 className="text-xl font-black text-slate-900">تقديم اعتذار عن فعالية (لملف الموارد البشرية HR)</h3>
-              <p className="text-xs text-slate-500">اختر الفعالية التي تعتذر عن حضورها واكتب السبب ليتم توثيقه في سجلك.</p>
+              <h3 className="text-xl font-black text-slate-900">أنا أعتذر عن حضور فعالية</h3>
+              <p className="text-xs text-slate-500">اختر الفعالية التي تعتذر عنها واكتب سببك ببساطة وبدون تعقيد:</p>
             </div>
 
             <div className="space-y-4">
@@ -353,26 +443,11 @@ export default function CommitteeDetailPage() {
                 <label className="text-xs font-bold text-slate-700">سبب الاعتذار</label>
                 <textarea
                   rows={3}
-                  placeholder="مثال: أعتذر عن عدم الحضور بسبب ظرف طارئ / اختبار..."
+                  placeholder="مثال: أعتذر عن عدم الحضور بسبب ظرف طارئ / عدم التفرغ..."
                   value={excuseText}
                   onChange={(e) => setExcuseText(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#630517]"
                   required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">إرفاق إثبات أو عذر (اختياري)</label>
-                <input
-                  type="file"
-                  accept="image/*, application/pdf"
-                  onChange={async (e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      const base64 = await convertFileToBase64(e.target.files[0]);
-                      setExcuseFile(base64);
-                    }
-                  }}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                 />
               </div>
             </div>
@@ -389,7 +464,7 @@ export default function CommitteeDetailPage() {
                 type="submit"
                 className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
               >
-                إرسال الاعتذار للـ HR 🚀
+                إرسال الاعتذار 🚀
               </button>
             </div>
           </form>
@@ -403,7 +478,7 @@ export default function CommitteeDetailPage() {
               ✨
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black text-slate-900">سجل الموارد البشرية</h3>
+              <h3 className="text-xl font-black text-slate-900">تم بنجاح</h3>
               <p className="text-xs text-slate-600 font-medium leading-relaxed">{modalMessage}</p>
             </div>
             <button
