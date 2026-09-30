@@ -174,6 +174,22 @@ export default function MemberSmartDashboard() {
           )}
         </div>
 
+        {/* بطاقة التبويب للوصول لصفحة رؤساء وقادة النادي واللجان */}
+        <div className="bg-gradient-to-r from-amber-400 to-amber-500 rounded-3xl p-6 text-slate-900 shadow-md flex justify-between items-center flex-wrap gap-4 border border-amber-300">
+          <div className="space-y-1">
+            <h3 className="text-sm sm:text-base font-black flex items-center gap-2">
+              <span>👑</span> دليل القيادة ورؤساء اللجان
+            </h3>
+            <p className="text-xs font-bold text-slate-900/80">استعرض صفحة رؤساء النادي وقادة لجان التمريض السبع بالكامل.</p>
+          </div>
+          <Link
+            href="/team"
+            className="px-6 py-3 rounded-2xl bg-slate-900 text-[#F5D061] font-black text-xs shadow-lg hover:scale-105 transition-all"
+          >
+            الانتقال لصفحة الرؤساء والقادة ➔
+          </Link>
+        </div>
+
         {/* بطاقة اللجنة المرتبطة */}
         {loading ? (
           <div className="py-20 text-center text-slate-400 bg-white rounded-3xl border border-slate-200">جاري مزامنة بيانات النظام السحابي... ⏳</div>
