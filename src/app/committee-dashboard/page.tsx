@@ -492,7 +492,6 @@ export default function CommitteeDashboard() {
   
   // 🛡️ [تعديل جذري لمنع ظهور العضو المقبول في رغبات اللجان الأخرى]:
   const filteredRequests = (requests || []).filter(req => {
-    // إذا كان العضو تم قبوله رسمياً في لجنة أخرى غير اللجنة الحالية، يتم حجبه نهائياً من هذه القائمة
     if (req.acceptedCommittee && req.acceptedCommittee !== currentActiveComm) {
       return false;
     }
@@ -519,7 +518,6 @@ export default function CommitteeDashboard() {
       const targetReq = requests.find(r => r.id === selectedReqId);
       const docRef = doc(db, 'applications', selectedReqId);
       
-      // 1. تحديث الطلب ليقفل على لجنته المقبولة فقط
       await updateDoc(docRef, {
         status: 'مقبول',
         acceptedCommittee: currentActiveComm,
@@ -527,7 +525,6 @@ export default function CommitteeDashboard() {
         latestNotification: `مبروك! تم قبولك رسمياً في (${currentActiveComm}) 🎉. انضم لقروب الواتساب: ${activeWhatsapp}`
       });
 
-      // 2. تحديث ملف المستخدم لربطه حصرياً بهذه اللجنة وتحديث البروفايل
       if (targetReq?.phone) {
         try {
           const userDocRef = doc(db, 'users', targetReq.phone);
@@ -545,6 +542,36 @@ export default function CommitteeDashboard() {
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء قبول الطلب.');
+    }
+  };
+
+  // 🗑️ [إضافة دالة حذف وإزالة العضو المقبول من اللجنة فعلياً وتحديث قاعدة البيانات]:
+  const handleRemoveAcceptedMember = async (memberId: string, memberPhone?: string) => {
+    if (!confirm('هل أنت متأكد من إزالة هذا العضو من اللجنة؟ سيتم تحريره وإتاحة قبوله مجدداً.')) return;
+    try {
+      const docRef = doc(db, 'applications', memberId);
+      await updateDoc(docRef, {
+        acceptedCommittee: null,
+        status: 'معلق',
+        whatsappLink: ''
+      });
+
+      if (memberPhone) {
+        try {
+          const userRef = doc(db, 'users', memberPhone);
+          await updateDoc(userRef, {
+            assignedCommittee: '',
+            committee: '',
+            latestNotification: `⚠️ تم تعديل حالتك الإدارية وإلغاء قبولك السابق في اللجنة. يمكنك متابعة حالة طلبك.`
+          });
+        } catch (e) { console.error(e); }
+      }
+
+      setRequests(requests.map(r => r.id === memberId ? { ...r, acceptedCommittee: null, status: 'معلق', whatsappLink: '' } : r));
+      alert('تم إزالة العضو من اللجنة وتحديث حالته بنجاح! 🗑️✅');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء إزالة العضو.');
     }
   };
 
@@ -1680,7 +1707,7 @@ export default function CommitteeDashboard() {
               })}
             </div>
 
-            {/* عرض جدول الأعضاء المقبولين للجنة المحددة حالياً بلجنة الجودة */}
+            {/* عرض جدول الأعضاء المقبولين للجنة المحددة حالياً بلجنة الجودة بدون فلترة جنس */}
             {isQualityTeam && (
               <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 mt-6">
                 <div className="flex justify-between items-center flex-wrap gap-3 border-b border-slate-100 pb-3">
@@ -1722,7 +1749,7 @@ export default function CommitteeDashboard() {
                                   {member.status || 'مقبول'}
                                 </span>
                               </td>
-                              <td className="py-3 text-left pl-2">
+                              <td className="py-3 text-left pl-2 flex gap-1.5 justify-end items-center">
                                 <a
                                   href={`https://wa.me/${member.phone?.startsWith('0') ? '966' + member.phone.substring(1) : member.phone}?text=مرحباً بك ${member.fullName}، بصفتنا لجنة الجودة والتطوير نتابع سير أعمالك في (${currentActiveComm}). نتمنى لك التوفيق! ⚡`}
                                   target="_blank"
@@ -1731,6 +1758,13 @@ export default function CommitteeDashboard() {
                                 >
                                   💬 تواصل
                                 </a>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveAcceptedMember(member.id, member.phone)}
+                                  className="px-2.5 py-1 bg-red-50 text-red-600 font-bold rounded-lg text-[11px] hover:bg-red-100"
+                                >
+                                  حذف ✕
+                                </button>
                               </td>
                             </tr>
                           ))
@@ -1743,7 +1777,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* إحصائيات فورية مستقلة وديناميكية لكل لجنة (للقادة فقط مع إمكانية الضغط لعرض المقبولين) */}
+        {/* إحصائيات فورية مستقلة وديناميكية لكل لجنة (للقادة فقط) */}
         {isCommitteeLeader && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-[#630517] to-[#80071D] text-white p-6 rounded-3xl shadow-xl space-y-2">
@@ -1775,7 +1809,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* جدول استعراض الأعضاء المقبولين الخاص برئيس اللجنة (يظهر عند الضغط على البطاقة) */}
+        {/* جدول استعراض الأعضاء المقبولين الخاص برئيس اللجنة (يظهر عند الضغط على البطاقة) بدون فلترة جنس */}
         {isCommitteeLeader && showLeaderAcceptedMembersTable && (
           <div className="bg-white rounded-3xl p-6 border-2 border-emerald-400 shadow-lg space-y-4 animate-fadeIn">
             <div className="flex justify-between items-center flex-wrap gap-3 border-b border-slate-100 pb-3">
@@ -1800,7 +1834,7 @@ export default function CommitteeDashboard() {
                     <th className="pb-3">رقم الجوال</th>
                     <th className="pb-3">الرقم الجامعي</th>
                     <th className="pb-3">الحالة</th>
-                    <th className="pb-3 text-left pl-2">تواصل واتساب</th>
+                    <th className="pb-3 text-left pl-2">إجراء (واتساب / حذف)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1821,7 +1855,7 @@ export default function CommitteeDashboard() {
                               {member.status || 'مقبول'}
                             </span>
                           </td>
-                          <td className="py-3 text-left pl-2">
+                          <td className="py-3 text-left pl-2 flex gap-2 justify-end items-center">
                             <a
                               href={`https://wa.me/${member.phone?.startsWith('0') ? '966' + member.phone.substring(1) : member.phone}?text=مرحباً بك ${member.fullName}، يسعدنا انضمامك إلى (${currentActiveComm}) بنادي التمريض. 🚀`}
                               target="_blank"
@@ -1830,6 +1864,13 @@ export default function CommitteeDashboard() {
                             >
                               💬 تواصل واتساب
                             </a>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAcceptedMember(member.id, member.phone)}
+                              className="px-3 py-1.5 bg-red-50 text-red-600 font-bold rounded-lg text-[11px] hover:bg-red-100 cursor-pointer"
+                            >
+                              حذف ✕
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -2209,7 +2250,7 @@ export default function CommitteeDashboard() {
                   <div key={rep.id} className="bg-red-50/60 border border-red-200 rounded-2xl p-4 space-y-3 relative">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black text-red-700">اللجنة المعنية: {rep.targetCommittee}</span>
-                      <button type="button" onClick={() => handleDeleteReport(rep.id)} className="px-2 py-0.5 bg-red-600 text-white rounded-md text-[10px] font-black hover:bg-red-700 cursor-pointer">حذف البلاغ 🗑️</button>
+                      <button type="button" onClick={() => handleDeleteReport(rep.id)} className="px-2 py-0.5 bg-red-600 text-white rounded-md text-[10px] font-black hover:bg-red-700 cursor-pointer">حذف البلاغ 🗑️️</button>
                     </div>
                     <p className="text-xs text-slate-800 font-semibold">السبب والتقصير المرصود: {rep.reason}</p>
                     {rep.leaderDefenseReply && (
