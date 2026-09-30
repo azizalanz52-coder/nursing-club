@@ -114,7 +114,7 @@ export default function CommitteeDetailPage() {
           }));
         }
 
-        // جلب الأعضاء المقبولين من جدول applications
+        // جلب كافة الأعضاء المقبولين من جدول applications دون أي فلترة جنس
         const appsSnap = await getDocs(collection(db, 'applications'));
         if (!appsSnap.empty) {
           const acceptedFromApps: any[] = [];
@@ -168,18 +168,11 @@ export default function CommitteeDetailPage() {
 
   const isAdmin = currentUserPhone === '0553731265';
 
-  const displayedMembers = isAdmin 
-    ? (committee.members || [])
-    : (committee.members || []).filter((m: any) => {
-        const memberPhone = m.phone ? String(m.phone).trim() : '';
-        const memberName = m.name ? String(m.name).trim() : '';
-        const matchPhone = currentUserPhone !== '' && memberPhone === currentUserPhone;
-        const matchName = currentUserName !== '' && memberName === currentUserName;
-        return matchPhone || matchName;
-      });
+  // 🛡️ [إلغاء فلترة الجنس وعرض جميع الأعضاء المقبولين للجميع]:
+  const displayedMembers = committee.members || [];
 
   // التحقق مما إذا كان المستخدم الحالي عضواً في هذه اللجنة أو مديراً
-  const isMemberOfThisCommittee = isAdmin || displayedMembers.length > 0;
+  const isMemberOfThisCommittee = isAdmin || displayedMembers.some((m: any) => m.phone === currentUserPhone || m.name === currentUserName);
 
   const handleUploadExcuseSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -251,7 +244,7 @@ export default function CommitteeDetailPage() {
             ← العودة لجميع اللجان
           </Link>
           <div className="flex items-center gap-3">
-            {!isAdmin && displayedMembers.length > 0 && (
+            {!isAdmin && displayedMembers.some((m: any) => m.phone === currentUserPhone || m.name === currentUserName) && (
               <button
                 type="button"
                 onClick={() => setShowExcuseModal(true)}
@@ -290,78 +283,70 @@ export default function CommitteeDetailPage() {
           </div>
         </div>
 
-        {/* قسم استعراض المهام (لا يظهر إلا إذا كان المستخدم عضواً في اللجنة أو مديراً للأمان والخصوصية) */}
-        {isMemberOfThisCommittee ? (
-          <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
-            <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
-              <div>
-                <h2 className="text-xl font-black text-slate-900">📌 مهام اللجنة ومهام لجنة الجودة والتطوير</h2>
-                <p className="text-xs text-slate-500 mt-1">تابع المهام والفعاليات المسندة للجن أو الموجهة من الجودة وقم بتحديث إنجازها:</p>
-              </div>
-              <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-xl text-xs font-bold">
-                {relevantTasks.length} مهام متاحة
-              </span>
+        {/* قسم استعراض المهام */}
+        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
+          <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-xl font-black text-slate-900">📌 مهام اللجنة ومهام لجنة الجودة والتطوير</h2>
+              <p className="text-xs text-slate-500 mt-1">تابع المهام والفعاليات المسندة للجنة أو الموجهة من الجودة وقم بتحديث إنجازها:</p>
             </div>
+            <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-xl text-xs font-bold">
+              {relevantTasks.length} مهام متاحة
+            </span>
+          </div>
 
-            {relevantTasks.length === 0 ? (
-              <p className="text-center py-8 text-slate-400 text-xs bg-slate-50 rounded-2xl">لا توجد مهام أو فعاليات معتمدة لهذه اللجنة حتى الآن.</p>
-            ) : (
-              <div className="space-y-6">
-                {relevantTasks.map((taskGroup) => (
-                  <div key={taskGroup.id} className="p-6 rounded-3xl border border-slate-200 bg-slate-50/50 shadow-sm space-y-4">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <span className="text-[10px] bg-[#630517]/10 text-[#630517] font-bold px-2.5 py-1 rounded-md">لجنة: {taskGroup.committee}</span>
-                        <h4 className="font-extrabold text-slate-900 text-sm mt-2">فعالية: {taskGroup.eventTitle}</h4>
-                      </div>
-                      <span className="text-xs font-bold text-slate-500">الموعد: {taskGroup.dueDate}</span>
+          {relevantTasks.length === 0 ? (
+            <p className="text-center py-8 text-slate-400 text-xs bg-slate-50 rounded-2xl">لا توجد مهام أو فعاليات معتمدة لهذه اللجنة حتى الآن.</p>
+          ) : (
+            <div className="space-y-6">
+              {relevantTasks.map((taskGroup) => (
+                <div key={taskGroup.id} className="p-6 rounded-3xl border border-slate-200 bg-slate-50/50 shadow-sm space-y-4">
+                  <div className="flex justify-between items-center flex-wrap gap-2">
+                    <div>
+                      <span className="text-[10px] bg-[#630517]/10 text-[#630517] font-bold px-2.5 py-1 rounded-md">لجنة: {taskGroup.committee}</span>
+                      <h4 className="font-extrabold text-slate-900 text-sm mt-2">فعالية: {taskGroup.eventTitle}</h4>
                     </div>
-
-                    <div className="space-y-2 pt-2 border-t border-slate-200">
-                      {(taskGroup.subTasks || []).map((st: any, idx: number) => (
-                        <div
-                          key={idx}
-                          onClick={() => handleToggleSubTask(taskGroup.id, idx)}
-                          className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
-                            st.completed ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs border ${
-                              st.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
-                            }`}>
-                              {st.completed ? '✓' : ''}
-                            </div>
-                            <span className={`text-xs font-bold ${st.completed ? 'line-through' : ''}`}>{st.text}</span>
-                          </div>
-                          {st.completedBy && (<span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">بإنجاز: {st.completedBy}</span>)}
-                        </div>
-                      ))}
-                    </div>
+                    <span className="text-xs font-bold text-slate-500">الموعد: {taskGroup.dueDate}</span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm text-center space-y-3">
-            <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full mx-auto flex items-center justify-center font-black text-lg">🔒</div>
-            <h3 className="text-base font-extrabold text-slate-800">قائمة المهام والفعاليات مؤمنة</h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto">هذه القائمة مخصصة للأعضاء المقبولين والمنضمين رسمياً لهذه اللجنة فقط حفاظاً على السرية وأمان التنظيم.</p>
-          </div>
-        )}
 
-        {/* جدول الأعضاء */}
+                  <div className="space-y-2 pt-2 border-t border-slate-200">
+                    {(taskGroup.subTasks || []).map((st: any, idx: number) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleToggleSubTask(taskGroup.id, idx)}
+                        className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                          st.completed ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs border ${
+                            st.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
+                          }`}>
+                            {st.completed ? '✓' : ''}
+                          </div>
+                          <span className={`text-xs font-bold ${st.completed ? 'line-through' : ''}`}>{st.text}</span>
+                        </div>
+                        {st.completedBy && (<span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">بإنجاز: {st.completedBy}</span>)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* جدول الأعضاء (يعرض جميع الأعضاء المقبولين بدون فلترة جنس) */}
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-8">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-xl font-black text-slate-900">أعضاء {committee.name}</h2>
+              <h2 className="text-xl font-black text-slate-900">أعضاء {committee.name} المقبولون</h2>
               <p className="text-xs text-slate-500 mt-1">
-                {isAdmin ? 'عرض لوحة التحكم (جميع الأعضاء وسجلات اعتذاراتهم)' : 'عرض خاص: يظهر اسمك واعتذارك المرفوع لضمان الخصوصية'}
+                قائمة كافة الأعضاء المنضمين والمقبولين رسمياً في هذه اللجنة
               </p>
             </div>
             <span className="px-3 py-1 bg-[#630517] text-[#F5D061] rounded-xl text-xs font-bold shadow">
-              {isAdmin ? `${committee.members?.length || 0} أعضاء` : (displayedMembers.length > 0 ? 'عضو مسجل' : 'خاص ومؤمن')}
+              {displayedMembers.length} أعضاء
             </span>
           </div>
 
@@ -370,6 +355,7 @@ export default function CommitteeDetailPage() {
               <thead>
                 <tr className="border-b border-slate-200 text-slate-400 text-xs font-bold">
                   <th className="pb-3 pr-4">اسم العضو</th>
+                  <th className="pb-3">الرقم الجامعي</th>
                   <th className="pb-3">المهمة / الدور</th>
                   <th className="pb-3">حالة الحضور والاعتذارات</th>
                 </tr>
@@ -377,8 +363,8 @@ export default function CommitteeDetailPage() {
               <tbody className="divide-y divide-slate-100">
                 {displayedMembers.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-slate-400 text-xs">
-                      {isAdmin ? 'لا توجد أعضاء في هذه اللجنة.' : 'لست مسجلاً في هذه اللجنة، أو أن أسماء وبقية الأعضاء مخفية لخصوصية الحسابات.'}
+                    <td colSpan={4} className="py-8 text-center text-slate-400 text-xs">
+                      لا توجد أعضاء مقبولين مسجلين في هذه اللجنة حتى الآن.
                     </td>
                   </tr>
                 ) : (
@@ -390,6 +376,7 @@ export default function CommitteeDetailPage() {
                         </span>
                         {m.name}
                       </td>
+                      <td className="py-4 text-slate-600 font-mono text-xs">{m.universityId || '-'}</td>
                       <td className="py-4 text-slate-600 font-medium">{m.role || 'عضو أساسي'}</td>
                       <td className="py-4 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
