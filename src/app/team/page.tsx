@@ -3,229 +3,145 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 
-interface CommitteeData {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  maleLeader: string;
-  femaleLeader: string;
-  whatsappLink?: string;
-  members: any[];
-}
+const leaders = [
+  { name: "عبدالله محمد المطيري", position: "رئيس النادي" },
+  { name: "اريام محمد الجبو", position: "نائب رئيس النادي" },
+];
 
-const committeesMeta: Record<string, { id: string; name: string; description: string; icon: string }> = {
-  design: { id: 'design', name: 'لجنة التصميم', description: 'الهوية البصرية والبوسترات والمحتوى المرئي', icon: '🎨' },
-  media: { id: 'media', name: 'لجنة الإعلام', description: 'إدارة المنصات والتغطيات الحية', icon: '📸' },
-  pr: { id: 'pr', name: 'لجنة العلاقات العامة', description: 'الشراكات واستقبال الضيوف', icon: '🌐' },
-  quality: { id: 'quality', name: 'لجنة الجودة والتطوير', description: 'مراجعة وتقييم الأداء المؤسسي', icon: '📊' },
-  scientific: { id: 'scientific', name: 'لجنة المحتوى العلمي', description: 'المطويات الطبية والأنشطة الأكاديمية', icon: '🔬' },
-  hr: { id: 'hr', name: 'لجنة الموارد البشرية', description: 'شؤون الأعضاء وتقييمات الأداء', icon: '👥' },
-  'events-org': { id: 'events-org', name: 'لجنة التنظيم والفعاليات', description: 'التخطيط الميداني وإدارة الحشود', icon: '📅' },
-};
+const initialCommittees = [
+  { id: 'design', name: 'التصميم', description: 'الهوية البصرية، تصميم البوسترات، والمحتوى المرئي.', icon: '🎨', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي' },
+  { id: 'media', name: 'الاعلام', description: 'منصات التواصل، التغطيات الحية، وصناعة المحتوى.', icon: '📸', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري' },
+  { id: 'events-org', name: 'تنظيم الفعاليات', description: 'التخطيط الميداني، إدارة الحشود، والفعاليات.', icon: '📅', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري' },
+  { id: 'hr', name: 'الموارد البشرية', description: 'إدارة الأعضاء، المتابعة، والتقييم والتحفيز.', icon: '👥', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي' },
+  { id: 'pr', name: 'العلاقات العامة', description: 'بناء الشراكات، استقبال الضيوف، والتنسيق الخارجي.', icon: '🌐', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي' },
+  { id: 'scientific', name: 'المحتوى العلمي', description: 'المطويات الطبية، المحاضرات، والدعم الأكاديمي.', icon: '🔬', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي' },
+  { id: 'quality', name: 'الجودة والتطوير', description: 'تقييم الأداء، قياس رضا الأعضاء، وتحسين العمل.', icon: '📊', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري' },
+];
 
-export default function MemberSmartDashboard() {
-  const [currentUserPhone, setCurrentUserPhone] = useState<string>('');
-  const [currentUserName, setCurrentUserName] = useState<string>('');
-  const [userRole, setUserRole] = useState<string>('عضو أساسي');
-  const [assignedCommittee, setAssignedCommittee] = useState<string>('');
-  const [userNotification, setUserNotification] = useState<string>('');
-  
-  const [userCommitteeData, setUserCommitteeData] = useState<CommitteeData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+export default function TeamPage() {
+  const [committees, setCommittees] = useState(initialCommittees);
 
   useEffect(() => {
-    const phone = localStorage.getItem('userPhone') || '';
-    const name = localStorage.getItem('userName') || '';
-    setCurrentUserPhone(phone);
-    setCurrentUserName(name);
-
-    const fetchLinkedData = async () => {
+    const fetchCloudCommittees = async () => {
       try {
-        let activeRole = 'عضو أساسي';
-        let activeComm = '';
-        let notification = '';
-        let finalName = name;
+        const querySnapshot = await getDocs(collection(db, 'committees'));
+        if (!querySnapshot.empty) {
+          const cloudDataMap: Record<string, any> = {};
+          querySnapshot.forEach((docSnap) => {
+            cloudDataMap[docSnap.id] = docSnap.data();
+          });
 
-        if (phone) {
-          const userSnap = await getDoc(doc(db, 'users', phone));
-          if (userSnap.exists()) {
-            const uData = userSnap.data();
-            if (uData.fullName) finalName = uData.fullName;
-            if (uData.role) activeRole = uData.role;
-            if (uData.assignedCommittee) activeComm = uData.assignedCommittee;
-            if (uData.latestNotification) notification = uData.latestNotification;
-          }
-
-          if (!activeComm) {
-            const appsSnap = await getDocs(collection(db, 'applications'));
-            appsSnap.forEach(d => {
-              const appData = d.data();
-              if (appData.phone === phone && appData.status === 'مقبول') {
-                activeComm = appData.acceptedCommittee || '';
-              }
-            });
-          }
+          const merged = initialCommittees.map((comm) => {
+            if (cloudDataMap[comm.id]) {
+              return {
+                ...comm,
+                maleLeader: cloudDataMap[comm.id].maleLeader || comm.maleLeader,
+                femaleLeader: cloudDataMap[comm.id].femaleLeader || comm.femaleLeader,
+              };
+            }
+            return comm;
+          });
+          setCommittees(merged);
         }
-
-        setCurrentUserName(finalName);
-        setUserRole(activeRole);
-        setAssignedCommittee(activeComm);
-        setUserNotification(notification);
-
-        let targetKey = 'design';
-        for (const key of Object.keys(committeesMeta)) {
-          if (activeComm.includes(committeesMeta[key].name) || activeComm.includes(key)) {
-            targetKey = key;
-            break;
-          }
-        }
-
-        const commDocRef = doc(db, 'committees', targetKey);
-        const commSnap = await getDoc(commDocRef);
-        const meta = committeesMeta[targetKey];
-
-        let members = [];
-        let maleLeader = 'قائد الطلاب';
-        let femaleLeader = 'قائدة الطالبات';
-        let whatsappLink = '';
-
-        if (commSnap.exists()) {
-          const dat = commSnap.data();
-          members = dat.members || [];
-          maleLeader = dat.maleLeader || maleLeader;
-          femaleLeader = dat.femaleLeader || femaleLeader;
-          whatsappLink = dat.whatsappLink || '';
-        }
-
-        setUserCommitteeData({
-          id: targetKey,
-          name: meta.name,
-          description: meta.description,
-          icon: meta.icon,
-          maleLeader,
-          femaleLeader,
-          whatsappLink,
-          members
-        });
-
       } catch (err) {
-        console.error('Error fetching linked system data:', err);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching committees:', err);
       }
     };
-
-    fetchLinkedData();
+    fetchCloudCommittees();
   }, []);
 
-  const isAdmin = currentUserPhone === '0553731265' || userRole === 'System Admin' || userRole === 'رئيس النادي' || userRole === 'رئيسة النادي' || userRole === 'نائب رئيس النادي' || userRole === 'نائبة رئيس النادي';
-  const isLeader = userRole.includes('رئيس لجنة') || userRole.includes('مشرف');
-
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        
-        {/* شريط التنقل العلوي المرتبط بالنظام */}
-        <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-[#630517] text-[#F5D061] flex items-center justify-center font-black text-lg">
-              UHB
-            </span>
-            <div>
-              <h1 className="text-base font-black text-slate-900">بوابة العضو المرتبطة سحابياً 🛡️</h1>
-              <p className="text-xs text-slate-500">منصة موحدة تتصل مباشرة بلوحة الأدمن وقادة اللجان</p>
-            </div>
-          </div>
-          <Link
-            href="/"
-            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all border border-slate-200"
-          >
-            الرئيسية ←
+    <main className="min-h-screen bg-slate-50 text-slate-800 pb-20" dir="rtl">
+      
+      {/* ترويسة الصفحة */}
+      <div className="bg-[#630517] text-white py-16 px-4 text-center space-y-4 shadow-md">
+        <span className="inline-block px-4 py-1.5 rounded-full bg-[#F5D061] text-[#630517] text-xs font-black uppercase tracking-wider">
+          👑 القيادة العليا والهيكل التنظيمي
+        </span>
+        <h1 className="text-3xl sm:text-5xl font-black">رؤساء وقادة لجان نادي التمريض</h1>
+        <p className="text-white/80 text-xs sm:text-sm max-w-xl mx-auto">
+          تعرف على فريق القيادة في قمة الهرم الإداري، وقادة اللجان الميدانية والأكاديمية لنادي كلية التمريض بجامعة حفر الباطن.
+        </p>
+        <div className="pt-2 flex justify-center gap-4">
+          <Link href="/" className="text-xs text-[#F5D061] underline font-bold">
+            ← العودة للرئيسية
+          </Link>
+          <Link href="/member" className="text-xs text-white underline font-bold">
+            🛡️ بوابة العضو
           </Link>
         </div>
+      </div>
 
-        {/* لوحة الترحيب الذكية */}
-        <div className="bg-gradient-to-r from-[#630517] to-[#80071D] rounded-3xl p-8 text-white shadow-xl space-y-6">
-          <div className="flex justify-between items-start flex-wrap gap-4">
-            <div className="space-y-2">
-              <span className="bg-[#F5D061] text-[#630517] font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider">
-                {isAdmin ? 'إدارة عليا للنادي' : isLeader ? 'قائد لجنة' : 'عضو أساسي معتمد'}
-              </span>
-              <h2 className="text-2xl font-black">أهلاً بك، {currentUserName || 'زميلنا العزيز'} 👋</h2>
-              <p className="text-xs text-white/80 max-w-lg leading-relaxed">
-                النظام مرتبط بالكامل: صلاحياتك معتمدة من الإدارة، ومهامك من لجنة الجودة وقائدك المباشر.
-              </p>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-md px-5 py-4 rounded-2xl border border-white/20 text-center space-y-1">
-              <span className="block text-xs text-white/70">رتبتك في النظام</span>
-              <span className="text-sm font-black text-[#F5D061]">{userRole}</span>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-20">
+        
+        {/* 1. رؤساء النادي أولاً في الأعلى */}
+        <section className="space-y-8">
+          <div className="text-center space-y-2">
+            <span className="text-xs text-[#630517] font-black uppercase tracking-widest bg-[#630517]/10 px-4 py-1 rounded-full">
+              قادة النادي
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900">رؤساء نادي التمريض</h2>
           </div>
 
-          {userNotification && (
-            <div className="bg-amber-400 text-slate-900 p-4 rounded-2xl text-xs font-black shadow-md flex items-center gap-3">
-              <span>🔔 تنبيه من الإدارة:</span>
-              <span>{userNotification}</span>
-            </div>
-          )}
-        </div>
-
-        {/* بطاقة اللجنة المرتبطة */}
-        {loading ? (
-          <div className="py-20 text-center text-slate-400 bg-white rounded-3xl border border-slate-200">جاري مزامنة بيانات النظام السحابي... ⏳</div>
-        ) : userCommitteeData ? (
-          <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6">
-            <div className="flex items-center gap-4 border-b border-slate-100 pb-6">
-              <span className="w-16 h-16 rounded-2xl bg-[#630517]/10 flex items-center justify-center text-3xl shadow-inner">
-                {userCommitteeData.icon}
-              </span>
-              <div>
-                <span className="text-xs font-bold text-[#630517] bg-[#630517]/10 px-3 py-1 rounded-full">لجنتك المعتمدة سحابياً</span>
-                <h3 className="text-2xl font-black text-slate-900 mt-1">{userCommitteeData.name}</h3>
-                <p className="text-xs text-slate-600 mt-1">{userCommitteeData.description}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1">
-                <span className="text-slate-400 font-bold">قائد الطلاب:</span>
-                <p className="font-extrabold text-slate-900 text-sm">{userCommitteeData.maleLeader}</p>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1">
-                <span className="text-slate-400 font-bold">قائدة الطالبات:</span>
-                <p className="font-extrabold text-slate-900 text-sm">{userCommitteeData.femaleLeader}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 pt-4 border-t border-slate-100 flex-wrap">
-              <Link
-                href={`/team/${userCommitteeData.id}`}
-                className="flex-1 py-3 px-6 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs text-center shadow-md hover:brightness-110 transition-all"
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {leaders.map((leader, index) => (
+              <div
+                key={index}
+                className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-xl text-center space-y-4 hover:border-[#630517] transition-all group"
               >
-                الدخول لصفحة المهام واعتذارات الحضور ➔
-              </Link>
+                <div className="w-24 h-24 mx-auto rounded-full bg-[#630517] text-[#F5D061] flex items-center justify-center text-3xl font-black shadow-md group-hover:scale-105 transition-transform">
+                  👑
+                </div>
+                <h3 className="text-2xl font-black text-slate-900">{leader.name}</h3>
+                <span className="inline-block bg-[#F5D061]/20 text-[#630517] font-black px-4 py-1.5 rounded-full text-xs">
+                  {leader.position}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
 
-              {userCommitteeData.whatsappLink && (
-                <a
-                  href={userCommitteeData.whatsappLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="py-3 px-6 rounded-2xl bg-emerald-600 text-white font-bold text-xs shadow-md hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
-                >
-                  💬 قروب واتساب اللجنة
-                </a>
-              )}
-            </div>
+        {/* 2. لجان النادي وقادتها بالأسفل */}
+        <section className="space-y-8 pt-10 border-t border-slate-200">
+          <div className="text-center space-y-2">
+            <span className="text-xs text-[#630517] font-black uppercase tracking-widest bg-[#630517]/10 px-4 py-1 rounded-full">
+              اللجان التنظيمية
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900">لجان نادي التمريض السبع</h2>
+            <p className="text-slate-600 text-sm">اضغط على أي لجنة لاستعراض تفاصيلها والمهام الخاصة بها</p>
           </div>
-        ) : (
-          <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-3">
-            <p className="text-slate-500 text-sm font-bold">لم يتم ربط حسابك بأي لجنة حتى الآن من قبل لوحة التحكم.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {committees.map((committee) => (
+              <Link
+                key={committee.id}
+                href={`/team/${committee.id}`}
+                className="bg-white rounded-3xl border border-slate-200 p-7 shadow-lg flex flex-col justify-between space-y-6 hover:shadow-xl hover:border-[#630517] hover:scale-[1.02] transition-all cursor-pointer group"
+              >
+                <div className="space-y-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#630517]/10 flex items-center justify-center text-2xl group-hover:bg-[#630517] group-hover:text-[#F5D061] transition-all">
+                    {committee.icon}
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 group-hover:text-[#630517] transition-colors">{committee.name}</h3>
+                  <p className="text-slate-600 text-sm leading-relaxed">{committee.description}</p>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 space-y-2 text-xs">
+                  <div className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+                    <span className="text-slate-400 font-bold">قائد الطلاب:</span>
+                    <span className="font-extrabold text-slate-900">{committee.maleLeader}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+                    <span className="text-slate-400 font-bold">قائدة الطالبات:</span>
+                    <span className="font-extrabold text-slate-900">{committee.femaleLeader}</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
-        )}
+        </section>
 
       </div>
     </main>
