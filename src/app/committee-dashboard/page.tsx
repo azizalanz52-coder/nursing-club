@@ -15,23 +15,19 @@ export default function CommitteeDashboard() {
   const [requests, setRequests] = useState<any[]>([]);
   const [whatsappLink, setWhatsappLink] = useState('');
   
-  // نظام تخزين روابط الواتساب الخاصة بكل لجنة بشكل مستقل وسحابي
   const [committeeWhatsappLinks, setCommitteeWhatsappLinks] = useState<{ [key: string]: string }>({});
   const [currentCommitteeWhatsappInput, setCurrentCommitteeWhatsappInput] = useState('');
 
   const [allUsersList, setAllUsersList] = useState<any[]>([]);
 
-  // هل المستخدم من لجنة الجودة والتطوير؟
   const [isQualityTeam, setIsQualityTeam] = useState(false);
-  // هل المستخدم قائد للجنة أم عضو عادي؟
   const [isCommitteeLeader, setIsCommitteeLeader] = useState(false);
 
-  // حالة التحكم بإظهار/إخفاء جدول الأعضاء المقبولين عند الضغط على البطاقة للقادة
   const [showLeaderAcceptedMembersTable, setShowLeaderAcceptedMembersTable] = useState(false);
 
   const [allCommitteesList] = useState<string[]>([
     'لجنة التصميم',
-    'لجنة الاعلام',
+    'لجنة الإعلام',
     'لجنة تنظيم الفعاليات',
     'لجنة الموارد البشرية',
     'لجنة العلاقات العامة',
@@ -42,11 +38,9 @@ export default function CommitteeDashboard() {
   const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('لجنة تنظيم الفعاليات');
   const [preferenceFilterTab, setPreferenceFilterTab] = useState<'pref-1' | 'pref-2' | 'pref-3'>('pref-1');
 
-  // الإشعارات والتعاميم
   const [announcementText, setAnnouncementText] = useState('');
   const [leaderCustomAlert, setLeaderCustomAlert] = useState('⚠️ تنبيه غرفة العمليات: يُرجى إنجاز كافة المهام المعلقة بالفعاليات بدقة ومراعاة المواعيد النهائية.');
   
-  // نظام المهام المتعددة (Checklist)
   const [eventTitle, setEventTitle] = useState(''); 
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskInputText, setTaskInputText] = useState('');
@@ -54,21 +48,17 @@ export default function CommitteeDashboard() {
   const [committeeTasks, setCommitteeTasks] = useState<any[]>([]);
   const [targetCommitteeForTask, setTargetCommitteeForTask] = useState<string>('لجنة التصميم');
 
-  // نافذة التقارير والإنذارات
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
   const [showReportsModal, setShowReportsModal] = useState(false);
 
-  // أرشيف التقارير التاريخية
   const [qualityArchives, setQualityArchives] = useState<any[]>([]);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
 
-  // نظام الإنذار المتدرج
   const [warningReason, setWarningReason] = useState('');
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [targetCommitteeForWarning, setTargetCommitteeForWarning] = useState('');
   const [warningStepType, setWarningStepType] = useState<'warn-leaders' | 'warn-members' | 'escalate-presidents'>('warn-leaders');
 
-  // حالات الرد والتبرير الخاصة بالقائد المنذَر
   const [showReplyModal, setShowReplyModal] = useState(false);
   const [activeReportToReply, setActiveReportToReply] = useState<any>(null);
   const [leaderDefenseReply, setLeaderDefenseReply] = useState('');
@@ -78,25 +68,21 @@ export default function CommitteeDashboard() {
 
   const [warningHidden, setWarningHidden] = useState(false);
 
-  // حالات خاصة بلجنة الإعلام (رفع الصور ومقاطع الفيديو فقط)
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaCategory, setMediaCategory] = useState('تغطية فعالية');
   const [mediaBase64, setMediaBase64] = useState('/header-banner.png');
   const [mediaGallery, setMediaGallery] = useState<any[]>([]);
 
-  // حالات خاصة بلجنة المحتوى العلمي
   const [textBannerTitle, setTextBannerTitle] = useState('');
   const [textBannerContent, setTextBannerContent] = useState('');
   const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
 
-  // نظام الاعتذارات المباشر
   const [eventExcuses, setEventExcuses] = useState<any[]>([]);
   const [showExcuseForm, setShowExcuseForm] = useState(false);
   const [excuseEventName, setExcuseEventName] = useState('');
   const [excuseEventDate, setExcuseEventDate] = useState('');
   const [excuseReason, setExcuseReason] = useState('');
 
-  // 🤝 حالات خاصة بلجنة العلاقات العامة (منظومة تتبع الشراكات والمحلات لمنع التكرار)
   const [partnerName, setPartnerName] = useState('');
   const [partnerContactPerson, setPartnerContactPerson] = useState('');
   const [partnerPhone, setPartnerPhone] = useState('');
@@ -472,10 +458,18 @@ export default function CommitteeDashboard() {
     }
   };
 
+  // دالة مطابقة ذكية موحدة لأسماء اللجان بغض النظر عن الهمزات (إعلام vs اعلام)
+  const isSameCommittee = (c1: string, c2: string) => {
+    if (!c1 || !c2) return false;
+    const clean1 = c1.replace(/الـ/g, '').replace(/[إأآا]/g, 'ا').replace(/ة/g, 'ه').trim();
+    const clean2 = c2.replace(/الـ/g, '').replace(/[إأآا]/g, 'ا').replace(/ة/g, 'ه').trim();
+    return clean1 === clean2 || c1.includes(c2) || c2.includes(c1);
+  };
+
   const matchesTargetCommittee = (choiceStr: string, targetComm: string) => {
     if (!choiceStr) return false;
-    const cleanChoice = choiceStr.replace(/الـ/g, '').replace(/إ/g, 'ا').replace(/أ/g, 'ا').replace(/آ/g, 'ا').trim();
-    const cleanTarget = targetComm.replace(/الـ/g, '').replace(/إ/g, 'ا').replace(/أ/g, 'ا').replace(/آ/g, 'ا').trim();
+    const cleanChoice = choiceStr.replace(/الـ/g, '').replace(/[إأآا]/g, 'ا').replace(/ة/g, 'ه').trim();
+    const cleanTarget = targetComm.replace(/الـ/g, '').replace(/[إأآا]/g, 'ا').replace(/ة/g, 'ه').trim();
     
     if (cleanChoice.includes('اعلام') && cleanTarget.includes('اعلام')) return true;
     if (cleanChoice.includes('تصميم') && cleanTarget.includes('تصميم')) return true;
@@ -485,26 +479,25 @@ export default function CommitteeDashboard() {
     if (cleanChoice.includes('علمي') && cleanTarget.includes('علمي')) return true;
     if (cleanChoice.includes('جودة') && cleanTarget.includes('جودة')) return true;
 
-    return choiceStr.includes(targetComm) || targetComm.includes(choiceStr);
+    return choiceStr.includes(targetComm) || targetComm.includes(choiceStr) || isSameCommittee(choiceStr, targetComm);
   };
 
   const currentActiveComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
   
-  // 🛡️ [تعديل جذري لمنع ظهور العضو المقبول في رغبات اللجان الأخرى]:
   const filteredRequests = (requests || []).filter(req => {
-    if (req.acceptedCommittee && req.acceptedCommittee !== currentActiveComm) {
+    if (req.acceptedCommittee && !isSameCommittee(req.acceptedCommittee, currentActiveComm)) {
       return false;
     }
 
     const targetKey = preferenceFilterTab === 'pref-1' ? 'firstChoice' : preferenceFilterTab === 'pref-2' ? 'secondChoice' : 'thirdChoice';
     const choiceValue = req[targetKey] || '';
-    return matchesTargetCommittee(choiceValue, currentActiveComm) || req.acceptedCommittee === currentActiveComm;
+    return matchesTargetCommittee(choiceValue, currentActiveComm) || isSameCommittee(req.acceptedCommittee, currentActiveComm);
   });
 
   const transferredRequestsList = (requests || []).filter(req => req.transferredToHR === true || req.status === 'محول للموارد البشرية');
 
-  const totalApplicantsCount = requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm) && (!r.acceptedCommittee || r.acceptedCommittee === currentActiveComm)).length;
-  const acceptedMembersCount = requests.filter(r => r.acceptedCommittee === currentActiveComm).length;
+  const totalApplicantsCount = requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm) && (!r.acceptedCommittee || isSameCommittee(r.acceptedCommittee, currentActiveComm))).length;
+  const acceptedMembersCount = requests.filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm)).length;
 
   const handleAcceptSubmit = async () => {
     if (!selectedReqId) return;
@@ -545,7 +538,6 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // 🗑️ [إضافة دالة حذف وإزالة العضو المقبول من اللجنة فعلياً وتحديث قاعدة البيانات]:
   const handleRemoveAcceptedMember = async (memberId: string, memberPhone?: string) => {
     if (!confirm('هل أنت متأكد من إزالة هذا العضو من اللجنة؟ سيتم تحريره وإتاحة قبوله مجدداً.')) return;
     try {
@@ -622,7 +614,7 @@ export default function CommitteeDashboard() {
 
     try {
       const targetComm = currentActiveComm;
-      const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm);
+      const acceptedList = requests.filter(r => isSameCommittee(r.acceptedCommittee, targetComm));
       for (const mem of acceptedList) {
         if (mem.phone) {
           const uRef = doc(db, 'users', mem.phone);
@@ -675,7 +667,7 @@ export default function CommitteeDashboard() {
       const docRef = await addDoc(collection(db, 'committee_tasks'), newTaskObj);
       setCommitteeTasks([{ id: docRef.id, ...newTaskObj }, ...committeeTasks]);
 
-      const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm);
+      const acceptedList = requests.filter(r => isSameCommittee(r.acceptedCommittee, targetComm));
       for (const mem of acceptedList) {
         if (mem.phone) {
           const uRef = doc(db, 'users', mem.phone);
@@ -852,7 +844,7 @@ export default function CommitteeDashboard() {
 
   const handleExportCommitteeExcel = () => {
     const targetComm = currentActiveComm;
-    const acceptedList = requests.filter(r => r.acceptedCommittee === targetComm);
+    const acceptedList = requests.filter(r => isSameCommittee(r.acceptedCommittee, targetComm));
     if (acceptedList.length === 0) {
       alert('لا توجد بيانات لأعضاء مقبولين للتصدير حالياً.');
       return;
@@ -928,7 +920,7 @@ export default function CommitteeDashboard() {
     let topCommName = 'لجنة التصميم';
     let maxMembers = -1;
     allCommitteesList.forEach(c => {
-      const cnt = requests.filter(r => r.acceptedCommittee === c).length;
+      const cnt = requests.filter(r => isSameCommittee(r.acceptedCommittee, c)).length;
       if (cnt > maxMembers) {
         maxMembers = cnt;
         topCommName = c;
@@ -981,7 +973,7 @@ export default function CommitteeDashboard() {
     `;
 
     allCommitteesList.forEach(comm => {
-      const commMembers = requests.filter(r => r.acceptedCommittee === comm).length;
+      const commMembers = requests.filter(r => isSameCommittee(r.acceptedCommittee, comm)).length;
       htmlContent += `
         <tr>
           <td><strong>${comm}</strong></td>
@@ -1043,12 +1035,12 @@ export default function CommitteeDashboard() {
     return <div className="min-h-screen flex items-center justify-center font-bold text-slate-600 bg-slate-50">جاري تحميل لوحة تحكم اللجنة التفاعلية...</div>;
   }
 
-  const displayedTasks = committeeTasks.filter(t => t.committee === currentActiveComm);
+  const displayedTasks = committeeTasks.filter(t => isSameCommittee(t.committee, currentActiveComm));
   const committeeExcusesFiltered = eventExcuses.filter(ex => matchesTargetCommittee(ex.committee, currentActiveComm));
 
   const memberScoresMap: { [memberName: string]: number } = {};
   committeeTasks
-    .filter(t => t.committee === currentActiveComm)
+    .filter(t => isSameCommittee(t.committee, currentActiveComm))
     .forEach(taskGroup => {
       (taskGroup.subTasks || []).forEach((st: any) => {
         if (st.completed && st.completedBy) {
@@ -1073,7 +1065,6 @@ export default function CommitteeDashboard() {
     <main className="min-h-screen bg-slate-50 text-slate-800 p-6 md:p-10 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* الشريط العلوي */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-xl font-black text-slate-900">
@@ -1107,7 +1098,6 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* ربط رابط الواتساب الخاص باللجنة */}
         {isCommitteeLeader && !isQualityTeam && (
           <div className="bg-emerald-50 border-2 border-emerald-400 rounded-3xl p-6 space-y-4 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -1139,7 +1129,6 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* شريط التنبيهات القيادي */}
         {!warningHidden && (
           <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white p-5 rounded-3xl shadow-lg flex items-center justify-between flex-wrap gap-4 border border-amber-400">
             <div className="flex items-center gap-3">
@@ -1165,7 +1154,6 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* تنبيهات وإنذارات اللجنة الحالية */}
         {!isQualityTeam && isCommitteeLeader && committeeReports.length > 0 && (
           <div className="bg-amber-50 border-2 border-amber-400 rounded-3xl p-6 space-y-4 shadow-sm">
             <div className="flex items-center gap-2">
@@ -1205,7 +1193,6 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* نظام إفادة عدم المشاركة والاعتذار المباشر */}
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
@@ -1291,7 +1278,6 @@ export default function CommitteeDashboard() {
           )}
         </div>
 
-        {/* 🤝 أداة لجنة العلاقات العامة */}
         {(currentActiveComm === 'لجنة العلاقات العامة' || currentActiveComm === 'لجنة العلاقات') && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
@@ -1412,7 +1398,6 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 1. أداة لجنة الموارد البشرية */}
         {isCommitteeLeader && currentActiveComm === 'لجنة الموارد البشرية' && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
@@ -1467,8 +1452,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 2. أداة لجنة الإعلام */}
-        {(currentActiveComm === 'لجنة الاعلام' || currentActiveComm === 'لجنة الإعلام') && isCommitteeLeader && (
+        {(isSameCommittee(currentActiveComm, 'لجنة الإعلام') || isSameCommittee(currentActiveComm, 'لجنة الاعلام')) && isCommitteeLeader && (
           <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
@@ -1545,8 +1529,7 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* 3. أداة لجنة المحتوى العلمي */}
-        {currentActiveComm === 'لجنة المحتوى العلمي' && isCommitteeLeader && (
+        {isSameCommittee(currentActiveComm, 'لجنة المحتوى العلمي') && isCommitteeLeader && (
           <div className="bg-white rounded-3xl p-8 border border-emerald-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
@@ -1610,7 +1593,6 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* رادار الجودة السبع (للقادة فقط) */}
         {isQualityTeam && (
           <div className="space-y-4">
             <div className="flex justify-between items-center flex-wrap gap-3">
@@ -1622,7 +1604,7 @@ export default function CommitteeDashboard() {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {allCommitteesList.map((commName, idx) => {
-                const count = requests.filter(r => r.acceptedCommittee === commName).length;
+                const count = requests.filter(r => isSameCommittee(r.acceptedCommittee, commName)).length;
                 return (
                   <div 
                     key={idx} 
@@ -1707,7 +1689,6 @@ export default function CommitteeDashboard() {
               })}
             </div>
 
-            {/* عرض جدول الأعضاء المقبولين للجنة المحددة حالياً بلجنة الجودة بدون فلترة جنس */}
             {isQualityTeam && (
               <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 mt-6">
                 <div className="flex justify-between items-center flex-wrap gap-3 border-b border-slate-100 pb-3">
@@ -1716,7 +1697,7 @@ export default function CommitteeDashboard() {
                     <p className="text-xs text-slate-500">هنا يتم عرض كافة أعضاء هذه اللجنة المقبولين للتدقيق والمتابعة المباشرة:</p>
                   </div>
                   <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs">
-                    الإجمالي: {requests.filter(r => r.acceptedCommittee === currentActiveComm).length} عضو
+                    الإجمالي: {requests.filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm)).length} عضو
                   </span>
                 </div>
 
@@ -1732,13 +1713,13 @@ export default function CommitteeDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {requests.filter(r => r.acceptedCommittee === currentActiveComm).length === 0 ? (
+                      {requests.filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm)).length === 0 ? (
                         <tr>
                           <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد أعضاء مقبولين مسجلين في هذه اللجنة حالياً.</td>
                         </tr>
                       ) : (
                         requests
-                          .filter(r => r.acceptedCommittee === currentActiveComm)
+                          .filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm))
                           .map((member, mIdx) => (
                             <tr key={mIdx} className="hover:bg-slate-50">
                               <td className="py-3 pr-2 font-bold text-slate-900">{member.fullName}</td>
@@ -1777,7 +1758,6 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* إحصائيات فورية مستقلة وديناميكية لكل لجنة (للقادة فقط) */}
         {isCommitteeLeader && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-[#630517] to-[#80071D] text-white p-6 rounded-3xl shadow-xl space-y-2">
@@ -1786,7 +1766,6 @@ export default function CommitteeDashboard() {
               <p className="text-xs text-white/80">المتقدمون برغبتهم الأولى لهذه اللجنة</p>
             </div>
 
-            {/* بطاقة عدد الأعضاء المقبولين القابلة للضغط لعرض القائمة */}
             <div 
               onClick={() => setShowLeaderAcceptedMembersTable(!showLeaderAcceptedMembersTable)}
               className="bg-white border-2 border-emerald-500 p-6 rounded-3xl shadow-md space-y-2 cursor-pointer hover:bg-emerald-50/40 transition-all relative group"
@@ -1809,7 +1788,6 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* جدول استعراض الأعضاء المقبولين الخاص برئيس اللجنة (يظهر عند الضغط على البطاقة) بدون فلترة جنس */}
         {isCommitteeLeader && showLeaderAcceptedMembersTable && (
           <div className="bg-white rounded-3xl p-6 border-2 border-emerald-400 shadow-lg space-y-4 animate-fadeIn">
             <div className="flex justify-between items-center flex-wrap gap-3 border-b border-slate-100 pb-3">
@@ -1838,13 +1816,13 @@ export default function CommitteeDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {requests.filter(r => r.acceptedCommittee === currentActiveComm).length === 0 ? (
+                  {requests.filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm)).length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد أعضاء مقبولين مسجلين في هذه اللجنة حتى الآن.</td>
                     </tr>
                   ) : (
                     requests
-                      .filter(r => r.acceptedCommittee === currentActiveComm)
+                      .filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm))
                       .map((member, mIdx) => (
                         <tr key={mIdx} className="hover:bg-slate-50">
                           <td className="py-3 pr-2 font-bold text-slate-900">{member.fullName}</td>
@@ -1881,7 +1859,6 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* الأدوات القيادية (للقادة فقط) */}
         {isCommitteeLeader && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
@@ -1982,7 +1959,6 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {/* قائمة المهام المتعددة ولوحة الشرف */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
@@ -1993,7 +1969,7 @@ export default function CommitteeDashboard() {
             </div>
 
             {displayedTasks.length === 0 ? (
-              <p className="text-center py-12 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد قوائم مهام مسجلة لهذه اللجنة حالياً.</p>
+              <p className="text-center py-12 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد قوائم مهام مسجلة لهذه اللجنة حتى الآن.</p>
             ) : (
               <div className="space-y-6">
                 {displayedTasks.map((taskGroup) => {
@@ -2082,7 +2058,6 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* الجدول الخاص بالمرشحين */}
         {isCommitteeLeader && !isQualityTeam && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
@@ -2093,13 +2068,13 @@ export default function CommitteeDashboard() {
               
               <div className="flex gap-2">
                 <button type="button" onClick={() => setPreferenceFilterTab('pref-1')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-1' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                  🎯 الرغبة الأولى ({requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm) && (!r.acceptedCommittee || r.acceptedCommittee === currentActiveComm)).length})
+                  🎯 الرغبة الأولى ({requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm) && (!r.acceptedCommittee || isSameCommittee(r.acceptedCommittee, currentActiveComm))).length})
                 </button>
                 <button type="button" onClick={() => setPreferenceFilterTab('pref-2')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-2' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                  🥈 الرغبة الثانية ({requests.filter(r => matchesTargetCommittee(r.secondChoice, currentActiveComm) && (!r.acceptedCommittee || r.acceptedCommittee === currentActiveComm)).length})
+                  🥈 الرغبة الثانية ({requests.filter(r => matchesTargetCommittee(r.secondChoice, currentActiveComm) && (!r.acceptedCommittee || isSameCommittee(r.acceptedCommittee, currentActiveComm))).length})
                 </button>
                 <button type="button" onClick={() => setPreferenceFilterTab('pref-3')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${preferenceFilterTab === 'pref-3' ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                  🥉 الرغبة الثالثة ({requests.filter(r => matchesTargetCommittee(r.thirdChoice, currentActiveComm) && (!r.acceptedCommittee || r.acceptedCommittee === currentActiveComm)).length})
+                  🥉 الرغبة الثالثة ({requests.filter(r => matchesTargetCommittee(r.thirdChoice, currentActiveComm) && (!r.acceptedCommittee || isSameCommittee(r.acceptedCommittee, currentActiveComm))).length})
                 </button>
               </div>
             </div>
@@ -2152,7 +2127,6 @@ export default function CommitteeDashboard() {
 
       </div>
 
-      {/* النوافذ التفاعلية */}
       {showArchiveModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-indigo-500">
@@ -2250,7 +2224,7 @@ export default function CommitteeDashboard() {
                   <div key={rep.id} className="bg-red-50/60 border border-red-200 rounded-2xl p-4 space-y-3 relative">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black text-red-700">اللجنة المعنية: {rep.targetCommittee}</span>
-                      <button type="button" onClick={() => handleDeleteReport(rep.id)} className="px-2 py-0.5 bg-red-600 text-white rounded-md text-[10px] font-black hover:bg-red-700 cursor-pointer">حذف البلاغ 🗑️️</button>
+                      <button type="button" onClick={() => handleDeleteReport(rep.id)} className="px-2 py-0.5 bg-red-600 text-white rounded-md text-[10px] font-black hover:bg-red-700 cursor-pointer">حذف البلاغ 🗑</button>
                     </div>
                     <p className="text-xs text-slate-800 font-semibold">السبب والتقصير المرصود: {rep.reason}</p>
                     {rep.leaderDefenseReply && (
