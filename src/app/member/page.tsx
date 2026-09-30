@@ -135,16 +135,24 @@ export default function MemberSmartDashboard() {
               UHB
             </span>
             <div>
-              <h1 className="text-base font-black text-slate-900">بوابة العضو المرتبطة سحابياً 🛡️</h1>
+              <h1 className="text-base font-black text-slate-900">بوابة العضو المرتبطة سحابياً 🛡️️</h1>
               <p className="text-xs text-slate-500">منصة موحدة تتصل مباشرة بلوحة الأدمن وقادة اللجان</p>
             </div>
           </div>
-          <Link
-            href="/"
-            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all border border-slate-200"
-          >
-            الرئيسية ←
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/team"
+              className="px-4 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs transition-all border border-amber-300"
+            >
+              👑 الرؤساء وقادة اللجان
+            </Link>
+            <Link
+              href="/"
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all border border-slate-200"
+            >
+              الرئيسية ←
+            </Link>
+          </div>
         </div>
 
         {/* لوحة الترحيب الذكية */}
