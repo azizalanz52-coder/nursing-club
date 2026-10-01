@@ -38,61 +38,61 @@ export default function Home() {
         </div>
       </section>
 
-     {/* قسم الوصول السريع للنشرة الأسبوعية - فايب جريدة ورقية عتيقة */}
-<section className="py-10 px-4 sm:px-6">
-  <div className="max-w-4xl mx-auto bg-[#F4F1EA] border-4 border-neutral-900 p-8 sm:p-12 relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.15)]">
+     {/* قسم الوصول السريع للنشرة الأسبوعية - فايب صحفي ينبض بهويتنا الحقيقية */}
+<section className="py-12 px-4 sm:px-6">
+  <div className="max-w-4xl mx-auto bg-[#F7F4EE] border-4 border-[#630517] rounded-[32px] p-8 sm:p-12 relative overflow-hidden shadow-[0_20px_50px_rgba(99,5,23,0.18)]">
     
-    {/* تأثير التايبو العملاق في الخلفية (Big Typography مثل الـ 'JA!' في الجريدة) */}
+    {/* تأثير التايبو العملاق في الخلفية بهوية النشرة */}
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
-      <span className="text-[13rem] sm:text-[18rem] font-black font-sans text-neutral-900/[0.035] uppercase tracking-tighter leading-none transform -rotate-6">
-        NEWS
+      <span className="text-[12rem] sm:text-[17rem] font-black font-sans text-[#630517]/[0.045] uppercase tracking-tighter leading-none transform -rotate-3">
+        NURSING
       </span>
     </div>
 
-    {/* تأثيرات خطوط الأعضاء والنصوص الدقيقة بالخلفية (Micro-text Watermark) */}
-    <div className="absolute inset-0 opacity-[0.03] pointer-events-none select-none overflow-hidden grid grid-cols-3 gap-2 text-[7px] font-mono text-neutral-900">
+    {/* تأثيرات خطوط الأعمدة والدقة الصحفية بالخلفية */}
+    <div className="absolute inset-0 opacity-[0.04] pointer-events-none select-none overflow-hidden grid grid-cols-3 gap-2 text-[7px] font-mono text-[#630517]">
       <div>nursing club weekly edition clinical updates health standards...</div>
-      <div>faculty of nursing hafar al batin breaking news medical care...</div>
-      <div>SLE exam preparation guidelines professional nursing skills...</div>
+      <div>exclusive newsletter medical care breaking news professional skills...</div>
+      <div>SLE exam preparation guidelines leadership nursing activities...</div>
     </div>
 
-    {/* محتوى الكرت الصحفي */}
+    {/* محتوى الكرت الصحفي الحيوي */}
     <div className="relative z-10 space-y-6 text-center">
       
-      {/* ترويسة علوية للجريدة */}
-      <div className="flex justify-between items-center text-[10px] sm:text-xs font-sans font-bold text-neutral-600 uppercase tracking-widest border-b-2 border-neutral-900 pb-2">
-        <span>جامعة حفر الباطن</span>
-        <span className="text-[#630517] font-black">ISSUE NO. 01</span>
-        <span>الجريدة الأسبوعية</span>
+      {/* ترويسة علوية للنشرة */}
+      <div className="flex justify-between items-center text-xs font-sans font-bold text-[#630517] uppercase tracking-widest border-b-2 border-[#630517]/30 pb-3">
+        <span className="bg-[#630517]/10 px-3 py-1 rounded-full text-[10px]">نادي التمريض</span>
+        <span className="font-black">ISSUE NO. 01</span>
+        <span className="bg-[#630517]/10 px-3 py-1 rounded-full text-[10px]">النشرة الأسبوعية</span>
       </div>
 
-      <div className="space-y-3 max-w-2xl mx-auto">
-        <span className="inline-block px-3 py-1 bg-[#630517] text-[#F5D061] text-[10px] font-black uppercase tracking-wider font-sans">
+      <div className="space-y-4 max-w-2xl mx-auto">
+        <span className="inline-block px-4 py-1.5 bg-[#630517] text-[#F5D061] text-xs font-black uppercase tracking-wider font-sans rounded-full shadow-md">
           📰 الإصدارات والأخبار الحصرية
         </span>
         
-        <h2 className="text-3xl sm:text-5xl font-black text-neutral-900 font-serif tracking-tight">
+        <h2 className="text-3xl sm:text-5xl font-black text-slate-900 font-serif tracking-tight leading-tight">
           النشرة الأسبوعية لنادي التمريض
         </h2>
         
-        <p className="text-neutral-700 text-xs sm:text-sm leading-relaxed font-serif italic max-w-xl mx-auto">
-          "اطلع على أحدث أخبار التمريض العالمية، مصادر مذاكرة اختبار الهيئة السعودية (SLE)، والأسس السريرية المعتمدة بفايب صحفي عتيق."
+        <p className="text-slate-700 text-xs sm:text-sm leading-relaxed font-serif italic max-w-xl mx-auto">
+          "اطلع على أحدث أخبار التمريض العالمية، مصادر مذاكرة اختبار الهيئة السعودية (SLE)، والأسس السريرية المعتمدة بفايب صحفي فخم ينبض بالإبداع."
         </p>
       </div>
       
-      <div className="pt-2">
+      <div className="pt-3">
         <Link
           href="/newsletter"
-          className="px-8 py-3.5 bg-neutral-900 text-[#F5D061] hover:bg-[#630517] font-black text-xs sm:text-sm shadow-md transition-all inline-flex items-center gap-2 font-sans uppercase tracking-wider border-2 border-neutral-900 cursor-pointer"
+          className="px-8 py-4 bg-[#630517] text-[#F5D061] hover:bg-slate-900 font-black text-xs sm:text-sm shadow-xl hover:scale-105 transition-all inline-flex items-center gap-2.5 font-sans uppercase tracking-wider border-2 border-[#630517] rounded-2xl cursor-pointer"
         >
           <span>📖</span>
-          <span>استعراض النشرة الصحفية الأسبوعية ➔</span>
+          <span>استعراض النشرة الأسبوعية ➔</span>
         </Link>
       </div>
 
-      {/* تذييل الكرت الصحفي */}
-      <div className="border-t border-neutral-300 pt-3 text-[10px] text-neutral-500 font-sans">
-        نادي كلية التمريض • الإصدار الرقمي الموثق
+      {/* تذييل الكرت النظيف */}
+      <div className="border-t border-[#630517]/20 pt-3 text-[11px] text-slate-600 font-sans font-bold">
+        نادي التمريض • إبداع وتصميم بلا حدود ✨
       </div>
     </div>
   </div>
