@@ -45,7 +45,7 @@ export default function Home() {
     {/* تأثير التايبو العملاق في الخلفية بهوية النشرة */}
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
       <span className="text-[12rem] sm:text-[17rem] font-black font-sans text-[#630517]/[0.045] uppercase tracking-tighter leading-none transform -rotate-3">
-        NURSING
+        NEWS
       </span>
     </div>
 
@@ -92,7 +92,7 @@ export default function Home() {
 
       {/* تذييل الكرت النظيف */}
       <div className="border-t border-[#630517]/20 pt-3 text-[11px] text-slate-600 font-sans font-bold">
-        نادي التمريض • إبداع وتصميم بلا حدود ✨
+        نادي التمريض 
       </div>
     </div>
   </div>
