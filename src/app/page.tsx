@@ -38,27 +38,40 @@ export default function Home() {
         </div>
       </section>
 
-      {/* قسم الوصول السريع للنشرة الأسبوعية */}
-      <section className="py-14 bg-gradient-to-br from-[#36020A] via-[#630517] to-[#4A030F] text-white text-center relative overflow-hidden">
-        <div className="max-w-4xl mx-auto px-4 space-y-4 relative z-10">
-          <span className="inline-block px-4 py-1.5 rounded-full bg-[#F5D061]/20 text-[#F5D061] text-xs font-black uppercase tracking-wider border border-[#F5D061]/30">
-            📰 الإصدارات والأخبار
-          </span>
-          <h2 className="text-3xl font-black text-white">النشرة الأسبوعية لنادي التمريض</h2>
-          <p className="text-amber-50/80 text-sm max-w-xl mx-auto">
-            اطلع على أخبار التمريض العالمية، مصادر مذاكرة اختبار الهيئة السعودية (SLE)، وأهم الأسس التمريضية.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/newsletter"
-              className="px-8 py-3.5 rounded-2xl bg-[#F5D061] text-[#630517] font-black text-xs sm:text-sm shadow-xl hover:scale-105 transition-all inline-flex items-center gap-2"
-            >
-              <span>📖</span>
-              <span>استعراض النشرة الأسبوعية ➔</span>
-            </Link>
-          </div>
-        </div>
-      </section>
+     {/* قسم الوصول السريع للنشرة الأسبوعية - بتصميم انسيابي فاخر */}
+<section className="py-8 px-4 sm:px-6">
+  <div className="max-w-4xl mx-auto bg-gradient-to-br from-slate-900 via-[#36020A] to-slate-950 rounded-[36px] p-8 sm:p-12 text-center relative overflow-hidden shadow-2xl border border-[#F5D061]/20">
+    
+    {/* تأثيرات توهج خلفية جمالية */}
+    <div className="absolute -top-24 -right-24 w-72 h-72 bg-[#630517]/40 rounded-full blur-3xl pointer-events-none" />
+    <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+    <div className="relative z-10 space-y-4 max-w-2xl mx-auto">
+      <span className="inline-block px-4 py-1.5 rounded-full bg-[#F5D061]/15 text-[#F5D061] text-xs font-black uppercase tracking-wider border border-[#F5D061]/30 backdrop-blur-md">
+        📰 الإصدارات والأخبار الحصرية
+      </span>
+      
+      <h2 className="text-3xl sm:text-4xl font-black text-white font-serif tracking-tight">
+        النشرة الأسبوعية لنادي التمريض
+      </h2>
+      
+      <p className="text-slate-300 text-xs sm:text-sm leading-relaxed font-medium">
+        اطلع على أخبار التمريض العالمية، مصادر مذاكرة اختبار الهيئة السعودية (SLE)، وأهم الأسس التمريضية بفايب صحفي فخم.
+      </p>
+      
+      <div className="pt-4">
+        <Link
+          href="/newsletter"
+          className="px-8 py-4 rounded-2xl bg-gradient-to-r from-[#F5D061] to-amber-400 text-[#630517] font-black text-xs sm:text-sm shadow-lg hover:scale-105 hover:shadow-amber-500/20 transition-all inline-flex items-center gap-2 group"
+        >
+          <span className="group-hover:rotate-12 transition-transform">📖</span>
+          <span>استعراض النشرة الأسبوعية</span>
+          <span className="transition-transform group-hover:-translate-x-1">➔</span>
+        </Link>
+      </div>
+    </div>
+  </div>
+</section>
 
       <EventsPreview />
       <CaseStudyCard />
