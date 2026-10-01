@@ -58,7 +58,7 @@ export default function TeamPage() {
       {/* ترويسة الصفحة */}
       <div className="bg-[#630517] text-white py-16 px-4 text-center space-y-4 shadow-md">
         <span className="inline-block px-4 py-1.5 rounded-full bg-[#F5D061] text-[#630517] text-xs font-black uppercase tracking-wider">
-          👑 القيادة العليا والهيكل التنظيمي
+             الهيكلة التنظيمية
         </span>
         <h1 className="text-3xl sm:text-5xl font-black">رؤساء وقادة لجان نادي التمريض</h1>
         <p className="text-white/80 text-xs sm:text-sm max-w-xl mx-auto">
