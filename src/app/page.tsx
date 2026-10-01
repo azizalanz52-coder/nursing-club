@@ -38,36 +38,61 @@ export default function Home() {
         </div>
       </section>
 
-     {/* قسم الوصول السريع للنشرة الأسبوعية - بتصميم انسيابي فاخر */}
-<section className="py-8 px-4 sm:px-6">
-  <div className="max-w-4xl mx-auto bg-gradient-to-br from-slate-900 via-[#36020A] to-slate-950 rounded-[36px] p-8 sm:p-12 text-center relative overflow-hidden shadow-2xl border border-[#F5D061]/20">
+     {/* قسم الوصول السريع للنشرة الأسبوعية - فايب جريدة ورقية عتيقة */}
+<section className="py-10 px-4 sm:px-6">
+  <div className="max-w-4xl mx-auto bg-[#F4F1EA] border-4 border-neutral-900 p-8 sm:p-12 relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.15)]">
     
-    {/* تأثيرات توهج خلفية جمالية */}
-    <div className="absolute -top-24 -right-24 w-72 h-72 bg-[#630517]/40 rounded-full blur-3xl pointer-events-none" />
-    <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-    <div className="relative z-10 space-y-4 max-w-2xl mx-auto">
-      <span className="inline-block px-4 py-1.5 rounded-full bg-[#F5D061]/15 text-[#F5D061] text-xs font-black uppercase tracking-wider border border-[#F5D061]/30 backdrop-blur-md">
-        📰 الإصدارات والأخبار الحصرية
+    {/* تأثير التايبو العملاق في الخلفية (Big Typography مثل الـ 'JA!' في الجريدة) */}
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+      <span className="text-[13rem] sm:text-[18rem] font-black font-sans text-neutral-900/[0.035] uppercase tracking-tighter leading-none transform -rotate-6">
+        NEWS
       </span>
+    </div>
+
+    {/* تأثيرات خطوط الأعضاء والنصوص الدقيقة بالخلفية (Micro-text Watermark) */}
+    <div className="absolute inset-0 opacity-[0.03] pointer-events-none select-none overflow-hidden grid grid-cols-3 gap-2 text-[7px] font-mono text-neutral-900">
+      <div>nursing club weekly edition clinical updates health standards...</div>
+      <div>faculty of nursing hafar al batin breaking news medical care...</div>
+      <div>SLE exam preparation guidelines professional nursing skills...</div>
+    </div>
+
+    {/* محتوى الكرت الصحفي */}
+    <div className="relative z-10 space-y-6 text-center">
       
-      <h2 className="text-3xl sm:text-4xl font-black text-white font-serif tracking-tight">
-        النشرة الأسبوعية لنادي التمريض
-      </h2>
+      {/* ترويسة علوية للجريدة */}
+      <div className="flex justify-between items-center text-[10px] sm:text-xs font-sans font-bold text-neutral-600 uppercase tracking-widest border-b-2 border-neutral-900 pb-2">
+        <span>جامعة حفر الباطن</span>
+        <span className="text-[#630517] font-black">ISSUE NO. 01</span>
+        <span>الجريدة الأسبوعية</span>
+      </div>
+
+      <div className="space-y-3 max-w-2xl mx-auto">
+        <span className="inline-block px-3 py-1 bg-[#630517] text-[#F5D061] text-[10px] font-black uppercase tracking-wider font-sans">
+          📰 الإصدارات والأخبار الحصرية
+        </span>
+        
+        <h2 className="text-3xl sm:text-5xl font-black text-neutral-900 font-serif tracking-tight">
+          النشرة الأسبوعية لنادي التمريض
+        </h2>
+        
+        <p className="text-neutral-700 text-xs sm:text-sm leading-relaxed font-serif italic max-w-xl mx-auto">
+          "اطلع على أحدث أخبار التمريض العالمية، مصادر مذاكرة اختبار الهيئة السعودية (SLE)، والأسس السريرية المعتمدة بفايب صحفي عتيق."
+        </p>
+      </div>
       
-      <p className="text-slate-300 text-xs sm:text-sm leading-relaxed font-medium">
-        اطلع على أخبار التمريض العالمية، مصادر مذاكرة اختبار الهيئة السعودية (SLE)، وأهم الأسس التمريضية بفايب صحفي فخم.
-      </p>
-      
-      <div className="pt-4">
+      <div className="pt-2">
         <Link
           href="/newsletter"
-          className="px-8 py-4 rounded-2xl bg-gradient-to-r from-[#F5D061] to-amber-400 text-[#630517] font-black text-xs sm:text-sm shadow-lg hover:scale-105 hover:shadow-amber-500/20 transition-all inline-flex items-center gap-2 group"
+          className="px-8 py-3.5 bg-neutral-900 text-[#F5D061] hover:bg-[#630517] font-black text-xs sm:text-sm shadow-md transition-all inline-flex items-center gap-2 font-sans uppercase tracking-wider border-2 border-neutral-900 cursor-pointer"
         >
-          <span className="group-hover:rotate-12 transition-transform">📖</span>
-          <span>استعراض النشرة الأسبوعية</span>
-          <span className="transition-transform group-hover:-translate-x-1">➔</span>
+          <span>📖</span>
+          <span>استعراض النشرة الصحفية الأسبوعية ➔</span>
         </Link>
+      </div>
+
+      {/* تذييل الكرت الصحفي */}
+      <div className="border-t border-neutral-300 pt-3 text-[10px] text-neutral-500 font-sans">
+        نادي كلية التمريض • الإصدار الرقمي الموثق
       </div>
     </div>
   </div>
