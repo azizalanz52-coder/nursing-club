@@ -22,10 +22,19 @@ const initialCommittees = [
 
 export default function TeamPage() {
   const [committees, setCommittees] = useState(initialCommittees);
+  const [userPhone, setUserPhone] = useState<string>('');
+  const [acceptedCommittees, setAcceptedCommittees] = useState<string[]>([]);
+  const [showAlertModal, setShowAlertModal] = useState<boolean>(false);
+  const [alertMessage, setAlertMessage] = useState<string>('');
 
   useEffect(() => {
-    const fetchCloudCommittees = async () => {
+    const phone = localStorage.getItem('userPhone') || '';
+    const trimmedPhone = phone.trim();
+    setUserPhone(trimmedPhone);
+
+    const fetchCloudCommitteesAndAuth = async () => {
       try {
+        // جلب بيانات اللجان المحدثة
         const querySnapshot = await getDocs(collection(db, 'committees'));
         if (!querySnapshot.empty) {
           const cloudDataMap: Record<string, any> = {};
@@ -45,12 +54,56 @@ export default function TeamPage() {
           });
           setCommittees(merged);
         }
+
+        // جلب الطلبات المقبولة لمعرفة اللجان التي ينتمي لها المستخدم الحالي
+        if (trimmedPhone !== '') {
+          const appsSnap = await getDocs(collection(db, 'applications'));
+          if (!appsSnap.empty) {
+            const userComms: string[] = [];
+            appsSnap.forEach((d) => {
+              const data = d.data();
+              const dataPhone = data.phone ? String(data.phone).trim() : '';
+              if (dataPhone === trimmedPhone && data.status === 'مقبول') {
+                const commName = data.acceptedCommittee || '';
+                userComms.push(commName);
+              }
+            });
+            setAcceptedCommittees(userComms);
+          }
+        }
       } catch (err) {
-        console.error('Error fetching committees:', err);
+        console.error('Error fetching data:', err);
       }
     };
-    fetchCloudCommittees();
+
+    fetchCloudCommitteesAndAuth();
   }, []);
+
+  const handleCommitteeClick = (e: React.MouseEvent, committee: any) => {
+    const isAdmin = userPhone === '0553731265';
+    
+    // إذا لم يكن مسجل دخول
+    if (!userPhone) {
+      e.preventDefault();
+      setAlertMessage('يجب تسجيل الدخول برقم الجوال أولاً للوصول إلى بوابة الأعضاء الخاصة باللجان.');
+      setShowAlertModal(true);
+      return;
+    }
+
+    // إذا كان للأدمن، السماح بالدخول مباشرة
+    if (isAdmin) return;
+
+    // التحقق هل المستخدم مقبول في هذه اللجنة
+    const isAcceptedInThis = acceptedCommittees.some(c => 
+      c.includes(committee.name) || c.includes(committee.id) || committee.name.includes(c)
+    );
+
+    if (!isAcceptedInThis) {
+      e.preventDefault();
+      setAlertMessage(`عذراً، هذه البوابة مخصصة لأعضاء (${committee.name}) المقبولين رسمياً فقط.`);
+      setShowAlertModal(true);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 pb-20" dir="rtl">
@@ -58,7 +111,7 @@ export default function TeamPage() {
       {/* ترويسة الصفحة */}
       <div className="bg-[#630517] text-white py-16 px-4 text-center space-y-4 shadow-md">
         <span className="inline-block px-4 py-1.5 rounded-full bg-[#F5D061] text-[#630517] text-xs font-black uppercase tracking-wider">
-             الهيكلة التنظيمية
+            الهيكلة التنظيمية
         </span>
         <h1 className="text-3xl sm:text-5xl font-black">رؤساء وقادة لجان نادي التمريض</h1>
         <p className="text-white/80 text-xs sm:text-sm max-w-xl mx-auto">
@@ -110,7 +163,7 @@ export default function TeamPage() {
               اللجان التنظيمية
             </span>
             <h2 className="text-3xl sm:text-4xl font-black text-slate-900">لجان نادي التمريض السبع</h2>
-            <p className="text-slate-600 text-sm">اضغط على أي لجنة لاستعراض تفاصيلها والمهام الخاصة بها</p>
+            <p className="text-slate-600 text-sm">اضغط على لجنتك المعتمدة لاستعراض تفاصيلها والمهام الخاصة بك</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -118,6 +171,7 @@ export default function TeamPage() {
               <Link
                 key={committee.id}
                 href={`/team/${committee.id}`}
+                onClick={(e) => handleCommitteeClick(e, committee)}
                 className="bg-white rounded-3xl border border-slate-200 p-7 shadow-lg flex flex-col justify-between space-y-6 hover:shadow-xl hover:border-[#630517] hover:scale-[1.02] transition-all cursor-pointer group"
               >
                 <div className="space-y-4">
@@ -144,6 +198,28 @@ export default function TeamPage() {
         </section>
 
       </div>
+
+      {/* نافذة التنبيه الأمني عند محاولة الدخول للجنة بدون صلاحية */}
+      {showAlertModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#630517]/20">
+            <div className="w-16 h-16 bg-red-100 text-red-700 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold">
+              🔒
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-900">منطقة مؤمنة للأعضاء</h3>
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">{alertMessage}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAlertModal(false)}
+              className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer transition-all"
+            >
+              حسنًا، فهمت ➔
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
