@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, FormEvent } from 'react';
+import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { db } from '../../lib/firebase';
-import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 
 const defaultCommitteesDetails: Record<string, any> = {
   design: {
@@ -93,11 +93,26 @@ export default function CommitteeDetailPage() {
   const [committeeTasks, setCommitteeTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // حالات نافذة الاعتذار
   const [showExcuseModal, setShowExcuseModal] = useState<boolean>(false);
   const [selectedEventTitle, setSelectedEventTitle] = useState<string>('');
   const [excuseText, setExcuseText] = useState<string>('');
   const [modalMessage, setModalMessage] = useState<string>('');
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+
+  // خصائص لجنة العلاقات العامة (سجل الشراكات)
+  const [publicPartnersList, setPublicPartnersList] = useState<any[]>([]);
+  const [partnerName, setPartnerName] = useState('');
+  const [partnerContactPerson, setPartnerContactPerson] = useState('');
+  const [partnerPhone, setPartnerPhone] = useState('');
+  const [partnerStatus, setPartnerStatus] = useState<'قيد المراجعة' | 'وافقوا' | 'رفضوا'>('قيد المراجعة');
+  const [partnerNotes, setPartnerNotes] = useState('');
+
+  // خصائص لجنة الإعلام (رفع الصور ومقاطع الفيديو)
+  const [mediaGallery, setMediaGallery] = useState<any[]>([]);
+  const [mediaTitle, setMediaTitle] = useState('');
+  const [mediaCategory, setMediaCategory] = useState('تغطية فعالية');
+  const [mediaBase64, setMediaBase64] = useState('/header-banner.png');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone') || '';
@@ -189,6 +204,15 @@ export default function CommitteeDetailPage() {
           tasksSnap.forEach((d) => { tasks.push({ id: d.id, ...d.data() }); });
           setCommitteeTasks(tasks);
         }
+
+        // جلب سجل الشراكات (للعلاقات العامة)
+        const partnersSnap = await getDocs(collection(db, 'public_partners_relations'));
+        setPublicPartnersList(partnersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        // جلب المعرض الإعلامي (للإعلام)
+        const mediaSnap = await getDocs(collection(db, 'media_committee_gallery'));
+        setMediaGallery(mediaSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
       } catch (err) {
         console.error('Error fetching cloud data:', err);
       } finally {
@@ -200,13 +224,6 @@ export default function CommitteeDetailPage() {
   }, [id, baseDetails]);
 
   const isAdmin = currentUserPhone === '0553731265';
-
-  const displayedMembers = isAdmin 
-    ? (committee?.members || [])
-    : (committee?.members || []).filter((m: any) => {
-        const memberPhone = m.phone ? String(m.phone).trim() : '';
-        return currentUserPhone !== '' && memberPhone === currentUserPhone;
-      });
 
   const handleUploadExcuseSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -242,6 +259,7 @@ export default function CommitteeDetailPage() {
     }
   };
 
+  // ربط مهام اللجنة أو مهام الجودة الموجهة إليها
   const relevantTasks = committeeTasks.filter(t => {
     const cName = t.committee || '';
     return committee && (cName.includes(committee.name) || cName.includes('الجودة') || cName.includes('التطوير'));
@@ -262,6 +280,66 @@ export default function CommitteeDetailPage() {
 
       setCommitteeTasks(committeeTasks.map(t => t.id === taskId ? { ...t, subTasks: updatedSubTasks } : t));
     } catch (e) { console.error(e); }
+  };
+
+  // إضافة شريك / شركة جديدة (خاص بالعلاقات العامة)
+  const handleAddPartnerSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!partnerName.trim()) return;
+
+    const newPartnerObj = {
+      name: partnerName.trim(),
+      contactPerson: partnerContactPerson.trim() || 'غير محدد',
+      phone: partnerPhone.trim() || 'غير متوفر',
+      status: partnerStatus,
+      notes: partnerNotes.trim() || 'لا توجد ملاحظات إضافية',
+      addedBy: currentUserName || 'عضو العلاقات العامة',
+      createdAt: Date.now(),
+      dateStr: new Date().toLocaleDateString('ar-SA')
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, 'public_partners_relations'), newPartnerObj);
+      setPublicPartnersList([{ id: docRef.id, ...newPartnerObj }, ...publicPartnersList]);
+      setPartnerName('');
+      setPartnerContactPerson('');
+      setPartnerPhone('');
+      setPartnerNotes('');
+      setPartnerStatus('قيد المراجعة');
+      alert('تم إضافة الشركة وسجل التفاوض بنجاح ليراه جميع الأعضاء لمنع تكرار التواصل! 🤝🎯');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء حفظ بيانات الشركة.');
+    }
+  };
+
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // رفع صورة أو فيديو (خاص بلجنة الإعلام)
+  const handleUploadMediaSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!mediaTitle.trim()) return;
+    const newObj = {
+      title: mediaTitle.trim(),
+      category: mediaCategory,
+      imageUrl: mediaBase64,
+      createdAt: new Date().toLocaleDateString('ar-SA'),
+      addedBy: currentUserName || 'عضو الإعلام'
+    };
+    try {
+      const docRef = await addDoc(collection(db, 'media_committee_gallery'), newObj);
+      setMediaGallery([{ id: docRef.id, ...newObj }, ...mediaGallery]);
+      setMediaTitle('');
+      setMediaBase64('/header-banner.png');
+      alert('تم رفع ونشر المادة الإعلامية سحابياً لتصل للأدمن والرؤساء بنجاح! 📸🚀');
+    } catch (err) { console.error(err); }
   };
 
   if (!baseDetails) {
@@ -392,12 +470,175 @@ export default function CommitteeDetailPage() {
           </div>
         </div>
 
-        {/* مهام اللجنة */}
+        {/* 🤝 الخاصية المخصصة: سجل الشراكات (تظهر حصرياً لأعضاء لجنة العلاقات العامة) */}
+        {(id === 'pr' || committee?.name?.includes('العلاقات العامة')) && (
+          <div className="bg-white rounded-3xl p-8 sm:p-10 border border-sky-200 shadow-xl space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">🤝 سجل الشراكات والمحلات المرئية (منع تكرار التواصل)</h2>
+                <p className="text-xs text-slate-500 mt-1">قاعدة بيانات مركزية تشاهدها اللجنة بالكامل؛ لتجنب التواصل مع أي جهة سبق وتم التواصل معها:</p>
+              </div>
+              <span className="px-3.5 py-1.5 rounded-xl bg-sky-100 text-sky-800 font-bold text-xs">
+                إجمالي الجهات: {publicPartnersList.length}
+              </span>
+            </div>
+
+            {/* نموذج إضافة شركة جديدة للعضو */}
+            <form onSubmit={handleAddPartnerSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-sky-50/40 p-6 rounded-2xl border border-sky-200">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">اسم الشركة أو المحل</label>
+                <input
+                  type="text"
+                  placeholder="مثال: صيدلية النهدي / مقهى كيرف"
+                  value={partnerName}
+                  onChange={(e) => setPartnerName(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">اسم المسؤول المُتواصل معه</label>
+                <input
+                  type="text"
+                  placeholder="مثال: الأستاذ محمد (مدير الفرع)"
+                  value={partnerContactPerson}
+                  onChange={(e) => setPartnerContactPerson(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">حالة التواصل الحالية</label>
+                <select
+                  value={partnerStatus}
+                  onChange={(e: any) => setPartnerStatus(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
+                >
+                  <option value="قيد المراجعة">⏳ قيد المراجعة / جاري التفاوض</option>
+                  <option value="وافقوا">✅ وافقوا رسمياً وتم إبرام التعاون</option>
+                  <option value="رفضوا">❌ نعتذر / رفضوا التعاون</option>
+                </select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-3">
+                <label className="text-xs font-bold text-slate-700">تفاصيل أو ملاحظات الخصم / الرعاية المقدمة</label>
+                <input
+                  type="text"
+                  placeholder="مثال: وافقوا على تقديم خصم 20% لطلاب النادي"
+                  value={partnerNotes}
+                  onChange={(e) => setPartnerNotes(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                />
+              </div>
+              <div className="sm:col-span-3 pt-2">
+                <button type="submit" className="bg-sky-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-sky-700 cursor-pointer">
+                  + إضافة الجهة للسجل العام (مانع التكرار) 🚀
+                </button>
+              </div>
+            </form>
+
+            {/* عرض الشركات المسجلة */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+              {publicPartnersList.length === 0 ? (
+                <p className="col-span-2 text-center py-8 text-slate-400 font-bold text-xs">لا توجد جهات أو شركات مسجلة في السجل حالياً.</p>
+              ) : (
+                publicPartnersList.map((partner) => (
+                  <div key={partner.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className={`text-[10px] font-black px-3 py-1 rounded-full ${
+                        partner.status === 'وافقوا' ? 'bg-emerald-100 text-emerald-800' : partner.status === 'رفضوا' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {partner.status === 'وافقوا' ? '✅ تم الموافقة والتعاون' : partner.status === 'رفضوا' ? '❌ نعتذر / مرفوض' : '⏳ قيد التفاوض'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">الإضافة: {partner.dateStr}</span>
+                    </div>
+                    <h4 className="font-black text-slate-900 text-sm">{partner.name}</h4>
+                    <p className="text-xs text-slate-700"><strong>المسؤول:</strong> {partner.contactPerson}</p>
+                    <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-100"><strong>ملاحظات:</strong> {partner.notes}</p>
+                    <p className="text-[10px] text-slate-400">بواسطة: {partner.addedBy}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 📸 الخاصية المخصصة: رفع الصور والمقاطع (تظهر حصرياً لأعضاء لجنة الإعلام) */}
+        {(id === 'media' || committee?.name?.includes('الإعلام') || committee?.name?.includes('الاعلام')) && (
+          <div className="bg-white rounded-3xl p-8 sm:p-10 border border-purple-200 shadow-xl space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">📸 مركز رفع ونشر الصور ومقاطع الفيديو (لجنة الإعلام)</h2>
+                <p className="text-xs text-slate-500 mt-1">ارفع تغطيات الفعاليات والمقاطع لتصل مباشرة إلى لوحة الأدمن ومكتب الرؤساء:</p>
+              </div>
+              <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
+                إجمالي المواد: {mediaGallery.length}
+              </span>
+            </div>
+
+            {/* نموذج رفع المادة */}
+            <form onSubmit={handleUploadMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">عنوان الصورة أو المقطع</label>
+                <input
+                  type="text"
+                  placeholder="مثال: تغطية ورشة الإسعافات الأولية"
+                  value={mediaTitle}
+                  onChange={(e) => setMediaTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">التصنيف الإعلامي</label>
+                <select
+                  value={mediaCategory}
+                  onChange={(e) => setMediaCategory(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
+                >
+                  <option value="تغطية فعالية">تغطية فعالية</option>
+                  <option value="صور ومقاطع">صور ومقاطع أرشيفية</option>
+                </select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-slate-700">اختر ملف الصورة أو الفيديو من جهازك</label>
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setMediaBase64(await convertFileToBase64(e.target.files[0]));
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white cursor-pointer"
+                  required
+                />
+              </div>
+              <div className="sm:col-span-2 pt-2">
+                <button type="submit" className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer">
+                  + رفع ونشر المواد سحابياً (تصل للأدمن والرؤساء) 🎬
+                </button>
+              </div>
+            </form>
+
+            {/* عرض الميديا المرفوعة */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+              {mediaGallery.map((item) => (
+                <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{item.category}</span>
+                  <h5 className="font-extrabold text-slate-900 text-xs">{item.title}</h5>
+                  <p className="text-[10px] text-slate-400">بواسطة: {item.addedBy} ({item.createdAt})</p>
+                  <a href={item.imageUrl} target="_blank" rel="noopener noreferrer" className="block w-full py-1.5 bg-sky-50 text-sky-700 text-center font-bold text-xs rounded-lg">عرض المعاينة 👁️</a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* مهام اللجنة (Checklist Tasks) والربط مع الجودة */}
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
             <div>
               <h2 className="text-xl font-black text-slate-900">📌 مهام اللجنة ومهام لجنة الجودة والتطوير</h2>
-              <p className="text-xs text-slate-500 mt-1">تابع المهام والفعاليات المسندة للجنة وقم بتحديث إنجازها:</p>
+              <p className="text-xs text-slate-500 mt-1">تابع المهام والفعاليات المسندة للجنة وقم بتحديث إنجازها لتكسب نقاطك الفردية:</p>
             </div>
             <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-xl text-xs font-bold">
               {relevantTasks.length} مهام متاحة
@@ -447,7 +688,7 @@ export default function CommitteeDetailPage() {
 
       </div>
 
-      {/* نوافذ الحوار والاعتذارات */}
+      {/* نافذة رفع الاعتذار */}
       {showExcuseModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={handleUploadExcuseSubmit} className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 border-2 border-[#630517]/20">

@@ -54,7 +54,6 @@ export default function TeamPage() {
     fetchCloudCommittees();
   }, []);
 
-  // 🛡️ دالة ذكية تفحص رقم الجوال وتوجه المستخدم للجنته المقبولة حصرياً عند الضغط على بوابة العضو
   const handleMemberPortalClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     const phone = (localStorage.getItem('userPhone') || '').trim();
@@ -65,7 +64,6 @@ export default function TeamPage() {
       return;
     }
 
-    // إذا كان الأدمن
     if (phone === '0553731265') {
       window.location.href = '/team/design';
       return;
@@ -81,7 +79,6 @@ export default function TeamPage() {
           const dataPhone = data.phone ? String(data.phone).trim() : '';
           if (dataPhone === phone && data.status === 'مقبول') {
             const acceptedComm = data.acceptedCommittee || '';
-            // مطابقة اسم اللجنة مع معرفاتها
             for (const comm of initialCommittees) {
               if (acceptedComm.includes(comm.name) || acceptedComm.includes(comm.id) || comm.name.includes(acceptedComm)) {
                 targetCommitteeId = comm.id;
@@ -153,7 +150,6 @@ export default function TeamPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 pb-20" dir="rtl">
       
-      {/* ترويسة الصفحة */}
       <div className="bg-[#630517] text-white py-16 px-4 text-center space-y-4 shadow-md">
         <span className="inline-block px-4 py-1.5 rounded-full bg-[#F5D061] text-[#630517] text-xs font-black uppercase tracking-wider">
             الهيكلة التنظيمية
@@ -174,7 +170,6 @@ export default function TeamPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-20">
         
-        {/* 1. رؤساء النادي أولاً في الأعلى */}
         <section className="space-y-8">
           <div className="text-center space-y-2">
             <span className="text-xs text-[#630517] font-black uppercase tracking-widest bg-[#630517]/10 px-4 py-1 rounded-full">
@@ -201,7 +196,6 @@ export default function TeamPage() {
           </div>
         </section>
 
-        {/* 2. لجان النادي وقادتها بالأسفل */}
         <section className="space-y-8 pt-10 border-t border-slate-200">
           <div className="text-center space-y-2">
             <span className="text-xs text-[#630517] font-black uppercase tracking-widest bg-[#630517]/10 px-4 py-1 rounded-full">
