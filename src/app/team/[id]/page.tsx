@@ -81,8 +81,8 @@ const defaultCommitteesDetails: Record<string, any> = {
 
 export default function CommitteeDetailPage() {
   const params = useParams();
-  const id = (params?.id as string) || 'design';
-  const baseDetails = defaultCommitteesDetails[id] || defaultCommitteesDetails['design'];
+  const id = (params?.id as string) || '';
+  const baseDetails = defaultCommitteesDetails[id] || null;
   
   const [committee, setCommittee] = useState<any>(baseDetails);
   const [currentUserPhone, setCurrentUserPhone] = useState<string>('');
@@ -93,7 +93,6 @@ export default function CommitteeDetailPage() {
   const [committeeTasks, setCommitteeTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // حالات نافذة رفع الاعتذار
   const [showExcuseModal, setShowExcuseModal] = useState<boolean>(false);
   const [selectedEventTitle, setSelectedEventTitle] = useState<string>('');
   const [excuseText, setExcuseText] = useState<string>('');
@@ -108,9 +107,13 @@ export default function CommitteeDetailPage() {
     setCurrentUserPhone(trimmedPhone);
     setCurrentUserName(name.trim());
     
-    // فحص هل المستخدم مسجل دخول أساساً؟
     if (trimmedPhone !== '') {
       setIsLoggedIn(true);
+    }
+
+    if (!baseDetails) {
+      setLoading(false);
+      return;
     }
 
     const fetchCloudData = async () => {
@@ -124,7 +127,7 @@ export default function CommitteeDetailPage() {
           if (cloudData.members && cloudData.members.length > 0) {
             mergedMembers = cloudData.members;
           }
-          setCommittee(prev => ({
+          setCommittee((prev: any) => ({
             ...prev,
             maleLeader: cloudData.maleLeader || prev.maleLeader,
             femaleLeader: cloudData.femaleLeader || prev.femaleLeader,
@@ -132,9 +135,8 @@ export default function CommitteeDetailPage() {
           }));
         }
 
-        // جلب الأعضاء المقبولين من جدول applications
         const appsSnap = await getDocs(collection(db, 'applications'));
-        let userAuthorized = trimmedPhone === '0553731265'; // الأدمن مصرح له تلقائياً
+        let userAuthorized = trimmedPhone === '0553731265';
 
         if (!appsSnap.empty) {
           const acceptedFromApps: any[] = [];
@@ -152,7 +154,6 @@ export default function CommitteeDetailPage() {
                 universityId: data.universityId || ''
               });
 
-              // تحقق هل الجوال الحالي مسجل ومقبول في هذه اللجنة؟
               if (trimmedPhone !== '' && data.phone && String(data.phone).trim() === trimmedPhone) {
                 userAuthorized = true;
               }
@@ -166,16 +167,14 @@ export default function CommitteeDetailPage() {
           }
         }
 
-        // فحص إضافي هل الجوال موجود ضمن أعضاء اللجنة المباشرين
         if (!userAuthorized && trimmedPhone !== '') {
           const foundInDirect = mergedMembers.some((m: any) => m.phone && String(m.phone).trim() === trimmedPhone);
           if (foundInDirect) userAuthorized = true;
         }
 
         setIsAuthorizedMember(userAuthorized);
-        setCommittee(prev => ({ ...prev, members: mergedMembers }));
+        setCommittee((prev: any) => ({ ...prev, members: mergedMembers }));
 
-        // جلب قائمة الفعاليات
         const eventsSnap = await getDocs(collection(db, 'site_events'));
         if (!eventsSnap.empty) {
           const evs: any[] = [];
@@ -184,7 +183,6 @@ export default function CommitteeDetailPage() {
           if (evs.length > 0) setSelectedEventTitle(evs[0].title);
         }
 
-        // جلب المهام
         const tasksSnap = await getDocs(collection(db, 'committee_tasks'));
         if (!tasksSnap.empty) {
           const tasks: any[] = [];
@@ -203,10 +201,9 @@ export default function CommitteeDetailPage() {
 
   const isAdmin = currentUserPhone === '0553731265';
 
-  // 🛡️ حماية الصلاحيات والخصوصية التامة
   const displayedMembers = isAdmin 
-    ? (committee.members || [])
-    : (committee.members || []).filter((m: any) => {
+    ? (committee?.members || [])
+    : (committee?.members || []).filter((m: any) => {
         const memberPhone = m.phone ? String(m.phone).trim() : '';
         return currentUserPhone !== '' && memberPhone === currentUserPhone;
       });
@@ -247,7 +244,7 @@ export default function CommitteeDetailPage() {
 
   const relevantTasks = committeeTasks.filter(t => {
     const cName = t.committee || '';
-    return cName.includes(committee.name) || cName.includes('الجودة') || cName.includes('التطوير');
+    return committee && (cName.includes(committee.name) || cName.includes('الجودة') || cName.includes('التطوير'));
   });
 
   const handleToggleSubTask = async (taskId: string, subTaskIdx: number) => {
@@ -267,7 +264,25 @@ export default function CommitteeDetailPage() {
     } catch (e) { console.error(e); }
   };
 
-  // 🛑 الحماية الكبرى: إذا لم يكن مسجل دخول، أو لم يكن مقبولاً في هذه اللجنة
+  if (!baseDetails) {
+    return (
+      <main className="min-h-screen bg-slate-50 text-slate-800 py-20 px-4" dir="rtl">
+        <div className="max-w-md mx-auto bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center space-y-6">
+          <div className="w-16 h-16 bg-red-100 text-red-700 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold">🔍</div>
+          <div className="space-y-2">
+            <h1 className="text-xl font-black text-slate-900">لم يتم تحديد اللجنة</h1>
+            <p className="text-xs text-slate-500 leading-relaxed">يرجى الانتقال إلى صفحة الهيكلة التنظيمية واختيار لجنتك المعتمدة.</p>
+          </div>
+          <div className="pt-2">
+            <Link href="/team" className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 transition-all inline-block">
+              الانتقال لصفحة اللجان ➔
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center" dir="rtl">
@@ -283,10 +298,10 @@ export default function CommitteeDetailPage() {
           <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold">🔒</div>
           <div className="space-y-2">
             <h1 className="text-xl font-black text-slate-900">تسجيل الدخول مطلوب</h1>
-            <p className="text-xs text-slate-500 leading-relaxed">بوابة الأعضاء واللجان مخصصة للأعضاء المقبولين فقط. يرجى تسجيل الدخول برقم الجوال للوصول إلى لجنتك المعتمدة.</p>
+            <p className="text-xs text-slate-500 leading-relaxed">بوابة الأعضاء واللجان مخصصة للأعضاء المقبولين فقط. يرجى تسجيل الدخول برقم الجوال.</p>
           </div>
-          <div className="pt-2 flex flex-col gap-3">
-            <Link href="/" className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 transition-all">
+          <div className="pt-2">
+            <Link href="/" className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 transition-all inline-block">
               العودة للرئيسية وتسجيل الدخول ➔
             </Link>
           </div>
@@ -302,11 +317,11 @@ export default function CommitteeDetailPage() {
           <div className="w-16 h-16 bg-red-100 text-red-700 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold">⚠️</div>
           <div className="space-y-2">
             <h1 className="text-xl font-black text-slate-900">عذراً، لست من أعضاء هذه اللجنة</h1>
-            <p className="text-xs text-slate-500 leading-relaxed">حسابك غير مقترن أو مقبول رسمياً في ({committee.name}). هذه الصفحة مؤمنة ولا تظهر إلا لأعضاء اللجنة المقبولين والأدمن.</p>
+            <p className="text-xs text-slate-500 leading-relaxed">حسابك غير مقترن أو مقبول رسمياً في ({committee?.name}). هذه الصفحة مؤمنة تماماً.</p>
           </div>
           <div className="pt-2">
-            <Link href="/" className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 transition-all inline-block">
-              العودة للرئيسية ➔
+            <Link href="/team" className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 transition-all inline-block">
+              العودة لقائمة اللجان ➔
             </Link>
           </div>
         </div>
@@ -343,16 +358,16 @@ export default function CommitteeDetailPage() {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-[#630517]/10 border border-[#630517]/20 flex items-center justify-center text-3xl shadow-sm">
-                {committee.icon}
+                {committee?.icon}
               </div>
               <div>
                 <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full">عضو معتمد في هذه اللجنة ✓</span>
-                <h1 className="text-3xl font-black text-slate-900 mt-1">{committee.name}</h1>
-                <p className="text-slate-600 text-sm mt-1">{committee.description}</p>
+                <h1 className="text-3xl font-black text-slate-900 mt-1">{committee?.name}</h1>
+                <p className="text-slate-600 text-sm mt-1">{committee?.description}</p>
               </div>
             </div>
 
-            {committee.whatsappLink && (
+            {committee?.whatsappLink && (
               <a
                 href={committee.whatsappLink}
                 target="_blank"
@@ -368,21 +383,21 @@ export default function CommitteeDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100 text-xs">
             <div className="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200/80">
               <span className="text-slate-400 font-bold">قائد الطلاب:</span>
-              <span className="font-extrabold text-slate-900 text-sm">{committee.maleLeader}</span>
+              <span className="font-extrabold text-slate-900 text-sm">{committee?.maleLeader}</span>
             </div>
             <div className="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200/80">
               <span className="text-slate-400 font-bold">قائدة الطالبات:</span>
-              <span className="font-extrabold text-slate-900 text-sm">{committee.femaleLeader}</span>
+              <span className="font-extrabold text-slate-900 text-sm">{committee?.femaleLeader}</span>
             </div>
           </div>
         </div>
 
-        {/* قسم المهام */}
+        {/* مهام اللجنة */}
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
             <div>
               <h2 className="text-xl font-black text-slate-900">📌 مهام اللجنة ومهام لجنة الجودة والتطوير</h2>
-              <p className="text-xs text-slate-500 mt-1">تابع المهام والفعاليات المسندة للجنة أو الموجهة من الجودة وقم بتحديث إنجازها:</p>
+              <p className="text-xs text-slate-500 mt-1">تابع المهام والفعاليات المسندة للجنة وقم بتحديث إنجازها:</p>
             </div>
             <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-xl text-xs font-bold">
               {relevantTasks.length} مهام متاحة
@@ -430,73 +445,9 @@ export default function CommitteeDetailPage() {
           )}
         </div>
 
-        {/* جدول الأعضاء */}
-        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-black text-slate-900">أعضاء {committee.name}</h2>
-              <p className="text-xs text-slate-500 mt-1">
-                {isAdmin ? 'عرض لوحة التحكم (جميع الأعضاء)' : 'عرض خاص: يظهر اسمك وحالة حضورك لضمان الخصوصية'}
-              </p>
-            </div>
-            <span className="px-3 py-1 bg-[#630517] text-[#F5D061] rounded-xl text-xs font-bold shadow">
-              {isAdmin ? `${committee.members?.length || 0} أعضاء` : 'عضو مسجل معتمد'}
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-slate-400 text-xs font-bold">
-                  <th className="pb-3 pr-4">اسم العضو</th>
-                  <th className="pb-3">المهمة / الدور</th>
-                  <th className="pb-3">حالة الحضور والاعتذارات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {displayedMembers.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="py-8 text-center text-slate-400 text-xs">لا توجد بيانات عرض مطابقة.</td>
-                  </tr>
-                ) : (
-                  displayedMembers.map((m: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-slate-50/80 transition-all">
-                      <td className="py-4 pr-4 font-bold text-slate-900 flex items-center gap-2">
-                        <span className="w-8 h-8 rounded-full bg-[#630517]/10 text-[#630517] flex items-center justify-center text-xs font-black">
-                          {m.name ? m.name.charAt(0) : 'ع'}
-                        </span>
-                        {m.name}
-                      </td>
-                      <td className="py-4 text-slate-600 font-medium">{m.role || 'عضو أساسي'}</td>
-                      <td className="py-4 space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-                            {m.status || 'نشط'}
-                          </span>
-                          {m.excuseStatus && (
-                            <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200">
-                              {m.excuseStatus}
-                            </span>
-                          )}
-                        </div>
-                        {m.excuseText && (
-                          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700 space-y-1 shadow-inner">
-                            <p className="font-black text-[#630517]">🙋‍♂️ اعتذار عن فعالية: "{m.targetEvent || 'فعالية عامة'}"</p>
-                            <p><strong>السبب:</strong> {m.excuseText}</p>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
       </div>
 
-      {/* نافذة رفع الاعتذار */}
+      {/* نوافذ الحوار والاعتذارات */}
       {showExcuseModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={handleUploadExcuseSubmit} className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 border-2 border-[#630517]/20">

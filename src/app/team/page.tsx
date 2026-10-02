@@ -22,19 +22,12 @@ const initialCommittees = [
 
 export default function TeamPage() {
   const [committees, setCommittees] = useState(initialCommittees);
-  const [userPhone, setUserPhone] = useState<string>('');
-  const [acceptedCommittees, setAcceptedCommittees] = useState<string[]>([]);
   const [showAlertModal, setShowAlertModal] = useState<boolean>(false);
   const [alertMessage, setAlertMessage] = useState<string>('');
 
   useEffect(() => {
-    const phone = localStorage.getItem('userPhone') || '';
-    const trimmedPhone = phone.trim();
-    setUserPhone(trimmedPhone);
-
-    const fetchCloudCommitteesAndAuth = async () => {
+    const fetchCloudCommittees = async () => {
       try {
-        // جلب بيانات اللجان المحدثة
         const querySnapshot = await getDocs(collection(db, 'committees'));
         if (!querySnapshot.empty) {
           const cloudDataMap: Record<string, any> = {};
@@ -54,53 +47,105 @@ export default function TeamPage() {
           });
           setCommittees(merged);
         }
-
-        // جلب الطلبات المقبولة لمعرفة اللجان التي ينتمي لها المستخدم الحالي
-        if (trimmedPhone !== '') {
-          const appsSnap = await getDocs(collection(db, 'applications'));
-          if (!appsSnap.empty) {
-            const userComms: string[] = [];
-            appsSnap.forEach((d) => {
-              const data = d.data();
-              const dataPhone = data.phone ? String(data.phone).trim() : '';
-              if (dataPhone === trimmedPhone && data.status === 'مقبول') {
-                const commName = data.acceptedCommittee || '';
-                userComms.push(commName);
-              }
-            });
-            setAcceptedCommittees(userComms);
-          }
-        }
       } catch (err) {
-        console.error('Error fetching data:', err);
+        console.error('Error fetching committees:', err);
       }
     };
-
-    fetchCloudCommitteesAndAuth();
+    fetchCloudCommittees();
   }, []);
 
-  const handleCommitteeClick = (e: React.MouseEvent, committee: any) => {
-    const isAdmin = userPhone === '0553731265';
-    
-    // إذا لم يكن مسجل دخول
-    if (!userPhone) {
-      e.preventDefault();
-      setAlertMessage('يجب تسجيل الدخول برقم الجوال أولاً للوصول إلى بوابة الأعضاء الخاصة باللجان.');
+  // 🛡️ دالة ذكية تفحص رقم الجوال وتوجه المستخدم للجنته المقبولة حصرياً عند الضغط على بوابة العضو
+  const handleMemberPortalClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    const phone = (localStorage.getItem('userPhone') || '').trim();
+
+    if (!phone) {
+      setAlertMessage('يرجى تسجيل الدخول برقم الجوال أولاً من الصفحة الرئيسية للوصول إلى بوابتك الخاصة.');
       setShowAlertModal(true);
       return;
     }
 
-    // إذا كان للأدمن، السماح بالدخول مباشرة
-    if (isAdmin) return;
+    // إذا كان الأدمن
+    if (phone === '0553731265') {
+      window.location.href = '/team/design';
+      return;
+    }
 
-    // التحقق هل المستخدم مقبول في هذه اللجنة
-    const isAcceptedInThis = acceptedCommittees.some(c => 
-      c.includes(committee.name) || c.includes(committee.id) || committee.name.includes(c)
-    );
+    try {
+      const appsSnap = await getDocs(collection(db, 'applications'));
+      let targetCommitteeId = '';
 
-    if (!isAcceptedInThis) {
-      e.preventDefault();
-      setAlertMessage(`عذراً، هذه البوابة مخصصة لأعضاء (${committee.name}) المقبولين رسمياً فقط.`);
+      if (!appsSnap.empty) {
+        appsSnap.forEach((d) => {
+          const data = d.data();
+          const dataPhone = data.phone ? String(data.phone).trim() : '';
+          if (dataPhone === phone && data.status === 'مقبول') {
+            const acceptedComm = data.acceptedCommittee || '';
+            // مطابقة اسم اللجنة مع معرفاتها
+            for (const comm of initialCommittees) {
+              if (acceptedComm.includes(comm.name) || acceptedComm.includes(comm.id) || comm.name.includes(acceptedComm)) {
+                targetCommitteeId = comm.id;
+              }
+            }
+          }
+        });
+      }
+
+      if (targetCommitteeId) {
+        window.location.href = `/team/${targetCommitteeId}`;
+      } else {
+        setAlertMessage('عذراً، حسابك غير مسجل كعضو مقبول في أي لجنة حالياً.');
+        setShowAlertModal(true);
+      }
+    } catch (err) {
+      console.error(err);
+      setAlertMessage('حدث خطأ أثناء التحقق من صلاحيات العضوية.');
+      setShowAlertModal(true);
+    }
+  };
+
+  const handleCommitteeClick = async (e: React.MouseEvent, committee: any) => {
+    e.preventDefault();
+    const phone = (localStorage.getItem('userPhone') || '').trim();
+    const isAdmin = phone === '0553731265';
+
+    if (!phone) {
+      setAlertMessage('يجب تسجيل الدخول برقم الجوال أولاً للوصول إلى بوابة الأعضاء.');
+      setShowAlertModal(true);
+      return;
+    }
+
+    if (isAdmin) {
+      window.location.href = `/team/${committee.id}`;
+      return;
+    }
+
+    try {
+      const appsSnap = await getDocs(collection(db, 'applications'));
+      let isAuthorized = false;
+
+      if (!appsSnap.empty) {
+        appsSnap.forEach((d) => {
+          const data = d.data();
+          const dataPhone = data.phone ? String(data.phone).trim() : '';
+          const acceptedComm = data.acceptedCommittee || '';
+          const matchesComm = acceptedComm.includes(committee.name) || acceptedComm.includes(committee.id) || committee.name.includes(acceptedComm);
+
+          if (dataPhone === phone && data.status === 'مقبول' && matchesComm) {
+            isAuthorized = true;
+          }
+        });
+      }
+
+      if (isAuthorized) {
+        window.location.href = `/team/${committee.id}`;
+      } else {
+        setAlertMessage(`عذراً، هذه البوابة مخصصة لأعضاء (${committee.name}) المقبولين رسمياً فقط.`);
+        setShowAlertModal(true);
+      }
+    } catch (err) {
+      console.error(err);
+      setAlertMessage('حدث خطأ أثناء التحقق من الصلاحيات.');
       setShowAlertModal(true);
     }
   };
@@ -121,9 +166,9 @@ export default function TeamPage() {
           <Link href="/" className="text-xs text-[#F5D061] underline font-bold">
             ← العودة للرئيسية
           </Link>
-          <Link href="/member" className="text-xs text-white underline font-bold">
+          <a href="#" onClick={handleMemberPortalClick} className="text-xs text-white underline font-bold cursor-pointer">
             🛡️ بوابة العضو
-          </Link>
+          </a>
         </div>
       </div>
 
@@ -168,9 +213,8 @@ export default function TeamPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {committees.map((committee) => (
-              <Link
+              <div
                 key={committee.id}
-                href={`/team/${committee.id}`}
                 onClick={(e) => handleCommitteeClick(e, committee)}
                 className="bg-white rounded-3xl border border-slate-200 p-7 shadow-lg flex flex-col justify-between space-y-6 hover:shadow-xl hover:border-[#630517] hover:scale-[1.02] transition-all cursor-pointer group"
               >
@@ -192,14 +236,13 @@ export default function TeamPage() {
                     <span className="font-extrabold text-slate-900">{committee.femaleLeader}</span>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </section>
 
       </div>
 
-      {/* نافذة التنبيه الأمني عند محاولة الدخول للجنة بدون صلاحية */}
       {showAlertModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#630517]/20">
