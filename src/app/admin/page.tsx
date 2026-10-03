@@ -166,6 +166,7 @@ export default function AdminDashboard() {
   const [targetShiftCommittee, setTargetShiftCommittee] = useState<string>('لجنة التصميم');
 
   const [requestSearchQuery, setRequestSearchQuery] = useState<string>('');
+  const [userSearchQuery, setUserSearchQuery] = useState<string>(''); // حقل البحث في الحسابات والرتب
 
   const togglePasswordVisibility = (phone: string) => {
     setShowPasswords((prev) => ({
@@ -234,6 +235,13 @@ export default function AdminDashboard() {
     fetchSiteSettings();
   }, [router]);
 
+  // دالة جلب الاسم الحقيقي للمستخدم من جدول الحسابات مباشرة (تلافياً لتناقض الأسماء القديمة)
+  const getRealUserName = (phone: string, defaultName: string) => {
+    if (!phone) return defaultName;
+    const found = usersList.find(u => u.phone === phone);
+    return found?.fullName || defaultName;
+  };
+
   const fetchSiteSettings = async () => {
     try {
       const settingsRef = doc(db, 'site_settings', 'general');
@@ -274,9 +282,7 @@ export default function AdminDashboard() {
           finalDate = new Date().toISOString();
           try {
             await updateDoc(doc(db, 'case_study_submissions', d.id), { createdAt: finalDate });
-          } catch (err) {
-            // تجاهل صامت
-          }
+          } catch (err) {}
         }
         return { id: d.id, ...data, createdAt: finalDate };
       }));
@@ -1621,6 +1627,19 @@ export default function AdminDashboard() {
     return nameA.localeCompare(nameB, 'ar');
   });
 
+  // تصفية وترتيب الحسابات في تبويب الحسابات والرتب (ترتيب أبجدي + بحث بالاسم أو الرقم)
+  const filteredAndSortedUsers = [...usersList].filter(usr => {
+    if (!userSearchQuery.trim()) return true;
+    const q = userSearchQuery.trim().toLowerCase();
+    const name = (usr.fullName || '').toLowerCase();
+    const phone = (usr.phone || '').toLowerCase();
+    return name.includes(q) || phone.includes(q);
+  }).sort((a, b) => {
+    const nameA = (a.fullName || a.phone || '').trim();
+    const nameB = (b.fullName || b.phone || '').trim();
+    return nameA.localeCompare(nameB, 'ar');
+  });
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       
@@ -1970,7 +1989,7 @@ export default function AdminDashboard() {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-emerald-900">🩺 دراسة الحالة والطلاب المتفاعلون (Case Study Submissions)</h3>
-                <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين، درجاتهم أو نقاطهم، وأرقام جوالاتهم مع إمكانية إضافة بونص، خصم نقاط، أو حذف الشخص.</p>
+                <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين (تُجلب تلقائياً من الحسابات)، درجاتهم أو نقاطهم، وأرقام جوالاتهم.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
                 إجمالي المشاركات: {caseSubmissions.length}
@@ -1986,7 +2005,7 @@ export default function AdminDashboard() {
                 <table className="w-full text-right text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                      <th className="pb-3 pr-2">اسم الطالب / المشارك</th>
+                      <th className="pb-3 pr-2">اسم الطالب / المشارك (الاسم الحقيقي)</th>
                       <th className="pb-3">رقم الجوال</th>
                       <th className="pb-3">الدرجة / النقاط</th>
                       <th className="pb-3">تاريخ ووقت المشاركة</th>
@@ -1999,13 +2018,18 @@ export default function AdminDashboard() {
                         ? new Date(sub.createdAt || sub.submittedAt).toLocaleString('ar-SA')
                         : new Date().toLocaleString('ar-SA');
 
+                      const userPhone = sub.phone || sub.phoneNumber || '';
+                      const rawName = sub.studentName || sub.fullName || sub.name || 'مشارك كريم';
+                      // استدعاء الاسم الحقيقي والمحدث من جدول الحسابات
+                      const realStudentName = getRealUserName(userPhone, rawName);
+
                       return (
                         <tr key={sub.id || idx} className="hover:bg-slate-50">
                           <td className="py-4 pr-2 font-bold text-slate-900">
-                            👤 {sub.studentName || sub.fullName || sub.name || 'مشارك كريم'}
+                            👤 {realStudentName}
                           </td>
                           <td className="py-4 text-slate-600 font-mono" dir="ltr">
-                            📞 {sub.phone || sub.phoneNumber || 'غير متوفر'}
+                            📞 {userPhone || 'غير متوفر'}
                           </td>
                           <td className="py-4">
                             <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs font-mono">
@@ -2035,8 +2059,8 @@ export default function AdminDashboard() {
                             <button
                               type="button"
                               onClick={() => {
-                                setCertRecipientInput(sub.studentName || sub.fullName || sub.name || '');
-                                setCertPhoneInput(sub.phone || sub.phoneNumber || '');
+                                setCertRecipientInput(realStudentName);
+                                setCertPhoneInput(userPhone);
                                 setCertTitleInput('شهادة مشاركة في دراسة الحالة الطبية');
                                 setCertCategoryInput('شهادة اجتياز دورة');
                                 setActiveTab('certificates');
@@ -2526,7 +2550,7 @@ export default function AdminDashboard() {
                       </div>
 
                       <div className="space-y-1 text-xs text-slate-700 bg-white p-3 rounded-xl border border-indigo-100">
-                        <p><strong>👨‍✈️ قائد الطلاب:</strong> {comm.maleLeader || 'غير متوفر'}</p>
+                        <p><strong>👨‍‍✈️ قائد الطلاب:</strong> {comm.maleLeader || 'غير متوفر'}</p>
                         <p><strong>👩‍✈️ قائدة الطالبات:</strong> {comm.femaleLeader || 'غير متوفر'}</p>
                         <p><strong>👥 الأعضاء المقبولون:</strong> {totalActiveCount} أعضاء فاعلين</p>
                       </div>
@@ -2685,9 +2709,18 @@ export default function AdminDashboard() {
 
         {activeTab === 'users-manager' && (isSystemAdminUser || isPresidentsRole) && (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-            <div className="border-b border-slate-100 pb-4">
-              <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، الأسماء، كلمات المرور، والرتب (خاص بالإدارة ورئاسة النادي 🛡️)</h3>
-              <p className="text-xs text-slate-500">يمكنك تعديل اسم المستخدم، رقم الجوال، كلمة المرور، أو الرتبة وتحديثها سحابياً في أي وقت.</p>
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، الأسماء، كلمات المرور، والرتب (مرتبة أبجدياً 🔤)</h3>
+                <p className="text-xs text-slate-500">يمكنك البحث بالاسم أو رقم الجوال، وتعديل بيانات أي عضو وتحديثها سحابياً.</p>
+              </div>
+              <input
+                type="text"
+                placeholder="🔍 ابحث بالاسم أو رقم الجوال..."
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50 focus:outline-none focus:border-[#630517] w-64"
+              />
             </div>
             
             <div className="overflow-x-auto">
@@ -2718,7 +2751,7 @@ export default function AdminDashboard() {
                           onClick={() => togglePasswordVisibility('0553731265')}
                           className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
                         >
-                          {showPasswords['0553731265'] ? '👁‍🗨️' : '👁️'}
+                          {showPasswords['0553731265'] ? '👁‍🗨️' : '👁️️'}
                         </button>
                       </div>
                     </td>
@@ -2730,7 +2763,7 @@ export default function AdminDashboard() {
                     <td className="py-4 text-slate-400 font-bold">إدارة كاملة للمنصة</td>
                   </tr>
 
-                  {usersList.map((usr, idx) => {
+                  {filteredAndSortedUsers.map((usr, idx) => {
                     const isOnline = usr.lastActive && (Date.now() - usr.lastActive < 4 * 60 * 1000);
 
                     return (
@@ -2782,7 +2815,7 @@ export default function AdminDashboard() {
                               className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-lg font-bold hover:bg-amber-100 cursor-pointer shadow-sm transition-all"
                               title="تعديل كلمة المرور"
                             >
-                              ✏️ تعديل
+                              ✏ تعديل
                             </button>
                           </div>
                         </td>
@@ -3921,6 +3954,64 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {showAcceptModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-emerald-400">
+            <div className="w-16 h-16 bg-emerald-600 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              ✅
+            </div>
+            <div className="space-y-2 text-center">
+              <h3 className="text-xl font-black text-slate-900">قبول العضو وتعيين اللجنة</h3>
+              <p className="text-xs text-slate-500">اختر اللجنة التي سيتم قبول العضو فيها وربط قروب الواتساب:</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">الجنة المقبول بها:</label>
+                <select
+                  value={acceptedCommittee}
+                  onChange={(e) => handleCommitteeSelectChange(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-emerald-600"
+                >
+                  {committeeNamesList.map((c, idx) => (
+                    <option key={idx} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">رابط قروب الواتساب التلقائي للجنة:</label>
+                <input
+                  type="text"
+                  value={whatsappLink}
+                  onChange={(e) => setWhatsappLink(e.target.value)}
+                  placeholder="https://chat.whatsapp.com/..."
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-mono text-slate-900 bg-white focus:outline-none focus:border-emerald-600"
+                  dir="ltr"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAcceptModal(false)}
+                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAcceptRequest}
+                className="w-1/2 py-3 rounded-xl bg-emerald-600 text-white font-black text-xs shadow hover:bg-emerald-700 cursor-pointer"
+              >
+                تأكيد القبول وإرسال الإشعار 🚀
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalType === 'success' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061]">
@@ -4012,6 +4103,44 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {modalType === 'password' && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <form onSubmit={submitUpdatePassword} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
+            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              🔒
+            </div>
+            <div className="space-y-2 text-center">
+              <h3 className="text-xl font-black text-slate-900">تعديل كلمة المرور</h3>
+              <p className="text-xs text-slate-500">أدخل كلمة المرور الجديدة للحساب:</p>
+            </div>
+            <input
+              type="text"
+              placeholder="كلمة المرور الجديدة..."
+              value={modalInputVal}
+              onChange={(e) => setModalInputVal(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-[#630517] font-mono"
+              dir="ltr"
+              required
+            />
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalType('none')}
+                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
+              >
+                حفظ كلمة المرور 🔒
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {modalType === 'phone' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={submitUpdatePhone} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
@@ -4019,8 +4148,8 @@ export default function AdminDashboard() {
               📱
             </div>
             <div className="space-y-2 text-center">
-              <h3 className="text-xl font-black text-slate-900">تعديل رقم الجوال</h3>
-              <p className="text-xs text-slate-500">أدخل رقم الجوال الجديد (اسم الدخول):</p>
+              <h3 className="text-xl font-black text-slate-900">تعديل رقم الجوال (اسم الدخول)</h3>
+              <p className="text-xs text-slate-500">أدخل رقم الجوال الجديد:</p>
             </div>
             <input
               type="text"
@@ -4043,108 +4172,13 @@ export default function AdminDashboard() {
                 type="submit"
                 className="w-1/2 py-3 rounded-xl bg-sky-600 text-white font-black text-xs shadow hover:bg-sky-700 cursor-pointer"
               >
-                تحديث رقم الجوال 🚀
+                حفظ رقم الجوال 📱
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {modalType === 'password' && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <form onSubmit={submitUpdatePassword} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
-            <div className="w-16 h-16 bg-amber-600 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
-              🔒
-            </div>
-            <div className="space-y-2 text-center">
-              <h3 className="text-xl font-black text-slate-900">تعديل كلمة المرور</h3>
-              <p className="text-xs text-slate-500">أدخل كلمة المرور الجديدة:</p>
-            </div>
-            <input
-              type="text"
-              placeholder="كلمة المرور الجديدة..."
-              value={modalInputVal}
-              onChange={(e) => setModalInputVal(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-amber-600 font-mono"
-              dir="ltr"
-              required
-            />
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setModalType('none')}
-                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                type="submit"
-                className="w-1/2 py-3 rounded-xl bg-amber-600 text-white font-black text-xs shadow hover:bg-amber-700 cursor-pointer"
-              >
-                تحديث كلمة المرور 🔒
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {showAcceptModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-emerald-400">
-            <div className="w-16 h-16 bg-emerald-600 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
-              ✅
-            </div>
-            <div className="space-y-2 text-center">
-              <h3 className="text-xl font-black text-slate-900">قبول العضو في اللجنة</h3>
-              <p className="text-xs text-slate-500">اختر اللجنة التي سيتم قبول العضو فيها:</p>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">اللجنة المقبول بها:</label>
-                <select
-                  value={acceptedCommittee}
-                  onChange={(e) => handleCommitteeSelectChange(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-emerald-600"
-                >
-                  {committeeNamesList.map((c, idx) => (
-                    <option key={idx} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">رابط قروب الواتساب لهذه اللجنة (يتم سحبه تلقائياً):</label>
-                <input
-                  type="text"
-                  placeholder="https://chat.whatsapp.com/..."
-                  value={whatsappLink}
-                  onChange={(e) => setWhatsappLink(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-none focus:border-emerald-600 font-mono"
-                  dir="ltr"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowAcceptModal(false)}
-                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmAcceptRequest}
-                className="w-1/2 py-3 rounded-xl bg-emerald-600 text-white font-black text-xs shadow hover:bg-emerald-700 cursor-pointer"
-              >
-                تأكيد القبول وإرسال الإشعار 🚀
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
