@@ -29,6 +29,10 @@ export default function Hero() {
     },
   ]);
 
+  const [acceptedData, setAcceptedData] = useState<{ committee: string; whatsapp: string } | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [currentUserPhone, setCurrentUserPhone] = useState<string | null>(null);
+
   // --- States خاصة بتهنئة الترقية والصلاحيات القيادية ---
   const [showRoleCongratModal, setShowRoleCongratModal] = useState(false);
   const [myNewRole, setMyNewRole] = useState('');
@@ -36,6 +40,12 @@ export default function Hero() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
+    // 1. التحقق الفوري محلياً هل سبق إغلاق النافذة لعدم تكرارها نهائياً
+    const hasSeenLocal = localStorage.getItem('hasSeenAcceptanceModal');
+    if (hasSeenLocal === 'true') {
+      setShowModal(false);
+    }
+
     const savedBanners = localStorage.getItem('UHB_BANNERS');
     if (savedBanners) {
       try {
@@ -77,6 +87,7 @@ export default function Hero() {
 
     const userPhone = localStorage.getItem('userPhone');
     const userName = localStorage.getItem('userName');
+    if (userPhone) setCurrentUserPhone(userPhone);
 
     if (userPhone || userName) {
       const checkUserData = async () => {
@@ -92,16 +103,66 @@ export default function Hero() {
                 setShowRoleCongratModal(true);
                 await updateDoc(userDocRef, { pendingCongratulation: false });
               }
+
+              // إذا سبق ورأاها سحابياً أو محلياً، لا تظهر
+              if (uData.hasSeenCongrats === true || hasSeenLocal === 'true') {
+                return;
+              }
+
+              if (uData.status === 'مقبول') {
+                setAcceptedData({
+                  committee: uData.assignedCommittee || uData.firstChoice || 'اللجنة',
+                  whatsapp: uData.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
+                });
+                setShowModal(true);
+                return;
+              }
             }
           }
+
+          // فحص applications فقط إذا لم يتم إغلاقها مسبقاً
+          if (hasSeenLocal !== 'true') {
+            const querySnapshot = await getDocs(collection(db, 'applications'));
+            querySnapshot.forEach((docSnap) => {
+              const data = docSnap.data();
+              if (
+                (userPhone && data.phone === userPhone) ||
+                (userName && data.fullName === userName)
+              ) {
+                if (data.status === 'مقبول') {
+                  setAcceptedData({
+                    committee: data.acceptedCommittee || data.firstChoice || 'اللجنة',
+                    whatsapp: data.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
+                  });
+                  setShowModal(true);
+                }
+              }
+            });
+          }
+
         } catch (err) {
-          console.error('Error checking role update:', err);
+          console.error('Error checking user acceptance or role update:', err);
         }
       };
 
       checkUserData();
     }
   }, []);
+
+  // دالة إغلاق نافذة القبول (تحفظ محلياً وسحابياً لتختفي بلا رجعة)
+  const handleCloseAcceptanceModal = async () => {
+    setShowModal(false);
+    localStorage.setItem('hasSeenAcceptanceModal', 'true');
+
+    const phone = currentUserPhone || localStorage.getItem('userPhone');
+    if (!phone) return;
+    try {
+      const userDocRef = doc(db, 'users', phone);
+      await updateDoc(userDocRef, { hasSeenCongrats: true });
+    } catch (err) {
+      console.error('Error updating hasSeenCongrats in cloud:', err);
+    }
+  };
 
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -213,6 +274,45 @@ export default function Hero() {
               className="w-full py-3.5 bg-[#630517] text-[#F5D061] rounded-2xl font-black text-sm shadow-lg hover:brightness-110 transition-all cursor-pointer"
             >
               بدء مهام العمل القيادي 🚀
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة التهنئة بالقبول (تظهر مرة واحدة وتختفي للأبد عند الإغلاق) */}
+      {showModal && acceptedData && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300" dir="rtl">
+          <div className="bg-gradient-to-br from-[#F5D061] via-[#dfb64d] to-[#630517] rounded-[32px] p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative text-slate-900">
+            
+            <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl border-4 border-white/20">
+              🎉
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-rose-950">مبروك تم قبولك!</h3>
+              <p className="text-xs font-bold text-slate-800 leading-relaxed">
+                يسعدنا انضمامك إلى <span className="text-[#630517] font-black underline">{acceptedData.committee}</span> في نادي التمريض 🌟
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <a
+                href={acceptedData.whatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 px-6 rounded-2xl shadow-xl transition-all text-xs"
+              >
+                <span>💬</span>
+                <span>الانضمام إلى قروب اللجنة عبر واتساب</span>
+              </a>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCloseAcceptanceModal}
+              className="text-xs font-extrabold text-rose-950 hover:text-rose-900 underline cursor-pointer pt-1 block mx-auto"
+            >
+              إغلاق النافذة ✕
             </button>
           </div>
         </div>

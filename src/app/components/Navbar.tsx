@@ -21,11 +21,7 @@ export default function Navbar() {
   // حالة فتح وإغلاق الانضمام من لوحة الأدمن سحابياً
   const [isRegistrationClosed, setIsRegistrationClosed] = useState(false);
   
-  // حالات نافذة الترقية والمباركة الاحتفالية المنفصلة
-  const [promotionMessage, setPromotionMessage] = useState<string | null>(null);
-  const [showPromotionModal, setShowPromotionModal] = useState<boolean>(false);
-  
-  // حالة الأليرت بار القيادي (الإنذارات تحت النافبار)
+  // حالة الأليرت بار القيادي (الإنذارات والتعميمات الخاصة بالقادة تحت النافبار)
   const [leaderAlertMsg, setLeaderAlertMsg] = useState<string | null>(null);
   const [showLeaderAlertBar, setShowLeaderAlertBar] = useState(true);
   
@@ -37,26 +33,6 @@ export default function Navbar() {
   const [passwordInput, setPasswordInput] = useState('');
   const [memberCertificates, setMemberCertificates] = useState<any[]>([]);
   const [searchStatus, setSearchStatus] = useState('');
-
-  const getRolePermissions = (roleName: string) => {
-    switch (roleName) {
-      case 'System Admin':
-        return 'الصلاحيات المطلقة على النظام (التحكم الكامل بجميع الأقسام، حذف ونشر الفعاليات، تعديل وإدارة رتب جميع الأعضاء، استيراد وتصدير بيانات الأكسل، والتحكم بالبانرات والشرائح).';
-      case 'General Supervisor':
-        return 'صلاحيات الإشراف العام على الأنشطة والفعاليات ومتابعة سير العمل في لجان النادي ومراجعة طلبات الأعضاء.';
-      case 'رئيس النادي':
-      case 'رئيسة النادي':
-      case 'نائب رئيس النادي':
-      case 'نائبة رئيس النادي':
-        return 'إدارة شاملة لجميع لجان النادي، متابعة الفعاليات، واعتماد وقبول الأعضاء بكامل الصلاحيات القيادية.';
-      case 'رئيس لجنة / مشرف قسم':
-        return 'إدارة أعضاء اللجنة الخاصة به، متابعة المهام المسندة للجنة، ورفع التقارير والمقترحات.';
-      case 'عضو مميز / منسق':
-        return 'المشاركة الفعالة في تنظيم المبادرات والأنشطة، التنسيق بين الأعضاء، وصلاحيات مساعدة في إدارة بعض المهام.';
-      default:
-        return 'المشاركة في فعاليات النادي، الانضمام للجان والقروبات، والتقديم على الأنشطة والبرامج.';
-    }
-  };
 
   useEffect(() => {
     setMounted(true);
@@ -104,15 +80,12 @@ export default function Navbar() {
           setAssignedCommittee(data.assignedCommittee);
         }
 
+        // رصد التنبيهات القيادية أو الإنذارات الخاصة بالقادة فقط
         if (data.latestNotification) {
           const notifText = data.latestNotification;
-          
           if (notifText.includes('إنذار') || notifText.includes('تنبيه') || notifText.includes('تصعيد') || notifText.includes('الإحالة')) {
             setLeaderAlertMsg(notifText);
             setShowLeaderAlertBar(true);
-          } else {
-            setPromotionMessage(notifText);
-            setShowPromotionModal(true);
           }
         }
       }
@@ -129,18 +102,6 @@ export default function Navbar() {
       await updateDoc(userRef, { lastActive: Date.now() });
     } catch (err) {
       console.error('Error updating presence:', err);
-    }
-  };
-
-  const handleDismissPromotion = async () => {
-    if (!userPhone) return;
-    try {
-      const userRef = doc(db, 'users', userPhone);
-      await updateDoc(userRef, { latestNotification: null });
-      setShowPromotionModal(false);
-      setPromotionMessage(null);
-    } catch (err) {
-      console.error(err);
     }
   };
 
@@ -203,7 +164,6 @@ export default function Navbar() {
 
   if (!mounted) return null;
 
-  // التحقق الشامل للأدمن ورئاسة النادي والنائبات
   const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026') || (userRole === 'System Admin') || (userRole === 'رئيس النادي') || (userRole === 'رئيسة النادي') || (userRole === 'نائب رئيس النادي') || (userRole === 'نائبة رئيس النادي');
   const isCommitteeLeader = userRole && (userRole.includes('رئيس لجنة') || userRole.includes('مشرف') || userRole.includes('General Supervisor'));
   const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || isAdmin;
@@ -212,46 +172,10 @@ export default function Navbar() {
 
   return (
     <>
-      {showPromotionModal && promotionMessage && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
-          <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative">
-            <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl border-4 border-white -mt-14">
-              🎉
-            </div>
-            <div className="space-y-1.5">
-              <h3 className="text-xl font-black text-slate-900">مبارك لك الثقة القيادية!</h3>
-              <p className="text-xs text-slate-500 font-medium">{promotionMessage}</p>
-            </div>
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-1.5 text-right shadow-inner">
-              <span className="text-[11px] font-bold text-slate-400 block">رتبتك القيادية الحالية:</span>
-              <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl py-2 px-4 text-center">
-                <span className="text-base font-black text-[#630517]">{userRole || 'عضو أساسي'}</span>
-              </div>
-            </div>
-            <div className="bg-amber-50/30 border border-amber-200/50 rounded-2xl p-4 space-y-1.5 text-right shadow-sm">
-              <span className="text-[11px] font-bold text-amber-900 block flex items-center gap-1">
-                <span>📜</span> صلاحياتك ومهامك القيادية المعتمدة:
-              </span>
-              <p className="text-xs text-slate-700 font-semibold leading-relaxed">
-                {getRolePermissions(userRole || 'عضو أساسي')}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleDismissPromotion}
-              className="w-full py-3.5 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-sm shadow-lg hover:brightness-110 cursor-pointer transition-all flex items-center justify-center gap-2"
-            >
-              <span>بدء مهام العمل القيادي 🚀</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       <header className={`w-full bg-white border-b border-slate-100 fixed top-0 z-50 transition-transform duration-300 ${showNavbar ? 'translate-y-0' : '-translate-y-full'}`}>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between" dir="rtl">
           
-          {/* شعارات النادي والجامعة بجانب بعضها */}
           <Link href="/" className="flex items-center gap-3 shrink-0" onClick={() => setMobileMenuOpen(false)}>
             <div className="flex items-center gap-2">
               <Image
@@ -325,7 +249,7 @@ export default function Navbar() {
 
                 <button 
                   onClick={handleLogout}
-                  className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1"
+                  className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 cursor-pointer"
                   title="تسجيل خروج"
                 >
                   خروج
@@ -341,7 +265,6 @@ export default function Navbar() {
               </button>
             )}
 
-            {/* زر تقديم الانضمام باللون الذهبي الفاخر (موجه إلى /join) */}
             {!isRegistrationClosed ? (
               <Link
                 href="/join"
@@ -441,7 +364,7 @@ export default function Navbar() {
                   setMobileMenuOpen(false);
                   setShowCertModal(true);
                 }}
-                className="text-right text-amber-800 font-black py-1 flex items-center gap-2"
+                className="text-right text-amber-800 font-black py-1 flex items-center gap-2 cursor-pointer"
               >
                 <span>🎖️</span> استعراض الشهادات
               </button>
@@ -455,7 +378,7 @@ export default function Navbar() {
                       <span className="text-xs font-bold text-rose-950 block truncate max-w-[180px]">👤 {userName}</span>
                       <span className="text-[10px] font-black text-[#630517] block">{userRole || 'عضو أساسي'}</span>
                     </div>
-                    <button onClick={handleLogout} className="text-xs text-red-600 hover:text-red-800 font-bold px-2 py-1">تسجيل خروج</button>
+                    <button onClick={handleLogout} className="text-xs text-red-600 hover:text-red-800 font-bold px-2 py-1 cursor-pointer">تسجيل خروج</button>
                   </div>
 
                   {isAdmin && (
@@ -466,7 +389,7 @@ export default function Navbar() {
 
                   {isCommitteeLeader && !isAdmin && (
                     <Link href="/committee-dashboard" onClick={() => setMobileMenuOpen(false)} className={`w-full py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2 ${isQualityOperationsRoom ? 'bg-rose-950 text-[#F5D061] border border-amber-400' : 'bg-amber-600 text-white'}`}>
-                      <span>{isQualityOperationsRoom ? '⚡' : '🛠️'}</span>
+                      <span>{isQualityOperationsRoom ? '⚡' : '🛠️️'}</span>
                       <span>{isQualityOperationsRoom ? 'غرفة العمليات المركزية' : 'لوحة تحكم اللجنة'}</span>
                     </Link>
                   )}
