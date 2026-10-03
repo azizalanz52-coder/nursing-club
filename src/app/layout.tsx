@@ -37,6 +37,13 @@ export default function RootLayout({
         <meta name="theme-color" content="#630517" />
         <link rel="apple-touch-icon" href="/logo.png" />
         <link rel="icon" href="/logo.png" />
+
+        {/* وسوم ظهور شعار النادي عند مشاركة الرابط في واتساب وسوشيال ميديا */}
+        <meta property="og:title" content="نادي التمريض - جامعة حفر الباطن" />
+        <meta property="og:description" content="مجتمع طلابي يهدف إلى تطوير المعرفة، وبناء المهارات القيادية، وصناعة أثر في مجال التمريض بجامعة حفر الباطن." />
+        <meta property="og:image" content="https://nursing-club.vercel.app/logo.png" />
+        <meta property="og:url" content="https://nursing-club.vercel.app" />
+        <meta property="og:type" content="website" />
       </head>
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-800">
         {isLoading ? (
