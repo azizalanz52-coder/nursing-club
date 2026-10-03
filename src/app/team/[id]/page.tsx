@@ -141,6 +141,9 @@ export default function CommitteeDetailPage() {
   const [mediaBase64, setMediaBase64] = useState('');
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
 
+  // نافذة معاينة الميديا الكبيرة داخل الصفحة
+  const [previewItem, setPreviewItem] = useState<any | null>(null);
+
   useEffect(() => {
     const phone = localStorage.getItem('userPhone') || '';
     const name = localStorage.getItem('userName') || '';
@@ -379,7 +382,7 @@ export default function CommitteeDetailPage() {
     });
   };
 
-  // رفع صورة أو فيديو (خاص بلجنة الإعلام)
+  // رفع صورة أو فيديو (خاص بلجنة الإعلام) - مربوط بقاعدة البيانات المركزية
   const handleUploadMediaSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!mediaTitle.trim() || !mediaBase64) {
@@ -399,10 +402,23 @@ export default function CommitteeDetailPage() {
       setMediaGallery([{ id: docRef.id, ...newObj }, ...mediaGallery]);
       setMediaTitle('');
       setMediaBase64('');
-      alert('تم رفع ونشر المادة الإعلامية وتخزينها سحابياً لتظهر للجميع ولوحة الأدمن بنجاح! 📸🚀');
+      alert('تم رفع ونشر محتوى لجنة الإعلام وتخزينها سحابياً لتظهر للجميع ولوحة الأدمن بنجاح! 📸🚀');
     } catch (err) { 
       console.error(err); 
       alert('حدث خطأ أثناء رفع الملف، يرجى المحاولة مرة أخرى.');
+    }
+  };
+
+  // حذف عنصر ميديا من الأرشيف
+  const handleDeleteMediaItem = async (itemId: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذه المادة الإعلامية نهائياً؟')) return;
+    try {
+      await deleteDoc(doc(db, 'media_committee_gallery', itemId));
+      setMediaGallery(mediaGallery.filter(item => item.id !== itemId));
+      alert('تم حذف المادة الإعلامية بنجاح 🗑️');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء الحذف.');
     }
   };
 
@@ -625,7 +641,7 @@ export default function CommitteeDetailPage() {
           </div>
         )}
 
-        {/* 📸 الخاصية المخصصة: رفع الصور والمقاطع (لجنة الإعلام) - مع عرض المعاينة البصرية المباشرة */}
+        {/* 📸 الخاصية المخصصة: رفع الصور والمقاطع (لجنة الإعلام) - مع عرض المعاينة وزر الحذف */}
         {(id === 'media' || normalizeArabic(committee?.name || '').includes('اعلام') || normalizeArabic(committee?.name || '').includes('إعلام')) && (
           <div className="bg-white rounded-3xl p-8 sm:p-10 border border-purple-200 shadow-xl space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
@@ -699,7 +715,7 @@ export default function CommitteeDetailPage() {
               </div>
             </form>
 
-            {/* عرض أرشيف ومقاطع لجنة الإعلام المرئية مباشرة */}
+            {/* عرض أرشيف ومقاطع لجنة الإعلام المرئية مع أزرار المعاينة والحذف */}
             <div className="space-y-4 pt-4 border-t border-slate-100">
               <h3 className="font-black text-slate-900 text-sm">أرشيف تغطيات لجنة الإعلام ({mediaGallery.length})</h3>
               {mediaGallery.length === 0 ? (
@@ -714,13 +730,30 @@ export default function CommitteeDetailPage() {
                         <p className="text-[10px] text-slate-400">بواسطة: {item.addedBy} ({item.createdAt})</p>
                       </div>
 
-                      {/* عرض الميديا مباشرة (صورة أو فيديو) داخل البطاقة دون الحاجة لفتح روابط خارجية */}
-                      <div className="rounded-xl overflow-hidden border border-slate-200 bg-black/5">
+                      <div className="rounded-xl overflow-hidden border border-slate-200 bg-black/5 relative group h-36">
                         {item.mediaType === 'video' ? (
-                          <video src={item.mediaUrl} controls className="w-full h-40 object-cover" />
+                          <video src={item.mediaUrl} className="w-full h-full object-cover" />
                         ) : (
-                          <img src={item.mediaUrl} alt={item.title} className="w-full h-40 object-cover hover:scale-105 transition-transform" />
+                          <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
                         )}
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewItem(item)}
+                          className="flex-1 py-2 bg-sky-50 text-sky-700 text-center font-bold text-xs rounded-xl border border-sky-200 hover:bg-sky-100 transition-all cursor-pointer"
+                        >
+                          👁️ عرض المعاينة
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMediaItem(item.id)}
+                          className="px-3 py-2 bg-red-50 text-red-600 text-center font-bold text-xs rounded-xl border border-red-200 hover:bg-red-100 transition-all cursor-pointer"
+                          title="حذف المادة"
+                        >
+                          🗑️ حذف
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -784,6 +817,46 @@ export default function CommitteeDetailPage() {
         </div>
 
       </div>
+
+      {/* نافذة معاينة الميديا الكبيرة داخل الصفحة */}
+      {previewItem && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-3xl w-full shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{previewItem.category}</span>
+                <h3 className="font-black text-slate-900 text-lg mt-1">{previewItem.title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewItem(null)}
+                className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center hover:bg-slate-200 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden border max-h-[60vh] flex items-center justify-center bg-black">
+              {previewItem.mediaType === 'video' ? (
+                <video src={previewItem.mediaUrl} controls autoPlay className="max-h-[60vh] w-auto mx-auto" />
+              ) : (
+                <img src={previewItem.mediaUrl} alt={previewItem.title} className="max-h-[60vh] w-auto mx-auto object-contain" />
+              )}
+            </div>
+
+            <div className="flex justify-between items-center text-xs text-slate-500 pt-2">
+              <span>تم الرفع بواسطة: <strong>{previewItem.addedBy}</strong> ({previewItem.createdAt})</span>
+              <button
+                type="button"
+                onClick={() => setPreviewItem(null)}
+                className="px-6 py-2 bg-[#630517] text-[#F5D061] font-bold rounded-xl cursor-pointer"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* نافذة رفع الاعتذار */}
       {showExcuseModal && (
