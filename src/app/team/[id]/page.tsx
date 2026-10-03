@@ -6,6 +6,32 @@ import { useParams } from 'next/navigation';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 
+// دالة ذكية لتطبيع النصوص العربية وتوحيد الهمزات والمسافات
+const normalizeArabic = (str: string) => {
+  if (!str) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[إأآا]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[\u064B-\u065F]/g, '') // إزالة التشكيل
+    .replace(/\s+/g, '');
+};
+
+// دالة ذكية لتطبيع رقم الجوال (إزالة الأصفار الزائدة ورمز الدولة لضمان المطابقة 100%)
+const normalizePhone = (phone: string) => {
+  if (!phone) return '';
+  let cleaned = String(phone).replace(/\D/g, '');
+  if (cleaned.startsWith('966')) {
+    cleaned = cleaned.slice(3);
+  }
+  if (cleaned.startsWith('0')) {
+    cleaned = cleaned.slice(1);
+  }
+  return cleaned;
+};
+
 const defaultCommitteesDetails: Record<string, any> = {
   design: {
     id: 'design',
@@ -152,38 +178,59 @@ export default function CommitteeDetailPage() {
 
         const appsSnap = await getDocs(collection(db, 'applications'));
         let userAuthorized = trimmedPhone === '0553731265';
+        const normUserPhone = normalizePhone(trimmedPhone);
 
         if (!appsSnap.empty) {
           const acceptedFromApps: any[] = [];
           appsSnap.forEach((d) => {
             const data = d.data();
-            const acceptedComm = data.acceptedCommittee || '';
-            const matchesId = acceptedComm.includes(baseDetails.name) || acceptedComm.includes(id) || baseDetails.name.includes(acceptedComm);
-            
-            if (data.status === 'مقبول' && matchesId) {
+            const acceptedComm = data.acceptedCommittee || data.committee || data.assignedCommittee || '';
+            const statusStr = String(data.status || '');
+            const isAccepted = normalizeArabic(statusStr).includes('مقبول') || statusStr === 'مقبول';
+
+            const normAccepted = normalizeArabic(acceptedComm);
+            const normBaseName = normalizeArabic(baseDetails.name);
+            const normId = normalizeArabic(id);
+
+            // مطابقة ذكية تتغلب على اختلاف الهمزات (الإعلام / الاعلام)
+            const matchesId = 
+              normAccepted.includes(normBaseName) || 
+              normBaseName.includes(normAccepted) || 
+              normAccepted.includes(normId) ||
+              normId.includes(normAccepted) ||
+              (id === 'media' && (normAccepted.includes('اعلام') || normAccepted.includes('إعلام'))) ||
+              (id === 'pr' && normAccepted.includes('علاقات')) ||
+              (id === 'design' && normAccepted.includes('تصميم')) ||
+              (id === 'quality' && (normAccepted.includes('جوده') || normAccepted.includes('تطوير'))) ||
+              (id === 'scientific' && normAccepted.includes('علمي')) ||
+              (id === 'hr' && (normAccepted.includes('موارد') || normAccepted.includes('بشري'))) ||
+              (id === 'events-org' && (normAccepted.includes('تنظيم') || normAccepted.includes('فعاليات')));
+
+            if (isAccepted && matchesId) {
               acceptedFromApps.push({
-                name: data.fullName,
+                name: data.fullName || data.name || '',
                 phone: data.phone ? String(data.phone).trim() : '',
                 role: 'عضو أساسي',
                 status: 'نشط ✓',
                 universityId: data.universityId || ''
               });
 
-              if (trimmedPhone !== '' && data.phone && String(data.phone).trim() === trimmedPhone) {
+              const appPhoneNorm = normalizePhone(data.phone);
+              if (normUserPhone !== '' && appPhoneNorm !== '' && appPhoneNorm === normUserPhone) {
                 userAuthorized = true;
               }
             }
           });
 
           if (acceptedFromApps.length > 0) {
-            const existingPhones = new Set(mergedMembers.map((m: any) => m.phone));
-            const uniqueNew = acceptedFromApps.filter(m => !existingPhones.has(m.phone));
+            const existingPhones = new Set(mergedMembers.map((m: any) => normalizePhone(m.phone)));
+            const uniqueNew = acceptedFromApps.filter(m => !existingPhones.has(normalizePhone(m.phone)));
             mergedMembers = [...mergedMembers, ...uniqueNew];
           }
         }
 
-        if (!userAuthorized && trimmedPhone !== '') {
-          const foundInDirect = mergedMembers.some((m: any) => m.phone && String(m.phone).trim() === trimmedPhone);
+        if (!userAuthorized && normUserPhone !== '') {
+          const foundInDirect = mergedMembers.some((m: any) => m.phone && normalizePhone(m.phone) === normUserPhone);
           if (foundInDirect) userAuthorized = true;
         }
 
@@ -231,8 +278,9 @@ export default function CommitteeDetailPage() {
 
     try {
       const updatedMembers = (committee.members || []).map((m: any) => {
-        const memberPhone = m.phone ? String(m.phone).trim() : '';
-        if (currentUserPhone !== '' && memberPhone === currentUserPhone) {
+        const memberPhone = normalizePhone(m.phone);
+        const userNormPhone = normalizePhone(currentUserPhone);
+        if (userNormPhone !== '' && memberPhone === userNormPhone) {
           return {
             ...m,
             targetEvent: selectedEventTitle,
@@ -259,10 +307,18 @@ export default function CommitteeDetailPage() {
     }
   };
 
-  // ربط مهام اللجنة أو مهام الجودة الموجهة إليها
+  // ربط مهام اللجنة أو مهام الجودة الموجهة إليها بشكل ذكي
   const relevantTasks = committeeTasks.filter(t => {
-    const cName = t.committee || '';
-    return committee && (cName.includes(committee.name) || cName.includes('الجودة') || cName.includes('التطوير'));
+    const cName = normalizeArabic(t.committee || '');
+    const commName = normalizeArabic(committee?.name || '');
+    return committee && (
+      cName.includes(commName) || 
+      commName.includes(cName) || 
+      cName.includes(normalizeArabic(id)) ||
+      cName.includes('جوده') || 
+      cName.includes('تطوير') ||
+      (id === 'media' && (cName.includes('اعلام') || cName.includes('إعلام')))
+    );
   });
 
   const handleToggleSubTask = async (taskId: string, subTaskIdx: number) => {
@@ -471,7 +527,7 @@ export default function CommitteeDetailPage() {
         </div>
 
         {/* 🤝 الخاصية المخصصة: سجل الشراكات (تظهر حصرياً لأعضاء لجنة العلاقات العامة) */}
-        {(id === 'pr' || committee?.name?.includes('العلاقات العامة')) && (
+        {(id === 'pr' || normalizeArabic(committee?.name || '').includes('علاقات')) && (
           <div className="bg-white rounded-3xl p-8 sm:p-10 border border-sky-200 shadow-xl space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
@@ -561,8 +617,8 @@ export default function CommitteeDetailPage() {
           </div>
         )}
 
-        {/* 📸 الخاصية المخصصة: رفع الصور والمقاطع (تظهر حصرياً لأعضاء لجنة الإعلام) */}
-        {(id === 'media' || committee?.name?.includes('الإعلام') || committee?.name?.includes('الاعلام')) && (
+        {/* 📸 الخاصية المخصصة: رفع الصور والمقاطع (تظهر حصرياً لأعضاء لجنة الإعلام - تدعم المطابقة الذكية للهمزات) */}
+        {(id === 'media' || normalizeArabic(committee?.name || '').includes('اعلام') || normalizeArabic(committee?.name || '').includes('إعلام')) && (
           <div className="bg-white rounded-3xl p-8 sm:p-10 border border-purple-200 shadow-xl space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
