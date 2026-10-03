@@ -557,7 +557,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // ✅ تم إزالة قيود وضغط الحجم بالكامل لدعم الملفات والفيديوهات الكبيرة جداً بسلاسة تامة
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -598,7 +597,6 @@ export default function AdminDashboard() {
   const [bannerTitle, setBannerTitle] = useState<string>('');
   const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
 
-  // ✅ إضافة حالات تعديل شركاء النجاح والرعاة (Edit Partners)
   const [partners, setPartners] = useState<PartnerItem[]>([]);
   const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
   const [partnerName, setPartnerName] = useState<string>('');
@@ -1311,7 +1309,6 @@ export default function AdminDashboard() {
     });
   };
 
-  // ✅ دعم إضافة وتعديل شركاء النجاح والرعاة بالكامل
   const handleSavePartner = async (e: FormEvent) => {
     e.preventDefault();
     if (!partnerName.trim()) return;
@@ -2721,7 +2718,7 @@ export default function AdminDashboard() {
                           onClick={() => togglePasswordVisibility('0553731265')}
                           className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
                         >
-                          {showPasswords['0553731265'] ? '👁️️‍🗨️' : '👁️'}
+                          {showPasswords['0553731265'] ? '👁‍🗨️' : '👁️'}
                         </button>
                       </div>
                     </td>
@@ -2777,7 +2774,7 @@ export default function AdminDashboard() {
                               onClick={() => togglePasswordVisibility(usr.phone)}
                               className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
                             >
-                              {showPasswords[usr.phone] ? '👁️‍🗨️' : '👁️️'}
+                              {showPasswords[usr.phone] ? '👁️‍🗨️' : '👁'}
                             </button>
                             <button
                               type="button"
@@ -3993,7 +3990,7 @@ export default function AdminDashboard() {
               placeholder="الاسم الكامل الجديد..."
               value={modalInputVal}
               onChange={(e) => setModalInputVal(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-bold text-center text-slate-900 focus:outline-none focus:border-[#630517]"
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-[#630517]"
               required
             />
             <div className="flex gap-3 pt-2">
@@ -4008,7 +4005,7 @@ export default function AdminDashboard() {
                 type="submit"
                 className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
               >
-                حفظ 🚀
+                حفظ التعديل ✏️
               </button>
             </div>
           </form>
@@ -4018,18 +4015,19 @@ export default function AdminDashboard() {
       {modalType === 'phone' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={submitUpdatePhone} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
-            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+            <div className="w-16 h-16 bg-sky-600 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
               📱
             </div>
             <div className="space-y-2 text-center">
               <h3 className="text-xl font-black text-slate-900">تعديل رقم الجوال</h3>
-              <p className="text-xs text-slate-500">أدخل رقم الجوال الجديد:</p>
+              <p className="text-xs text-slate-500">أدخل رقم الجوال الجديد (اسم الدخول):</p>
             </div>
             <input
               type="text"
+              placeholder="05XXXXXXXX"
               value={modalInputVal}
               onChange={(e) => setModalInputVal(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-mono font-bold text-center text-slate-900 focus:outline-none focus:border-[#630517]"
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-sky-600 font-mono"
               dir="ltr"
               required
             />
@@ -4043,9 +4041,9 @@ export default function AdminDashboard() {
               </button>
               <button
                 type="submit"
-                className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
+                className="w-1/2 py-3 rounded-xl bg-sky-600 text-white font-black text-xs shadow hover:bg-sky-700 cursor-pointer"
               >
-                حفظ 🚀
+                تحديث رقم الجوال 🚀
               </button>
             </div>
           </form>
@@ -4055,7 +4053,7 @@ export default function AdminDashboard() {
       {modalType === 'password' && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={submitUpdatePassword} className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-[#F5D061]">
-            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+            <div className="w-16 h-16 bg-amber-600 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
               🔒
             </div>
             <div className="space-y-2 text-center">
@@ -4067,7 +4065,8 @@ export default function AdminDashboard() {
               placeholder="كلمة المرور الجديدة..."
               value={modalInputVal}
               onChange={(e) => setModalInputVal(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-mono font-bold text-center text-slate-900 focus:outline-none focus:border-[#630517]"
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-amber-600 font-mono"
+              dir="ltr"
               required
             />
             <div className="flex gap-3 pt-2">
@@ -4080,9 +4079,9 @@ export default function AdminDashboard() {
               </button>
               <button
                 type="submit"
-                className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
+                className="w-1/2 py-3 rounded-xl bg-amber-600 text-white font-black text-xs shadow hover:bg-amber-700 cursor-pointer"
               >
-                حفظ 🚀
+                تحديث كلمة المرور 🔒
               </button>
             </div>
           </form>
@@ -4090,55 +4089,57 @@ export default function AdminDashboard() {
       )}
 
       {showAcceptModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-black text-slate-900 border-b border-slate-100 pb-3">تأكيد القبول في {acceptedCommittee}</h3>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-emerald-400">
+            <div className="w-16 h-16 bg-emerald-600 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
+              ✅
+            </div>
+            <div className="space-y-2 text-center">
+              <h3 className="text-xl font-black text-slate-900">قبول العضو في اللجنة</h3>
+              <p className="text-xs text-slate-500">اختر اللجنة التي سيتم قبول العضو فيها:</p>
+            </div>
             
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600">تم القبول في لجنة:</label>
+                <label className="text-xs font-bold text-slate-700">اللجنة المقبول بها:</label>
                 <select
                   value={acceptedCommittee}
                   onChange={(e) => handleCommitteeSelectChange(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 bg-white"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-emerald-600"
                 >
-                  <option value="لجنة التصميم">لجنة التصميم</option>
-                  <option value="لجنة الإعلام">لجنة الإعلام</option>
-                  <option value="لجنة تنظيم الفعاليات">لجنة تنظيم الفعاليات</option>
-                  <option value="لجنة الموارد البشرية">لجنة الموارد البشرية</option>
-                  <option value="لجنة العلاقات العامة">لجنة العلاقات العامة</option>
-                  <option value="لجنة المحتوى العلمي">لجنة المحتوى العلمي</option>
-                  <option value="لجنة الجودة والتطوير">لجنة الجودة والتطوير</option>
+                  {committeeNamesList.map((c, idx) => (
+                    <option key={idx} value={c}>{c}</option>
+                  ))}
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-emerald-700">🔗 رابط قروب الواتساب:</label>
+                <label className="text-xs font-bold text-slate-700">رابط قروب الواتساب لهذه اللجنة (يتم سحبه تلقائياً):</label>
                 <input
                   type="text"
-                  placeholder="رابط الواتساب..."
+                  placeholder="https://chat.whatsapp.com/..."
                   value={whatsappLink}
                   onChange={(e) => setWhatsappLink(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm text-slate-900 font-mono focus:outline-none focus:border-emerald-600"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-none focus:border-emerald-600 font-mono"
                   dir="ltr"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setShowAcceptModal(false)}
-                className="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200"
+                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
               >
                 إلغاء
               </button>
               <button
                 type="button"
                 onClick={handleConfirmAcceptRequest}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black hover:bg-emerald-700 shadow-lg cursor-pointer"
+                className="w-1/2 py-3 rounded-xl bg-emerald-600 text-white font-black text-xs shadow hover:bg-emerald-700 cursor-pointer"
               >
-                تأكيد القبول ✅
+                تأكيد القبول وإرسال الإشعار 🚀
               </button>
             </div>
           </div>
