@@ -46,7 +46,7 @@ interface PartnerItem {
   name: string;
   category: string;
   logo: string;
-  websiteUrl?: string; // أُضيف لدعم رابط الشريك أو الراعي
+  websiteUrl?: string;
 }
 
 interface SuggestionItem {
@@ -105,12 +105,22 @@ interface CertificateItem {
   description: string;
 }
 
+interface NewsletterItem {
+  id: string;
+  title: string;
+  category: string;
+  content: string;
+  link?: string;
+  date: string;
+  image: string;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study'>('case-study');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter'>('case-study');
 
   const [isRegistrationClosed, setIsRegistrationClosed] = useState<boolean>(false);
 
@@ -136,6 +146,14 @@ export default function AdminDashboard() {
   const [certCategoryInput, setCertCategoryInput] = useState<string>('شهادة شكر وتقدير');
   const [certImageInput, setCertImageInput] = useState<string>('/logo.png');
   const [certDescInput, setCertDescInput] = useState<string>('');
+
+  const [newsletters, setNewsletters] = useState<NewsletterItem[]>([]);
+  const [editingNewsletterId, setEditingNewsletterId] = useState<string | null>(null);
+  const [newsTitleInput, setNewsTitleInput] = useState<string>('');
+  const [newsCategoryInput, setNewsCategoryInput] = useState<string>('أخبار النادي الأسبوعية');
+  const [newsContentInput, setNewsContentInput] = useState<string>('');
+  const [newsLinkInput, setNewsLinkInput] = useState<string>('');
+  const [newsImageInput, setNewsImageInput] = useState<string>('/logo.png');
 
   const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'name' | 'confirm'>('none');
   const [modalMessage, setModalMessage] = useState<string>('');
@@ -211,6 +229,7 @@ export default function AdminDashboard() {
     fetchHistoricalVault();
     fetchStudentAchievements();
     fetchCertificates();
+    fetchNewsletters();
     fetchCaseSubmissions();
     fetchSiteSettings();
   }, [router]);
@@ -256,7 +275,7 @@ export default function AdminDashboard() {
           try {
             await updateDoc(doc(db, 'case_study_submissions', d.id), { createdAt: finalDate });
           } catch (err) {
-            // تجاهل خطأ التحديث الصامت
+            // تجاهل صامت
           }
         }
         return { id: d.id, ...data, createdAt: finalDate };
@@ -285,6 +304,76 @@ export default function AdminDashboard() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const fetchNewsletters = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'site_newsletters'));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as NewsletterItem[];
+      setNewsletters(list);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveNewsletter = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newsTitleInput.trim() || !newsContentInput.trim()) return;
+
+    const newsId = editingNewsletterId ? editingNewsletterId : Date.now().toString();
+    const updatedNews: NewsletterItem = {
+      id: newsId,
+      title: newsTitleInput.trim(),
+      category: newsCategoryInput,
+      content: newsContentInput.trim(),
+      link: newsLinkInput.trim(),
+      image: newsImageInput,
+      date: new Date().toISOString()
+    };
+
+    try {
+      await setDoc(doc(db, 'site_newsletters', newsId), updatedNews);
+      if (editingNewsletterId) {
+        setNewsletters(newsletters.map(n => n.id === newsId ? updatedNews : n));
+        setModalMessage('تم تحديث وتعديل النشرة الأسبوعية بنجاح سحابياً! ✏️📰');
+      } else {
+        setNewsletters([updatedNews, ...newsletters]);
+        setModalMessage('تم إصدار ونشر النشرة الأسبوعية بنجاح سحابياً للموقع! 📢✨');
+      }
+      setEditingNewsletterId(null);
+      setNewsTitleInput('');
+      setNewsContentInput('');
+      setNewsLinkInput('');
+      setNewsImageInput('/logo.png');
+      setModalType('success');
+    } catch (err) {
+      console.error(err);
+      setModalMessage('حدث خطأ أثناء حفظ النشرة.');
+      setModalType('success');
+    }
+  };
+
+  const handleEditNewsletterClick = (news: NewsletterItem) => {
+    setEditingNewsletterId(news.id);
+    setNewsTitleInput(news.title);
+    setNewsCategoryInput(news.category || 'أخبار النادي الأسبوعية');
+    setNewsContentInput(news.content);
+    setNewsLinkInput(news.link || '');
+    setNewsImageInput(news.image || '/logo.png');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteNewsletter = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من حذف هذه النشرة نهائياً من السحابة؟', async () => {
+      try {
+        await deleteDoc(doc(db, 'site_newsletters', id));
+        setNewsletters(newsletters.filter(n => n.id !== id));
+        setModalMessage('تم حذف النشرة بنجاح.');
+        setModalType('success');
+      } catch (err) {
+        console.error(err);
+      }
+    });
   };
 
   const handleSaveCertificate = async (e: FormEvent) => {
@@ -468,48 +557,12 @@ export default function AdminDashboard() {
     }
   };
 
+  // ✅ تم إزالة قيود وضغط الحجم بالكامل لدعم الملفات والفيديوهات الكبيرة جداً بسلاسة تامة
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      if (file.type.startsWith('video/')) {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (error) => reject(error);
-        return;
-      }
-
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1000;
-          const MAX_HEIGHT = 1000;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.8));
-        };
-        img.onerror = (error) => reject(error);
-      };
+      reader.onload = () => resolve(reader.result as string);
       reader.onerror = (error) => reject(error);
     });
   };
@@ -545,12 +598,13 @@ export default function AdminDashboard() {
   const [bannerTitle, setBannerTitle] = useState<string>('');
   const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
 
-  // تعريفات الشركاء مع حقل رابط الموقع
+  // ✅ إضافة حالات تعديل شركاء النجاح والرعاة (Edit Partners)
   const [partners, setPartners] = useState<PartnerItem[]>([]);
+  const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
   const [partnerName, setPartnerName] = useState<string>('');
   const [partnerCategory, setPartnerCategory] = useState<string>('شريك إستراتيجي');
   const [partnerLogo, setPartnerLogo] = useState<string>('/logo.png');
-  const [partnerWebsiteUrl, setPartnerWebsiteUrl] = useState<string>(''); // حقل الرابط الجديد
+  const [partnerWebsiteUrl, setPartnerWebsiteUrl] = useState<string>('');
 
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [requests, setRequests] = useState<Record<string, any>[]>([]);
@@ -1043,7 +1097,7 @@ export default function AdminDashboard() {
       setModalType('success');
     } catch (err) {
       console.error('Error saving event:', err);
-      setModalMessage('حدث خطأ أثناء رفع الفعالية بالسحابة. تأكد من حجم الملفات وحاول مجدداً.');
+      setModalMessage('حدث خطأ أثناء رفع الفعالية بالسحابة.');
       setModalType('success');
     } finally {
       setIsUploadingDiscover(false);
@@ -1257,31 +1311,48 @@ export default function AdminDashboard() {
     });
   };
 
-  // دالة حفظ الشريك مع دعم رابط الموقع/السوشيال ميديا
-  const handleAddPartner = async (e: FormEvent) => {
+  // ✅ دعم إضافة وتعديل شركاء النجاح والرعاة بالكامل
+  const handleSavePartner = async (e: FormEvent) => {
     e.preventDefault();
     if (!partnerName.trim()) return;
-    const partnerId = Date.now().toString();
-    const newPartner: PartnerItem = {
+    const partnerId = editingPartnerId ? editingPartnerId : Date.now().toString();
+    const updatedPartner: PartnerItem = {
       id: partnerId,
       name: partnerName.trim(),
       category: partnerCategory,
       logo: partnerLogo,
-      websiteUrl: partnerWebsiteUrl.trim() // تخزين الرابط
+      websiteUrl: partnerWebsiteUrl.trim()
     };
 
     try {
-      await setDoc(doc(db, 'site_partners', partnerId), newPartner);
-      setPartners([newPartner, ...partners]);
+      await setDoc(doc(db, 'site_partners', partnerId), updatedPartner);
+      if (editingPartnerId) {
+        setPartners(partners.map((p) => p.id === partnerId ? updatedPartner : p));
+        setModalMessage('تم تحديث وتعديل بيانات الشريك/الراعي بنجاح سحابياً! ✏️🤝');
+      } else {
+        setPartners([updatedPartner, ...partners]);
+        setModalMessage('تم إضافة شريك النجاح بنجاح سحابياً! 🤝');
+      }
+      setEditingPartnerId(null);
       setPartnerName('');
       setPartnerCategory('شريك إستراتيجي');
       setPartnerLogo('/logo.png');
       setPartnerWebsiteUrl('');
-      setModalMessage('تم إضافة شريك النجاح بنجاح سحابياً! 🤝');
       setModalType('success');
     } catch (err) {
       console.error(err);
+      setModalMessage('حدث خطأ أثناء حفظ بيانات الشريك.');
+      setModalType('success');
     }
+  };
+
+  const handleEditPartnerClick = (p: PartnerItem) => {
+    setEditingPartnerId(p.id);
+    setPartnerName(p.name);
+    setPartnerCategory(p.category || 'شريك إستراتيجي');
+    setPartnerLogo(p.logo || '/logo.png');
+    setPartnerWebsiteUrl(p.websiteUrl || '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeletePartner = (id: string) => {
@@ -1562,7 +1633,7 @@ export default function AdminDashboard() {
             UHB
           </span>
           <div>
-            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (سحابي متكامل ☁️)</h1>
+            <h1 className="text-lg font-black text-slate-900">لوحة تحكم نادي التمريض (سحابي متكامل ☁)</h1>
             <p className="text-xs text-slate-500">إدارة اللجان والفعاليات والطلبات سحابياً</p>
           </div>
         </div>
@@ -1653,6 +1724,16 @@ export default function AdminDashboard() {
 
           <button
             type="button"
+            onClick={() => setActiveTab('weekly-newsletter')}
+            className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+              activeTab === 'weekly-newsletter' ? 'bg-purple-700 text-white shadow-md scale-105' : 'bg-purple-50 text-purple-900 border border-purple-200 hover:bg-purple-100'
+            }`}
+          >
+            📰 النشرة الأسبوعية ({newsletters.length})
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('student-achievements')}
             className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
               activeTab === 'student-achievements' ? 'bg-amber-600 text-white shadow-md scale-105' : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
@@ -1726,12 +1807,173 @@ export default function AdminDashboard() {
           ))}
         </div>
 
+        {activeTab === 'weekly-newsletter' && (
+          <div className="space-y-8">
+            <div className="bg-white rounded-3xl p-8 border border-purple-300 shadow-sm space-y-6">
+              <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-purple-900">
+                    {editingNewsletterId ? '✏️ تعديل النشرة الأسبوعية وأخبار التمريض' : '📰 إصدار ونشر نشرة أسبوعية جديدة (أخبار التمريض ومصادر اختبار الهيئة)'}
+                  </h3>
+                  <p className="text-xs text-slate-500">أدخل عنوان النشرة، التصنيف، المحتوى التفصيلي، روابط مفيدة، والصورة البصرية.</p>
+                </div>
+                {editingNewsletterId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingNewsletterId(null);
+                      setNewsTitleInput('');
+                      setNewsContentInput('');
+                      setNewsLinkInput('');
+                      setNewsImageInput('/logo.png');
+                    }}
+                    className="text-xs text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-xl hover:bg-red-100"
+                  >
+                    إلغاء التعديل ✕
+                  </button>
+                )}
+              </div>
+
+              <form onSubmit={handleSaveNewsletter} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">عنوان النشرة أو الخبر</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: النشرة الأسبوعية #4: ملخص فعاليات الشهر ومصادر الهيئة"
+                    value={newsTitleInput}
+                    onChange={(e) => setNewsTitleInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-purple-600"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">تصنيف النشرة</label>
+                  <select
+                    value={newsCategoryInput}
+                    onChange={(e) => setNewsCategoryInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
+                  >
+                    <option value="أخبار النادي الأسبوعية">أخبار النادي الأسبوعية 📢</option>
+                    <option value="مصادر اختبار الهيئة">مصادر اختبار الهيئة 🩺</option>
+                    <option value="تحديثات كلية التمريض">تحديثات كلية التمريض 🏛️</option>
+                    <option value="مقالات وابتكارات">مقالات وابتكارات 💡</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">رابط خارجي مفيد (اختياري)</label>
+                  <input
+                    type="text"
+                    placeholder="https://..."
+                    value={newsLinkInput}
+                    onChange={(e) => setNewsLinkInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 font-mono bg-white focus:outline-none focus:border-purple-600"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">صورة النشرة أو البوستر (📁)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const base64 = await convertFileToBase64(e.target.files[0]);
+                        setNewsImageInput(base64);
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-600 file:text-white cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">محتوى النشرة والتفاصيل</label>
+                  <textarea
+                    rows={4}
+                    placeholder="اكتب تفاصيل النشرة، أبرز الإنجازات، ومصادر اختبار التمريض..."
+                    value={newsContentInput}
+                    onChange={(e) => setNewsContentInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-purple-600 leading-relaxed"
+                    required
+                  />
+                </div>
+
+                <div className="sm:col-span-2 pt-2">
+                  <button
+                    type="submit"
+                    className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer"
+                  >
+                    {editingNewsletterId ? '💾 حفظ التعديلات وتحديث النشرة سحابياً' : '+ إصدار ونشر النشرة الأسبوعية سحابياً للموقع 🚀'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+              <h3 className="text-xl font-black text-slate-900">سجل النشرات الأسبوعية الصادرة ({newsletters.length})</h3>
+              {newsletters.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <p className="text-sm font-bold">لم تتم إضافة أي نشرة أسبوعية حتى الآن.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {newsletters.map((news) => (
+                    <div key={news.id} className="p-6 rounded-2xl border border-purple-200 bg-purple-50/20 shadow-sm flex flex-col justify-between space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <img src={news.image || '/logo.png'} alt={news.title} className="w-14 h-14 rounded-2xl object-cover border-2 border-purple-400 shadow" />
+                          <div>
+                            <span className="text-[10px] bg-purple-200 text-purple-900 px-2.5 py-0.5 rounded-full font-bold inline-block">
+                              {news.category}
+                            </span>
+                            <h4 className="font-black text-slate-900 text-sm mt-1">{news.title}</h4>
+                          </div>
+                        </div>
+                        <p className="text-slate-700 text-xs font-semibold bg-white p-3 rounded-xl border border-purple-100 shadow-inner leading-relaxed">
+                          "{news.content}"
+                        </p>
+                        {news.link && (
+                          <a href={news.link} target="_blank" rel="noopener noreferrer" className="block text-xs text-sky-600 hover:underline font-mono truncate" dir="ltr">
+                            🔗 {news.link}
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="pt-2 border-t border-purple-200 flex justify-between items-center text-[11px]">
+                        <span className="text-slate-400">{new Date(news.date).toLocaleDateString('ar-SA')}</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditNewsletterClick(news)}
+                            className="px-3 py-1 rounded-lg bg-purple-100 text-purple-900 font-bold hover:bg-purple-200 cursor-pointer"
+                          >
+                            تعديل ✏️
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteNewsletter(news.id)}
+                            className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                          >
+                            حذف ✕
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'case-study' && (
           <div className="bg-white rounded-3xl p-8 border border-emerald-300 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-emerald-900">🩺 دراسة الحالة والطلاب المتفاعلون (Case Study Submissions)</h3>
-                <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين، درجاتهم أو نقاطهم، وأرقام جوالاتهم مع إمكانية إضافة بونص، خصم نقاط، أو حذف الشخص من القائمة.</p>
+                <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين، درجاتهم أو نقاطهم، وأرقام جوالاتهم مع إمكانية إضافة بونص، خصم نقاط، أو حذف الشخص.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
                 إجمالي المشاركات: {caseSubmissions.length}
@@ -1751,7 +1993,7 @@ export default function AdminDashboard() {
                       <th className="pb-3">رقم الجوال</th>
                       <th className="pb-3">الدرجة / النقاط</th>
                       <th className="pb-3">تاريخ ووقت المشاركة</th>
-                      <th className="pb-3 text-left pl-2">الإجراءات وصلاحيات النقاط (بونص / خصم / حذف)</th>
+                      <th className="pb-3 text-left pl-2">الإجراءات وصلاحيات النقاط</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1835,7 +2077,7 @@ export default function AdminDashboard() {
                   <h3 className="text-xl font-black text-sky-900">
                     {editingCertId ? '✏️ تعديل بيانات الشهادة المعتمدة' : '📜 إصدار ورفع شهادة شكر أو إنجاز جديدة'}
                   </h3>
-                  <p className="text-xs text-slate-500">أدخل اسم المكرم، رقم الجوال وكلمة المرور الخاصة به (للاستعلام)، عنوان الشهادة، نوع الشهادة، ملف الشهادة أو الصورة، واضغط حفظ.</p>
+                  <p className="text-xs text-slate-500">أدخل اسم المكرم، رقم الجوال وكلمة المرور الخاصة به (للاستعلام)، عنوان الشهادة، ونوعها.</p>
                 </div>
                 {editingCertId && (
                   <button
@@ -1899,7 +2141,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-700">عنوان الشهادة أو الفعالية</label>
                   <input
                     type="text"
-                    placeholder="مثال: شهادة شكر على التنظيم المتميز لملتقى التمريض"
+                    placeholder="مثال: شهادة شكر على التنظيم المتميز"
                     value={certTitleInput}
                     onChange={(e) => setCertTitleInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-sky-600"
@@ -1922,7 +2164,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-3">
-                  <label className="text-xs font-bold text-slate-700">صورة أو ملف الشهادة (📁)</label>
+                  <label className="text-xs font-bold text-slate-700">صورة أو ملف الشهادة (📁 بدون قيود حجمية)</label>
                   <input
                     type="file"
                     accept="image/*,.pdf"
@@ -1940,7 +2182,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-700">وصف أو تفاصيل إضافية للشهادة</label>
                   <textarea
                     rows={2}
-                    placeholder="اكتب تفاصيل تكريم العضو أو مساهمته الفعالة..."
+                    placeholder="اكتب تفاصيل تكريم العضو..."
                     value={certDescInput}
                     onChange={(e) => setCertDescInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-sky-600"
@@ -2020,7 +2262,7 @@ export default function AdminDashboard() {
                   <h3 className="text-xl font-black text-amber-900">
                     {editingAchievementId ? '✏️ تعديل الإنجاز الجماعي أو الفردي' : '🏆 إضافة إنجاز جماعي أو فردي جديد من كلية التمريض'}
                   </h3>
-                  <p className="text-xs text-slate-500">أدخل أسماء الطلبة المشاركين (الفردي أو الجماعي), اسم الجائزة أو التكريم, صورة التكريم, وتفاصيل الإنجاز لعرضها في الصفحة الرئيسية للموقع.</p>
+                  <p className="text-xs text-slate-500">أدخل أسماء الطلبة، اسم الجائزة، صورة التكريم، وتفاصيل الإنجاز لعرضها في الصفحة الرئيسية.</p>
                 </div>
                 {editingAchievementId && (
                   <button
@@ -2044,20 +2286,19 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-700">أسماء الطلبة المشاركين (فردي أو جماعي)</label>
                   <input
                     type="text"
-                    placeholder="مثال: عبد العزيز العنزي, طارق الشمري, محمد القحطاني"
+                    placeholder="مثال: عبد العزيز العنزي, طارق الشمري"
                     value={studentNameInput}
                     onChange={(e) => setStudentNameInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
                     required
                   />
-                  <span className="block text-[10px] text-amber-800 font-semibold">يمكنك كتابة عدة أسماء مفصولة بفواصل للإنجازات الجماعية 👥</span>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">اسم الجائزة أو الإنجاز</label>
                   <input
                     type="text"
-                    placeholder="مثال: المركز الأول في مسار الابتكار الطبي (مشروع ترياق)"
+                    placeholder="مثال: المركز الأول في مسار الابتكار الطبي"
                     value={awardNameInput}
                     onChange={(e) => setAwardNameInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
@@ -2066,7 +2307,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">صورة الإنجاز أو فريق العمل / التكريم (صورة 📁)</label>
+                  <label className="text-xs font-bold text-slate-700">صورة الإنجاز أو فريق العمل / التكريم (📁 بدون قيود حجمية)</label>
                   <input
                     type="file"
                     accept="image/*"
@@ -2084,7 +2325,7 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-700">وصف الإنجاز والتفاصيل</label>
                   <textarea
                     rows={3}
-                    placeholder="اكتب نبذة مختصرة عن الإنجاز الجماعي المفاخر لكلية التمريض..."
+                    placeholder="اكتب نبذة مختصرة عن الإنجاز..."
                     value={achievementDescInput}
                     onChange={(e) => setAchievementDescInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
@@ -2158,8 +2399,8 @@ export default function AdminDashboard() {
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm space-y-6">
               <div className="border-b border-slate-100 pb-4">
-                <h3 className="text-xl font-black text-rose-900">🎥 رفع وتوثيق محتوى لجنة الإعلام (صور وفيديوهات)</h3>
-                <p className="text-xs text-slate-500">خاص برفع التغطيات المرئية والفيديوهات والصور وتخزينها سحابياً لعرضها في المنصة.</p>
+                <h3 className="text-xl font-black text-rose-900">🎥 رفع وتوثيق محتوى لجنة الإعلام (صور وفيديوهات بدون قيود حجمية)</h3>
+                <p className="text-xs text-slate-500">خاص برفع التغطيات المرئية والفيديوهات والصور الكبيرة وتخزينها سحابياً لعرضها في المنصة.</p>
               </div>
 
               <form onSubmit={handleUploadMediaCommitteeContent} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-rose-50/30 p-6 rounded-2xl border border-rose-100">
@@ -2189,7 +2430,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر الملفات (صور وفيديوهات متعددة 📁)</label>
+                  <label className="text-xs font-bold text-slate-700">اختر الملفات والفيديوهات (📁 بدون أي قيود على الحجم)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -2323,7 +2564,7 @@ export default function AdminDashboard() {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">📦 أرشيف التقارير التاريخية (Historical Vault)</h3>
-                <p className="text-xs text-slate-500">سجل كامل ومؤرشف سحابياً لكافة التقارير المعتمدة وتقارير محفظة أدلة الجودة الختامية.</p>
+                <p className="text-xs text-slate-500">سجل كامل ومؤرشف سحابياً لكافة التقارير المعتمدة وتقارير أدلة الجودة.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-bold text-xs">
                 إجمالي المؤرشف: {historicalVaultReports.length}
@@ -2332,7 +2573,7 @@ export default function AdminDashboard() {
 
             {historicalVaultReports.length === 0 ? (
               <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <p className="text-sm font-bold">لا توجد تقارير في الأرشيف التاريخي حتى الآن. سيتم أرشفة البلاغات والتقارير المعتمدة من لجنة الجودة تلقائياً هنا.</p>
+                <p className="text-sm font-bold">لا توجد تقارير في الأرشيف التاريخي حتى الآن.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2372,7 +2613,7 @@ export default function AdminDashboard() {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">🚨 مركز تقارير الجودة (نظام الإنذار والإحالة للرؤساء)</h3>
-                <p className="text-xs text-slate-500">أرسل إنذاراً تحذيرياً أولاً لقائد وقائدة اللجنة، وإذا لم يتجاوبوا قم إحالة البلاغ رسمياً لرئيس ونائبة الرئيس.</p>
+                <p className="text-xs text-slate-500">أرسل إنذاراً تحذيرياً أولاً لقائد وقائدة اللجنة، أو قم بإحالة البلاغ رسمياً لرئيس ونائبة الرئيس.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 font-bold text-xs">
                 إجمالي البلاغات: {escalatedReports.length}
@@ -2480,7 +2721,7 @@ export default function AdminDashboard() {
                           onClick={() => togglePasswordVisibility('0553731265')}
                           className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
                         >
-                          {showPasswords['0553731265'] ? '👁️‍🗨️' : '👁️'}
+                          {showPasswords['0553731265'] ? '👁️️‍🗨️' : '👁️'}
                         </button>
                       </div>
                     </td>
@@ -2536,7 +2777,7 @@ export default function AdminDashboard() {
                               onClick={() => togglePasswordVisibility(usr.phone)}
                               className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
                             >
-                              {showPasswords[usr.phone] ? '👁️‍🗨️' : '👁️'}
+                              {showPasswords[usr.phone] ? '👁️‍🗨️' : '👁️️'}
                             </button>
                             <button
                               type="button"
@@ -2643,7 +2884,7 @@ export default function AdminDashboard() {
         {activeTab === 'discover' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة مع معرض صور وفيديوهات سحابي</h3>
+              <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة مع معرض صور وفيديوهات سحابي (بدون قيود حجمية)</h3>
               <form onSubmit={handleCreateNewDiscoverEvent} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">عنوان الفعالية الجديدة</label>
@@ -2677,7 +2918,7 @@ export default function AdminDashboard() {
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر صور وفيديوهات المعرض (صور وفيديوهات متعددة 📁)</label>
+                  <label className="text-xs font-bold text-slate-700">اختر صور وفيديوهات المعرض (📁 بدون أي قيود على الحجم)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -2776,7 +3017,7 @@ export default function AdminDashboard() {
               <h3 className="text-xl font-black text-slate-900">إدارة صور وعبارات بطاقة "شغف، عطاء، واحترافية" (سحابي)</h3>
               <form onSubmit={handleAddPassionSlide} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر صورة أو فيديو الشريحة من جهازك</label>
+                  <label className="text-xs font-bold text-slate-700">اختر صورة أو فيديو الشريحة من جهازك (بدون قيود حجمية)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -2923,7 +3164,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر بوستر أو فيديو الفعالية من جهازك</label>
+                  <label className="text-xs font-bold text-slate-600">اختر بوستر أو فيديو الفعالية (بدون قيود حجمية)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -3024,7 +3265,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر صورة أو فيديو البانر من جهازك</label>
+                  <label className="text-xs font-bold text-slate-600">اختر صورة أو فيديو البانر (بدون قيود حجمية)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -3086,9 +3327,31 @@ export default function AdminDashboard() {
         {activeTab === 'partners' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">🤝 إضافة شريك نجاح أو راعي جديد (سحابي)</h3>
+              <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">
+                    {editingPartnerId ? '✏️ تعديل بيانات شريك النجاح أو الراعي' : '🤝 إضافة شريك نجاح أو راعي جديد (سحابي)'}
+                  </h3>
+                  <p className="text-xs text-slate-500">قم بتعديل التصنيف، الروابط، أو شعار الشريك بكل مرونة في أي وقت.</p>
+                </div>
+                {editingPartnerId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingPartnerId(null);
+                      setPartnerName('');
+                      setPartnerCategory('شريك إستراتيجي');
+                      setPartnerLogo('/logo.png');
+                      setPartnerWebsiteUrl('');
+                    }}
+                    className="text-xs text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-xl hover:bg-red-100"
+                  >
+                    إلغاء التعديل ✕
+                  </button>
+                )}
+              </div>
               
-              <form onSubmit={handleAddPartner} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <form onSubmit={handleSavePartner} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600">اسم الجهة أو الشريك</label>
                   <input
@@ -3108,19 +3371,19 @@ export default function AdminDashboard() {
                     onChange={(e) => setPartnerCategory(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
                   >
-                    <option value="شريك إستراتيجي">شريك إستراتيجي</option>
-                    <option value="راعي ذهبي">راعي ذهبي</option>
-                    <option value="راعي فضي">راعي فضي</option>
-                    <option value="جهة داعمة">جهة داعمة</option>
+                    <option value="شريك إستراتيجي">شريك إستراتيجي 🌟</option>
+                    <option value="راعي ذهبي">راعي ذهبي 🥇</option>
+                    <option value="راعي فضي">راعي فضي 🥈</option>
+                    <option value="راعي برونزي">راعي برونزي 🥉</option>
+                    <option value="جهة داعمة">جهة داعمة 💎</option>
                   </select>
                 </div>
 
-                {/* حقل رابط الموقع أو السوشيال ميديا الجديد */}
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">رابط الموقع أو السوشيال ميديا (انستغرام / تويتر / موقع إلكتروني)</label>
+                  <label className="text-xs font-bold text-slate-600">رابط الموقع أو السوشيال ميديا</label>
                   <input
                     type="text"
-                    placeholder="https://instagram.com/... أو https://..."
+                    placeholder="https://..."
                     value={partnerWebsiteUrl}
                     onChange={(e) => setPartnerWebsiteUrl(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 font-mono focus:outline-none focus:border-[#630517]"
@@ -3129,7 +3392,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر شعار أو فيديو الشريك من جهازك</label>
+                  <label className="text-xs font-bold text-slate-600">اختر شعار أو فيديو الشريك (📁 بدون قيود حجمية)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -3148,7 +3411,7 @@ export default function AdminDashboard() {
                     type="submit"
                     className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 transition-all cursor-pointer"
                   >
-                    + حفظ ونشر الشريك سحابياً
+                    {editingPartnerId ? '💾 حفظ التعديلات وتحديث الشريك سحابياً' : '+ حفظ ونشر الشريك سحابياً'}
                   </button>
                 </div>
               </form>
@@ -3156,38 +3419,51 @@ export default function AdminDashboard() {
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-4">
               <h3 className="text-xl font-black text-slate-900">الشركاء والرعاة الحاليون بالسحابة ({partners.length})</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {partners.map((p) => {
                   const isVideo = p.logo.startsWith('data:video') || p.logo.includes('.mp4');
                   return (
-                    <div key={p.id} className="p-4 rounded-2xl border border-slate-200 flex flex-col items-center text-center space-y-3 bg-slate-50 relative group">
-                      {isVideo ? (
-                        <video src={p.logo} className="w-16 h-16 object-contain rounded-xl bg-white p-2 shadow-sm" />
-                      ) : (
-                        <img src={p.logo} alt={p.name} className="w-16 h-16 object-contain rounded-xl bg-white p-2 shadow-sm" />
-                      )}
-                      <div>
-                        <h4 className="font-extrabold text-slate-900 text-xs">{p.name}</h4>
-                        <span className="text-[10px] text-[#630517] font-bold bg-[#630517]/10 px-2 py-0.5 rounded-md mt-1 inline-block">{p.category}</span>
-                        {p.websiteUrl && (
-                          <a 
-                            href={p.websiteUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="block text-[10px] text-sky-600 hover:underline mt-1 font-mono truncate max-w-[140px]"
-                            dir="ltr"
-                          >
-                            🔗 {p.websiteUrl}
-                          </a>
+                    <div key={p.id} className="p-4 rounded-2xl border border-slate-200 flex flex-col justify-between space-y-3 bg-slate-50 relative group">
+                      <div className="flex items-center gap-3">
+                        {isVideo ? (
+                          <video src={p.logo} className="w-14 h-14 object-contain rounded-xl bg-white p-1 shadow-sm" />
+                        ) : (
+                          <img src={p.logo} alt={p.name} className="w-14 h-14 object-contain rounded-xl bg-white p-1 shadow-sm" />
                         )}
+                        <div>
+                          <h4 className="font-extrabold text-slate-900 text-xs">{p.name}</h4>
+                          <span className="text-[10px] text-[#630517] font-bold bg-[#630517]/10 px-2 py-0.5 rounded-md mt-1 inline-block">{p.category}</span>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePartner(p.id)}
-                        className="absolute top-2 left-2 bg-red-600 text-white w-6 h-6 rounded-full text-xs font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
-                      >
-                        ✕
-                      </button>
+
+                      {p.websiteUrl && (
+                        <a 
+                          href={p.websiteUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="block text-[10px] text-sky-600 hover:underline font-mono truncate"
+                          dir="ltr"
+                        >
+                          🔗 {p.websiteUrl}
+                        </a>
+                      )}
+
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => handleEditPartnerClick(p)}
+                          className="px-3 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
+                        >
+                          تعديل ✏️
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePartner(p.id)}
+                          className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                        >
+                          حذف ✕
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -3271,7 +3547,7 @@ export default function AdminDashboard() {
                     className="w-full px-4 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/30 text-xs text-slate-900 focus:outline-none focus:border-emerald-600 font-mono"
                     dir="ltr"
                   />
-                  <span className="block text-[11px] text-slate-500">عند قبول أي طالب في هذه اللجنة، سيتم وضع هذا الرابط تلقائياً في رسالة القبول والإشعار بدون كتابته يدوياً! ✨</span>
+                  <span className="block text-[11px] text-slate-500">عند قبول أي طالب في هذه اللجنة، سيتم وضع هذا الرابط تلقائياً في رسالة القبول والإشعار! ✨</span>
                 </div>
               </div>
 
@@ -3286,7 +3562,7 @@ export default function AdminDashboard() {
             </form>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة (تشمل المقبولين في هذه اللجنة تحديداً والأعضاء المضافين)</h4>
+              <h4 className="font-extrabold text-slate-900 text-sm">قائمة الأعضاء المنضمين للجنة</h4>
               
               {(() => {
                 const manualMembers = currentCommittee.members || [];
@@ -3307,7 +3583,7 @@ export default function AdminDashboard() {
                 });
 
                 if (allCombinedMembers.length === 0) {
-                  return <p className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-2xl">لا يوجد أعضاء في هذه اللجنة حتى الآن. قم بقبول أعضاء من صفحة "طلبات الانضمام" ليظهروا هنا تلقائياً!</p>;
+                  return <p className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-2xl">لا يوجد أعضاء في هذه اللجنة حتى الآن.</p>;
                 }
 
                 return (
@@ -3421,7 +3697,7 @@ export default function AdminDashboard() {
                   onClick={() => setRequestSubTab('pending')}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${requestSubTab === 'pending' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                 >
-                  ⏳ المعلقون (لم يقبلوا بعد) ({requests.filter(r => r.status === 'معلق' || !r.status || r.status === 'قيد المراجعة').length})
+                  ⏳ المعلقون ({requests.filter(r => r.status === 'معلق' || !r.status || r.status === 'قيد المراجعة').length})
                 </button>
                 <button
                   type="button"
@@ -3471,7 +3747,7 @@ export default function AdminDashboard() {
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h3 className="text-xl font-black text-slate-900">
-                {requestSubTab === 'accepted' ? 'قائمة الأعضاء المقبولين' : requestSubTab === 'pending' ? 'قائمة الأعضاء المعلقين (الذين لم يقبلوا بعد)' : 'طلبات انضمام الأعضاء (مرتبة أبجدياً 🔤)'} ({filteredRequests.length})
+                طلبات انضمام الأعضاء ({filteredRequests.length})
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs">
@@ -3531,7 +3807,6 @@ export default function AdminDashboard() {
                               type="button"
                               onClick={() => openManualShiftModal(req)}
                               className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer"
-                              title="تحديد وتحويل رغبة الطالب يدويّاً"
                             >
                               🔄 تحويل لرغبة أخرى
                             </button>
@@ -3554,7 +3829,7 @@ export default function AdminDashboard() {
                               onClick={() => handleDeleteRequest(req.id)}
                               className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                             >
-                              {req.status === 'مقبول' ? 'إزالة (طرد) 🗑️' : 'حذف نهائي 🗑️'}
+                              حذف 🗑️
                             </button>
                           </td>
                         </tr>
@@ -3620,8 +3895,8 @@ export default function AdminDashboard() {
               ⚠️
             </div>
             <div className="space-y-2 text-center">
-              <h3 className="text-xl font-black text-slate-900">إرسال إنذار تحذيري قادة ({warningTargetCommittee})</h3>
-              <p className="text-xs text-slate-500">نص الإنذار الذي سيصل للجنة مع مهلة التصحيح:</p>
+              <h3 className="text-xl font-black text-slate-900">إرسال إنذار تحذيري لقادة ({warningTargetCommittee})</h3>
+              <p className="text-xs text-slate-500">نص الإنذار الذي سيصل للجنة:</p>
             </div>
             <textarea
               rows={4}
@@ -3677,7 +3952,7 @@ export default function AdminDashboard() {
               🚨
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black text-slate-900">تأكيد الإحالة للرؤساء</h3>
+              <h3 className="text-xl font-black text-slate-900">تأكيد الإجراء</h3>
               <p className="text-xs text-slate-600 font-medium leading-relaxed">{modalMessage}</p>
             </div>
             <div className="flex gap-3 pt-2">
@@ -3696,7 +3971,7 @@ export default function AdminDashboard() {
                 }}
                 className="w-1/2 py-3 rounded-xl bg-red-600 text-white font-black text-xs shadow hover:bg-red-700 cursor-pointer"
               >
-                تأكيد الإحالة رسمياً ⚖️
+                تأكيد ⚖️
               </button>
             </div>
           </div>
@@ -3733,7 +4008,7 @@ export default function AdminDashboard() {
                 type="submit"
                 className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
               >
-                Submit 🚀
+                حفظ 🚀
               </button>
             </div>
           </form>
@@ -3747,8 +4022,8 @@ export default function AdminDashboard() {
               📱
             </div>
             <div className="space-y-2 text-center">
-              <h3 className="text-xl font-black text-slate-900">تعديل رقم الجوال (اسم الدخول)</h3>
-              <p className="text-xs text-slate-500">أدخل رقم الجوال الجديد بالصيغة الصحيحة:</p>
+              <h3 className="text-xl font-black text-slate-900">تعديل رقم الجوال</h3>
+              <p className="text-xs text-slate-500">أدخل رقم الجوال الجديد:</p>
             </div>
             <input
               type="text"
@@ -3770,7 +4045,7 @@ export default function AdminDashboard() {
                 type="submit"
                 className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
               >
-                Submit 🚀
+                حفظ 🚀
               </button>
             </div>
           </form>
@@ -3785,7 +4060,7 @@ export default function AdminDashboard() {
             </div>
             <div className="space-y-2 text-center">
               <h3 className="text-xl font-black text-slate-900">تعديل كلمة المرور</h3>
-              <p className="text-xs text-slate-500">أدخل كلمة المرور الجديدة للعضو:</p>
+              <p className="text-xs text-slate-500">أدخل كلمة المرور الجديدة:</p>
             </div>
             <input
               type="text"
@@ -3807,7 +4082,7 @@ export default function AdminDashboard() {
                 type="submit"
                 className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
               >
-                Submit 🚀
+                حفظ 🚀
               </button>
             </div>
           </form>
@@ -3838,16 +4113,15 @@ export default function AdminDashboard() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-emerald-700">🔗 رابط قروب الواتساب (مُجلب تلقائياً من إعدادات اللجنة ✨):</label>
+                <label className="text-xs font-bold text-emerald-700">🔗 رابط قروب الواتساب:</label>
                 <input
                   type="text"
-                  placeholder="لم يتم إضافته في إعدادات اللجنة بعد..."
+                  placeholder="رابط الواتساب..."
                   value={whatsappLink}
                   onChange={(e) => setWhatsappLink(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 text-sm text-slate-900 font-mono focus:outline-none focus:border-emerald-600"
                   dir="ltr"
                 />
-                <span className="block text-[10px] text-slate-400">يمكنك تعديله أو إضافة رابط جديد من تبويب "القادة والأعضاء" لكل لجنة.</span>
               </div>
             </div>
 
@@ -3864,7 +4138,7 @@ export default function AdminDashboard() {
                 onClick={handleConfirmAcceptRequest}
                 className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black hover:bg-emerald-700 shadow-lg cursor-pointer"
               >
-                تأكيد القبول وإرسال الرابط ✅
+                تأكيد القبول ✅
               </button>
             </div>
           </div>
