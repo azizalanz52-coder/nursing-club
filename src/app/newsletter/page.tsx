@@ -2,16 +2,19 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { db } from '../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
-// الإصدارات الأسبوعية بأسلوب الجريدة والمجلة الصحفية الفخمة
-const newsletterEditions = [
+// الإصدارات الافتراضية بأسلوب الجريدة والمجلة الصحفية الفخمة (تستخدم كاحتياطي أو بيانات أولية)
+const defaultEditions = [
   {
-    id: 1,
+    id: '1',
     editionName: "الإصدار الأول (#1)",
     theme: "الذكاء الاصطناعي ومستقبل الرعاية الحرجة",
     dateText: "الأسبوع الأول - أكتوبر 2026",
     whoHeadline: "منظمة الصحة العالمية (WHO): تعزيز الكوادر التمريضية في خطوط الدفاع الأولى",
     whoSnippet: "أصدرت منظمة الصحة العالمية تقريراً حديثاً يؤكد أهمية دمج التقنيات الحديثة والتدريب الإكلينيكي المتقدم لرفع كفاءة طواقم التمريض عالمياً لمواجهة الطوارئ.",
+    image: "/logo.png",
     worldNews: [
       {
         tag: "تكنولوجيا الرعاية السريرية",
@@ -40,12 +43,13 @@ const newsletterEditions = [
     ]
   },
   {
-    id: 2,
+    id: '2',
     editionName: "الإصدار الثاني (#2)",
     theme: "إدارة الأزمات والطوارئ في أقسام التمريض",
     dateText: "الأسبوع الثاني - أكتوبر 2026",
     whoHeadline: "منظمة الصحة العالمية (WHO): استراتيجيات خفض الإجهاد المهني للتمريض",
     whoSnippet: "دعت منظمة الصحة العالمية المستشفيات إلى تبني بيئات عمل مرنة تدعم الصحة النفسية للكوادر التمريضية لضمان استدامة جودة الرعاية.",
+    image: "/logo.png",
     worldNews: [
       {
         tag: "طوارئ طبية",
@@ -76,8 +80,56 @@ const newsletterEditions = [
 ];
 
 export default function NewsletterPage() {
+  const [editions, setEditions] = useState<any[]>(defaultEditions);
   const [currentEditionIndex, setCurrentEditionIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState({ days: 6, hours: 23, minutes: 59, seconds: 59 });
+
+  // جلب النشرات المحدثة سحابياً من Firebase Firestore
+  useEffect(() => {
+    const fetchCloudNewsletters = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'site_newsletters'));
+        if (!snap.empty) {
+          const cloudEditions = snap.docs.map(docSnap => {
+            const data = docSnap.data();
+            return {
+              id: docSnap.id,
+              editionName: data.title || data.editionName || "الإصدار الأسبوعي",
+              theme: data.category || data.theme || "أخبار النادي ومصادر الهيئة",
+              dateText: data.date ? new Date(data.date).toLocaleDateString('ar-SA') : "أكتوبر 2026",
+              whoHeadline: data.whoHeadline || data.title || "تحديثات كلية التمريض بجامعة حفر الباطن",
+              whoSnippet: data.content || data.whoSnippet || "متابعة مستمرة لأحدث الفعاليات والأنشطة الإكلينيكية ومصادر الاختبارات.",
+              image: data.image || "/logo.png",
+              worldNews: data.worldNews || [
+                {
+                  tag: data.category || "أخبار النادي",
+                  title: data.title || "نشاط أسبوعي متميز",
+                  desc: data.content || "تفاصيل الخبر والنشرة الأسبوعية المحدثة."
+                }
+              ],
+              sleGuide: data.sleGuide || {
+                title: "دليل اجتياز اختبار الهيئة السعودية (SLE)",
+                tips: [
+                  "التركيز على بنوك الأسئلة والمراجع المعتمدة.",
+                  "إتقان حساب الجرعات الدوائية وحالات الطوارئ.",
+                  "المراجعة المستمرة للتجميعات الرسمية."
+                ],
+                sources: ["Saunders Comprehensive Review", "تجميعات هيئة التخصصات الصحية"]
+              },
+              clinicalBasics: data.clinicalBasics || [
+                { title: "التقييم الشامل والأسس الإكلينيكية", desc: "تطبيق المعايير التمريضية المبنية على البراهين والأدلة السريرية." }
+              ]
+            };
+          });
+          setEditions(cloudEditions);
+        }
+      } catch (err) {
+        console.error("Error fetching cloud newsletters:", err);
+      }
+    };
+
+    fetchCloudNewsletters();
+  }, []);
 
   // عداد تنازلي تجديدي تفاعلي كل 7 أيام
   useEffect(() => {
@@ -92,7 +144,7 @@ export default function NewsletterPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const activeEdition = newsletterEditions[currentEditionIndex];
+  const activeEdition = editions[currentEditionIndex] || editions[0];
 
   return (
     <main className="min-h-screen bg-[#F4F1EA] text-neutral-950 selection:bg-[#630517] selection:text-[#F4F1EA] py-8 px-4 sm:px-6 font-serif" dir="rtl">
@@ -114,7 +166,7 @@ export default function NewsletterPage() {
             <div className="flex justify-between items-center text-xs font-sans font-bold text-neutral-600 uppercase tracking-widest px-2 border-b border-neutral-900 pb-2">
               <span>جامعة حفر الباطن • كلية التمريض</span>
               <span className="text-[#630517] font-black">{activeEdition.editionName}</span>
-              <span>الجريدة الأسبوعية الرسمية</span>
+              <span>الجريدة الأسبوعية الرسمية ☁</span>
             </div>
 
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-[#630517] uppercase py-3 border-y-2 border-neutral-900 my-2 bg-[#F4F1EA]">
@@ -134,13 +186,15 @@ export default function NewsletterPage() {
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setCurrentEditionIndex(prev => (prev === 0 ? 1 : 0))}
-                className="px-5 py-2 bg-[#630517] text-[#F5D061] font-black font-sans text-xs shadow hover:bg-neutral-900 transition-all cursor-pointer border border-neutral-900"
-              >
-                🔄 تبديل الإصدار (عرض {currentEditionIndex === 0 ? "الإصدار الثاني (#2)" : "الإصدار الأول (#1)"})
-              </button>
+              {editions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setCurrentEditionIndex(prev => (prev + 1) % editions.length)}
+                  className="px-5 py-2 bg-[#630517] text-[#F5D061] font-black font-sans text-xs shadow hover:bg-neutral-900 transition-all cursor-pointer border border-neutral-900"
+                >
+                  🔄 تبديل الإصدار ({currentEditionIndex + 1} / {editions.length})
+                </button>
+              )}
             </div>
 
             <div className="pt-1">
@@ -164,12 +218,19 @@ export default function NewsletterPage() {
               <span className="text-xs font-sans font-bold text-neutral-600">تحديثات المنظمة العالمية • {activeEdition.dateText}</span>
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 font-serif leading-snug">
-              {activeEdition.whoHeadline}
-            </h2>
-            <p className="text-neutral-800 text-xs sm:text-sm leading-relaxed font-serif text-justify">
-              {activeEdition.whoSnippet}
-            </p>
+            <div className="flex flex-col md:flex-row gap-6 items-center">
+              {activeEdition.image && (
+                <img src={activeEdition.image} alt="صورة النشرة" className="w-full md:w-48 h-40 object-cover border-2 border-neutral-900 shadow" />
+              )}
+              <div className="space-y-3 flex-1">
+                <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 font-serif leading-snug">
+                  {activeEdition.whoHeadline}
+                </h2>
+                <p className="text-neutral-800 text-xs sm:text-sm leading-relaxed font-serif text-justify">
+                  {activeEdition.whoSnippet}
+                </p>
+              </div>
+            </div>
           </section>
 
           {/* تخطيط الأعمدة المزدوجة (أخبار التمريض العالمية + الركائز والأسس) */}
@@ -185,7 +246,7 @@ export default function NewsletterPage() {
                   <p className="text-[11px] text-neutral-600 font-sans mt-1">أحدث المستجدات والابتكارات في قطاع الرعاية الصحية والتمريض.</p>
                 </div>
                 <div className="space-y-4 pt-2">
-                  {activeEdition.worldNews.map((news, idx) => (
+                  {activeEdition.worldNews?.map((news: any, idx: number) => (
                     <div key={idx} className="border-b border-neutral-300 pb-4 space-y-2 last:border-0">
                       <span className="text-[10px] bg-neutral-900 text-[#F5D061] px-2 py-0.5 font-bold font-sans inline-block">{news.tag}</span>
                       <h4 className="font-extrabold text-neutral-900 text-sm font-serif">{news.title}</h4>
@@ -206,7 +267,7 @@ export default function NewsletterPage() {
                   <p className="text-[11px] text-neutral-600 font-sans mt-1">معايير ممارسة مهنة التمريض المبنية على الأدلة والبراهين السريرية.</p>
                 </div>
                 <div className="space-y-4 pt-2">
-                  {activeEdition.clinicalBasics.map((item, idx) => (
+                  {activeEdition.clinicalBasics?.map((item: any, idx: number) => (
                     <div key={idx} className="border-b border-neutral-300 pb-4 space-y-1.5 last:border-0">
                       <h4 className="font-extrabold text-[#630517] text-xs font-serif">{item.title}</h4>
                       <p className="text-xs text-neutral-700 leading-normal">{item.desc}</p>
@@ -223,7 +284,7 @@ export default function NewsletterPage() {
             <div className="flex items-center gap-3 border-b border-neutral-700 pb-3 flex-wrap">
               <span className="w-10 h-10 bg-[#F5D061] text-[#630517] flex items-center justify-center text-xl font-bold border border-neutral-900">🎯</span>
               <div>
-                <h2 className="text-xl sm:text-2xl font-black font-serif text-[#F5D061]">{activeEdition.sleGuide.title}</h2>
+                <h2 className="text-xl sm:text-2xl font-black font-serif text-[#F5D061]">{activeEdition.sleGuide?.title}</h2>
                 <p className="text-xs text-neutral-300 font-sans">استراتيجيات ومراجع موثوقة لاجتياز اختبار رخصة المهنة من المحاولة الأولى.</p>
               </div>
             </div>
@@ -232,7 +293,7 @@ export default function NewsletterPage() {
               <div className="border border-neutral-700 p-5 bg-neutral-800/90 space-y-3">
                 <h3 className="font-bold text-[#F5D061] text-xs font-sans">💡 استراتيجيات التفوق والأسرار:</h3>
                 <ul className="space-y-2 list-disc list-inside text-neutral-200">
-                  {activeEdition.sleGuide.tips.map((tip, i) => (
+                  {activeEdition.sleGuide?.tips?.map((tip: string, i: number) => (
                     <li key={i}>{tip}</li>
                   ))}
                 </ul>
@@ -241,7 +302,7 @@ export default function NewsletterPage() {
               <div className="border border-neutral-700 p-5 bg-neutral-800/90 space-y-3">
                 <h3 className="font-bold text-[#F5D061] text-xs font-sans">📚 المراجع والمصادر الموصى بها:</h3>
                 <ul className="space-y-2 list-disc list-inside text-neutral-200">
-                  {activeEdition.sleGuide.sources.map((src, i) => (
+                  {activeEdition.sleGuide?.sources?.map((src: string, i: number) => (
                     <li key={i}><strong>{src}</strong></li>
                   ))}
                 </ul>
@@ -253,7 +314,7 @@ export default function NewsletterPage() {
 
         {/* --- تذييل الجريدة (Footer) --- */}
         <footer className="border-t-2 border-neutral-900 mt-10 pt-4 text-center font-sans text-[11px] text-neutral-600 space-y-1 relative z-10">
-          <p className="font-bold text-neutral-900">نادي كلية التمريض • جامعة حفر الباطن • الإصدار الرقمي الموثق</p>
+          <p className="font-bold text-neutral-900">نادي كلية التمريض • جامعة حفر الباطن • الإصدار الرقمي الموثق سحابياً ☁</p>
           <p>جميع الحقوق محفوظة © 2026 | النشرة الأسبوعية الصحفية</p>
         </footer>
 
