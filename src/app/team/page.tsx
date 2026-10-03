@@ -5,6 +5,32 @@ import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
+// دالة ذكية لتطبيع النصوص العربية وتوحيد الهمزات والمسافات
+const normalizeArabic = (str: string) => {
+  if (!str) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[إأآا]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[\u064B-\u065F]/g, '') // إزالة التشكيل
+    .replace(/\s+/g, '');
+};
+
+// دالة ذكية لتطبيع رقم الجوال لضمان مطابقة دقيقة 100%
+const normalizePhone = (phone: string) => {
+  if (!phone) return '';
+  let cleaned = String(phone).replace(/\D/g, '');
+  if (cleaned.startsWith('966')) {
+    cleaned = cleaned.slice(3);
+  }
+  if (cleaned.startsWith('0')) {
+    cleaned = cleaned.slice(1);
+  }
+  return cleaned;
+};
+
 const leaders = [
   { name: "عبدالله محمد المطيري", position: "رئيس النادي" },
   { name: "اريام محمد الجبو", position: "نائب رئيس النادي" },
@@ -15,10 +41,32 @@ const initialCommittees = [
   { id: 'media', name: 'الاعلام', description: 'منصات التواصل، التغطيات الحية، وصناعة المحتوى.', icon: '📸', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري' },
   { id: 'events-org', name: 'تنظيم الفعاليات', description: 'التخطيط الميداني، إدارة الحشود، والفعاليات.', icon: '📅', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري' },
   { id: 'hr', name: 'الموارد البشرية', description: 'إدارة الأعضاء، المتابعة، والتقييم والتحفيز.', icon: '👥', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي' },
-  { id: 'pr', name: 'العلاقات العامة', description: 'بناء الشراكات،  ، والتنسيق الخارجي.', icon: '🌐', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي' },
-  { id: 'scientific', name: 'المحتوى العلمي', description: '، المحاضرات، والدعم الأكاديمي.', icon: '🔬', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي' },
+  { id: 'pr', name: 'العلاقات العامة', description: 'بناء الشراكات، والتنسيق الخارجي.', icon: '🌐', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي' },
+  { id: 'scientific', name: 'المحتوى العلمي', description: 'المحاضرات، والدعم الأكاديمي.', icon: '🔬', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي' },
   { id: 'quality', name: 'الجودة والتطوير', description: 'تقييم الأداء، قياس رضا الأعضاء، وتحسين العمل.', icon: '📊', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري' },
 ];
+
+// دالة مطابقة ذكية وشاملة للجان تتغلب على اختلاف الهمزات والتسميات
+const isCommitteeMatch = (acceptedComm: string, comm: { id: string, name: string }) => {
+  const normAcc = normalizeArabic(acceptedComm);
+  const normName = normalizeArabic(comm.name);
+  const normId = normalizeArabic(comm.id);
+
+  if (comm.id === 'media' && (normAcc.includes('اعلام') || normAcc.includes('إعلام'))) return true;
+  if (comm.id === 'pr' && normAcc.includes('علاقات')) return true;
+  if (comm.id === 'design' && normAcc.includes('تصميم')) return true;
+  if (comm.id === 'quality' && (normAcc.includes('جوده') || normAcc.includes('تطوير'))) return true;
+  if (comm.id === 'scientific' && normAcc.includes('علمي')) return true;
+  if (comm.id === 'hr' && (normAcc.includes('موارد') || normAcc.includes('بشري'))) return true;
+  if (comm.id === 'events-org' && (normAcc.includes('تنظيم') || normAcc.includes('فعاليات'))) return true;
+
+  return (
+    normAcc.includes(normName) || 
+    normName.includes(normAcc) || 
+    normAcc.includes(normId) || 
+    normId.includes(normAcc)
+  );
+};
 
 export default function TeamPage() {
   const [committees, setCommittees] = useState(initialCommittees);
@@ -56,7 +104,9 @@ export default function TeamPage() {
 
   const handleMemberPortalClick = async (e: React.MouseEvent) => {
     e.preventDefault();
-    const phone = (localStorage.getItem('userPhone') || '').trim();
+    const rawPhone = localStorage.getItem('userPhone') || '';
+    const phone = rawPhone.trim();
+    const normUserPhone = normalizePhone(phone);
 
     if (!phone) {
       setAlertMessage('يرجى تسجيل الدخول برقم الجوال أولاً من الصفحة الرئيسية للوصول إلى بوابتك الخاصة.');
@@ -64,7 +114,7 @@ export default function TeamPage() {
       return;
     }
 
-    if (phone === '0553731265') {
+    if (phone === '0553731265' || normUserPhone === '553731265') {
       window.location.href = '/team/design';
       return;
     }
@@ -77,10 +127,13 @@ export default function TeamPage() {
         appsSnap.forEach((d) => {
           const data = d.data();
           const dataPhone = data.phone ? String(data.phone).trim() : '';
-          if (dataPhone === phone && data.status === 'مقبول') {
-            const acceptedComm = data.acceptedCommittee || '';
+          const statusStr = String(data.status || '');
+          const isAccepted = normalizeArabic(statusStr).includes('مقبول') || statusStr === 'مقبول';
+
+          if (normalizePhone(dataPhone) === normUserPhone && isAccepted) {
+            const acceptedComm = data.acceptedCommittee || data.committee || data.assignedCommittee || '';
             for (const comm of initialCommittees) {
-              if (acceptedComm.includes(comm.name) || acceptedComm.includes(comm.id) || comm.name.includes(acceptedComm)) {
+              if (isCommitteeMatch(acceptedComm, comm)) {
                 targetCommitteeId = comm.id;
               }
             }
@@ -103,8 +156,10 @@ export default function TeamPage() {
 
   const handleCommitteeClick = async (e: React.MouseEvent, committee: any) => {
     e.preventDefault();
-    const phone = (localStorage.getItem('userPhone') || '').trim();
-    const isAdmin = phone === '0553731265';
+    const rawPhone = localStorage.getItem('userPhone') || '';
+    const phone = rawPhone.trim();
+    const normUserPhone = normalizePhone(phone);
+    const isAdmin = phone === '0553731265' || normUserPhone === '553731265';
 
     if (!phone) {
       setAlertMessage('يجب تسجيل الدخول برقم الجوال أولاً للوصول إلى بوابة الأعضاء.');
@@ -125,10 +180,13 @@ export default function TeamPage() {
         appsSnap.forEach((d) => {
           const data = d.data();
           const dataPhone = data.phone ? String(data.phone).trim() : '';
-          const acceptedComm = data.acceptedCommittee || '';
-          const matchesComm = acceptedComm.includes(committee.name) || acceptedComm.includes(committee.id) || committee.name.includes(acceptedComm);
+          const acceptedComm = data.acceptedCommittee || data.committee || data.assignedCommittee || '';
+          const statusStr = String(data.status || '');
+          const isAccepted = normalizeArabic(statusStr).includes('مقبول') || statusStr === 'مقبول';
 
-          if (dataPhone === phone && data.status === 'مقبول' && matchesComm) {
+          const matchesComm = isCommitteeMatch(acceptedComm, committee);
+
+          if (normalizePhone(dataPhone) === normUserPhone && isAccepted && matchesComm) {
             isAuthorized = true;
           }
         });
