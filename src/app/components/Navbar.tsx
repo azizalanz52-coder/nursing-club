@@ -80,6 +80,12 @@ export default function Navbar() {
           setAssignedCommittee(data.assignedCommittee);
         }
 
+        // تحديث الاسم فوراً في الحالة والـ localStorage سحابياً عند أي تعديل من الأدمن
+        if (data.fullName) {
+          setUserName(data.fullName);
+          localStorage.setItem('userName', data.fullName);
+        }
+
         // رصد التنبيهات القيادية أو الإنذارات الخاصة بالقادة فقط
         if (data.latestNotification) {
           const notifText = data.latestNotification;
@@ -237,7 +243,7 @@ export default function Navbar() {
                         : 'bg-amber-600 text-white hover:bg-amber-700'
                     }`}
                   >
-                    <span>{isQualityOperationsRoom ? '⚡' : '🛠️'}</span>
+                    <span>{isQualityOperationsRoom ? '⚡' : '🛠️️'}</span>
                     <span>{isQualityOperationsRoom ? 'غرفة العمليات المركزية' : 'لوحة اللجنة'}</span>
                   </Link>
                 )}
@@ -389,7 +395,7 @@ export default function Navbar() {
 
                   {isCommitteeLeader && !isAdmin && (
                     <Link href="/committee-dashboard" onClick={() => setMobileMenuOpen(false)} className={`w-full py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2 ${isQualityOperationsRoom ? 'bg-rose-950 text-[#F5D061] border border-amber-400' : 'bg-amber-600 text-white'}`}>
-                      <span>{isQualityOperationsRoom ? '⚡' : '🛠️️'}</span>
+                      <span>{isQualityOperationsRoom ? '⚡' : '🛠'}</span>
                       <span>{isQualityOperationsRoom ? 'غرفة العمليات المركزية' : 'لوحة تحكم اللجنة'}</span>
                     </Link>
                   )}
