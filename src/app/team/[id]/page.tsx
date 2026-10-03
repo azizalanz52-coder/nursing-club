@@ -19,7 +19,7 @@ const normalizeArabic = (str: string) => {
     .replace(/\s+/g, '');
 };
 
-// دالة ذكية لتطبيع رقم الجوال (إزالة الأصفار الزائدة ورمز الدولة لضمان المطابقة 100%)
+// دالة ذكية لتطبيع رقم الجوال لضمان مطابقة دقيقة 100%
 const normalizePhone = (phone: string) => {
   if (!phone) return '';
   let cleaned = String(phone).replace(/\D/g, '');
@@ -137,8 +137,9 @@ export default function CommitteeDetailPage() {
   // خصائص لجنة الإعلام (رفع الصور ومقاطع الفيديو)
   const [mediaGallery, setMediaGallery] = useState<any[]>([]);
   const [mediaTitle, setMediaTitle] = useState('');
-  const [mediaCategory, setMediaCategory] = useState('تغطية فعالية');
-  const [mediaBase64, setMediaBase64] = useState('/header-banner.png');
+  const [mediaCategory, setMediaCategory] = useState('تغطيات مرئية وفيديوهات 🎥');
+  const [mediaBase64, setMediaBase64] = useState('');
+  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone') || '';
@@ -381,11 +382,15 @@ export default function CommitteeDetailPage() {
   // رفع صورة أو فيديو (خاص بلجنة الإعلام)
   const handleUploadMediaSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!mediaTitle.trim()) return;
+    if (!mediaTitle.trim() || !mediaBase64) {
+      alert('يرجى كتابة عنوان التغطية واختيار ملف الصورة أو الفيديو.');
+      return;
+    }
     const newObj = {
       title: mediaTitle.trim(),
       category: mediaCategory,
-      imageUrl: mediaBase64,
+      mediaUrl: mediaBase64,
+      mediaType: mediaType,
       createdAt: new Date().toLocaleDateString('ar-SA'),
       addedBy: currentUserName || 'عضو الإعلام'
     };
@@ -393,9 +398,12 @@ export default function CommitteeDetailPage() {
       const docRef = await addDoc(collection(db, 'media_committee_gallery'), newObj);
       setMediaGallery([{ id: docRef.id, ...newObj }, ...mediaGallery]);
       setMediaTitle('');
-      setMediaBase64('/header-banner.png');
-      alert('تم رفع ونشر المادة الإعلامية سحابياً لتصل للأدمن والرؤساء بنجاح! 📸🚀');
-    } catch (err) { console.error(err); }
+      setMediaBase64('');
+      alert('تم رفع ونشر المادة الإعلامية وتخزينها سحابياً لتظهر للجميع ولوحة الأدمن بنجاح! 📸🚀');
+    } catch (err) { 
+      console.error(err); 
+      alert('حدث خطأ أثناء رفع الملف، يرجى المحاولة مرة أخرى.');
+    }
   };
 
   if (!baseDetails) {
@@ -617,13 +625,13 @@ export default function CommitteeDetailPage() {
           </div>
         )}
 
-        {/* 📸 الخاصية المخصصة: رفع الصور والمقاطع (تظهر حصرياً لأعضاء لجنة الإعلام - تدعم المطابقة الذكية للهمزات) */}
+        {/* 📸 الخاصية المخصصة: رفع الصور والمقاطع (لجنة الإعلام) - مع عرض المعاينة البصرية المباشرة */}
         {(id === 'media' || normalizeArabic(committee?.name || '').includes('اعلام') || normalizeArabic(committee?.name || '').includes('إعلام')) && (
           <div className="bg-white rounded-3xl p-8 sm:p-10 border border-purple-200 shadow-xl space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h2 className="text-xl font-black text-slate-900">📸 مركز رفع ونشر الصور ومقاطع الفيديو (لجنة الإعلام)</h2>
-                <p className="text-xs text-slate-500 mt-1">ارفع تغطيات الفعاليات والمقاطع لتصل مباشرة إلى لوحة الأدمن ومكتب الرؤساء:</p>
+                <h2 className="text-xl font-black text-slate-900">📸 مركز رفع وتوثيق محتوى لجنة الإعلام (صور ومقاطع فيديو بدون قيود حجمية)</h2>
+                <p className="text-xs text-slate-500 mt-1">خاص برفع التغطيات المرئية والفيديوهات والصور الكبيرة وتخزينها سحابياً لعرضها في المنصة.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
                 إجمالي المواد: {mediaGallery.length}
@@ -633,10 +641,10 @@ export default function CommitteeDetailPage() {
             {/* نموذج رفع المادة */}
             <form onSubmit={handleUploadMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">عنوان الصورة أو المقطع</label>
+                <label className="text-xs font-bold text-slate-700">عنوان التغطية أو الفعالية</label>
                 <input
                   type="text"
-                  placeholder="مثال: تغطية ورشة الإسعافات الأولية"
+                  placeholder="مثال: تغطية ملتقى التمريض المرئي"
                   value={mediaTitle}
                   onChange={(e) => setMediaTitle(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
@@ -644,47 +652,80 @@ export default function CommitteeDetailPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">التصنيف الإعلامي</label>
+                <label className="text-xs font-bold text-slate-700">تصنيف المحتوى</label>
                 <select
                   value={mediaCategory}
                   onChange={(e) => setMediaCategory(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
                 >
-                  <option value="تغطية فعالية">تغطية فعالية</option>
-                  <option value="صور ومقاطع">صور ومقاطع أرشيفية</option>
+                  <option value="تغطيات مرئية وفيديوهات 🎥">تغطيات مرئية وفيديوهات 🎥</option>
+                  <option value="صور فعاليات وتوثيق 📸">صور فعاليات وتوثيق 📸</option>
+                  <option value="تصاميم وبوسترات 🎨">تصاميم وبوسترات 🎨</option>
                 </select>
               </div>
               <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-bold text-slate-700">اختر ملف الصورة أو الفيديو من جهازك</label>
+                <label className="text-xs font-bold text-slate-700">اختر الملفات والفيديوهات (📁 بدون أي قيود على الحجم)</label>
                 <input
                   type="file"
                   accept="image/*,video/*"
                   onChange={async (e: ChangeEvent<HTMLInputElement>) => {
                     if (e.target.files && e.target.files[0]) {
-                      setMediaBase64(await convertFileToBase64(e.target.files[0]));
+                      const file = e.target.files[0];
+                      setMediaType(file.type.startsWith('video') ? 'video' : 'image');
+                      setMediaBase64(await convertFileToBase64(file));
                     }
                   }}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white cursor-pointer"
                   required
                 />
               </div>
+
+              {/* معاينة فورية للملف المختار قبل الرفع */}
+              {mediaBase64 && (
+                <div className="sm:col-span-2 p-4 bg-white rounded-2xl border border-purple-200 space-y-2">
+                  <span className="text-xs font-bold text-purple-800">👁️ معاينة الملف قبل النشر:</span>
+                  {mediaType === 'video' ? (
+                    <video src={mediaBase64} controls className="w-full h-48 object-cover rounded-xl border" />
+                  ) : (
+                    <img src={mediaBase64} alt="معاينة" className="w-full h-48 object-cover rounded-xl border" />
+                  )}
+                </div>
+              )}
+
               <div className="sm:col-span-2 pt-2">
                 <button type="submit" className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer">
-                  + رفع ونشر المواد سحابياً (تصل للأدمن والرؤساء) 🎬
+                  + رفع ونشر محتوى لجنة الإعلام سحابياً 🎬
                 </button>
               </div>
             </form>
 
-            {/* عرض الميديا المرفوعة */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
-              {mediaGallery.map((item) => (
-                <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                  <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{item.category}</span>
-                  <h5 className="font-extrabold text-slate-900 text-xs">{item.title}</h5>
-                  <p className="text-[10px] text-slate-400">بواسطة: {item.addedBy} ({item.createdAt})</p>
-                  <a href={item.imageUrl} target="_blank" rel="noopener noreferrer" className="block w-full py-1.5 bg-sky-50 text-sky-700 text-center font-bold text-xs rounded-lg">عرض المعاينة 👁️</a>
+            {/* عرض أرشيف ومقاطع لجنة الإعلام المرئية مباشرة */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <h3 className="font-black text-slate-900 text-sm">أرشيف تغطيات لجنة الإعلام ({mediaGallery.length})</h3>
+              {mediaGallery.length === 0 ? (
+                <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لم يتم رفع أي محتوى مرئي أو صور للجنة الإعلام حتى الآن.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                  {mediaGallery.map((item) => (
+                    <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{item.category}</span>
+                        <h5 className="font-extrabold text-slate-900 text-sm">{item.title}</h5>
+                        <p className="text-[10px] text-slate-400">بواسطة: {item.addedBy} ({item.createdAt})</p>
+                      </div>
+
+                      {/* عرض الميديا مباشرة (صورة أو فيديو) داخل البطاقة دون الحاجة لفتح روابط خارجية */}
+                      <div className="rounded-xl overflow-hidden border border-slate-200 bg-black/5">
+                        {item.mediaType === 'video' ? (
+                          <video src={item.mediaUrl} controls className="w-full h-40 object-cover" />
+                        ) : (
+                          <img src={item.mediaUrl} alt={item.title} className="w-full h-40 object-cover hover:scale-105 transition-transform" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           </div>
         )}
