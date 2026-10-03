@@ -174,21 +174,40 @@ export default function CaseStudyPage() {
     return () => clearInterval(timer);
   }, []);
 
+  // دالة جلب لوحة الصدارة مع مطابقة الأسماء الحالية المحدثة من جدول الحسابات (users)
   const fetchLeaderboard = async () => {
     try {
-      const q = query(collection(db, 'case_study_submissions'));
-      const snap = await getDocs(q);
+      // 1. جلب خريطة الأسماء المحدثة من جدول المستخدمين (users) لضمان دقة الأسماء
+      const usersSnap = await getDocs(query(collection(db, 'users')));
+      const userNamesMap: Record<string, string> = {};
+      usersSnap.forEach(userDoc => {
+        const phoneKey = userDoc.id.trim();
+        const userData = userDoc.data();
+        if (userData.fullName) {
+          userNamesMap[phoneKey] = userData.fullName.trim();
+        }
+      });
+
+      // استثناء خاص للمشرف العام إذا لزم
+      userNamesMap['0553731265'] = 'عبدالعزيز سليمان العنزي (المشرف العام)';
+
+      // 2. جلب المشاركات وتجميع النقاط مع اعتماد الاسم الأحدث من جدول users
+      const snap = await getDocs(query(collection(db, 'case_study_submissions')));
       const scoreMap: Record<string, number> = {};
 
       snap.forEach(docSnap => {
         const data = docSnap.data();
-        const name = (data.studentName || 'مشارك').trim();
+        const phoneKey = (data.phone || data.phoneNumber || '').trim();
+        const fallbackName = (data.studentName || 'مشارك').trim();
+        
+        // استخدام الاسم من جدول users إن وجد، وإلا فالاسم المخزن
+        const finalName = (phoneKey && userNamesMap[phoneKey]) ? userNamesMap[phoneKey] : fallbackName;
         const score = Number(data.score) || 0;
         
-        if (scoreMap[name]) {
-          scoreMap[name] += score;
+        if (scoreMap[finalName]) {
+          scoreMap[finalName] += score;
         } else {
-          scoreMap[name] = score;
+          scoreMap[finalName] = score;
         }
       });
 
@@ -280,7 +299,6 @@ export default function CaseStudyPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 pb-20 relative" dir="ltr">
       
-      {/* تم تعديل الترويسة لتصبح مرنة وتحتوي على زر لوحة الصدارة بشكل مرتب وجذاب دون أي تداخل */}
       <div className="bg-[#630517] text-white py-10 px-4 sm:px-6 shadow-md">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
           <div className="space-y-2 text-center sm:text-left">
