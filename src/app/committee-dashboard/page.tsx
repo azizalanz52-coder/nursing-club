@@ -293,9 +293,9 @@ export default function CommitteeDashboard() {
           const cStr = usr.assignedCommittee || usr.committee || '';
           if (cStr.includes('العلاقات') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
             try {
-              await updateDoc(doc(db, 'users', usr.id), {
+              await setDoc(doc(db, 'users', usr.id), {
                 latestNotification: `🤝 [شراكة جديدة معتمدة]: تمت الموافقة رسمياً من قِبل (${partnerName}) بتنسيق لجنة العلاقات العامة.`
-              });
+              }, { merge: true });
             } catch (er) { console.error(er); }
           }
         }
@@ -360,9 +360,9 @@ export default function CommitteeDashboard() {
         const cStr = usr.assignedCommittee || usr.committee || '';
         if (cStr.includes('التصميم') || cStr.includes('الاعلام') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
           try {
-            await updateDoc(doc(db, 'users', usr.id), {
+            await setDoc(doc(db, 'users', usr.id), {
               latestNotification: `📸 [تحديث إعلامي جديد]: أضافت لجنة الإعلام مادة جديدة (${mediaTitle})`
-            });
+            }, { merge: true });
           } catch (er) { console.error(er); }
         }
       }
@@ -397,9 +397,9 @@ export default function CommitteeDashboard() {
         const cStr = usr.assignedCommittee || usr.committee || '';
         if (cStr.includes('التصميم') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
           try {
-            await updateDoc(doc(db, 'users', usr.id), {
+            await setDoc(doc(db, 'users', usr.id), {
               latestNotification: `🔬 [محتوى علمي جديد موجه للبنرات والتصميم]: "${textBannerTitle}" - النص: ${textBannerContent}`
-            });
+            }, { merge: true });
           } catch (er) { console.error(er); }
         }
       }
@@ -440,9 +440,9 @@ export default function CommitteeDashboard() {
         const cStr = usr.assignedCommittee || usr.committee || '';
         if (cStr.includes('الموارد البشرية') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
           try {
-            await updateDoc(doc(db, 'users', usr.id), {
+            await setDoc(doc(db, 'users', usr.id), {
               latestNotification: `ℹ️ [إفادة اعتذار عدم مشاركة]: أفاد الزميل (${userData?.fullName || 'عضو'}) بعدم مشاركته في فعالية (${excuseEventName}).`
-            });
+            }, { merge: true });
           } catch (er) { console.error(er); }
         }
       }
@@ -458,7 +458,6 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // دالة مطابقة ذكية موحدة لأسماء اللجان بغض النظر عن الهمزات (إعلام vs اعلام)
   const isSameCommittee = (c1: string, c2: string) => {
     if (!c1 || !c2) return false;
     const clean1 = c1.replace(/الـ/g, '').replace(/[إأآا]/g, 'ا').replace(/ة/g, 'ه').trim();
@@ -521,11 +520,11 @@ export default function CommitteeDashboard() {
       if (targetReq?.phone) {
         try {
           const userDocRef = doc(db, 'users', targetReq.phone);
-          await updateDoc(userDocRef, {
+          await setDoc(userDocRef, {
             latestNotification: `🎉 مبارك القبول النهائي في (${currentActiveComm})! رابط قروب الواتساب: ${activeWhatsapp}`,
             assignedCommittee: currentActiveComm,
             committee: currentActiveComm
-          });
+          }, { merge: true });
         } catch (e) { console.error(e); }
       }
 
@@ -551,11 +550,11 @@ export default function CommitteeDashboard() {
       if (memberPhone) {
         try {
           const userRef = doc(db, 'users', memberPhone);
-          await updateDoc(userRef, {
+          await setDoc(userRef, {
             assignedCommittee: '',
             committee: '',
             latestNotification: `⚠️ تم تعديل حالتك الإدارية وإلغاء قبولك السابق في اللجنة. يمكنك متابعة حالة طلبك.`
-          });
+          }, { merge: true });
         } catch (e) { console.error(e); }
       }
 
@@ -618,9 +617,11 @@ export default function CommitteeDashboard() {
       for (const mem of acceptedList) {
         if (mem.phone) {
           const uRef = doc(db, 'users', mem.phone);
-          await updateDoc(uRef, {
-            latestNotification: `📢 تعميم من رئيس ${targetComm}: ${announcementText}`
-          });
+          try {
+            await setDoc(uRef, {
+              latestNotification: `📢 تعميم من رئيس ${targetComm}: ${announcementText}`
+            }, { merge: true });
+          } catch (er) { console.error(er); }
         }
       }
       alert('تم إرسال التعميم والإشعار لجميع أعضاء اللجنة المقبولين فقط بنجاح! 🚀');
@@ -641,6 +642,7 @@ export default function CommitteeDashboard() {
     setTasksListBuffer(tasksListBuffer.filter((_, idx) => idx !== index));
   };
 
+  // دالة نشر المهام المعدلة بأمان تام لضمان عدم ظهور رسائل الخطأ الوهمية
   const handlePublishTasksList = async (e: FormEvent) => {
     e.preventDefault();
     if (!eventTitle.trim() || tasksListBuffer.length === 0) {
@@ -664,16 +666,22 @@ export default function CommitteeDashboard() {
         createdAt: Date.now()
       };
 
+      // 1. حفظ المهام أولاً وقبل كل شيء
       const docRef = await addDoc(collection(db, 'committee_tasks'), newTaskObj);
       setCommitteeTasks([{ id: docRef.id, ...newTaskObj }, ...committeeTasks]);
 
+      // 2. إرسال الإشعارات بشكل آمن منفصل لكي لا يتسبب أي مستند غير موجود في إيقاف أو إشعار خطأ
       const acceptedList = requests.filter(r => isSameCommittee(r.acceptedCommittee, targetComm));
       for (const mem of acceptedList) {
         if (mem.phone) {
-          const uRef = doc(db, 'users', mem.phone);
-          await updateDoc(uRef, {
-            latestNotification: `⚡ [مهام جديدة لفعالية: ${eventTitle}] تم إسناد ${tasksListBuffer.length} مهام جديدة للجنة (${targetComm}).`
-          });
+          try {
+            const uRef = doc(db, 'users', mem.phone);
+            await setDoc(uRef, {
+              latestNotification: `⚡ [مهام جديدة لفعالية: ${eventTitle}] تم إسناد ${tasksListBuffer.length} مهام جديدة للجنة (${targetComm}).`
+            }, { merge: true });
+          } catch (er) {
+            console.error('Notification skip error:', er);
+          }
         }
       }
 
@@ -737,28 +745,28 @@ export default function CommitteeDashboard() {
         if (warningStepType === 'warn-members') {
           if (isMatchComm) {
             try {
-              await updateDoc(doc(db, 'users', usr.id), {
+              await setDoc(doc(db, 'users', usr.id), {
                 latestNotification: alertMsg,
                 warningHidden: false
-              });
+              }, { merge: true });
             } catch (er) { console.error(er); }
           }
         } else if (warningStepType === 'warn-leaders') {
           if ((isMatchComm && (roleStr.includes('رئيس') || roleStr.includes('قائد') || roleStr.includes('مشرف'))) || roleStr.includes('System Admin')) {
             try {
-              await updateDoc(doc(db, 'users', usr.id), {
+              await setDoc(doc(db, 'users', usr.id), {
                 latestNotification: alertMsg,
                 warningHidden: false
-              });
+              }, { merge: true });
             } catch (er) { console.error(er); }
           }
         } else {
           if (isMatchComm || roleStr.includes('رئيس')) {
             try {
-              await updateDoc(doc(db, 'users', usr.id), {
+              await setDoc(doc(db, 'users', usr.id), {
                 latestNotification: alertMsg,
                 warningHidden: false
-              });
+              }, { merge: true });
             } catch (er) { console.error(er); }
           }
         }
@@ -884,9 +892,9 @@ export default function CommitteeDashboard() {
       for (const usr of allUsersList) {
         if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
           try {
-            await updateDoc(doc(db, 'users', usr.id), {
+            await setDoc(doc(db, 'users', usr.id), {
               latestNotification: reportSummaryText
-            });
+            }, { merge: true });
           } catch (er) { console.error(er); }
         }
       }
