@@ -90,6 +90,11 @@ export default function CommitteeDashboard() {
   const [partnerNotes, setPartnerNotes] = useState('');
   const [publicPartnersList, setPublicPartnersList] = useState<any[]>([]);
 
+  // حقول تقرير الجودة الذكي واليدوي الجديد
+  const [smartReportTitle, setSmartReportTitle] = useState('تقرير إنجاز الفعالية والأداء العام للجان');
+  const [smartReportErrors, setSmartReportErrors] = useState('');
+  const [smartReportAdvantages, setSmartReportAdvantages] = useState('');
+
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
     if (!phone) {
@@ -642,7 +647,6 @@ export default function CommitteeDashboard() {
     setTasksListBuffer(tasksListBuffer.filter((_, idx) => idx !== index));
   };
 
-  // دالة نشر المهام المعدلة بأمان تام لضمان عدم ظهور رسائل الخطأ الوهمية
   const handlePublishTasksList = async (e: FormEvent) => {
     e.preventDefault();
     if (!eventTitle.trim() || tasksListBuffer.length === 0) {
@@ -666,11 +670,9 @@ export default function CommitteeDashboard() {
         createdAt: Date.now()
       };
 
-      // 1. حفظ المهام أولاً وقبل كل شيء
       const docRef = await addDoc(collection(db, 'committee_tasks'), newTaskObj);
       setCommitteeTasks([{ id: docRef.id, ...newTaskObj }, ...committeeTasks]);
 
-      // 2. إرسال الإشعارات بشكل آمن منفصل لكي لا يتسبب أي مستند غير موجود في إيقاف أو إشعار خطأ
       const acceptedList = requests.filter(r => isSameCommittee(r.acceptedCommittee, targetComm));
       for (const mem of acceptedList) {
         if (mem.phone) {
@@ -917,6 +919,168 @@ export default function CommitteeDashboard() {
     }
   };
 
+  // دوال حساب أفضل لجنة وأفضل الأعضاء تلقائياً لمساعدات الجودة
+  const getBestCommitteeName = () => {
+    let bestComm = 'لجنة تنظيم الفعاليات';
+    let maxDone = -1;
+    allCommitteesList.forEach(comm => {
+      const commTasks = committeeTasks.filter(t => isSameCommittee(t.committee, comm));
+      let doneCount = 0;
+      commTasks.forEach(tg => {
+        (tg.subTasks || []).forEach((st: any) => {
+          if (st.completed) doneCount++;
+        });
+      });
+      if (doneCount > maxDone) {
+        maxDone = doneCount;
+        bestComm = comm;
+      }
+    });
+    return bestComm;
+  };
+
+  const getBestMemberForCommittee = (commName: string) => {
+    const commTasks = committeeTasks.filter(t => isSameCommittee(t.committee, commName));
+    const counts: { [name: string]: number } = {};
+    commTasks.forEach(tg => {
+      (tg.subTasks || []).forEach((st: any) => {
+        if (st.completed && st.completedBy) {
+          counts[st.completedBy] = (counts[st.completedBy] || 0) + 1;
+        }
+      });
+    });
+    let bestMem = 'لم يتم رصد إنجاز بعد';
+    let maxP = -1;
+    Object.entries(counts).forEach(([name, p]) => {
+      if (p > maxP) {
+        maxP = p;
+        bestMem = `${name} (${p} مهام منجزة)`;
+      }
+    });
+    return bestMem;
+  };
+
+  // دالة تصدير تقرير الجودة الذكي والمخصص بصيغة PDF وطباعته
+  const handleExportSmartQualityPDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('الرجاء السماح بفتح النوافذ المنبثقة لتحميل التقرير.');
+      return;
+    }
+
+    const bestComm = getBestCommitteeName();
+
+    let htmlContent = `
+      <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <title>${smartReportTitle} - نادي التمريض</title>
+        <style>
+          body { font-family: Tahoma, Arial, sans-serif; padding: 35px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.6; }
+          .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 25px; }
+          .header h1 { color: #630517; font-size: 22px; margin: 0 0 5px 0; font-weight: 900; }
+          .header p { color: #64748b; font-size: 11px; margin: 0; }
+          .section-box { background: #f8fafc; border-right: 4px solid #630517; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 12px; color: #334155; }
+          .section-box strong { color: #630517; }
+          .section-title { font-size: 14px; font-weight: bold; color: #630517; margin-top: 25px; margin-bottom: 10px; border-right: 4px solid #F5D061; padding-right: 8px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+          th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: right; }
+          th { background-color: #f1f5f9; color: #334155; font-weight: bold; }
+          .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>نادي كلية التمريض - جامعة حفر الباطن</h1>
+          <p>لجنة الجودة والتطوير • ${smartReportTitle}</p>
+          <p>تاريخ الاصدار: ${new Date().toLocaleDateString('ar-SA')}</p>
+        </div>
+
+        <div class="section-box">
+          <strong>🏆 أفضل لجنة أداءً وإنجازاً للمهام:</strong><br/>
+          استناداً إلى إحصاءات الإنجاز الفعلي على النظام، تصدرت <strong>${bestComm}</strong> قائمة اللجان الأكثر التزاماً وإنتاجية في إنجاز المهام المطلوبة.
+        </div>
+
+        <div class="section-title">أولاً: أفضل الأعضاء من كل لجنة (لوحة التميز)</div>
+        <table>
+          <thead>
+            <tr>
+              <th>اللجنة التنظيمية</th>
+              <th>أبرز عضو متميز وإنجازاته</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    allCommitteesList.forEach(comm => {
+      const topMem = getBestMemberForCommittee(comm);
+      htmlContent += `
+        <tr>
+          <td><strong>${comm}</strong></td>
+          <td>${topMem}</td>
+        </tr>
+      `;
+    });
+
+    htmlContent += `
+          </tbody>
+        </table>
+
+        <div class="section-title">ثانياً: المميزات والإيجابيات البارزة</div>
+        <div class="section-box" style="border-right-color: #047857; background: #ecfdf5;">
+          ${smartReportAdvantages ? smartReportAdvantages.replace(/\n/g, '<br/>') : 'لم تُحدد مميزات إضافية.'}
+        </div>
+
+        <div class="section-title">ثالثاً: الأخطاء والملاحظات المرصودة للتحسين المستقبلي</div>
+        <div class="section-box" style="border-right-color: #b91c1c; background: #fef2f2;">
+          ${smartReportErrors ? smartReportErrors.replace(/\n/g, '<br/>') : 'لا توجد أخطاء جوهرية مسجلة.'}
+        </div>
+
+        <div class="footer">
+          <p>هذا التقرير معتمد رسمياً من لجنة الجودة والتطوير وموجه لإدارة نادي التمريض والعمادة • 2026</p>
+        </div>
+        <script>window.onload = function() { window.print(); }</script>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  const handlePublishSmartReportToPresidents = async () => {
+    if (!confirm('هل أنت متأكد من حفظ ورفع هذا التقرير رسمياً لمكتب الرؤساء والأدمن وإرسال إشعار فوري لهم؟')) return;
+
+    try {
+      const bestComm = getBestCommitteeName();
+      const reportFullText = `📊 [تقرير الجودة المعتمد: ${smartReportTitle}] • أفضل لجنة: ${bestComm} • المميزات: ${smartReportAdvantages || 'لا توجد'} • الأخطاء والملاحظات: ${smartReportErrors || 'لا توجد'}`;
+
+      await addDoc(collection(db, 'quality_reports_archive'), {
+        title: smartReportTitle,
+        details: reportFullText,
+        createdAt: Date.now(),
+        dateStr: new Date().toLocaleDateString('ar-SA'),
+        status: 'معتمد ومرفوع للرؤساء والأدمن',
+        author: userData?.fullName || 'لجنة الجودة والتطوير'
+      });
+
+      for (const usr of allUsersList) {
+        if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
+          try {
+            await setDoc(doc(db, 'users', usr.id), {
+              latestNotification: `🏆 [تقرير جودة جديد مرفوع]: ${smartReportTitle} (أفضل لجنة: ${bestComm})`
+            }, { merge: true });
+          } catch (er) { console.error(er); }
+        }
+      }
+
+      alert('🎉 تم رفع التقرير وحفظه في الأرشيف التاريخي، وإرسال إشعار فوري لجميع الرؤساء والأدمن بنجاح تام!');
+      fetchQualityArchives();
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء رفع التقرير.');
+    }
+  };
+
   const handleExportQualityPDF = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -1106,13 +1270,100 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
+        {/* قسم تقارير الجودة الذكية والمتقدمة (المضاف بناءً على طلبك) */}
+        {isQualityTeam && (
+          <div className="bg-white rounded-3xl p-8 border-2 border-[#630517] shadow-md space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-lg font-black text-[#630517]">📊 منصة كتابة وتقييم التقارير الذكية (أفضل اللجان، الأعضاء، الأخطاء، والمميزات)</h3>
+                <p className="text-xs text-slate-500">يعرض النظام مساعدات تحليلية فورية للإنجاز، وتكتب أنت التحليل والتقييم لترفع التقرير كـ PDF وارساله للرؤساء.</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportSmartQualityPDF}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>📄</span><span>معاينة وتصدير التقرير PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePublishSmartReportToPresidents}
+                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow transition-all cursor-pointer flex items-center gap-1.5 animate-pulse"
+                >
+                  <span>🚀</span><span>رفع واعتماد التقرير للرؤساء والأدمن</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                <h4 className="font-extrabold text-sm text-slate-900">🔍 المساعدات والتحليلات التلقائية للنظام:</h4>
+                
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1">
+                  <span className="text-[11px] font-bold text-slate-400 block">🏆 أفضل لجنة أداءً وإنجازاً للمهام (مستخرج تلقائياً):</span>
+                  <p className="text-xs font-black text-emerald-700">{getBestCommitteeName()}</p>
+                </div>
+
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2">
+                  <span className="text-[11px] font-bold text-slate-400 block">⭐ أبرز الأعضاء المتميزين من كل لجنة (حسب المهام المنجزة):</span>
+                  <div className="max-h-36 overflow-y-auto space-y-1 text-xs">
+                    {allCommitteesList.map((comm, idx) => (
+                      <div key={idx} className="flex justify-between items-center border-b border-slate-100 pb-1">
+                        <span className="font-bold text-slate-700">{comm}:</span>
+                        <span className="text-[#630517] font-semibold">{getBestMemberForCommittee(comm)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">عنوان التقرير أو الفعالية المستهدفة</label>
+                  <input
+                    type="text"
+                    value={smartReportTitle}
+                    onChange={(e) => setSmartReportTitle(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                <h4 className="font-extrabold text-sm text-slate-900">✍️ كتابة التقييم والتحليل اليدوي:</h4>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-emerald-800">✅ المميزات والإيجابيات البارزة خلال الفترة:</label>
+                  <textarea
+                    rows={4}
+                    placeholder="اكتب هنا نقاط القوة، الإنجازات الاستثنائية، وسرعة تجاوب اللجان..."
+                    value={smartReportAdvantages}
+                    onChange={(e) => setSmartReportAdvantages(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-red-700">⚠️ الأخطاء والملاحظات المرصودة للتحسين:</label>
+                  <textarea
+                    rows={4}
+                    placeholder="اكتب هنا أبرز التحديات، التأخيرات، أو الأخطاء لتفاديها مستقبلاً..."
+                    value={smartReportErrors}
+                    onChange={(e) => setSmartReportErrors(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isCommitteeLeader && !isQualityTeam && (
           <div className="bg-emerald-50 border-2 border-emerald-400 rounded-3xl p-6 space-y-4 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-3">
                 <span className="text-3xl">🔗</span>
                 <div>
-                  <h4 className="font-black text-sm text-emerald-900">ربط رابط مجموعة الواتساب الخاصة بـ ({currentActiveComm}):</h4>
+                  <h4 className="font-black text-sm text-emerald-900">ربط مجموعة الواتساب الخاصة بـ ({currentActiveComm}):</h4>
                   <p className="text-xs text-emerald-700">هنا يمكنك ربط لوحة تحكم لجنتك برابط الواتساب لكي يُرسل تلقائياً لأي طالب تقبله.</p>
                 </div>
               </div>
@@ -2145,150 +2396,3 @@ export default function CommitteeDashboard() {
             <div className="space-y-3">
               {qualityArchives.length === 0 ? (
                 <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير مؤرشفة حتى الآن.</p>
-              ) : (
-                qualityArchives.map((arch) => (
-                  <div key={arch.id} className="bg-indigo-50/50 border border-indigo-200 rounded-2xl p-4 flex justify-between items-center">
-                    <div>
-                      <h4 className="font-extrabold text-slate-900 text-xs">{arch.title}</h4>
-                      <p className="text-[10px] text-slate-500 mt-0.5">تاريخ الاعتماد: {arch.dateStr} • بواسطة: {arch.author}</p>
-                    </div>
-                    <span className="text-[10px] bg-indigo-600 text-white font-bold px-3 py-1 rounded-xl">{arch.status}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAcceptModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
-            <h3 className="text-xl font-black text-slate-900 border-b border-slate-100 pb-3">تأكيد القبول في {currentActiveComm}</h3>
-            <div className="space-y-4">
-              <p className="text-xs text-slate-600">سيتم قبول الطالب رسمياً في هذه اللجنة وربطه برابط قروب الواتساب الخاص باللجنة حصرياً ولن يظهر في رغبات اللجان الأخرى بعد اليوم.</p>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600">رابط قروب الواتساب المحفوظ:</label>
-                <input
-                  type="text"
-                  value={committeeWhatsappLinks[currentActiveComm] || whatsappLink || 'لم يتم تعيين رابط لهذه اللجنة بعد'}
-                  disabled
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-700 bg-slate-100 font-mono"
-                  dir="ltr"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">يمكنك تعديل رابط اللجنة مباشرة من حقل الإعدادات في أعلى اللوحة.</p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setShowAcceptModal(false)} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs">إلغاء</button>
-              <button type="button" onClick={handleAcceptSubmit} className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">تأكيد القبول وإرسال الرابط ✅</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showReplyModal && activeReportToReply && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
-          <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-500">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500 mx-auto flex items-center justify-center text-3xl font-bold text-white">✍️</div>
-            <div className="text-center space-y-1">
-              <h3 className="text-xl font-black text-slate-900">تقديم الرد والتبرير الرسمي</h3>
-              <p className="text-xs text-slate-500">الرد على الملاحظة الواردة من لجنة الجودة والتطوير</p>
-            </div>
-            <div className="bg-slate-50 p-3 rounded-2xl text-xs space-y-1 border border-slate-200">
-              <span className="font-bold text-slate-700 block">سبب الملاحظة المرصودة:</span>
-              <p className="text-slate-600">{activeReportToReply.reason}</p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">اكتب تفاصيل التبرير أو خطة المعالجة:</label>
-              <textarea
-                rows={3}
-                placeholder="اكتب التبرير..."
-                value={leaderDefenseReply}
-                onChange={(e) => setLeaderDefenseReply(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setShowReplyModal(false)} className="w-1/2 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs">إلغاء</button>
-              <button type="button" onClick={handleSubmitLeaderReply} className="w-1/2 py-3 rounded-2xl bg-amber-600 text-white font-black text-xs shadow-lg hover:bg-amber-700 cursor-pointer">إرسال التبرير للجودة 📨</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showReportsModal && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
-          <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-red-500">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-              <h3 className="text-lg font-black text-slate-900">🚨 مركز التقارير والشكاوى ومتابعة ردود القادة</h3>
-              <button onClick={() => setShowReportsModal(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕ إغلاق</button>
-            </div>
-            <div className="space-y-4">
-              {escalatedReports.length === 0 ? (
-                <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير تقصير أو شكاوى مرفوعة حتى الآن.</p>
-              ) : (
-                escalatedReports.map((rep) => (
-                  <div key={rep.id} className="bg-red-50/60 border border-red-200 rounded-2xl p-4 space-y-3 relative">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-black text-red-700">اللجنة المعنية: {rep.targetCommittee}</span>
-                      <button type="button" onClick={() => handleDeleteReport(rep.id)} className="px-2 py-0.5 bg-red-600 text-white rounded-md text-[10px] font-black hover:bg-red-700 cursor-pointer">حذف البلاغ 🗑</button>
-                    </div>
-                    <p className="text-xs text-slate-800 font-semibold">السبب والتقصير المرصود: {rep.reason}</p>
-                    {rep.leaderDefenseReply && (
-                      <div className="bg-white border border-emerald-300 p-3 rounded-xl text-xs space-y-1 shadow-inner">
-                        <span className="font-bold text-emerald-800 block">💬 رد وتبرير قائد اللجنة:</span>
-                        <p className="text-slate-700">{rep.leaderDefenseReply}</p>
-                      </div>
-                    )}
-                    <div className="text-[10px] text-slate-500 flex justify-between pt-2 border-t border-red-200/50">
-                      <span>الرافع: {rep.reporter}</span>
-                      <span className="font-bold text-red-800">{rep.status}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showWarningModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
-          <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-500">
-            <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold text-white ${warningStepType === 'warn-leaders' ? 'bg-amber-500' : warningStepType === 'warn-members' ? 'bg-sky-500' : 'bg-red-600'}`}>
-              {warningStepType === 'warn-leaders' ? '⚠️' : warningStepType === 'warn-members' ? '📢' : '🚨'}
-            </div>
-            <div className="text-center space-y-1">
-              <h3 className="text-xl font-black text-slate-900">
-                {warningStepType === 'warn-leaders' ? 'تنبيه قائد وقائدة اللجنة' : warningStepType === 'warn-members' ? 'إرسال تحذير لكافة أعضاء اللجنة' : 'إحالة البلاغ للرئيس ونائبة الرئيس'}
-              </h3>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">التفاصيل أو الملاحظة المرصودة:</label>
-              <textarea
-                rows={3}
-                placeholder="اكتب التفاصيل..."
-                value={warningReason}
-                onChange={(e) => setWarningReason(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setShowWarningModal(false)} className="w-1/2 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs">إلغاء</button>
-              <button
-                type="button"
-                onClick={handleExecuteWarningOrEscalation}
-                className={`w-1/2 py-3 rounded-2xl text-white font-black text-xs shadow-lg cursor-pointer ${
-                  warningStepType === 'warn-leaders' ? 'bg-amber-600 hover:bg-amber-700' : warningStepType === 'warn-members' ? 'bg-sky-600 hover:bg-sky-700' : 'bg-red-600 hover:bg-red-700'
-                }`}
-              >
-                {warningStepType === 'warn-leaders' ? 'إرسال التنبيه 📨' : warningStepType === 'warn-members' ? 'إرسال التحذير للأعضاء 📢' : 'إحالة البلاغ ⚖️'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
