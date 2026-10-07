@@ -90,10 +90,27 @@ export default function CommitteeDashboard() {
   const [partnerNotes, setPartnerNotes] = useState('');
   const [publicPartnersList, setPublicPartnersList] = useState<any[]>([]);
 
-  // حقول تقرير الجودة الذكي واليدوي الجديد
+  // حقول تقرير الجودة الذكي واليدوي الجديد (مدعومة بالكامل بالكتابة اليدوية)
   const [smartReportTitle, setSmartReportTitle] = useState('تقرير إنجاز الفعالية والأداء العام للجان');
   const [smartReportErrors, setSmartReportErrors] = useState('');
   const [smartReportAdvantages, setSmartReportAdvantages] = useState('');
+  
+  // حقول يدوية لأفضل لجنة وأبرز الأعضاء في تقرير الجودة
+  const [manualBestCommittee, setManualBestCommittee] = useState('لجنة التصميم');
+  const [manualBestMembers, setManualBestMembers] = useState<{ [key: string]: string }>({
+    'لجنة التصميم': 'أحمد العنزي (تصاميم احترافية متميزة)',
+    'لجنة الإعلام': 'سارة الشمري (تغطيات فورية استثنائية)',
+    'لجنة تنظيم الفعاليات': 'محمد الدوسري (تنظيم وانضباط عالٍ)',
+    'لجنة الموارد البشرية': 'فاطمة الرشيدي (متابعة دقيقة للأعضاء)',
+    'لجنة العلاقات العامة': 'عبدالله العتيبي (عقد شراكات ناجحة)',
+    'لجنة المحتوى العلمي': 'منيرة الحربي (صياغة محتوى دقيق)',
+    'لجنة الجودة والتطوير': 'ريما العنزي (متابعة جودة متميزة)'
+  });
+
+  // حقول لوحة الشرف اليدوية (إضافة وتعديل وحذف من قِبل القائد)
+  const [honorBoardList, setHonorBoardList] = useState<any[]>([]);
+  const [newHonorMemberName, setNewHonorMemberName] = useState('');
+  const [newHonorScore, setNewHonorScore] = useState('');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -113,6 +130,7 @@ export default function CommitteeDashboard() {
     fetchEventExcuses();
     fetchPublicPartners();
     fetchCommitteeWhatsappLinks();
+    fetchHonorBoard();
 
     const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
     if (isHiddenLocally === 'true') {
@@ -130,6 +148,54 @@ export default function CommitteeDashboard() {
       setCommitteeWhatsappLinks(linksMap);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const fetchHonorBoard = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'committee_honor_board'));
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setHonorBoardList(items);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddHonorMember = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newHonorMemberName.trim() || !newHonorScore.trim()) {
+      alert('الرجاء إدخال اسم العضو وعدد النقاط أو التقييم.');
+      return;
+    }
+
+    const currentComm = currentActiveComm;
+    const newEntry = {
+      name: newHonorMemberName.trim(),
+      score: newHonorScore.trim(),
+      committee: currentComm,
+      createdAt: Date.now()
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, 'committee_honor_board'), newEntry);
+      setHonorBoardList([{ id: docRef.id, ...newEntry }, ...honorBoardList]);
+      setNewHonorMemberName('');
+      setNewHonorScore('');
+      alert('تم إضافة العضو ونقاطه بنجاح إلى لوحة الشرف! 🏆');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء حفظ بيانات لوحة الشرف.');
+    }
+  };
+
+  const handleDeleteHonorMember = async (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا العضو من لوحة الشرف؟')) {
+      try {
+        await deleteDoc(doc(db, 'committee_honor_board', id));
+        setHonorBoardList(honorBoardList.filter(item => item.id !== id));
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
@@ -919,56 +985,13 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // دوال حساب أفضل لجنة وأفضل الأعضاء تلقائياً لمساعدات الجودة
-  const getBestCommitteeName = () => {
-    let bestComm = 'لجنة تنظيم الفعاليات';
-    let maxDone = -1;
-    allCommitteesList.forEach(comm => {
-      const commTasks = committeeTasks.filter(t => isSameCommittee(t.committee, comm));
-      let doneCount = 0;
-      commTasks.forEach(tg => {
-        (tg.subTasks || []).forEach((st: any) => {
-          if (st.completed) doneCount++;
-        });
-      });
-      if (doneCount > maxDone) {
-        maxDone = doneCount;
-        bestComm = comm;
-      }
-    });
-    return bestComm;
-  };
-
-  const getBestMemberForCommittee = (commName: string) => {
-    const commTasks = committeeTasks.filter(t => isSameCommittee(t.committee, commName));
-    const counts: { [name: string]: number } = {};
-    commTasks.forEach(tg => {
-      (tg.subTasks || []).forEach((st: any) => {
-        if (st.completed && st.completedBy) {
-          counts[st.completedBy] = (counts[st.completedBy] || 0) + 1;
-        }
-      });
-    });
-    let bestMem = 'لم يتم رصد إنجاز بعد';
-    let maxP = -1;
-    Object.entries(counts).forEach(([name, p]) => {
-      if (p > maxP) {
-        maxP = p;
-        bestMem = `${name} (${p} مهام منجزة)`;
-      }
-    });
-    return bestMem;
-  };
-
-  // دالة تصدير تقرير الجودة الذكي والمخصص بصيغة PDF وطباعته
+  // دالة تصدير تقرير الجودة الذكي والمخصص بصيغة PDF وتعتمد على الإدخال اليدوي المخصص بالكامل
   const handleExportSmartQualityPDF = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert('الرجاء السماح بفتح النوافذ المنبثقة لتحميل التقرير.');
       return;
     }
-
-    const bestComm = getBestCommitteeName();
 
     let htmlContent = `
       <html lang="ar" dir="rtl">
@@ -997,23 +1020,23 @@ export default function CommitteeDashboard() {
         </div>
 
         <div class="section-box">
-          <strong>🏆 أفضل لجنة أداءً وإنجازاً للمهام:</strong><br/>
-          استناداً إلى إحصاءات الإنجاز الفعلي على النظام، تصدرت <strong>${bestComm}</strong> قائمة اللجان الأكثر التزاماً وإنتاجية في إنجاز المهام المطلوبة.
+          <strong>🏆 أفضل لجنة أداءً وإنجازاً للمهام (محدد يدوياً):</strong><br/>
+          استناداً للتقييم الإداري المعتمد، تصدرت <strong>${manualBestCommittee}</strong> قائمة اللجان المتميزة في الأداء والانضباط.
         </div>
 
-        <div class="section-title">أولاً: أفضل الأعضاء من كل لجنة (لوحة التميز)</div>
+        <div class="section-title">أولاً: أبرز الأعضاء المتميزين في اللجان (إدخال وإشراف رئيس/قائدة الجودة)</div>
         <table>
           <thead>
             <tr>
               <th>اللجنة التنظيمية</th>
-              <th>أبرز عضو متميز وإنجازاته</th>
+              <th>أبرز عضو متميز وإنجازاته (يدوي)</th>
             </tr>
           </thead>
           <tbody>
     `;
 
     allCommitteesList.forEach(comm => {
-      const topMem = getBestMemberForCommittee(comm);
+      const topMem = manualBestMembers[comm] || 'غير محدد';
       htmlContent += `
         <tr>
           <td><strong>${comm}</strong></td>
@@ -1051,8 +1074,7 @@ export default function CommitteeDashboard() {
     if (!confirm('هل أنت متأكد من حفظ ورفع هذا التقرير رسمياً لمكتب الرؤساء والأدمن وإرسال إشعار فوري لهم؟')) return;
 
     try {
-      const bestComm = getBestCommitteeName();
-      const reportFullText = `📊 [تقرير الجودة المعتمد: ${smartReportTitle}] • أفضل لجنة: ${bestComm} • المميزات: ${smartReportAdvantages || 'لا توجد'} • الأخطاء والملاحظات: ${smartReportErrors || 'لا توجد'}`;
+      const reportFullText = `📊 [تقرير الجودة المعتمد: ${smartReportTitle}] • أفضل لجنة: ${manualBestCommittee} • المميزات: ${smartReportAdvantages || 'لا توجد'} • الأخطاء والملاحظات: ${smartReportErrors || 'لا توجد'}`;
 
       await addDoc(collection(db, 'quality_reports_archive'), {
         title: smartReportTitle,
@@ -1067,7 +1089,7 @@ export default function CommitteeDashboard() {
         if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
           try {
             await setDoc(doc(db, 'users', usr.id), {
-              latestNotification: `🏆 [تقرير جودة جديد مرفوع]: ${smartReportTitle} (أفضل لجنة: ${bestComm})`
+              latestNotification: `🏆 [تقرير جودة جديد مرفوع]: ${smartReportTitle} (أفضل لجنة: ${manualBestCommittee})`
             }, { merge: true });
           } catch (er) { console.error(er); }
         }
@@ -1089,15 +1111,6 @@ export default function CommitteeDashboard() {
     }
 
     const totalAcceptedAll = requests.filter(r => r.acceptedCommittee).length;
-    let topCommName = 'لجنة التصميم';
-    let maxMembers = -1;
-    allCommitteesList.forEach(c => {
-      const cnt = requests.filter(r => isSameCommittee(r.acceptedCommittee, c)).length;
-      if (cnt > maxMembers) {
-        maxMembers = cnt;
-        topCommName = c;
-      }
-    });
 
     let htmlContent = `
       <html lang="ar" dir="rtl">
@@ -1129,7 +1142,7 @@ export default function CommitteeDashboard() {
 
         <div class="executive-box">
           <strong>📝 الملخص التحليلي التنفيذي (Executive Summary):</strong>
-          يُوثق هذا التقرير حالة الأداء الميداني والإداري لكافة اللجان السبع بنادي التمريض. يُظهر التحليل المباشر للبيانات استقراراً هيكلياً عالياً بوجود <strong>${totalAcceptedAll}</strong> عضواً مقبولاً وفاعلاً عبر مختلف الأقسام، مع تصدر <strong>${topCommName}</strong> لمؤشرات الاستقطاب والانضمام. تؤكد لجنة الجودة والتطوير أن كافة مسارات العمل والمهام تسير وفق المعايير المعتمدة والمخطط لها لضمان مخرجات استثنائية أمام إدارة الجامعة وعمادة الكلية.
+          يُوثق هذا التقرير حالة الأداء الميداني والإداري لكافة اللجان السبع بنادي التمريض بوجود <strong>${totalAcceptedAll}</strong> عضواً مقبولاً وفاعلاً عبر مختلف الأقسام.
         </div>
 
         <div class="section-title">أولاً: جدول مؤشرات الأداء والأعضاء المقبولين باللجان السبع</div>
@@ -1210,20 +1223,8 @@ export default function CommitteeDashboard() {
   const displayedTasks = committeeTasks.filter(t => isSameCommittee(t.committee, currentActiveComm));
   const committeeExcusesFiltered = eventExcuses.filter(ex => matchesTargetCommittee(ex.committee, currentActiveComm));
 
-  const memberScoresMap: { [memberName: string]: number } = {};
-  committeeTasks
-    .filter(t => isSameCommittee(t.committee, currentActiveComm))
-    .forEach(taskGroup => {
-      (taskGroup.subTasks || []).forEach((st: any) => {
-        if (st.completed && st.completedBy) {
-          memberScoresMap[st.completedBy] = (memberScoresMap[st.completedBy] || 0) + 10;
-        }
-      });
-    });
-
-  const rankedMembers = Object.entries(memberScoresMap)
-    .map(([name, score]) => ({ name, score }))
-    .sort((a, b) => b.score - a.score);
+  // تصنيف أعضاء لوحة الشرف الخاصة باللجنة الحالية يدوياً
+  const currentCommitteeHonorMembers = honorBoardList.filter(h => isSameCommittee(h.committee, currentActiveComm));
 
   const committeeReports = Array.from(
     new Map(
@@ -1270,13 +1271,13 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* قسم تقارير الجودة الذكية والمتقدمة (المضاف بناءً على طلبك) */}
+        {/* قسم تقارير الجودة الذكية والمتقدمة (إدخال وإدارة يدوية بالكامل من قائد/قائدة الجودة) */}
         {isQualityTeam && (
           <div className="bg-white rounded-3xl p-8 border-2 border-[#630517] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-lg font-black text-[#630517]">📊 منصة كتابة وتقييم التقارير الذكية (أفضل اللجان، الأعضاء، الأخطاء، والمميزات)</h3>
-                <p className="text-xs text-slate-500">يعرض النظام مساعدات تحليلية فورية للإنجاز، وتكتب أنت التحليل والتقييم لترفع التقرير كـ PDF وارساله للرؤساء.</p>
+                <h3 className="text-lg font-black text-[#630517]">📊 منصة كتابة وتقييم التقارير اليدوية (أفضل اللجان، الأعضاء، الأخطاء، والمميزات)</h3>
+                <p className="text-xs text-slate-500">قم بتعبئة التقرير يدوياً بالكامل واختيار أفضل اللجان والأعضاء لتصدير التقرير كـ PDF وإرساله للرؤساء.</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -1298,26 +1299,40 @@ export default function CommitteeDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                <h4 className="font-extrabold text-sm text-slate-900">🔍 المساعدات والتحليلات التلقائية للنظام:</h4>
+                <h4 className="font-extrabold text-sm text-slate-900">✏️ التحديد اليدوي لأفضل اللجان والأعضاء:</h4>
                 
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1">
-                  <span className="text-[11px] font-bold text-slate-400 block">🏆 أفضل لجنة أداءً وإنجازاً للمهام (مستخرج تلقائياً):</span>
-                  <p className="text-xs font-black text-emerald-700">{getBestCommitteeName()}</p>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">🏆 اختيار أفضل لجنة أداءً وإنجازاً (يدوي):</label>
+                  <select
+                    value={manualBestCommittee}
+                    onChange={(e) => setManualBestCommittee(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
+                  >
+                    {allCommitteesList.map((comm, idx) => (
+                      <option key={idx} value={comm}>{comm}</option>
+                    ))}
+                  </select>
                 </div>
 
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2">
-                  <span className="text-[11px] font-bold text-slate-400 block">⭐ أبرز الأعضاء المتميزين من كل لجنة (حسب المهام المنجزة):</span>
-                  <div className="max-h-36 overflow-y-auto space-y-1 text-xs">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 block">⭐ أبرز الأعضاء المتميزين في كل لجنة (اكتب اسم العضو وإنجازه يدوياً):</label>
+                  <div className="max-h-56 overflow-y-auto space-y-2 text-xs">
                     {allCommitteesList.map((comm, idx) => (
-                      <div key={idx} className="flex justify-between items-center border-b border-slate-100 pb-1">
-                        <span className="font-bold text-slate-700">{comm}:</span>
-                        <span className="text-[#630517] font-semibold">{getBestMemberForCommittee(comm)}</span>
+                      <div key={idx} className="space-y-1 bg-white p-2.5 rounded-xl border border-slate-200">
+                        <span className="font-bold text-[#630517] block">{comm}:</span>
+                        <input
+                          type="text"
+                          value={manualBestMembers[comm] || ''}
+                          onChange={(e) => setManualBestMembers({ ...manualBestMembers, [comm]: e.target.value })}
+                          placeholder="اكتب اسم العضو المتميز وإنجازه هنا..."
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-slate-50 text-slate-900"
+                        />
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 pt-2">
                   <label className="text-xs font-bold text-slate-700">عنوان التقرير أو الفعالية المستهدفة</label>
                   <input
                     type="text"
@@ -2288,32 +2303,61 @@ export default function CommitteeDashboard() {
             )}
           </div>
 
+          {/* لوحة الشرف ونقاط العضو الفردي (مخصصة للإدخال اليدوي المباشر من قائد/قائدة اللجنة) */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-1">
               <h3 className="text-sm font-black text-slate-900">🏆 لوحة الشرف ونقاط العضو الفردي</h3>
-              <p className="text-[11px] text-slate-500">الأعضاء الأكثر تفاعلاً وإنجازاً للمهام في ({currentActiveComm}):</p>
+              <p className="text-[11px] text-slate-500">إضافة وإدارة أسماء الأعضاء ونقاط التميز يدوياً في ({currentActiveComm}):</p>
             </div>
 
-            <div className="space-y-2.5 overflow-y-auto max-h-[380px] pt-2">
-              {rankedMembers.length === 0 ? (
-                <p className="text-center py-12 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لم يتم تسجيل إنجازات مهام للأعضاء بعد.</p>
+            {isCommitteeLeader && (
+              <form onSubmit={handleAddHonorMember} className="space-y-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                <span className="text-[11px] font-bold text-[#630517] block">إضافة عضو جديد للوحة الشرف:</span>
+                <input
+                  type="text"
+                  placeholder="اسم العضو..."
+                  value={newHonorMemberName}
+                  onChange={(e) => setNewHonorMemberName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                />
+                <input
+                  type="text"
+                  placeholder="عدد النقاط أو التقييم (مثال: 100 نقطة أو متميز جداً)"
+                  value={newHonorScore}
+                  onChange={(e) => setNewHonorScore(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                />
+                <button type="submit" className="w-full py-2 bg-[#630517] text-[#F5D061] font-bold text-xs rounded-xl shadow cursor-pointer">
+                  + إضافة للوحة الشرف 🏆
+                </button>
+              </form>
+            )}
+
+            <div className="space-y-2.5 overflow-y-auto max-h-[300px] pt-2">
+              {currentCommitteeHonorMembers.length === 0 ? (
+                <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لم يتم إضافة أعضاء يدوياً للوحة الشرف بعد.</p>
               ) : (
-                rankedMembers.map((member, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                currentCommitteeHonorMembers.map((member, idx) => (
+                  <div key={member.id} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
                     <div className="flex items-center gap-2.5">
                       <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${
                         idx === 0 ? 'bg-amber-400 text-slate-900 shadow' : idx === 1 ? 'bg-slate-300 text-slate-900' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'
                       }`}>
                         {idx + 1}
                       </span>
-                      <span className="font-bold text-slate-800">{member.name}</span>
+                      <div>
+                        <span className="font-bold text-slate-800 block">{member.name}</span>
+                        <span className="font-black text-[#630517] text-[11px]">{member.score}</span>
+                      </div>
                     </div>
-                    <span className="font-black text-[#630517] bg-[#630517]/10 px-2.5 py-1 rounded-lg">{member.score} نقطة</span>
+                    {isCommitteeLeader && (
+                      <button type="button" onClick={() => handleDeleteHonorMember(member.id)} className="text-red-600 font-bold text-xs hover:underline px-2">حذف ✕</button>
+                    )}
                   </div>
                 ))
               )}
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center">* تحسب 10 نقاط لكل مهمة ينجزها العضو.</div>
+            <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center">* التحكم كامل للقائد/ة بإضافة وتحديث الأسماء والتقييمات يدوياً.</div>
           </div>
         </div>
 
