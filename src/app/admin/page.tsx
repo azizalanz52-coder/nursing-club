@@ -562,7 +562,7 @@ export default function AdminDashboard() {
     }
   };
 
- // دالة فتح وطباعة التقرير المؤرشف بتصميم الجودة المعتمد
+ // دالة فتح وطباعة تقرير الجودة المعتمد المطابق للتصميم الأصلي 100%
   const handlePrintArchiveReport = (arch: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -570,17 +570,19 @@ export default function AdminDashboard() {
       return;
     }
 
-    const reportTitle = arch.title || arch.targetCommittee || 'الصحة النفسية 3';
-    const reportDate = arch.archivedAt 
+    // استخراج كافة البيانات الديناميكية القادمة من لجنة الجودة مع خيارات بديلة للحقول
+    const reportTitle = arch.title || arch.activityName || arch.eventName || arch.targetCommittee || 'الصحة النفسية 3';
+    const reportDate = arch.dateStr || (arch.archivedAt 
       ? new Date(arch.archivedAt).toLocaleDateString('ar-SA') 
-      : (arch.dateStr || arch.createdAt ? new Date(arch.createdAt).toLocaleDateString('ar-SA') : '2026/10/7');
-    const reportAuthor = arch.reporter || arch.author || 'لجنة الجودة والتطوير';
+      : (arch.createdAt ? new Date(arch.createdAt).toLocaleDateString('ar-SA') : '2026/10/7'));
+    const reportAuthor = arch.reporter || arch.author || arch.createdByName || 'لجنة الجودة والتطوير';
 
-    const featuredCommittee = arch.featuredCommittee || arch.targetCommittee || 'لجنة التصميم';
-    const positives = arch.positives || arch.features || arch.details || 'استهداف التخصصات الأخرى بشكل أكبر';
-    const notes = arch.notes || arch.reason || arch.description || 'سوء التنظيم عند البونات عند الملاحظات من الدكتور الفلاني سلبية';
+    const featuredCommittee = arch.featuredCommittee || arch.bestCommittee || arch.topCommittee || 'لجنة التصميم';
+    const positives = arch.positives || arch.features || arch.positivesText || arch.details || 'لا توجد ملاحظات إيجابية مضافة';
+    const notes = arch.notes || arch.negatives || arch.negativesText || arch.reason || arch.description || 'لا توجد ملاحظات مرصودة';
 
-    const topMembers = arch.topMembers || [
+    // جلب قائمة الأعضاء المميزين القادمة من الفايرستور أو استخدام القائمة المسجلة
+    const rawMembers = arch.topMembers || arch.featuredMembers || arch.members || arch.distinguishedMembers || [
       { committee: 'لجنة التصميم', member: 'أحمد العنزي (تصاميم احترافية متميزة)' },
       { committee: 'لجنة الإعلام', member: 'سارة الشمري (تغطيات فورية استثنائية)' },
       { committee: 'لجنة تنظيم الفعاليات', member: 'محمد الدوسري (تنظيم وانضباط عالٍ)' },
@@ -595,12 +597,12 @@ export default function AdminDashboard() {
       <html lang="ar" dir="rtl">
       <head>
         <meta charset="UTF-8">
-        <title>${reportTitle}</title>
+        <title>تقرير الجودة - ${reportTitle}</title>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
           body {
             font-family: 'Tajawal', Tahoma, Arial, sans-serif;
-            padding: 30px 40px;
+            padding: 30px 50px;
             color: #1e293b;
             background: #ffffff;
             direction: rtl;
@@ -636,12 +638,12 @@ export default function AdminDashboard() {
           }
           .header {
             text-align: center;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
           }
           .header h1 {
             color: #630517;
             font-size: 26px;
-            margin: 0 0 6px 0;
+            margin: 0 0 4px 0;
             font-weight: 900;
           }
           .header .subtitle {
@@ -654,7 +656,7 @@ export default function AdminDashboard() {
             color: #64748b;
             font-size: 12px;
             font-weight: 700;
-            margin-top: 4px;
+            margin-top: 2px;
           }
           .divider {
             border: 0;
@@ -666,13 +668,13 @@ export default function AdminDashboard() {
             background: #f8fafc;
             border-right: 5px solid #630517;
             padding: 16px 20px;
-            border-radius: 8px;
+            border-radius: 6px;
             margin-bottom: 25px;
           }
           .featured-box .title {
             font-size: 14px;
             font-weight: 900;
-            color: #1e293b;
+            color: #0f172a;
             margin-bottom: 4px;
           }
           .featured-box .desc {
@@ -708,15 +710,12 @@ export default function AdminDashboard() {
             color: #1e293b;
             font-weight: 700;
           }
-          .custom-table tr:nth-child(even) {
-            background: #fafafa;
-          }
           .box-green {
             background: #f0fdf4;
             border: 1px solid #dcfce7;
             border-right: 5px solid #16a34a;
             padding: 16px 20px;
-            border-radius: 8px;
+            border-radius: 6px;
             font-size: 13px;
             color: #166534;
             font-weight: 700;
@@ -727,7 +726,7 @@ export default function AdminDashboard() {
             border: 1px solid #fee2e2;
             border-right: 5px solid #dc2626;
             padding: 16px 20px;
-            border-radius: 8px;
+            border-radius: 6px;
             font-size: 13px;
             color: #991b1b;
             font-weight: 700;
@@ -735,7 +734,7 @@ export default function AdminDashboard() {
           }
           @media print {
             .no-print { display: none !important; }
-            body { padding: 10px; }
+            body { padding: 15px; }
           }
         </style>
       </head>
@@ -754,25 +753,25 @@ export default function AdminDashboard() {
         <hr class="divider" />
 
         <div class="featured-box">
-          <div class="title">🏆 أفضل لجنة أداءً وإنجازاً للمهام (محدد يدوياً):</div>
-          <div class="desc">استناداً للتقييم الإداري المعتمد، تصدرت <strong>${featuredCommittee}</strong> قائمة اللجان المتميزة في الأداء والانضباط.</div>
+          <div class="title">🏆 أفضل لجنة أداءً وإنجازاً للمهام (محدد يدويّاً):</div>
+          <div class="desc">استناداً للتقييم الإداري المعتمد، تصدرت <strong style="color: #630517;">${featuredCommittee}</strong> قائمة اللجان المتميزة في الأداء والانضباط.</div>
         </div>
 
         <div class="section-title">أولاً: أبرز الأعضاء المتميزين في اللجان (إدخال وإشراف رئيس/قائدة الجودة)</div>
         <table class="custom-table">
           <thead>
             <tr>
-              <th style="width: 35%;">اللجنة التنظيمية</th>
+              <th style="width: 32%;">اللجنة التنظيمية</th>
               <th>أبرز عضو متميز وإنجازاته (يدوي)</th>
             </tr>
           </thead>
           <tbody>
-            ${topMembers.map((m: any) => `
+            ${Array.isArray(rawMembers) ? rawMembers.map((m: any) => `
               <tr>
-                <td style="font-weight: 900; color: #0f172a;">${m.committee}</td>
-                <td>${m.member}</td>
+                <td style="font-weight: 900; color: #0f172a;">${m.committee || m.committeeName || 'اللجنة'}</td>
+                <td>${m.member || m.memberName || m.name || m.details || '-'}</td>
               </tr>
-            `).join('')}
+            `).join('') : ''}
           </tbody>
         </table>
 
