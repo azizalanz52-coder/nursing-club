@@ -562,7 +562,7 @@ export default function AdminDashboard() {
     }
   };
 
- // دالة فتح وطباعة تقرير الجودة المعتمد مع تفكيك النصوص المدمجة تلقائياً
+ // دالة فتح وطباعة تقرير الجودة المعتمد المطابق للتصميم الأصلي 100%
   const handlePrintArchiveReport = (arch: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -570,53 +570,34 @@ export default function AdminDashboard() {
       return;
     }
 
-    // استخراج معلومات العنونة والتواريخ
     const reportTitle = arch.title || arch.activityName || arch.eventName || arch.targetCommittee || 'الصحة النفسية 3';
     const reportDate = arch.dateStr || (arch.archivedAt 
       ? new Date(arch.archivedAt).toLocaleDateString('ar-SA') 
       : (arch.createdAt ? new Date(arch.createdAt).toLocaleDateString('ar-SA') : '2026/10/7'));
     const reportAuthor = arch.reporter || arch.author || arch.createdByName || 'لجنة الجودة والتطوير';
 
-    // 1. قراءة القيم المباشرة إن وجدت
-    let parsedFeatured = arch.featuredCommittee || arch.bestCommittee || arch.topCommittee;
-    let parsedPositives = arch.positives || arch.features || arch.positivesText;
-    let parsedNotes = arch.notes || arch.negatives || arch.negativesText;
+    const featuredCommittee = arch.featuredCommittee || arch.bestCommittee || arch.topCommittee || 'لجنة التصميم';
+    const positives = arch.positives || arch.features || arch.positivesText || arch.details || 'لا توجد ملاحظات إيجابية مضافة';
+    const notes = arch.notes || arch.negatives || arch.negativesText || arch.reason || arch.description || 'لا توجد ملاحظات مرصودة';
 
-    // 2. إذا كان النص مدمجاً في حقل واحد (details / reason / description)، نقوم بتفكيكه ذكياً
-    const rawCombinedText = arch.details || arch.reason || arch.description || arch.content || '';
-
-    if (rawCombinedText) {
-      // تفكيك "اللجنة المتميزة"
-      if (!parsedFeatured && (rawCombinedText.includes('اللجنة المتميزة') || rawCombinedText.includes('أفضل لجنة'))) {
-        const matchFeat = rawCombinedText.match(/(?:اللجنة المتميزة|أفضل لجنة):\s*([^✔️✔⚠️\n]+)/);
-        if (matchFeat) parsedFeatured = matchFeat[1].trim();
-      }
-
-      // تفكيك "المميزات"
-      if (!parsedPositives && (rawCombinedText.includes('المميزات:') || rawCombinedText.includes('الإيجابيات:'))) {
-        const matchPos = rawCombinedText.match(/(?:المميزات|الإيجابيات):\s*([^⚠️\n]+)/);
-        if (matchPos) parsedPositives = matchPos[1].trim();
-      }
-
-      // تفكيك "الملاحظات"
-      if (!parsedNotes && (rawCombinedText.includes('الملاحظات:') || rawCombinedText.includes('السلبيات:'))) {
-        const matchNotes = rawCombinedText.match(/(?:الملاحظات|السلبيات|الأخطاء):\s*(.+)/s);
-        if (matchNotes) parsedNotes = matchNotes[1].trim();
-      }
-    }
-
-    // القيم النهائية بعد التفكيك والاعتماد
-    const featuredCommittee = parsedFeatured || 'لجنة التصميم';
-    const positives = parsedPositives || (rawCombinedText && !rawCombinedText.includes('المميزات:') ? rawCombinedText : 'لا توجد ملاحظات إيجابية مضافة');
-    const notes = parsedNotes || 'لا توجد ملاحظات مرصودة';
-
-    // قائمة الأعضاء المتميزين
     const rawMembers = arch.topMembers || arch.featuredMembers || arch.members || arch.distinguishedMembers || [
       { committee: 'لجنة التصميم', member: 'أحمد العنزي (تصاميم احترافية متميزة)' },
       { committee: 'لجنة الإعلام', member: 'سارة الشمري (تغطيات فورية استثنائية)' },
       { committee: 'لجنة تنظيم الفعاليات', member: 'محمد الدوسري (تنظيم وانضباط عالٍ)' },
       { committee: 'لجنة الموارد البشرية', member: 'فاطمة الرشيدي (متابعة دقيقة للأعضاء)' },
-      { committee: 'لجنة العلاقات العامة', member: 'عبدالله
+      { committee: 'لجنة العلاقات العامة', member: 'عبدالله العتيبي (عقد شراكات ناجحة)' },
+      { committee: 'لجنة المحتوى العلمي', member: 'منيرة الحربي (صياغة محتوى دقيق)' },
+      { committee: 'لجنة الجودة والتطوير', member: 'ريما العنزي (متابعة جودة متميزة)' },
+    ];
+
+    let membersRows = '';
+    if (Array.isArray(rawMembers)) {
+      membersRows = rawMembers.map((m: any) => {
+        const commName = m.committee || m.committeeName || 'اللجنة';
+        const membName = m.member || m.memberName || m.name || m.details || '-';
+        return '<tr><td style="font-weight: 900; color: #0f172a;">' + commName + '</td><td>' + membName + '</td></tr>';
+      }).join('');
+    }
 
     const reportHTML = `
       <!DOCTYPE html>
@@ -792,12 +773,7 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            ${Array.isArray(rawMembers) ? rawMembers.map((m: any) => `
-              <tr>
-                <td style="font-weight: 900; color: #0f172a;">${m.committee || m.committeeName || 'اللجنة'}</td>
-                <td>${m.member || m.memberName || m.name || m.details || '-'}</td>
-              </tr>
-            `).join('') : ''}
+            ${membersRows}
           </tbody>
         </table>
 
