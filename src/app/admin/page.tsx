@@ -543,49 +543,62 @@ export default function AdminDashboard() {
       console.error(e);
     }
   };
-// دالة مساعدة آمنة لتنسيق وعرض التواريخ في الأرشيف التاريخي
-  const formatVaultDate = (vaultItem: any) => {
-    if (vaultItem.dateStr) return vaultItem.dateStr;
-    const dateValue = vaultItem.archivedAt || vaultItem.createdAt || vaultItem.submittedAt;
-    if (!dateValue) return 'معتمد رسمياً';
-    try {
-      if (typeof dateValue.toDate === 'function') {
-        return dateValue.toDate().toLocaleDateString('ar-SA');
-      }
-      const parsedDate = new Date(dateValue);
-      if (!isNaN(parsedDate.getTime())) {
-        return parsedDate.toLocaleDateString('ar-SA');
-      }
-    } catch (err) {
-      // ignore
+// دالة طباعة وتصدير الأرشيف التاريخي (محدثة بطريقة كتابة الصفحة المباشرة لضمان عدم ظهور خطأ التحميل)
+  const handlePrintArchiveReport = (arch: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('الرجاء السماح للنوافذ المنبثقة (Pop-ups) في المتصفح لفتح التقرير.');
+      return;
     }
-    return String(dateValue);
-  };
 
-  // دالة تحميل التقرير كملف PDF بشكل نظيف وخالٍ من الرموز العشوائية
-  const handleDownloadReportPdf = (vaultItem: any) => {
-    try {
-      const docPdf = new jsPDF();
-      docPdf.setFont("helvetica");
-      docPdf.setFontSize(16);
-      docPdf.text('Nursing Club - Historical Vault Report', 14, 20);
-      
-      docPdf.setFontSize(11);
-      docPdf.text(`Report ID: ${vaultItem.id || 'N/A'}`, 14, 32);
-      docPdf.text(`Target Committee: ${vaultItem.targetCommittee || vaultItem.title || 'N/A'}`, 14, 42);
-      docPdf.text(`Status / Reason: ${vaultItem.reason || vaultItem.status || 'N/A'}`, 14, 52);
-      docPdf.text(`Reporter / Author: ${vaultItem.reporter || vaultItem.author || 'Quality Committee'}`, 14, 62);
-      docPdf.text(`Date: ${formatVaultDate(vaultItem)}`, 14, 72);
-      
-      docPdf.save(`Vault_Report_${vaultItem.id || Date.now()}.pdf`);
-      
-      setModalMessage('تم تحميل التقرير كملف PDF بنجاح وبدون أي أخطاء! 📄✨');
-      setModalType('success');
-    } catch (err) {
-      console.error('PDF generation error:', err);
-      setModalMessage('حدث خطأ أثناء محاولة تحميل ملف الـ PDF.');
-      setModalType('success');
-    }
+    const reportHTML = `
+      <!DOCTYPE html>
+      <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <title>${arch.title || 'تقرير مؤرشف'}</title>
+        <style>
+          body { font-family: Tahoma, Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.8; }
+          .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 30px; }
+          .header h1 { color: #630517; font-size: 22px; margin: 0 0 8px 0; font-weight: 900; }
+          .header p { color: #64748b; font-size: 12px; margin: 0; }
+          .section-box { background: #f8fafc; border-right: 5px solid #630517; padding: 20px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; color: #334155; }
+          .print-btn { background: #630517; color: white; padding: 14px 28px; border: none; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; display: block; margin: 0 auto 30px auto; box-shadow: 0 4px 12px rgba(99,5,23,0.3); }
+          .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+          @media print { .no-print { display: none !important; } }
+        </style>
+      </head>
+      <body>
+        <div class="no-print">
+          <button class="print-btn" onclick="window.print()">🖨️ اضغط هنا للطباعة أو الحفظ كـ PDF (اختر Save as PDF)</button>
+        </div>
+
+        <div class="header">
+          <h1>نادي كلية التمريض - جامعة حفر الباطن</h1>
+          <p>الأرشيف التاريخي والتقارير المعتمدة • ${arch.title || 'تقرير الجودة'}</p>
+          <p>تاريخ الاعتماد: ${arch.dateStr || 'غير محدد'} | بواسطة: ${arch.author || 'لجنة الجودة والتطوير'}</p>
+        </div>
+
+        <div class="section-box">
+          <strong style="color: #630517; font-size: 14px; display: block; margin-bottom: 10px;">📂 تفاصيل التقرير المؤرشف:</strong>
+          ${arch.details ? arch.details.replace(/\n/g, '<br/>') : (arch.content ? arch.content.replace(/\n/g, '<br/>') : 'تم اعتماد هذا التقرير وأرشفته سحابياً بنجاح تام وفق معايير الجودة الشاملة.')}
+        </div>
+
+        <div class="footer">
+          <p>هذا التقرير موثق ومعتمد رسمياً في الأرشيف التاريخي لنادي التمريض • 2026</p>
+        </div>
+
+        <script>
+          // فتح نافذة الطباعة تلقائياً بعد التحميل
+          setTimeout(() => { window.print(); }, 500);
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(reportHTML);
+    printWindow.document.close();
   };
   const [passionSlides, setPassionSlides] = useState<PassionSlide[]>([]);
   const [newPassionQuote, setNewPassionQuote] = useState<string>('');
@@ -2593,7 +2606,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-       {activeTab === 'historical-vault' && (
+        {activeTab === 'historical-vault' && (
           <div className="bg-white rounded-3xl p-8 border border-amber-300 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
@@ -2641,6 +2654,7 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+
         {activeTab === 'escalated-reports' && (
           <div className="bg-white rounded-3xl p-8 border border-red-300 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
