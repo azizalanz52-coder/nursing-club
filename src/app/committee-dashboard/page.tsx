@@ -985,34 +985,36 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // دالة تصدير تقرير الجودة الذكي والمخصص بصيغة PDF وتعتمد على الإدخال اليدوي المخصص بالكامل
+ // 1. دالة التحميل المباشر للتقرير كملف نظيف يدعم العربية 100% (يمكن فتحه كـ HTML أو طباعته وحفظه كـ PDF بحرفية تامة)
   const handleExportSmartQualityPDF = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('الرجاء السماح بفتح النوافذ المنبثقة لتحميل التقرير.');
-      return;
-    }
-
-    let htmlContent = `
+    const reportHTML = `
+      <!DOCTYPE html>
       <html lang="ar" dir="rtl">
       <head>
         <meta charset="UTF-8">
-        <title>${smartReportTitle} - نادي التمريض</title>
+        <title>${smartReportTitle}</title>
         <style>
-          body { font-family: Tahoma, Arial, sans-serif; padding: 35px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.6; }
-          .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 25px; }
-          .header h1 { color: #630517; font-size: 22px; margin: 0 0 5px 0; font-weight: 900; }
-          .header p { color: #64748b; font-size: 11px; margin: 0; }
-          .section-box { background: #f8fafc; border-right: 4px solid #630517; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 12px; color: #334155; }
-          .section-box strong { color: #630517; }
-          .section-title { font-size: 14px; font-weight: bold; color: #630517; margin-top: 25px; margin-bottom: 10px; border-right: 4px solid #F5D061; padding-right: 8px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
-          th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: right; }
+          body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.8; }
+          .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 30px; }
+          .header h1 { color: #630517; font-size: 24px; margin: 0 0 8px 0; font-weight: 900; }
+          .header p { color: #64748b; font-size: 13px; margin: 0; }
+          .section-box { background: #f8fafc; border-right: 5px solid #630517; padding: 18px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; color: #334155; }
+          .section-title { font-size: 15px; font-weight: bold; color: #630517; margin-top: 30px; margin-bottom: 12px; border-right: 5px solid #F5D061; padding-right: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 12px; }
+          th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: right; }
           th { background-color: #f1f5f9; color: #334155; font-weight: bold; }
-          .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+          .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+          @media print {
+            body { padding: 15px; }
+            .no-print { display: none; }
+          }
         </style>
       </head>
       <body>
+        <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+          <button onclick="window.print()" style="background: #630517; color: #fff; border: none; padding: 12px 25px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer;">🖨️ طباعة أو حفظ كـ PDF</button>
+        </div>
+
         <div class="header">
           <h1>نادي كلية التمريض - جامعة حفر الباطن</h1>
           <p>لجنة الجودة والتطوير • ${smartReportTitle}</p>
@@ -1020,32 +1022,25 @@ export default function CommitteeDashboard() {
         </div>
 
         <div class="section-box">
-          <strong>🏆 أفضل لجنة أداءً وإنجازاً للمهام (محدد يدوياً):</strong><br/>
+          <strong>🏆 أفضل لجنة أداءً وإنجازاً للمهام:</strong><br/>
           استناداً للتقييم الإداري المعتمد، تصدرت <strong>${manualBestCommittee}</strong> قائمة اللجان المتميزة في الأداء والانضباط.
         </div>
 
-        <div class="section-title">أولاً: أبرز الأعضاء المتميزين في اللجان (إدخال وإشراف رئيس/قائدة الجودة)</div>
+        <div class="section-title">أولاً: أبرز الأعضاء المتميزين في اللجان</div>
         <table>
           <thead>
             <tr>
               <th>اللجنة التنظيمية</th>
-              <th>أبرز عضو متميز وإنجازاته (يدوي)</th>
+              <th>أبرز عضو متميز وإنجازاته</th>
             </tr>
           </thead>
           <tbody>
-    `;
-
-    allCommitteesList.forEach(comm => {
-      const topMem = manualBestMembers[comm] || 'غير محدد';
-      htmlContent += `
-        <tr>
-          <td><strong>${comm}</strong></td>
-          <td>${topMem}</td>
-        </tr>
-      `;
-    });
-
-    htmlContent += `
+            ${allCommitteesList.map(comm => `
+              <tr>
+                <td><strong>${comm}</strong></td>
+                <td>${manualBestMembers[comm] || 'غير محدد'}</td>
+              </tr>
+            `).join('')}
           </tbody>
         </table>
 
@@ -1060,40 +1055,47 @@ export default function CommitteeDashboard() {
         </div>
 
         <div class="footer">
-          <p>هذا التقرير معتمد رسمياً من لجنة الجودة والتطوير وموجه لإدارة نادي التمريض والعمادة • 2026</p>
+          <p>هذا التقرير معتمد رسمياً من لجنة الجودة والتطوير وموجه لإدارة نادي التمريض • 2026</p>
         </div>
-        <script>window.onload = function() { window.print(); }</script>
+      </body>
       </html>
     `;
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    // إنشاء ملف Blob بترميز UTF-8 الحقيقي لضمان عدم تلف الحروف العربية أبداً
+    const blob = new Blob(['\uFEFF' + reportHTML], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Quality_Report_${Date.now()}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    alert('تم تحميل التقرير كملف جاهز بنجاح! افتحه من جهازك واستعرضه أو احفظه كـ PDF بوضوح تام.');
   };
 
- // دالة اعتماد ورفع التقرير الذكي للأدمن والرؤساء (محدثة لتتطابق مع لوحة الأدمن وتعمل بلا أخطاء)
+  // 2. دالة رفع واعتماد التقرير للأدمن والرؤساء (مع ضمان قراءتها بدقة في لوحة الأدمن)
   const handlePublishSmartReportToPresidents = async () => {
     if (!confirm('هل أنت متأكد من حفظ ورفع هذا التقرير رسمياً لمكتب الرؤساء والأدمن وإرسال إشعار فوري لهم؟')) return;
 
     try {
       const reportFullText = `📊 [تقرير الجودة المعتمد: ${smartReportTitle}] • أفضل لجنة: ${manualBestCommittee} • المميزات: ${smartReportAdvantages || 'لا توجد'} • الأخطاء والملاحظات: ${smartReportErrors || 'لا توجد'}`;
       
-      const reportDataObj = {
-        title: smartReportTitle,
-        details: reportFullText,
-        content: reportFullText,
-        createdAt: Date.now(),
-        dateStr: new Date().toLocaleDateString('ar-SA'),
+      const cleanReportObj = {
+        title: String(smartReportTitle || 'تقرير الجودة'),
+        details: String(reportFullText),
+        content: String(reportFullText),
+        author: String(userData?.fullName || 'لجنة الجودة والتطوير'),
         status: 'معتمد ومرفوع للرؤساء والأدمن',
-        author: userData?.fullName || 'لجنة الجودة والتطوير'
+        dateStr: new Date().toLocaleDateString('ar-SA'),
+        createdAt: Date.now()
       };
 
-      // 1. الحفظ في أرشيف الجودة الخاص باللجنة
-      await addDoc(collection(db, 'quality_reports_archive'), reportDataObj);
-      
-      // 2. الحفظ في جدول التقارير العام (reports) لكي يقرأه الأدمن بضغطة زر وبدون مشاكل
-      await addDoc(collection(db, 'reports'), reportDataObj);
+      // الحفظ في أرشيف الجودة وفي التقارير العامة لكي يقرأها الأدمن فوراً وبدون أي أخطاء
+      await addDoc(collection(db, 'quality_reports_archive'), cleanReportObj);
+      await addDoc(collection(db, 'reports'), cleanReportObj);
 
-      // 3. إرسال الإشعارات الفورية للرؤساء والأدمن
+      // إرسال الإشعارات الفورية
       for (const usr of allUsersList) {
         if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
           try {
@@ -1104,13 +1106,14 @@ export default function CommitteeDashboard() {
         }
       }
 
-      alert('🎉 تم رفع التقرير وحفظه في الأرشيف وفي لوحة الأدمن، وإرسال إشعار فوري لجميع المسؤولين بنجاح تام!');
+      alert('🎉 تم رفع التقرير وحفظه في لوحة الأدمن والأرشيف، وإرسال الإشعارات بنجاح تام!');
       fetchQualityArchives();
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء رفع التقرير.');
     }
   };
+
   const handleExportQualityPDF = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
