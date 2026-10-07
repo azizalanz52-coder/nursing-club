@@ -2396,3 +2396,150 @@ export default function CommitteeDashboard() {
             <div className="space-y-3">
               {qualityArchives.length === 0 ? (
                 <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير مؤرشفة حتى الآن.</p>
+              ) : (
+                qualityArchives.map((arch) => (
+                  <div key={arch.id} className="bg-indigo-50/50 border border-indigo-200 rounded-2xl p-4 flex justify-between items-center">
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-xs">{arch.title}</h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5">تاريخ الاعتماد: {arch.dateStr} • بواسطة: {arch.author}</p>
+                    </div>
+                    <span className="text-[10px] bg-indigo-600 text-white font-bold px-3 py-1 rounded-xl">{arch.status}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAcceptModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
+            <h3 className="text-xl font-black text-slate-900 border-b border-slate-100 pb-3">تأكيد القبول في {currentActiveComm}</h3>
+            <div className="space-y-4">
+              <p className="text-xs text-slate-600">سيتم قبول الطالب رسمياً في هذه اللجنة وربطه برابط قروب الواتساب الخاص باللجنة حصرياً ولن يظهر في رغبات اللجان الأخرى بعد اليوم.</p>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600">رابط قروب الواتساب المحفوظ:</label>
+                <input
+                  type="text"
+                  value={committeeWhatsappLinks[currentActiveComm] || whatsappLink || 'لم يتم تعيين رابط لهذه اللجنة بعد'}
+                  disabled
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-700 bg-slate-100 font-mono"
+                  dir="ltr"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">يمكنك تعديل رابط اللجنة مباشرة من حقل الإعدادات في أعلى اللوحة.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setShowAcceptModal(false)} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs">إلغاء</button>
+              <button type="button" onClick={handleAcceptSubmit} className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">تأكيد القبول وإرسال الرابط ✅</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReplyModal && activeReportToReply && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
+          <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-500">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500 mx-auto flex items-center justify-center text-3xl font-bold text-white">✍️</div>
+            <div className="text-center space-y-1">
+              <h3 className="text-xl font-black text-slate-900">تقديم الرد والتبرير الرسمي</h3>
+              <p className="text-xs text-slate-500">الرد على الملاحظة الواردة من لجنة الجودة والتطوير</p>
+            </div>
+            <div className="bg-slate-50 p-3 rounded-2xl text-xs space-y-1 border border-slate-200">
+              <span className="font-bold text-slate-700 block">سبب الملاحظة المرصودة:</span>
+              <p className="text-slate-600">{activeReportToReply.reason}</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 block">اكتب تفاصيل التبرير أو خطة المعالجة:</label>
+              <textarea
+                rows={3}
+                placeholder="اكتب التبرير..."
+                value={leaderDefenseReply}
+                onChange={(e) => setLeaderDefenseReply(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setShowReplyModal(false)} className="w-1/2 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs">إلغاء</button>
+              <button type="button" onClick={handleSubmitLeaderReply} className="w-1/2 py-3 rounded-2xl bg-amber-600 text-white font-black text-xs shadow-lg hover:bg-amber-700 cursor-pointer">إرسال التبرير للجودة 📨</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReportsModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
+          <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-red-500">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <h3 className="text-lg font-black text-slate-900">🚨 مركز التقارير والشكاوى ومتابعة ردود القادة</h3>
+              <button onClick={() => setShowReportsModal(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕ إغلاق</button>
+            </div>
+            <div className="space-y-4">
+              {escalatedReports.length === 0 ? (
+                <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير تقصير أو شكاوى مرفوعة حتى الآن.</p>
+              ) : (
+                escalatedReports.map((rep) => (
+                  <div key={rep.id} className="bg-red-50/60 border border-red-200 rounded-2xl p-4 space-y-3 relative">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-black text-red-700">اللجنة المعنية: {rep.targetCommittee}</span>
+                      <button type="button" onClick={() => handleDeleteReport(rep.id)} className="px-2 py-0.5 bg-red-600 text-white rounded-md text-[10px] font-black hover:bg-red-700 cursor-pointer">حذف البلاغ 🗑</button>
+                    </div>
+                    <p className="text-xs text-slate-800 font-semibold">السبب والتقصير المرصود: {rep.reason}</p>
+                    {rep.leaderDefenseReply && (
+                      <div className="bg-white border border-emerald-300 p-3 rounded-xl text-xs space-y-1 shadow-inner">
+                        <span className="font-bold text-emerald-800 block">💬 رد وتبرير قائد اللجنة:</span>
+                        <p className="text-slate-700">{rep.leaderDefenseReply}</p>
+                      </div>
+                    )}
+                    <div className="text-[10px] text-slate-500 flex justify-between pt-2 border-t border-red-200/50">
+                      <span>الرافع: {rep.reporter}</span>
+                      <span className="font-bold text-red-800">{rep.status}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showWarningModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
+          <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-500">
+            <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold text-white ${warningStepType === 'warn-leaders' ? 'bg-amber-500' : warningStepType === 'warn-members' ? 'bg-sky-500' : 'bg-red-600'}`}>
+              {warningStepType === 'warn-leaders' ? '⚠️' : warningStepType === 'warn-members' ? '📢' : '🚨'}
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-xl font-black text-slate-900">
+                {warningStepType === 'warn-leaders' ? 'تنبيه قائد وقائدة اللجنة' : warningStepType === 'warn-members' ? 'إرسال تحذير لكافة أعضاء اللجنة' : 'إحالة البلاغ للرئيس ونائبة الرئيس'}
+              </h3>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 block">التفاصيل أو الملاحظة المرصودة:</label>
+              <textarea
+                rows={3}
+                placeholder="اكتب التفاصيل..."
+                value={warningReason}
+                onChange={(e) => setWarningReason(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setShowWarningModal(false)} className="w-1/2 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs">إلغاء</button>
+              <button
+                type="button"
+                onClick={handleExecuteWarningOrEscalation}
+                className={`w-1/2 py-3 rounded-2xl text-white font-black text-xs shadow-lg cursor-pointer ${
+                  warningStepType === 'warn-leaders' ? 'bg-amber-600 hover:bg-amber-700' : warningStepType === 'warn-members' ? 'bg-sky-600 hover:bg-sky-700' : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {warningStepType === 'warn-leaders' ? 'إرسال التنبيه 📨' : warningStepType === 'warn-members' ? 'إرسال التحذير للأعضاء 📢' : 'إحالة البلاغ ⚖️'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
