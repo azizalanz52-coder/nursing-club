@@ -562,7 +562,7 @@ export default function AdminDashboard() {
     }
   };
 
- // دالة فتح وطباعة تقرير الجودة المعتمد المطابق للتصميم الأصلي 100%
+ // دالة فتح وطباعة تقرير الجودة مع تفكيك وفصل النصوص المدمجة تلقائياً
   const handlePrintArchiveReport = (arch: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -576,10 +576,37 @@ export default function AdminDashboard() {
       : (arch.createdAt ? new Date(arch.createdAt).toLocaleDateString('ar-SA') : '2026/10/7'));
     const reportAuthor = arch.reporter || arch.author || arch.createdByName || 'لجنة الجودة والتطوير';
 
-    const featuredCommittee = arch.featuredCommittee || arch.bestCommittee || arch.topCommittee || 'لجنة التصميم';
-    const positives = arch.positives || arch.features || arch.positivesText || arch.details || 'لا توجد ملاحظات إيجابية مضافة';
-    const notes = arch.notes || arch.negatives || arch.negativesText || arch.reason || arch.description || 'لا توجد ملاحظات مرصودة';
+    // النص الخام المجمع القادم من قاعدة البيانات
+    const rawContent = arch.details || arch.reason || arch.description || arch.content || '';
 
+    // 1. تفكيك واسـتخراج اسم أفضل لجنة
+    let featuredCommittee = arch.featuredCommittee || arch.bestCommittee || arch.topCommittee || '';
+    if (!featuredCommittee && rawContent.includes('اللجنة المتميزة:')) {
+      const match = rawContent.match(/اللجنة المتميزة:\s*([^\n✔️⚠️]+)/);
+      if (match) featuredCommittee = match[1].trim();
+    }
+    if (!featuredCommittee) featuredCommittee = 'لجنة التصميم';
+
+    // 2. تفكيك واستخراج "المميزات" فقط للصندوق الأخضر
+    let positives = arch.positives || arch.features || arch.positivesText || '';
+    if (!positives && rawContent.includes('المميزات:')) {
+      const match = rawContent.match(/المميزات:\s*([^\n⚠️]+)/);
+      if (match) positives = match[1].trim();
+    }
+    if (!positives && !rawContent.includes('المميزات:') && !rawContent.includes('الملاحظات:')) {
+      positives = rawContent;
+    }
+    if (!positives) positives = 'لا توجد ملاحظات إيجابية مضافة';
+
+    // 3. تفكيك واستخراج "الملاحظات والأخطاء" فقط للصندوق الأحمر بالأسفل
+    let notes = arch.notes || arch.negatives || arch.negativesText || '';
+    if (!notes && rawContent.includes('الملاحظات:')) {
+      const match = rawContent.match(/الملاحظات:\s*([\s\S]+)/);
+      if (match) notes = match[1].trim();
+    }
+    if (!notes) notes = 'لا توجد ملاحظات مرصودة';
+
+    // 4. استخراج قائمة الأعضاء المتميزين
     const rawMembers = arch.topMembers || arch.featuredMembers || arch.members || arch.distinguishedMembers || [
       { committee: 'لجنة التصميم', member: 'أحمد العنزي (تصاميم احترافية متميزة)' },
       { committee: 'لجنة الإعلام', member: 'سارة الشمري (تغطيات فورية استثنائية)' },
