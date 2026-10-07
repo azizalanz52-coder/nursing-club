@@ -166,7 +166,7 @@ export default function AdminDashboard() {
   const [targetShiftCommittee, setTargetShiftCommittee] = useState<string>('لجنة التصميم');
 
   const [requestSearchQuery, setRequestSearchQuery] = useState<string>('');
-  const [userSearchQuery, setUserSearchQuery] = useState<string>('');
+  const [userSearchQuery, setUserSearchQuery] = useState<string>(''); // حقل البحث في الحسابات والرتب
 
   const togglePasswordVisibility = (phone: string) => {
     setShowPasswords((prev) => ({
@@ -235,6 +235,7 @@ export default function AdminDashboard() {
     fetchSiteSettings();
   }, [router]);
 
+  // دالة جلب الاسم الحقيقي للمستخدم من جدول الحسابات مباشرة (تلافياً لتناقض الأسماء القديمة)
   const getRealUserName = (phone: string, defaultName: string) => {
     if (!phone) return defaultName;
     const found = usersList.find(u => u.phone === phone);
@@ -543,6 +544,25 @@ export default function AdminDashboard() {
     }
   };
 
+  // دالة مساعدة آمنة لتنسيق وعرض التواريخ في الأرشيف التاريخي والتفادي من مشاكل Firestore Timestamps
+  const formatVaultDate = (vaultItem: any) => {
+    if (vaultItem.dateStr) return vaultItem.dateStr;
+    const dateValue = vaultItem.archivedAt || vaultItem.createdAt || vaultItem.submittedAt;
+    if (!dateValue) return 'معتمد رسمياً';
+    try {
+      if (typeof dateValue.toDate === 'function') {
+        return dateValue.toDate().toLocaleDateString('ar-SA');
+      }
+      const parsedDate = new Date(dateValue);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate.toLocaleDateString('ar-SA');
+      }
+    } catch (err) {
+      // ignore
+    }
+    return String(dateValue);
+  };
+
   const handleDownloadReportPdf = (vaultItem: any) => {
     try {
       const docPdf = new jsPDF();
@@ -550,7 +570,7 @@ export default function AdminDashboard() {
       docPdf.text(`Title / Committee: ${vaultItem.title || vaultItem.targetCommittee || 'N/A'}`, 14, 30);
       docPdf.text(`Details: ${vaultItem.reason || vaultItem.status || 'N/A'}`, 14, 40);
       docPdf.text(`Reporter / Author: ${vaultItem.reporter || vaultItem.author || 'Quality Committee'}`, 14, 50);
-      docPdf.text(`Date: ${vaultItem.dateStr || (vaultItem.archivedAt ? new Date(vaultItem.archivedAt).toLocaleDateString() : 'N/A')}`, 14, 60);
+      docPdf.text(`Date: ${formatVaultDate(vaultItem)}`, 14, 60);
       docPdf.save(`Vault_Report_${vaultItem.id || Date.now()}.pdf`);
       
       setModalMessage('تم تحميل التقرير كملف PDF بنجاح! 📄');
@@ -2598,13 +2618,13 @@ export default function AdminDashboard() {
                 {historicalVaultReports.map((vaultItem, idx) => (
                   <div key={vaultItem.id || idx} className="p-6 rounded-2xl border border-amber-200 bg-amber-50/40 shadow-sm space-y-3">
                     <div className="flex justify-between items-center flex-wrap gap-2">
-                      <span className="font-black text-amber-900 text-sm">العنوان / اللجنة: {vaultItem.title || vaultItem.targetCommittee}</span>
+                      <span className="font-black text-amber-900 text-sm">العنوان / اللجنة: {vaultItem.title || vaultItem.targetCommittee || 'تقرير مؤرشف'}</span>
                       <span className="text-[10px] bg-amber-200 text-amber-900 font-mono px-2 py-0.5 rounded font-bold">
-                        {vaultItem.dateStr || (vaultItem.archivedAt ? new Date(vaultItem.archivedAt).toLocaleDateString('ar-SA') : 'معتمد رسمياً')}
+                        {formatVaultDate(vaultItem)}
                       </span>
                     </div>
                     <p className="text-slate-800 text-xs sm:text-sm font-semibold bg-white p-3 rounded-xl border border-amber-100 shadow-inner">
-                      <strong>التفاصيل:</strong> {vaultItem.reason || vaultItem.status || 'معتمد ومؤرشف في محفظة أدلة الجودة'}
+                      <strong>التفاصيل:</strong> {vaultItem.reason || vaultItem.status || vaultItem.description || 'معتمد ومؤرشف في محفظة أدلة الجودة'}
                     </p>
                     <div className="pt-2 border-t border-amber-200 flex justify-between items-center text-[11px] text-slate-600 font-bold flex-wrap gap-2">
                       <span>الرافع والموثق: {vaultItem.reporter || vaultItem.author || 'لجنة الجودة والتطوير'}</span>
@@ -2612,7 +2632,7 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => handleDownloadReportPdf(vaultItem)}
-                          className="px-3 py-1 bg-amber-700 text-white rounded-lg font-bold text-[11px] shadow hover:bg-amber-800 transition-colors"
+                          className="px-3 py-1 bg-amber-700 text-white rounded-lg font-bold text-[11px] shadow hover:bg-amber-800 transition-colors cursor-pointer"
                         >
                           📥 تحميل PDF
                         </button>
@@ -3970,14 +3990,14 @@ export default function AdminDashboard() {
                   onChange={(e) => handleCommitteeSelectChange(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:outline-none focus:border-emerald-600"
                 >
-                  {committeeNamesList.map((c, idx) => (
-                    <option key={idx} value={c}>{c}</option>
+                  {committeeNamesList.map((commName, idx) => (
+                    <option key={idx} value={commName}>{commName}</option>
                   ))}
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">رابط قروب الواتساب للجنة:</label>
+                <label className="text-xs font-bold text-slate-700">رابط الواتساب المرتبط باللجنة:</label>
                 <input
                   type="text"
                   value={whatsappLink}
@@ -4002,7 +4022,7 @@ export default function AdminDashboard() {
                 onClick={handleConfirmAcceptRequest}
                 className="w-1/2 py-3 rounded-xl bg-emerald-600 text-white font-black text-xs shadow hover:bg-emerald-700 cursor-pointer"
               >
-                تأكيد القبول 🚀
+                تأكيد القبول وإرسال الإشعار 🚀
               </button>
             </div>
           </div>
@@ -4010,86 +4030,160 @@ export default function AdminDashboard() {
       )}
 
       {modalType !== 'none' && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 text-center">
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 text-center border-2 border-slate-200">
             {modalType === 'success' && (
               <>
-                <div className="w-16 h-16 bg-emerald-600 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">✅</div>
-                <p className="text-sm font-bold text-slate-800 whitespace-pre-line">{modalMessage}</p>
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold">
+                  ✨
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-slate-900">تنبيه النظام</h3>
+                  <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">{modalMessage}</p>
+                </div>
                 <button
+                  type="button"
                   onClick={() => setModalType('none')}
-                  className="w-full py-3 rounded-xl bg-emerald-600 text-white font-black text-xs shadow hover:bg-emerald-700 cursor-pointer"
+                  className="w-full py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
                 >
-                  حسناً 🚀
+                  حسناً، فهمت 🚀
                 </button>
               </>
             )}
+
             {modalType === 'password' && (
               <form onSubmit={submitUpdatePassword} className="space-y-4">
-                <h3 className="text-lg font-black text-slate-900">تعديل كلمة المرور</h3>
+                <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-2xl mx-auto flex items-center justify-center text-3xl">
+                  🔑
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-slate-900">تعديل كلمة مرور العضو</h3>
+                  <p className="text-xs text-slate-500">أدخل كلمة المرور الجديدة:</p>
+                </div>
                 <input
                   type="text"
-                  placeholder="كلمة المرور الجديدة"
                   value={modalInputVal}
                   onChange={(e) => setModalInputVal(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-mono"
+                  placeholder="كلمة المرور الجديدة..."
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-mono text-slate-900 bg-white focus:outline-none focus:border-[#630517]"
+                  dir="ltr"
                   required
                 />
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setModalType('none')} className="w-1/2 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">إلغاء</button>
-                  <button type="submit" className="w-1/2 py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs">حفظ</button>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalType('none')}
+                    className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
+                  >
+                    حفظ التعديل 🔒
+                  </button>
                 </div>
               </form>
             )}
+
             {modalType === 'name' && (
               <form onSubmit={submitUpdateName} className="space-y-4">
-                <h3 className="text-lg font-black text-slate-900">تعديل اسم المستخدم</h3>
+                <div className="w-16 h-16 bg-indigo-100 text-indigo-700 rounded-2xl mx-auto flex items-center justify-center text-3xl">
+                  👤
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-slate-900">تعديل الاسم الكامل</h3>
+                  <p className="text-xs text-slate-500">أدخل الاسم الجديد:</p>
+                </div>
                 <input
                   type="text"
-                  placeholder="الاسم الكامل الجديد"
                   value={modalInputVal}
                   onChange={(e) => setModalInputVal(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs"
+                  placeholder="الاسم الكامل..."
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-none focus:border-[#630517]"
                   required
                 />
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setModalType('none')} className="w-1/2 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">إلغاء</button>
-                  <button type="submit" className="w-1/2 py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs">حفظ</button>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalType('none')}
+                    className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
+                  >
+                    حفظ الاسم 👤
+                  </button>
                 </div>
               </form>
             )}
+
             {modalType === 'phone' && (
               <form onSubmit={submitUpdatePhone} className="space-y-4">
-                <h3 className="text-lg font-black text-slate-900">تعديل رقم الجوال</h3>
+                <div className="w-16 h-16 bg-sky-100 text-sky-700 rounded-2xl mx-auto flex items-center justify-center text-3xl">
+                  📱
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-slate-900">تعديل رقم الجوال</h3>
+                  <p className="text-xs text-slate-500">أدخل رقم الجوال الجديد:</p>
+                </div>
                 <input
                   type="text"
-                  placeholder="رقم الجوال الجديد"
                   value={modalInputVal}
                   onChange={(e) => setModalInputVal(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-mono"
+                  placeholder="05XXXXXXXX"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-mono text-slate-900 bg-white focus:outline-none focus:border-[#630517]"
+                  dir="ltr"
                   required
                 />
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setModalType('none')} className="w-1/2 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">إلغاء</button>
-                  <button type="submit" className="w-1/2 py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs">حفظ</button>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalType('none')}
+                    className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-1/2 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
+                  >
+                    حفظ الرقم 🚀
+                  </button>
                 </div>
               </form>
             )}
+
             {modalType === 'confirm' && (
               <div className="space-y-4">
-                <h3 className="text-lg font-black text-slate-900">تأكيد الإجراء</h3>
-                <p className="text-xs text-slate-600">{modalMessage}</p>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setModalType('none')} className="w-1/2 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">إلغاء</button>
+                <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl mx-auto flex items-center justify-center text-3xl">
+                  ⚠️
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-slate-900">تأكيد الإجراء</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">{modalMessage}</p>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalType('none')}
+                    className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
                       if (confirmActionCallback) confirmActionCallback();
                       setModalType('none');
                     }}
-                    className="w-1/2 py-2.5 rounded-xl bg-red-600 text-white font-black text-xs"
+                    className="w-1/2 py-3 rounded-xl bg-red-600 text-white font-black text-xs shadow hover:bg-red-700 cursor-pointer"
                   >
-                    تأكيد
+                    تأكيد وحذف ✕
                   </button>
                 </div>
               </div>
