@@ -543,8 +543,7 @@ export default function AdminDashboard() {
       console.error(e);
     }
   };
-
-  // دالة مساعدة آمنة لتنسيق وعرض التواريخ في الأرشيف التاريخي والتفادي من مشاكل Firestore Timestamps
+// دالة مساعدة آمنة لتنسيق وعرض التواريخ في الأرشيف التاريخي
   const formatVaultDate = (vaultItem: any) => {
     if (vaultItem.dateStr) return vaultItem.dateStr;
     const dateValue = vaultItem.archivedAt || vaultItem.createdAt || vaultItem.submittedAt;
@@ -563,17 +562,24 @@ export default function AdminDashboard() {
     return String(dateValue);
   };
 
+  // دالة تحميل التقرير كملف PDF بشكل نظيف وخالٍ من الرموز العشوائية
   const handleDownloadReportPdf = (vaultItem: any) => {
     try {
       const docPdf = new jsPDF();
+      docPdf.setFont("helvetica");
+      docPdf.setFontSize(16);
       docPdf.text('Nursing Club - Historical Vault Report', 14, 20);
-      docPdf.text(`Title / Committee: ${vaultItem.title || vaultItem.targetCommittee || 'N/A'}`, 14, 30);
-      docPdf.text(`Details: ${vaultItem.reason || vaultItem.status || 'N/A'}`, 14, 40);
-      docPdf.text(`Reporter / Author: ${vaultItem.reporter || vaultItem.author || 'Quality Committee'}`, 14, 50);
-      docPdf.text(`Date: ${formatVaultDate(vaultItem)}`, 14, 60);
+      
+      docPdf.setFontSize(11);
+      docPdf.text(`Report ID: ${vaultItem.id || 'N/A'}`, 14, 32);
+      docPdf.text(`Target Committee: ${vaultItem.targetCommittee || vaultItem.title || 'N/A'}`, 14, 42);
+      docPdf.text(`Status / Reason: ${vaultItem.reason || vaultItem.status || 'N/A'}`, 14, 52);
+      docPdf.text(`Reporter / Author: ${vaultItem.reporter || vaultItem.author || 'Quality Committee'}`, 14, 62);
+      docPdf.text(`Date: ${formatVaultDate(vaultItem)}`, 14, 72);
+      
       docPdf.save(`Vault_Report_${vaultItem.id || Date.now()}.pdf`);
       
-      setModalMessage('تم تحميل التقرير كملف PDF بنجاح! 📄');
+      setModalMessage('تم تحميل التقرير كملف PDF بنجاح وبدون أي أخطاء! 📄✨');
       setModalType('success');
     } catch (err) {
       console.error('PDF generation error:', err);
@@ -581,16 +587,6 @@ export default function AdminDashboard() {
       setModalType('success');
     }
   };
-
-  const convertFileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
   const [passionSlides, setPassionSlides] = useState<PassionSlide[]>([]);
   const [newPassionQuote, setNewPassionQuote] = useState<string>('');
   const [newPassionImage, setNewPassionImage] = useState<string>('/header-banner.png');
@@ -2597,7 +2593,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === 'historical-vault' && (
+       {activeTab === 'historical-vault' && (
           <div className="bg-white rounded-3xl p-8 border border-amber-300 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
@@ -2645,7 +2641,6 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
-
         {activeTab === 'escalated-reports' && (
           <div className="bg-white rounded-3xl p-8 border border-red-300 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
