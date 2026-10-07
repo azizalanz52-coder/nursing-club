@@ -942,67 +942,20 @@ export default function CommitteeDashboard() {
     alert('تم تصدير ملف الأكسل بنجاح وجاهز لرفعه للآدمن! 📊');
   };
 
-  // دالة اعتماد ورفع التقرير الذكي للأدمن والرؤساء (تكتب في جدولين لضمان قراءة الأدمن لها فوراً)
-  const handlePublishSmartReportToPresidents = async () => {
-    if (!confirm('هل أنت متأكد من حفظ ورفع هذا التقرير رسمياً لمكتب الرؤساء والأدمن وإرسال إشعار فوري لهم؟')) return;
-
-    try {
-      const reportFullText = `📊 [تقرير الجودة المعتمد: ${smartReportTitle}] • أفضل لجنة: ${manualBestCommittee} • المميزات: ${smartReportAdvantages || 'لا توجد'} • الأخطاء والملاحظات: ${smartReportErrors || 'لا توجد'}`;
-      const reportDataObj = {
-        title: smartReportTitle,
-        details: reportFullText,
-        content: reportFullText, // لتتوافق مع أي كود يقرأ حقل content في الأدمن
-        createdAt: Date.now(),
-        dateStr: new Date().toLocaleDateString('ar-SA'),
-        status: 'معتمد ومرفوع للرؤساء والأدمن',
-        author: userData?.fullName || 'لجنة الجودة والتطوير'
-      };
-
-      // 1. الحفظ في أرشيف الجودة
-      await addDoc(collection(db, 'quality_reports_archive'), reportDataObj);
-      
-      // 2. الحفظ في جدول التقارير العام (reports) لكي يقرأه الأدمن بضغطة زر وبدون مشاكل
-      await addDoc(collection(db, 'reports'), reportDataObj);
-
-      // 3. إرسال الإشعارات لجميع الرؤساء والأدمن
-      for (const usr of allUsersList) {
-        if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
-          try {
-            await setDoc(doc(db, 'users', usr.id), {
-              latestNotification: `🏆 [تقرير جودة جديد مرفوع]: ${smartReportTitle} (أفضل لجنة: ${manualBestCommittee})`
-            }, { merge: true });
-          } catch (er) { console.error(er); }
-        }
-      }
-
-      alert('🎉 تم رفع التقرير وحفظه في الأرشيف وفي لوحة الأدمن، وإرسال إشعار فوري لجميع المسؤولين بنجاح تام!');
-      fetchQualityArchives();
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ أثناء رفع التقرير.');
-    }
-  };
-
-  // دالة أرشفة تقرير الختام للأدمن والرؤساء
   const handleApproveAndSubmitToPresidents = async () => {
     if (!confirm('هل أنت متأكد من اعتماد التقرير الختامي لمحفظة الجودة وحفظه في الأرشيف التاريخي وإرساله رسمياً لمكتب الرؤساء والأدمن؟')) return;
 
     try {
       const reportTitle = `تقرير محفظة أدلة الجودة الختامي (${new Date().toLocaleDateString('ar-SA')})`;
       const reportSummaryText = `🏆 [اعتماد تقرير محفظة الجودة الختامي]: تمت مراجعة إنجازات اللجان السبع، وحفظ الأرشيف، ورفع التقرير بنجاح تام.`;
-      
-      const archiveObj = {
+
+      await addDoc(collection(db, 'quality_reports_archive'), {
         title: reportTitle,
-        details: reportSummaryText,
-        content: reportSummaryText,
         createdAt: Date.now(),
         dateStr: new Date().toLocaleDateString('ar-SA'),
         status: 'معتمد ومؤرشف رسمياً',
         author: userData?.fullName || 'لجنة الجودة والتطوير'
-      };
-
-      await addDoc(collection(db, 'quality_reports_archive'), archiveObj);
-      await addDoc(collection(db, 'reports'), archiveObj);
+      });
 
       for (const usr of allUsersList) {
         if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
@@ -1014,7 +967,16 @@ export default function CommitteeDashboard() {
         }
       }
 
-      alert('🎉 تم اعتماد التقرير، حفظه في الأرشيف والأدمن، وترحيله بنجاح تام لمكتب الرؤساء!');
+      await addDoc(collection(db, 'escalated_reports'), {
+        targetCommittee: 'جميع اللجان السبع',
+        reporter: userData?.fullName || 'لجنة الجودة والتطوير',
+        reason: 'تم إعداد واعتماد تقرير محفظة أدلة الجودة الختامي وأرشفته ورفعه رسمياً لمكتب الرؤساء.',
+        status: '✅ معتمد ومنجز ومؤرشف ومرفوع للرؤساء',
+        leaderDefenseReply: 'تم الإنجاز والاعتماد والأرشفة بنجاح',
+        createdAt: Date.now()
+      });
+
+      alert('🎉 تم اعتماد التقرير، حفظه في الأرشيف التاريخي، وترحيله بنجاح تام لمكتب الرؤساء والأدمن!');
       fetchEscalatedReports();
       fetchQualityArchives();
     } catch (err) {
@@ -1098,7 +1060,7 @@ export default function CommitteeDashboard() {
         </div>
 
         <div class="footer">
-          <p>هذا التقرير معتمد رسمياً من لجنة الجودة والتطوير وموجه لإدارة نادي التمريض و • 2026</p>
+          <p>هذا التقرير معتمد رسمياً من لجنة الجودة والتطوير وموجه لإدارة نادي التمريض والعمادة • 2026</p>
         </div>
         <script>window.onload = function() { window.print(); }</script>
       </html>
@@ -1108,21 +1070,30 @@ export default function CommitteeDashboard() {
     printWindow.document.close();
   };
 
+ // دالة اعتماد ورفع التقرير الذكي للأدمن والرؤساء (محدثة لتتطابق مع لوحة الأدمن وتعمل بلا أخطاء)
   const handlePublishSmartReportToPresidents = async () => {
     if (!confirm('هل أنت متأكد من حفظ ورفع هذا التقرير رسمياً لمكتب الرؤساء والأدمن وإرسال إشعار فوري لهم؟')) return;
 
     try {
       const reportFullText = `📊 [تقرير الجودة المعتمد: ${smartReportTitle}] • أفضل لجنة: ${manualBestCommittee} • المميزات: ${smartReportAdvantages || 'لا توجد'} • الأخطاء والملاحظات: ${smartReportErrors || 'لا توجد'}`;
-
-      await addDoc(collection(db, 'quality_reports_archive'), {
+      
+      const reportDataObj = {
         title: smartReportTitle,
         details: reportFullText,
+        content: reportFullText,
         createdAt: Date.now(),
         dateStr: new Date().toLocaleDateString('ar-SA'),
         status: 'معتمد ومرفوع للرؤساء والأدمن',
         author: userData?.fullName || 'لجنة الجودة والتطوير'
-      });
+      };
 
+      // 1. الحفظ في أرشيف الجودة الخاص باللجنة
+      await addDoc(collection(db, 'quality_reports_archive'), reportDataObj);
+      
+      // 2. الحفظ في جدول التقارير العام (reports) لكي يقرأه الأدمن بضغطة زر وبدون مشاكل
+      await addDoc(collection(db, 'reports'), reportDataObj);
+
+      // 3. إرسال الإشعارات الفورية للرؤساء والأدمن
       for (const usr of allUsersList) {
         if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
           try {
@@ -1133,14 +1104,13 @@ export default function CommitteeDashboard() {
         }
       }
 
-      alert('🎉 تم رفع التقرير وحفظه في الأرشيف التاريخي، وإرسال إشعار فوري لجميع الرؤساء والأدمن بنجاح تام!');
+      alert('🎉 تم رفع التقرير وحفظه في الأرشيف وفي لوحة الأدمن، وإرسال إشعار فوري لجميع المسؤولين بنجاح تام!');
       fetchQualityArchives();
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء رفع التقرير.');
     }
   };
-
   const handleExportQualityPDF = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
