@@ -562,7 +562,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // دالة فتح التقرير المؤرشف في صفحة منفصلة مع خيارات الطباعة و PDF
+ // دالة فتح وطباعة التقرير المؤرشف بتصميم الجودة المعتمد
   const handlePrintArchiveReport = (arch: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -570,10 +570,25 @@ export default function AdminDashboard() {
       return;
     }
 
-    const reportTitle = arch.title || arch.targetCommittee || 'تقرير مؤرشف';
-    const reportDate = arch.archivedAt ? new Date(arch.archivedAt).toLocaleDateString('ar-SA') : (arch.dateStr || arch.createdAt ? new Date(arch.createdAt).toLocaleDateString('ar-SA') : 'غير محدد');
+    const reportTitle = arch.title || arch.targetCommittee || 'الصحة النفسية 3';
+    const reportDate = arch.archivedAt 
+      ? new Date(arch.archivedAt).toLocaleDateString('ar-SA') 
+      : (arch.dateStr || arch.createdAt ? new Date(arch.createdAt).toLocaleDateString('ar-SA') : '2026/10/7');
     const reportAuthor = arch.reporter || arch.author || 'لجنة الجودة والتطوير';
-    const reportDetails = arch.details || arch.reason || arch.content || arch.description || 'تم اعتماد هذا التقرير وأرشفته سحابياً بنجاح تام وفق معايير الجودة الشاملة.';
+
+    const featuredCommittee = arch.featuredCommittee || arch.targetCommittee || 'لجنة التصميم';
+    const positives = arch.positives || arch.features || arch.details || 'استهداف التخصصات الأخرى بشكل أكبر';
+    const notes = arch.notes || arch.reason || arch.description || 'سوء التنظيم عند البونات عند الملاحظات من الدكتور الفلاني سلبية';
+
+    const topMembers = arch.topMembers || [
+      { committee: 'لجنة التصميم', member: 'أحمد العنزي (تصاميم احترافية متميزة)' },
+      { committee: 'لجنة الإعلام', member: 'سارة الشمري (تغطيات فورية استثنائية)' },
+      { committee: 'لجنة تنظيم الفعاليات', member: 'محمد الدوسري (تنظيم وانضباط عالٍ)' },
+      { committee: 'لجنة الموارد البشرية', member: 'فاطمة الرشيدي (متابعة دقيقة للأعضاء)' },
+      { committee: 'لجنة العلاقات العامة', member: 'عبدالله العتيبي (عقد شراكات ناجحة)' },
+      { committee: 'لجنة المحتوى العلمي', member: 'منيرة الحربي (صياغة محتوى دقيق)' },
+      { committee: 'لجنة الجودة والتطوير', member: 'ريما العنزي (متابعة جودة متميزة)' },
+    ];
 
     const reportHTML = `
       <!DOCTYPE html>
@@ -583,45 +598,192 @@ export default function AdminDashboard() {
         <title>${reportTitle}</title>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
-          body { font-family: 'Tajawal', Tahoma, Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.8; }
-          .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 30px; }
-          .header h1 { color: #630517; font-size: 24px; margin: 0 0 8px 0; font-weight: 900; }
-          .header p { color: #64748b; font-size: 13px; margin: 4px 0; font-weight: 700; }
-          .meta-info { display: flex; justify-content: space-between; background: #fff8f8; border: 1px solid #fecdd3; padding: 12px 20px; border-radius: 12px; margin-bottom: 25px; font-size: 12px; font-weight: bold; color: #881337; }
-          .section-box { background: #f8fafc; border-right: 5px solid #630517; padding: 25px; border-radius: 12px; margin-bottom: 25px; font-size: 14px; color: #334155; white-space: pre-wrap; line-height: 1.9; }
-          .action-bar { display: flex; justify-content: center; gap: 15px; margin-bottom: 30px; }
-          .print-btn { background: #630517; color: #F5D061; padding: 12px 24px; border: none; border-radius: 12px; font-size: 14px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(99,5,23,0.3); transition: all 0.2s; }
-          .pdf-btn { background: #0284c7; color: #ffffff; padding: 12px 24px; border: none; border-radius: 12px; font-size: 14px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(2,132,199,0.3); transition: all 0.2s; }
-          .print-btn:hover { background: #80071D; }
-          .pdf-btn:hover { background: #0369a1; }
-          .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; font-weight: bold; }
-          @media print { .no-print { display: none !important; } body { padding: 20px; } }
+          body {
+            font-family: 'Tajawal', Tahoma, Arial, sans-serif;
+            padding: 30px 40px;
+            color: #1e293b;
+            background: #ffffff;
+            direction: rtl;
+            line-height: 1.8;
+          }
+          .no-print {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+          }
+          .btn-print {
+            background: #630517;
+            color: #F5D061;
+            padding: 10px 22px;
+            border: none;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(99,5,23,0.25);
+          }
+          .btn-pdf {
+            background: #0284c7;
+            color: #ffffff;
+            padding: 10px 22px;
+            border: none;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(2,132,199,0.25);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 15px;
+          }
+          .header h1 {
+            color: #630517;
+            font-size: 26px;
+            margin: 0 0 6px 0;
+            font-weight: 900;
+          }
+          .header .subtitle {
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 700;
+            margin: 2px 0;
+          }
+          .header .date-str {
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+            margin-top: 4px;
+          }
+          .divider {
+            border: 0;
+            height: 2px;
+            background: #630517;
+            margin: 15px 0 25px 0;
+          }
+          .featured-box {
+            background: #f8fafc;
+            border-right: 5px solid #630517;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+          }
+          .featured-box .title {
+            font-size: 14px;
+            font-weight: 900;
+            color: #1e293b;
+            margin-bottom: 4px;
+          }
+          .featured-box .desc {
+            font-size: 12px;
+            color: #475569;
+            font-weight: 700;
+          }
+          .section-title {
+            font-size: 15px;
+            font-weight: 900;
+            color: #630517;
+            border-right: 4px solid #630517;
+            padding-right: 10px;
+            margin: 25px 0 12px 0;
+          }
+          .custom-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+            font-size: 12px;
+          }
+          .custom-table th {
+            background: #f1f5f9;
+            color: #334155;
+            font-weight: 900;
+            padding: 10px 14px;
+            border: 1px solid #e2e8f0;
+            text-align: right;
+          }
+          .custom-table td {
+            padding: 10px 14px;
+            border: 1px solid #e2e8f0;
+            color: #1e293b;
+            font-weight: 700;
+          }
+          .custom-table tr:nth-child(even) {
+            background: #fafafa;
+          }
+          .box-green {
+            background: #f0fdf4;
+            border: 1px solid #dcfce7;
+            border-right: 5px solid #16a34a;
+            padding: 16px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #166534;
+            font-weight: 700;
+            margin-bottom: 25px;
+          }
+          .box-red {
+            background: #fef2f2;
+            border: 1px solid #fee2e2;
+            border-right: 5px solid #dc2626;
+            padding: 16px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #991b1b;
+            font-weight: 700;
+            margin-bottom: 25px;
+          }
+          @media print {
+            .no-print { display: none !important; }
+            body { padding: 10px; }
+          }
         </style>
       </head>
       <body>
-        <div class="no-print action-bar">
-          <button class="print-btn" onclick="window.print()">🖨️ طباعة التقرير الفورية</button>
-          <button class="pdf-btn" onclick="window.print()">📄 حفظ التقرير كـ PDF (اختر Save as PDF)</button>
+        <div class="no-print">
+          <button class="btn-print" onclick="window.print()">🖨️ طباعة التقرير الفورية</button>
+          <button class="btn-pdf" onclick="window.print()">📄 حفظ التقرير كـ PDF (اختر Save as PDF)</button>
         </div>
 
         <div class="header">
           <h1>نادي كلية التمريض - جامعة حفر الباطن</h1>
-          <p>الأرشيف التاريخي والتقارير المعتمدة • ${reportTitle}</p>
+          <div class="subtitle">${reportAuthor} • ${reportTitle}</div>
+          <div class="date-str">تاريخ الاصدار: ${reportDate}</div>
         </div>
 
-        <div class="meta-info">
-          <span>📅 تاريخ الاعتماد: ${reportDate}</span>
-          <span>👤 الموثق / الرافع: ${reportAuthor}</span>
-          <span>🛡️ حالة التقرير: معتمد رسمياً</span>
+        <hr class="divider" />
+
+        <div class="featured-box">
+          <div class="title">🏆 أفضل لجنة أداءً وإنجازاً للمهام (محدد يدوياً):</div>
+          <div class="desc">استناداً للتقييم الإداري المعتمد، تصدرت <strong>${featuredCommittee}</strong> قائمة اللجان المتميزة في الأداء والانضباط.</div>
         </div>
 
-        <div class="section-box">
-          <strong style="color: #630517; font-size: 15px; display: block; margin-bottom: 12px;">📂 نص وتفاصيل التقرير المؤرشف:</strong>
-          ${reportDetails.replace(/\n/g, '<br/>')}
+        <div class="section-title">أولاً: أبرز الأعضاء المتميزين في اللجان (إدخال وإشراف رئيس/قائدة الجودة)</div>
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th style="width: 35%;">اللجنة التنظيمية</th>
+              <th>أبرز عضو متميز وإنجازاته (يدوي)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${topMembers.map((m: any) => `
+              <tr>
+                <td style="font-weight: 900; color: #0f172a;">${m.committee}</td>
+                <td>${m.member}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="section-title">ثانياً: المميزات والإيجابيات البارزة</div>
+        <div class="box-green">
+          ${positives}
         </div>
 
-        <div class="footer">
-          <p>هذا المستند موثق ومعتمد رسمياً في الأرشيف التاريخي لنادي التمريض بجامعة حفر الباطن • 2026</p>
+        <div class="section-title">ثالثاً: الأخطاء والملاحظات المرصودة للتحسين المستقبلي</div>
+        <div class="box-red">
+          ${notes}
         </div>
       </body>
       </html>
