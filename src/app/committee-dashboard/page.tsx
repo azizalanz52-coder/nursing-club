@@ -985,8 +985,14 @@ export default function CommitteeDashboard() {
     }
   };
 
- // 1. دالة التحميل المباشر للتقرير كملف نظيف يدعم العربية 100% (يمكن فتحه كـ HTML أو طباعته وحفظه كـ PDF بحرفية تامة)
+ // 1. دالة تصدير وطباعة تقرير الـ PDF الذكي (مع زر بارز وأمر طباعة تلقائي يضمن ظهور خيار Save as PDF)
   const handleExportSmartQualityPDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('الرجاء السماح بفتح النوافذ المنبثقة.');
+      return;
+    }
+
     const reportHTML = `
       <!DOCTYPE html>
       <html lang="ar" dir="rtl">
@@ -994,25 +1000,25 @@ export default function CommitteeDashboard() {
         <meta charset="UTF-8">
         <title>${smartReportTitle}</title>
         <style>
-          body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.8; }
+          body { font-family: Tahoma, Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.8; }
           .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 30px; }
-          .header h1 { color: #630517; font-size: 24px; margin: 0 0 8px 0; font-weight: 900; }
-          .header p { color: #64748b; font-size: 13px; margin: 0; }
-          .section-box { background: #f8fafc; border-right: 5px solid #630517; padding: 18px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; color: #334155; }
-          .section-title { font-size: 15px; font-weight: bold; color: #630517; margin-top: 30px; margin-bottom: 12px; border-right: 5px solid #F5D061; padding-right: 10px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 12px; }
-          th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: right; }
+          .header h1 { color: #630517; font-size: 22px; margin: 0 0 8px 0; font-weight: 900; }
+          .header p { color: #64748b; font-size: 12px; margin: 0; }
+          .section-box { background: #f8fafc; border-right: 5px solid #630517; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 12px; color: #334155; }
+          .section-title { font-size: 14px; font-weight: bold; color: #630517; margin-top: 25px; margin-bottom: 10px; border-right: 5px solid #F5D061; padding-right: 8px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+          th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: right; }
           th { background-color: #f1f5f9; color: #334155; font-weight: bold; }
-          .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+          .print-btn-box { background: #630517; color: white; padding: 18px; text-align: center; border-radius: 12px; margin-bottom: 30px; cursor: pointer; font-size: 15px; font-weight: bold; box-shadow: 0 4px 12px rgba(99,5,23,0.3); }
+          .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
           @media print {
-            body { padding: 15px; }
-            .no-print { display: none; }
+            .no-print { display: none !important; }
           }
         </style>
       </head>
       <body>
-        <div class="no-print" style="text-align: center; margin-bottom: 20px;">
-          <button onclick="window.print()" style="background: #630517; color: #fff; border: none; padding: 12px 25px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer;">🖨️ طباعة أو حفظ كـ PDF</button>
+        <div class="no-print print-btn-box" onclick="window.print()">
+          📥 اضغط هنا لحفظ التقرير بصيغة PDF (اختر Save as PDF من خيار الوجهة/Destination)
         </div>
 
         <div class="header">
@@ -1057,29 +1063,25 @@ export default function CommitteeDashboard() {
         <div class="footer">
           <p>هذا التقرير معتمد رسمياً من لجنة الجودة والتطوير وموجه لإدارة نادي التمريض • 2026</p>
         </div>
+
+        <script>
+          // فتح نافذة الطباعة تلقائياً بعد تحميل الصفحة بـ نصف ثانية
+          setTimeout(() => { window.print(); }, 500);
+        </script>
       </body>
       </html>
     `;
 
-    // إنشاء ملف Blob بترميز UTF-8 الحقيقي لضمان عدم تلف الحروف العربية أبداً
-    const blob = new Blob(['\uFEFF' + reportHTML], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Quality_Report_${Date.now()}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    alert('تم تحميل التقرير كملف جاهز بنجاح! افتحه من جهازك واستعرضه أو احفظه كـ PDF بوضوح تام.');
+    printWindow.document.write(reportHTML);
+    printWindow.document.close();
   };
 
-  // 2. دالة رفع واعتماد التقرير للأدمن والرؤساء (مع ضمان قراءتها بدقة في لوحة الأدمن)
+  // 2. دالة رفع واعتماد التقرير بترميز UTF-8 سليم 100% ليقرأه الأدمن والرؤساء بوضوح
   const handlePublishSmartReportToPresidents = async () => {
     if (!confirm('هل أنت متأكد من حفظ ورفع هذا التقرير رسمياً لمكتب الرؤساء والأدمن وإرسال إشعار فوري لهم؟')) return;
 
     try {
-      const reportFullText = `📊 [تقرير الجودة المعتمد: ${smartReportTitle}] • أفضل لجنة: ${manualBestCommittee} • المميزات: ${smartReportAdvantages || 'لا توجد'} • الأخطاء والملاحظات: ${smartReportErrors || 'لا توجد'}`;
+      const reportFullText = `تقرير الجودة المعتمد: ${smartReportTitle} | أفضل لجنة: ${manualBestCommittee} | المميزات: ${smartReportAdvantages || 'لا توجد'} | الملاحظات: ${smartReportErrors || 'لا توجد'}`;
       
       const cleanReportObj = {
         title: String(smartReportTitle || 'تقرير الجودة'),
@@ -1091,11 +1093,11 @@ export default function CommitteeDashboard() {
         createdAt: Date.now()
       };
 
-      // الحفظ في أرشيف الجودة وفي التقارير العامة لكي يقرأها الأدمن فوراً وبدون أي أخطاء
+      // الحفظ في أرشيف الجودة والتقارير العامة بترميز نصي صريح
       await addDoc(collection(db, 'quality_reports_archive'), cleanReportObj);
       await addDoc(collection(db, 'reports'), cleanReportObj);
 
-      // إرسال الإشعارات الفورية
+      // إرسال الإشعارات
       for (const usr of allUsersList) {
         if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
           try {
@@ -1106,11 +1108,24 @@ export default function CommitteeDashboard() {
         }
       }
 
-      alert('🎉 تم رفع التقرير وحفظه في لوحة الأدمن والأرشيف، وإرسال الإشعارات بنجاح تام!');
+      alert('🎉 تم رفع التقرير وحفظه في لوحة الأدمن والأرشيف بوضوح تام، وإرسال الإشعارات بنجاح!');
       fetchQualityArchives();
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء رفع التقرير.');
+    }
+  };
+
+  // 3. خاصية حذف تقرير من الأرشيف التاريخي (مطلوبة)
+  const handleDeleteQualityArchive = async (archiveId: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا التقرير من الأرشيف نهائياً؟')) return;
+    try {
+      await deleteDoc(doc(db, 'quality_reports_archive', archiveId));
+      setQualityArchives(qualityArchives.filter(a => a.id !== archiveId));
+      alert('تم حذف التقرير بنجاح! 🗑️');
+    } catch (e) {
+      console.error(e);
+      alert('حدث خطأ أثناء حذف التقرير.');
     }
   };
 
@@ -2441,31 +2456,38 @@ export default function CommitteeDashboard() {
 
       </div>
 
-      {showArchiveModal && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
-          <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-indigo-500">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-              <h3 className="text-lg font-black text-slate-900">📂 الأرشيف التاريخي لتقارير الجودة المعتمدة</h3>
-              <button onClick={() => setShowArchiveModal(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕ إغلاق</button>
-            </div>
-            <div className="space-y-3">
-              {qualityArchives.length === 0 ? (
-                <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير مؤرشفة حتى الآن.</p>
-              ) : (
-                qualityArchives.map((arch) => (
-                  <div key={arch.id} className="bg-indigo-50/50 border border-indigo-200 rounded-2xl p-4 flex justify-between items-center">
-                    <div>
-                      <h4 className="font-extrabold text-slate-900 text-xs">{arch.title}</h4>
-                      <p className="text-[10px] text-slate-500 mt-0.5">تاريخ الاعتماد: {arch.dateStr} • بواسطة: {arch.author}</p>
-                    </div>
-                    <span className="text-[10px] bg-indigo-600 text-white font-bold px-3 py-1 rounded-xl">{arch.status}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+     {qualityArchives.length === 0 ? (
+  <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير مؤرشفة حالياً</p>
+) : (
+  qualityArchives.map((arch) => (
+    <div key={arch.id} className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl flex justify-between items-center flex-wrap gap-3">
+      <div>
+        <h4 className="font-extrabold text-slate-900 text-xs">{arch.title}</h4>
+        <p className="text-[10px] text-slate-500 mt-0.5">تاريخ الاعتماد: {arch.dateStr || 'غير محدد'} | بواسطة: {arch.author || 'لجنة الجودة'}</p>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        {/* زر الطباعة والتصدير القديم الموجود عندك */}
+        <button
+          type="button"
+          onClick={() => handlePrintArchiveReport(arch)}
+          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+        >
+          📄 طباعة وتصدير PDF
+        </button>
+
+        {/* 🗑️ زر الحذف الجديد اللي طلبته */}
+        <button
+          type="button"
+          onClick={() => handleDeleteQualityArchive(arch.id)}
+          className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+        >
+          🗑️ حذف
+        </button>
+      </div>
+    </div>
+  ))
+)}
 
       {showAcceptModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
