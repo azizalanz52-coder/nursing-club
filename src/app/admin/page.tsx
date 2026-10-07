@@ -168,6 +168,25 @@ export default function AdminDashboard() {
   const [requestSearchQuery, setRequestSearchQuery] = useState<string>('');
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
 
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const formatVaultDate = (vaultItem: any) => {
+    const d = vaultItem.archivedAt || vaultItem.dateStr || vaultItem.createdAt || vaultItem.warningSentAt;
+    if (!d) return 'تاريخ غير محدد';
+    try {
+      return new Date(d).toLocaleDateString('ar-SA');
+    } catch {
+      return String(d);
+    }
+  };
+
   const togglePasswordVisibility = (phone: string) => {
     setShowPasswords((prev) => ({
       ...prev,
@@ -543,6 +562,76 @@ export default function AdminDashboard() {
     }
   };
 
+  // دالة فتح التقرير المؤرشف في صفحة منفصلة مع خيارات الطباعة و PDF
+  const handlePrintArchiveReport = (arch: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('الرجاء السماح للنوافذ المنبثقة (Pop-ups) في المتصفح لفتح التقرير.');
+      return;
+    }
+
+    const reportTitle = arch.title || arch.targetCommittee || 'تقرير مؤرشف';
+    const reportDate = arch.archivedAt ? new Date(arch.archivedAt).toLocaleDateString('ar-SA') : (arch.dateStr || arch.createdAt ? new Date(arch.createdAt).toLocaleDateString('ar-SA') : 'غير محدد');
+    const reportAuthor = arch.reporter || arch.author || 'لجنة الجودة والتطوير';
+    const reportDetails = arch.details || arch.reason || arch.content || arch.description || 'تم اعتماد هذا التقرير وأرشفته سحابياً بنجاح تام وفق معايير الجودة الشاملة.';
+
+    const reportHTML = `
+      <!DOCTYPE html>
+      <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <title>${reportTitle}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+          body { font-family: 'Tajawal', Tahoma, Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.8; }
+          .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 30px; }
+          .header h1 { color: #630517; font-size: 24px; margin: 0 0 8px 0; font-weight: 900; }
+          .header p { color: #64748b; font-size: 13px; margin: 4px 0; font-weight: 700; }
+          .meta-info { display: flex; justify-content: space-between; background: #fff8f8; border: 1px solid #fecdd3; padding: 12px 20px; border-radius: 12px; margin-bottom: 25px; font-size: 12px; font-weight: bold; color: #881337; }
+          .section-box { background: #f8fafc; border-right: 5px solid #630517; padding: 25px; border-radius: 12px; margin-bottom: 25px; font-size: 14px; color: #334155; white-space: pre-wrap; line-height: 1.9; }
+          .action-bar { display: flex; justify-content: center; gap: 15px; margin-bottom: 30px; }
+          .print-btn { background: #630517; color: #F5D061; padding: 12px 24px; border: none; border-radius: 12px; font-size: 14px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(99,5,23,0.3); transition: all 0.2s; }
+          .pdf-btn { background: #0284c7; color: #ffffff; padding: 12px 24px; border: none; border-radius: 12px; font-size: 14px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(2,132,199,0.3); transition: all 0.2s; }
+          .print-btn:hover { background: #80071D; }
+          .pdf-btn:hover { background: #0369a1; }
+          .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; font-weight: bold; }
+          @media print { .no-print { display: none !important; } body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="no-print action-bar">
+          <button class="print-btn" onclick="window.print()">🖨️ طباعة التقرير الفورية</button>
+          <button class="pdf-btn" onclick="window.print()">📄 حفظ التقرير كـ PDF (اختر Save as PDF)</button>
+        </div>
+
+        <div class="header">
+          <h1>نادي كلية التمريض - جامعة حفر الباطن</h1>
+          <p>الأرشيف التاريخي والتقارير المعتمدة • ${reportTitle}</p>
+        </div>
+
+        <div class="meta-info">
+          <span>📅 تاريخ الاعتماد: ${reportDate}</span>
+          <span>👤 الموثق / الرافع: ${reportAuthor}</span>
+          <span>🛡️ حالة التقرير: معتمد رسمياً</span>
+        </div>
+
+        <div class="section-box">
+          <strong style="color: #630517; font-size: 15px; display: block; margin-bottom: 12px;">📂 نص وتفاصيل التقرير المؤرشف:</strong>
+          ${reportDetails.replace(/\n/g, '<br/>')}
+        </div>
+
+        <div class="footer">
+          <p>هذا المستند موثق ومعتمد رسمياً في الأرشيف التاريخي لنادي التمريض بجامعة حفر الباطن • 2026</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(reportHTML);
+    printWindow.document.close();
+  };
+
   const [passionSlides, setPassionSlides] = useState<PassionSlide[]>([]);
   const [newPassionQuote, setNewPassionQuote] = useState<string>('');
   const [newPassionImage, setNewPassionImage] = useState<string>('/header-banner.png');
@@ -869,7 +958,7 @@ export default function AdminDashboard() {
   };
 
   const handleEscalateToPresidentsFinal = async (rep: any) => {
-    triggerConfirmModal(`هل أنت متأكد من عدم تجاوب قائد وقائدة (${rep.targetCommittee}) وترغب في رفع البلاغ وإحالتته رسمياً لرئيس ونائبة الرئيس الآن وأرشفته؟`, async () => {
+    triggerConfirmModal(`هل أنت متأكد من عدم تجاوب قائد وقائدة (${rep.targetCommittee}) وترغب في رفع البلاغ وإحالته رسمياً لرئيس ونائبة الرئيس الآن وأرشفته؟`, async () => {
       try {
         const repRef = doc(db, 'escalated_reports', rep.id);
         const finalStatus = 'مُحال رسمياً لرئيس ونائبة الرئيس (لعدم التجاوب 🚨)';
@@ -2583,10 +2672,10 @@ export default function AdminDashboard() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => handleDownloadReportPdf(vaultItem)}
-                          className="px-3 py-1 bg-amber-700 text-white rounded-lg font-bold text-[11px] shadow hover:bg-amber-800 transition-colors cursor-pointer"
+                          onClick={() => handlePrintArchiveReport(vaultItem)}
+                          className="px-3.5 py-1.5 bg-[#630517] text-[#F5D061] rounded-xl font-black text-xs shadow-md hover:bg-[#80071D] transition-all cursor-pointer flex items-center gap-1.5"
                         >
-                          📥 تحميل PDF
+                          📄 فتح التقرير / طباعة و PDF ↗
                         </button>
                         <span className="text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg">✅ معتمد</span>
                       </div>
@@ -3843,6 +3932,7 @@ export default function AdminDashboard() {
 
       </div>
 
+      {/* مودال تحويل الرغبات يدويًا */}
       {showShiftModal && selectedReqForShift && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-sky-400">
@@ -3887,278 +3977,139 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* مودال الإنذار التحذيري للقادة */}
       {showWarningModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <form onSubmit={handleSendWarningToLeaders} className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 border-2 border-amber-400">
-            <div className="w-16 h-16 bg-amber-500 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
-              ⚠️
-            </div>
-            <div className="space-y-2 text-center">
-              <h3 className="text-xl font-black text-slate-900">إرسال إنذار تحذيري لقادة ({warningTargetCommittee})</h3>
-              <p className="text-xs text-slate-500">نص الإنذار الذي سيصل للجنة:</p>
-            </div>
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 border-2 border-amber-500">
+            <h3 className="text-lg font-black text-amber-900">⚠️ إرسال إنذار لقادة اللجنة ({warningTargetCommittee})</h3>
             <textarea
               rows={4}
               value={warningMessageText}
               onChange={(e) => setWarningMessageText(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 focus:outline-none focus:border-amber-500 leading-relaxed"
-              required
+              className="w-full p-3 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-600"
             />
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowWarningModal(false)}
-                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                type="submit"
-                className="w-1/2 py-3 rounded-xl bg-amber-600 text-white font-black text-xs shadow hover:bg-amber-700 cursor-pointer"
-              >
-                إرسال الإنذار ⚠️
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {showAcceptModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-emerald-400">
-            <div className="w-16 h-16 bg-emerald-600 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
-              ✅
-            </div>
-            <div className="space-y-2 text-center">
-              <h3 className="text-xl font-black text-slate-900">تأكيد قبول العضو وتحديد اللجنة</h3>
-              <p className="text-xs text-slate-500">سيتم إضافة العضو تلقائياً للجنة المحددة مع رابط الواتساب:</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">اللجنة المقبول بها:</label>
-                <select
-                  value={acceptedCommittee}
-                  onChange={(e) => handleCommitteeSelectChange(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white"
-                >
-                  {committeeNamesList.map((c, idx) => (
-                    <option key={idx} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">رابط مجموعة الواتساب:</label>
-                <input
-                  type="text"
-                  placeholder="https://chat.whatsapp.com/..."
-                  value={whatsappLink}
-                  onChange={(e) => setWhatsappLink(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono"
-                  dir="ltr"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowAcceptModal(false)}
-                className="w-1/2 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmAcceptRequest}
-                className="w-1/2 py-3 rounded-xl bg-emerald-600 text-white font-black text-xs shadow hover:bg-emerald-700 cursor-pointer"
-              >
-                تأكيد القبول وإرسال الإشعار 🚀
-              </button>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowWarningModal(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-200">إلغاء</button>
+              <button type="button" onClick={handleSendWarningToLeaders} className="px-4 py-2 bg-amber-600 text-white font-bold text-xs rounded-xl shadow hover:bg-amber-700">إرسال الإنذار ⚠️</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* مودال قبول الطلبات وتحديد قروب الواتساب */}
+      {showAcceptModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 border-2 border-emerald-500">
+            <h3 className="text-lg font-black text-emerald-900">✅ قبول المتقدم وتحديد اللجنة</h3>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700">اختر اللجنة المقبول بها:</label>
+              <select
+                value={acceptedCommittee}
+                onChange={(e) => handleCommitteeSelectChange(e.target.value)}
+                className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 bg-white"
+              >
+                {committeeNamesList.map((c, i) => <option key={i} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700">رابط الواتساب التلقائي:</label>
+              <input
+                type="text"
+                value={whatsappLink}
+                onChange={(e) => setWhatsappLink(e.target.value)}
+                className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-mono text-slate-900"
+                dir="ltr"
+              />
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <button type="button" onClick={() => setShowAcceptModal(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-200">إلغاء</button>
+              <button type="button" onClick={handleConfirmAcceptRequest} className="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow hover:bg-emerald-700">تأكيد القبول 🎉</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* النوافذ المنبثقة العامة (تأكيد، نجاح، تعديل كلمة مرور، تعديل اسم، تعديل رقم جوال) */}
       {modalType !== 'none' && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl space-y-6 text-center border-2 border-slate-200">
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 border border-slate-200">
             {modalType === 'success' && (
               <>
-                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full mx-auto flex items-center justify-center text-3xl shadow-inner">
-                  ✨
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full mx-auto flex items-center justify-center text-2xl font-bold">✓</div>
+                <p className="text-xs font-bold text-slate-800 text-center whitespace-pre-line leading-relaxed">{modalMessage}</p>
+                <button type="button" onClick={() => setModalType('none')} className="w-full py-2.5 bg-[#630517] text-[#F5D061] font-bold text-xs rounded-xl shadow">حسناً</button>
+              </>
+            )}
+
+            {modalType === 'confirm' && (
+              <>
+                <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-full mx-auto flex items-center justify-center text-2xl font-bold">⚠️</div>
+                <p className="text-xs font-bold text-slate-800 text-center leading-relaxed">{modalMessage}</p>
+                <div className="flex gap-2 pt-2">
+                  <button type="button" onClick={() => setModalType('none')} className="w-1/2 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl">إلغاء</button>
+                  <button type="button" onClick={() => { if (confirmActionCallback) confirmActionCallback(); setModalType('none'); }} className="w-1/2 py-2 bg-red-600 text-white font-bold text-xs rounded-xl shadow">تأكيد الإجراء</button>
                 </div>
-                <p className="text-sm font-black text-slate-800 whitespace-pre-line leading-relaxed">{modalMessage}</p>
-                <button
-                  type="button"
-                  onClick={() => setModalType('none')}
-                  className="w-full py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
-                >
-                  حسناً، فهمت 👍
-                </button>
               </>
             )}
 
             {modalType === 'password' && (
               <form onSubmit={submitUpdatePassword} className="space-y-4">
-                <div className="w-14 h-14 bg-amber-100 text-amber-700 rounded-full mx-auto flex items-center justify-center text-2xl">
-                  🔑
-                </div>
-                <h4 className="font-black text-slate-900 text-base">تعديل كلمة مرور العضو</h4>
+                <h3 className="text-sm font-black text-slate-900">🔒 تعديل كلمة المرور للمستخدم</h3>
                 <input
                   type="text"
-                  placeholder="أدخل كلمة المرور الجديدة"
+                  placeholder="كلمة المرور الجديدة..."
                   value={modalInputVal}
                   onChange={(e) => setModalInputVal(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono"
-                  dir="ltr"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:border-[#630517]"
                   required
                 />
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setModalType('none')}
-                    className="w-1/2 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs"
-                  >
-                    إلغاء
-                  </button>
-                  <button
-                    type="submit"
-                    className="w-1/2 py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow"
-                  >
-                    حفظ الكلمة
-                  </button>
+                  <button type="button" onClick={() => setModalType('none')} className="w-1/2 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl">إلغاء</button>
+                  <button type="submit" className="w-1/2 py-2 bg-[#630517] text-[#F5D061] font-bold text-xs rounded-xl shadow">تحديث كلمة المرور</button>
                 </div>
               </form>
             )}
 
             {modalType === 'name' && (
               <form onSubmit={submitUpdateName} className="space-y-4">
-                <div className="w-14 h-14 bg-indigo-100 text-indigo-700 rounded-full mx-auto flex items-center justify-center text-2xl">
-                  👤
-                </div>
-                <h4 className="font-black text-slate-900 text-base">تعديل الاسم الكامل للمستخدم</h4>
+                <h3 className="text-sm font-black text-slate-900">👤 تعديل اسم المستخدم الكامل</h3>
                 <input
                   type="text"
-                  placeholder="أدخل الاسم الكامل"
+                  placeholder="الاسم الكامل..."
                   value={modalInputVal}
                   onChange={(e) => setModalInputVal(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs text-slate-900"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   required
                 />
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setModalType('none')}
-                    className="w-1/2 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs"
-                  >
-                    إلغاء
-                  </button>
-                  <button
-                    type="submit"
-                    className="w-1/2 py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow"
-                  >
-                    حفظ الاسم
-                  </button>
+                  <button type="button" onClick={() => setModalType('none')} className="w-1/2 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl">إلغاء</button>
+                  <button type="submit" className="w-1/2 py-2 bg-[#630517] text-[#F5D061] font-bold text-xs rounded-xl shadow">تحديث الاسم</button>
                 </div>
               </form>
             )}
 
             {modalType === 'phone' && (
               <form onSubmit={submitUpdatePhone} className="space-y-4">
-                <div className="w-14 h-14 bg-sky-100 text-sky-700 rounded-full mx-auto flex items-center justify-center text-2xl">
-                  📱
-                </div>
-                <h4 className="font-black text-slate-900 text-base">تعديل رقم الجوال الإداري</h4>
+                <h3 className="text-sm font-black text-slate-900">📱 تعديل رقم الجوال (اسم الدخول)</h3>
                 <input
                   type="text"
                   placeholder="05XXXXXXXX"
                   value={modalInputVal}
                   onChange={(e) => setModalInputVal(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:border-[#630517]"
                   dir="ltr"
                   required
                 />
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setModalType('none')}
-                    className="w-1/2 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs"
-                  >
-                    إلغاء
-                  </button>
-                  <button
-                    type="submit"
-                    className="w-1/2 py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-bold text-xs shadow"
-                  >
-                    تحديث الرقم
-                  </button>
+                  <button type="button" onClick={() => setModalType('none')} className="w-1/2 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl">إلغاء</button>
+                  <button type="submit" className="w-1/2 py-2 bg-sky-600 text-white font-bold text-xs rounded-xl shadow">تحديث رقم الجوال</button>
                 </div>
               </form>
-            )}
-
-            {modalType === 'confirm' && (
-              <div className="space-y-4">
-                <div className="w-14 h-14 bg-amber-100 text-amber-700 rounded-full mx-auto flex items-center justify-center text-2xl">
-                  ⚠️
-                </div>
-                <p className="text-sm font-bold text-slate-800 leading-relaxed">{modalMessage}</p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setModalType('none')}
-                    className="w-1/2 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs"
-                  >
-                    إلغاء
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirmActionCallback) confirmActionCallback();
-                      setModalType('none');
-                    }}
-                    className="w-1/2 py-2.5 rounded-xl bg-red-600 text-white font-black text-xs shadow"
-                  >
-                    تأكيد الحذف/الإجراء
-                  </button>
-                </div>
-              </div>
             )}
           </div>
         </div>
       )}
+
     </main>
   );
 }
-
-// الدوال المساعدة لضمان عمل كافة الوظائف البرمجية بسلاسة
-const convertFileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = (error) => reject(error);
-  });
-};
-
-const formatVaultDate = (item: any): string => {
-  const d = item.archivedAt || item.dateStr || item.createdAt;
-  if (!d) return '2026';
-  try {
-    return new Date(d).toLocaleDateString('ar-SA');
-  } catch (e) {
-    return '2026';
-  }
-};
-
-const handleDownloadReportPdf = (vaultItem: any) => {
-  const doc = new jsPDF();
-  doc.setFont("helvetica", "bold");
-  doc.text("UHB Nursing Club - Historical Vault Report", 20, 20);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Title: ${vaultItem.title || vaultItem.targetCommittee || 'Report'}`, 20, 30);
-  doc.text(`Details: ${vaultItem.reason || vaultItem.status || vaultItem.description || 'N/A'}`, 20, 40);
-  doc.text(`Date: ${formatVaultDate(vaultItem)}`, 20, 50);
-  doc.save(`Vault_Report_${vaultItem.id || 'document'}.pdf`);
-};
