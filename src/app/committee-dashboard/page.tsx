@@ -1060,7 +1060,7 @@ export default function CommitteeDashboard() {
         </div>
 
         <div class="footer">
-          <p>هذا التقرير معتمد رسمياً من لجنة الجودة والتطوير وموجه لإدارة نادي التمريض والعمادة • 2026</p>
+          <p>هذا التقرير معتمد رسمياً من لجنة الجودة والتطوير وموجه لإدارة نادي التمريض  • 2026</p>
         </div>
         <script>window.onload = function() { window.print(); }</script>
       </html>
