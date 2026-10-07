@@ -942,7 +942,7 @@ export default function CommitteeDashboard() {
     alert('تم تصدير ملف الأكسل بنجاح وجاهز لرفعه للآدمن! 📊');
   };
 
- // دالة اعتماد ورفع التقرير الذكي للأدمن والرؤساء (تكتب في جدولين لضمان قراءة الأدمن لها فوراً)
+  // دالة اعتماد ورفع التقرير الذكي للأدمن والرؤساء (تكتب في جدولين لضمان قراءة الأدمن لها فوراً)
   const handlePublishSmartReportToPresidents = async () => {
     if (!confirm('هل أنت متأكد من حفظ ورفع هذا التقرير رسمياً لمكتب الرؤساء والأدمن وإرسال إشعار فوري لهم؟')) return;
 
@@ -1023,6 +1023,14 @@ export default function CommitteeDashboard() {
     }
   };
 
+  // دالة تصدير تقرير الجودة الذكي والمخصص بصيغة PDF وتعتمد على الإدخال اليدوي المخصص بالكامل
+  const handleExportSmartQualityPDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('الرجاء السماح بفتح النوافذ المنبثقة لتحميل التقرير.');
+      return;
+    }
+
     let htmlContent = `
       <html lang="ar" dir="rtl">
       <head>
@@ -1090,7 +1098,7 @@ export default function CommitteeDashboard() {
         </div>
 
         <div class="footer">
-          <p>هذا التقرير معتمد رسمياً من لجنة الجودة والتطوير وموجه لإدارة نادي التمريض  • 2026</p>
+          <p>هذا التقرير معتمد رسمياً من لجنة الجودة والتطوير وموجه لإدارة نادي التمريض و • 2026</p>
         </div>
         <script>window.onload = function() { window.print(); }</script>
       </html>
