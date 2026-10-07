@@ -90,10 +90,10 @@ export default function CommitteeDashboard() {
   const [partnerNotes, setPartnerNotes] = useState('');
   const [publicPartnersList, setPublicPartnersList] = useState<any[]>([]);
 
-  // حقول تقرير الجودة الذكي واليدوي الجديد
-  const [smartReportTitle, setSmartReportTitle] = useState('تقرير إنجاز الفعالية والأداء العام للجان');
-  const [smartReportErrors, setSmartReportErrors] = useState('');
-  const [smartReportAdvantages, setSmartReportAdvantages] = useState('');
+  // حقول تقرير الجودة الذكي واليدوي
+  const [smartReportTitle, setSmartReportTitle] = useState('الصحة النفسية 3');
+  const [smartReportErrors, setSmartReportErrors] = useState('سوء التنظيم عند البونات عند الملاحظات من الدكتور الفلاني سلبية');
+  const [smartReportAdvantages, setSmartReportAdvantages] = useState('استهداف التخصصات الأخرى بشكل أكبر');
   
   // حقول يدوية لأفضل لجنة وأبرز الأعضاء في تقرير الجودة
   const [manualBestCommittee, setManualBestCommittee] = useState('لجنة التصميم');
@@ -845,7 +845,7 @@ export default function CommitteeDashboard() {
           targetCommittee: targetCommitteeForWarning,
           reporter: userData?.fullName || 'لجنة الجودة والتطوير',
           reason: warningReason,
-          status: '⚠️ تم إرسال إنذار للقادة (بانتظار الرد خلال 24 ساعة)',
+          status: '⚠️ تم إرسال إنذار لقادة (بانتظار الرد خلال 24 ساعة)',
           leaderDefenseReply: '',
           warningSentAt: Date.now(),
           createdAt: Date.now()
@@ -985,72 +985,103 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // دالة تصدير تقرير الجودة المتقدم واليدوي كملف PDF
+  // دالة تصدير تقرير الجودة المطابقة 100% للتصميم التاريخي في الصورة
   const handleExportSmartQualityPDF = () => {
+    const reportTitle = smartReportTitle || 'الصحة النفسية 3';
     const reportHTML = `
       <!DOCTYPE html>
       <html lang="ar" dir="rtl">
       <head>
         <meta charset="UTF-8">
-        <title>${smartReportTitle || 'تقرير إنجاز الفعالية والأداء العام'}</title>
+        <title>${reportTitle}</title>
         <style>
-          body { font-family: Tahoma, Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.8; }
-          .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 30px; }
-          .header h1 { color: #630517; font-size: 22px; margin: 0 0 8px 0; font-weight: 900; }
-          .header p { color: #64748b; font-size: 12px; margin: 0; }
-          .section-box { background: #f8fafc; border-right: 5px solid #630517; padding: 20px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; color: #334155; }
-          .section-title { font-size: 15px; font-weight: bold; color: #630517; margin-top: 25px; margin-bottom: 12px; border-bottom: 2px solid #f1f5f9; padding-bottom: 6px; }
-          .print-btn { background: #630517; color: white; padding: 14px 28px; border: none; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; display: block; margin: 0 auto 30px auto; box-shadow: 0 4px 12px rgba(99,5,23,0.3); }
-          .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
-          .badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; background: #fef3c7; color: #92400e; }
-          @media print { .no-print { display: none !important; } }
+          @page { size: A4; margin: 15mm; }
+          body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 30px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.7; }
+          
+          .no-print-bar { background: #f8fafc; border: 2px solid #630517; padding: 14px 20px; border-radius: 12px; margin-bottom: 25px; text-align: center; font-size: 13px; font-weight: bold; color: #630517; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+          .print-btn { background: #630517; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 900; font-size: 13px; cursor: pointer; margin-top: 8px; }
+
+          .header { text-align: center; margin-bottom: 10px; }
+          .header h1 { color: #630517; font-size: 24px; font-weight: 900; margin: 0 0 6px 0; }
+          .header .sub { color: #64748b; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+          .header .date { color: #64748b; font-size: 12px; margin-bottom: 15px; }
+          .divider { border: none; border-top: 2px solid #630517; margin-bottom: 25px; }
+          
+          .top-box { background: #f8fafc; border-right: 5px solid #630517; padding: 16px 20px; border-radius: 8px; margin-bottom: 25px; }
+          .top-box-title { color: #000; font-size: 14px; font-weight: 900; margin-bottom: 4px; }
+          .top-box-sub { color: #475569; font-size: 13px; font-weight: 600; }
+          
+          .section-title { font-size: 15px; font-weight: 900; color: #630517; border-right: 4px solid #F5D061; padding-right: 8px; margin-top: 25px; margin-bottom: 12px; }
+          
+          table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 12px; }
+          th, td { border: 1px solid #cbd5e1; padding: 10px 14px; text-align: right; }
+          th { background-color: #f1f5f9; color: #334155; font-weight: 800; }
+          td { color: #1e293b; font-weight: 600; }
+
+          .green-box { background: #f0fdf4; border-right: 5px solid #16a34a; padding: 16px 20px; border-radius: 8px; color: #166534; font-size: 13px; font-weight: 600; margin-bottom: 25px; }
+          .red-box { background: #fef2f2; border-right: 5px solid #dc2626; padding: 16px 20px; border-radius: 8px; color: #991b1b; font-size: 13px; font-weight: 600; margin-bottom: 25px; }
+          
+          .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+          
+          @media print {
+            .no-print-bar { display: none !important; }
+            body { padding: 0; }
+          }
         </style>
       </head>
       <body>
-        <div class="no-print">
-          <button class="print-btn" onclick="window.print()">🖨️ طباعة التقرير أو الحفظ كـ PDF (Save as PDF)</button>
+        <div class="no-print-bar">
+          <div>💡 لحفظ التقرير كملف PDF: من نافذة الطباعة اختر <strong>"الحفظ بتنسيق PDF" (Save as PDF)</strong> في خانة الوجهة (Destination).</div>
+          <button class="print-btn" onclick="window.print()">🖨️ فتح نافذة الطباعة / الحفظ كـ PDF</button>
         </div>
 
         <div class="header">
           <h1>نادي كلية التمريض - جامعة حفر الباطن</h1>
-          <p>تقرير إنجاز الفعالية والأداء العام للجان • لجنة الجودة والتطوير</p>
-          <p>العنوان: ${smartReportTitle || 'تقرير إنجاز الفعالية'} | التاريخ: ${new Date().toLocaleDateString('ar-SA')}</p>
+          <div class="sub">لجنة الجودة والتطوير • ${reportTitle}</div>
+          <div class="date">تاريخ الإصدار: ${new Date().toLocaleDateString('ar-SA')}</div>
+        </div>
+        <hr class="divider" />
+
+        <div class="top-box">
+          <div class="top-box-title">🏆 أفضل لجنة أداءً وإنجازاً للمهام (حدد يدوياً):</div>
+          <div class="top-box-sub">استناداً للتقييم الإداري المعتمد، تصدرت <strong style="color: #630517;">${manualBestCommittee}</strong> قائمة اللجان المتميزة في الأداء والانضباط.</div>
         </div>
 
-        <div class="section-box">
-          <strong style="color: #630517; font-size: 14px; display: block; margin-bottom: 8px;">🏆 اللجنة الأفضل أداءً:</strong>
-          <span class="badge" style="background: #dcfce7; color: #166534; font-size: 13px;">${manualBestCommittee}</span>
+        <div class="section-title">أولاً: أبرز الأعضاء المتميزين في اللجان (إدخال وإشراف رئيس/قائدة الجودة)</div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 35%;">اللجنة التنظيمية</th>
+              <th>أبرز عضو متميز وإنجازاته (يدوي)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${allCommitteesList.map(comm => `
+              <tr>
+                <td><strong>${comm}</strong></td>
+                <td>${manualBestMembers[comm] || 'لم يتم التحديد'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="section-title">ثانياً: المميزات والإيجابيات البارزة</div>
+        <div class="green-box">
+          ${smartReportAdvantages ? smartReportAdvantages.replace(/\n/g, '<br/>') : 'لا توجد ملاحظات مسجلة.'}
         </div>
 
-        <div class="section-title">⭐ الأعضاء المتميزون حسب اللجان:</div>
-        <div style="margin-bottom: 25px;">
-          ${Object.entries(manualBestMembers).map(([comm, member]) => `
-            <div style="margin-bottom: 8px; font-size: 12px; background: #f8fafc; padding: 10px; border-radius: 6px;">
-              <strong style="color: #630517;">${comm}:</strong> ${member || 'لم يتم التحديد'}
-            </div>
-          `).join('')}
+        <div class="section-title">ثالثاً: الأخطاء والملاحظات المرصودة للتحسين المستقبلي</div>
+        <div class="red-box">
+          ${smartReportErrors ? smartReportErrors.replace(/\n/g, '<br/>') : 'لا توجد أخطاء مسجلة.'}
         </div>
-
-        ${smartReportAdvantages ? `
-          <div class="section-title">✅ المميزات والإيجابيات البارزة:</div>
-          <div class="section-box" style="border-right-color: #10b981;">
-            ${smartReportAdvantages.replace(/\n/g, '<br/>')}
-          </div>
-        ` : ''}
-
-        ${smartReportErrors ? `
-          <div class="section-title">⚠️ الملاحظات والتحديات المرصودة للتحسين:</div>
-          <div class="section-box" style="border-right-color: #ef4444;">
-            ${smartReportErrors.replace(/\n/g, '<br/>')}
-          </div>
-        ` : ''}
 
         <div class="footer">
-          <p>تقرير معتمد وموثق من لجنة الجودة والتطوير • نادي التمريض بجامعة حفر الباطن 2026</p>
+          نادي كلية التمريض - جامعة حفر الباطن • لجنة الجودة والتطوير 2026
         </div>
 
         <script>
-          setTimeout(() => { window.print(); }, 400);
+          document.title = "${reportTitle}";
+          setTimeout(() => { window.print(); }, 300);
         </script>
       </body>
       </html>
@@ -1064,7 +1095,6 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // دالة اعتماد ورفع التقرير اليدوي للرؤساء والأدمن
   const handlePublishSmartReportToPresidents = async () => {
     if (!confirm('هل أنت متأكد من اعتماد هذا التقرير وأرشفته سحابياً ورفعه رسمياً لمكتب الرؤساء والأدمن؟')) return;
 
@@ -1103,7 +1133,6 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // دالة طباعة وتصدير الأرشيف التاريخي
   const handlePrintArchiveReport = (arch: any) => {
     const reportHTML = `
       <!DOCTYPE html>
@@ -1337,13 +1366,13 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* قسم تقارير الجودة الذكية والمتقدمة */}
+        {/* قسم تقارير الجودة المتقدمة واليدوية */}
         {isQualityTeam && (
           <div className="bg-white rounded-3xl p-8 border-2 border-[#630517] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-lg font-black text-[#630517]">📊 منصة كتابة وتقييم التقارير اليدوية (أفضل اللجان، الأعضاء، الأخطاء، والمميزات)</h3>
-                <p className="text-xs text-slate-500">قم بتعبئة التقرير يدوياً بالكامل واختيار أفضل اللجان والأعضاء لتصدير التقرير كـ PDF وإرساله للرؤساء.</p>
+                <p className="text-xs text-slate-500">قم بتعبئة التقرير يدوياً بالكامل واختيار أفضل اللجان والأعضاء لتصدير التقرير بالتصميم التاريخي الرسمي كـ PDF.</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -2460,7 +2489,7 @@ export default function CommitteeDashboard() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredRequests.length === 0 ? (
-                    <tr><td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد طلبات متقدمين مطابقة لهذه الرغبة في "{currentActiveComm}" حالياً.</td></tr>
+                    <tr><td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد طلبات متتقدمين مطابقة لهذه الرغبة في "{currentActiveComm}" حالياً.</td></tr>
                   ) : (
                     filteredRequests.map((req) => (
                       <tr key={req.id} className="hover:bg-slate-50">
