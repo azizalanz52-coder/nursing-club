@@ -985,134 +985,60 @@ export default function CommitteeDashboard() {
     }
   };
 
- // 1. دالة تصدير وطباعة تقرير الـ PDF الذكي (مع زر بارز وأمر طباعة تلقائي يضمن ظهور خيار Save as PDF)
-  const handleExportSmartQualityPDF = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('الرجاء السماح بفتح النوافذ المنبثقة.');
-      return;
-    }
-
+// دالة طباعة وتصدير الأرشيف التاريخي (محدثة بتقنية Blob لضمان عدم حظرها من المتصفح وفتحها فوراً)
+  const handlePrintArchiveReport = (arch: any) => {
     const reportHTML = `
       <!DOCTYPE html>
       <html lang="ar" dir="rtl">
       <head>
         <meta charset="UTF-8">
-        <title>${smartReportTitle}</title>
+        <title>${arch.title || 'تقرير مؤرشف'}</title>
         <style>
           body { font-family: Tahoma, Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.8; }
           .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 30px; }
           .header h1 { color: #630517; font-size: 22px; margin: 0 0 8px 0; font-weight: 900; }
           .header p { color: #64748b; font-size: 12px; margin: 0; }
-          .section-box { background: #f8fafc; border-right: 5px solid #630517; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 12px; color: #334155; }
-          .section-title { font-size: 14px; font-weight: bold; color: #630517; margin-top: 25px; margin-bottom: 10px; border-right: 5px solid #F5D061; padding-right: 8px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
-          th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: right; }
-          th { background-color: #f1f5f9; color: #334155; font-weight: bold; }
-          .print-btn-box { background: #630517; color: white; padding: 18px; text-align: center; border-radius: 12px; margin-bottom: 30px; cursor: pointer; font-size: 15px; font-weight: bold; box-shadow: 0 4px 12px rgba(99,5,23,0.3); }
-          .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
-          @media print {
-            .no-print { display: none !important; }
-          }
+          .section-box { background: #f8fafc; border-right: 5px solid #630517; padding: 20px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; color: #334155; }
+          .print-btn { background: #630517; color: white; padding: 14px 28px; border: none; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; display: block; margin: 0 auto 30px auto; box-shadow: 0 4px 12px rgba(99,5,23,0.3); }
+          .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+          @media print { .no-print { display: none !important; } }
         </style>
       </head>
       <body>
-        <div class="no-print print-btn-box" onclick="window.print()">
-          📥 اضغط هنا لحفظ التقرير بصيغة PDF (اختر Save as PDF من خيار الوجهة/Destination)
+        <div class="no-print">
+          <button class="print-btn" onclick="window.print()">🖨️ اضغط هنا للطباعة أو الحفظ كـ PDF (اختر Save as PDF)</button>
         </div>
 
         <div class="header">
           <h1>نادي كلية التمريض - جامعة حفر الباطن</h1>
-          <p>لجنة الجودة والتطوير • ${smartReportTitle}</p>
-          <p>تاريخ الاصدار: ${new Date().toLocaleDateString('ar-SA')}</p>
+          <p>الأرشيف التاريخي والتقارير المعتمدة • ${arch.title || 'تقرير الجودة'}</p>
+          <p>تاريخ الاعتماد: ${arch.dateStr || 'غير محدد'} | بواسطة: ${arch.author || 'لجنة الجودة والتطوير'}</p>
         </div>
 
         <div class="section-box">
-          <strong>🏆 أفضل لجنة أداءً وإنجازاً للمهام:</strong><br/>
-          استناداً للتقييم الإداري المعتمد، تصدرت <strong>${manualBestCommittee}</strong> قائمة اللجان المتميزة في الأداء والانضباط.
-        </div>
-
-        <div class="section-title">أولاً: أبرز الأعضاء المتميزين في اللجان</div>
-        <table>
-          <thead>
-            <tr>
-              <th>اللجنة التنظيمية</th>
-              <th>أبرز عضو متميز وإنجازاته</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${allCommitteesList.map(comm => `
-              <tr>
-                <td><strong>${comm}</strong></td>
-                <td>${manualBestMembers[comm] || 'غير محدد'}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-
-        <div class="section-title">ثانياً: المميزات والإيجابيات البارزة</div>
-        <div class="section-box" style="border-right-color: #047857; background: #ecfdf5;">
-          ${smartReportAdvantages ? smartReportAdvantages.replace(/\n/g, '<br/>') : 'لم تُحدد مميزات إضافية.'}
-        </div>
-
-        <div class="section-title">ثالثاً: الأخطاء والملاحظات المرصودة للتحسين المستقبلي</div>
-        <div class="section-box" style="border-right-color: #b91c1c; background: #fef2f2;">
-          ${smartReportErrors ? smartReportErrors.replace(/\n/g, '<br/>') : 'لا توجد أخطاء جوهرية مسجلة.'}
+          <strong style="color: #630517; font-size: 14px; display: block; margin-bottom: 10px;">📂 تفاصيل التقرير المؤرشف:</strong>
+          ${arch.details ? arch.details.replace(/\n/g, '<br/>') : (arch.content ? arch.content.replace(/\n/g, '<br/>') : 'تم اعتماد هذا التقرير وأرشفته سحابياً بنجاح تام وفق معايير الجودة الشاملة.')}
         </div>
 
         <div class="footer">
-          <p>هذا التقرير معتمد رسمياً من لجنة الجودة والتطوير وموجه لإدارة نادي التمريض • 2026</p>
+          <p>هذا التقرير موثق ومعتمد رسمياً في الأرشيف التاريخي لنادي التمريض • 2026</p>
         </div>
 
         <script>
-          // فتح نافذة الطباعة تلقائياً بعد تحميل الصفحة بـ نصف ثانية
-          setTimeout(() => { window.print(); }, 500);
+          // فتح نافذة الطباعة تلقائياً
+          setTimeout(() => { window.print(); }, 400);
         </script>
       </body>
       </html>
     `;
 
-    printWindow.document.write(reportHTML);
-    printWindow.document.close();
-  };
-
-  // 2. دالة رفع واعتماد التقرير بترميز UTF-8 سليم 100% ليقرأه الأدمن والرؤساء بوضوح
-  const handlePublishSmartReportToPresidents = async () => {
-    if (!confirm('هل أنت متأكد من حفظ ورفع هذا التقرير رسمياً لمكتب الرؤساء والأدمن وإرسال إشعار فوري لهم؟')) return;
-
-    try {
-      const reportFullText = `تقرير الجودة المعتمد: ${smartReportTitle} | أفضل لجنة: ${manualBestCommittee} | المميزات: ${smartReportAdvantages || 'لا توجد'} | الملاحظات: ${smartReportErrors || 'لا توجد'}`;
-      
-      const cleanReportObj = {
-        title: String(smartReportTitle || 'تقرير الجودة'),
-        details: String(reportFullText),
-        content: String(reportFullText),
-        author: String(userData?.fullName || 'لجنة الجودة والتطوير'),
-        status: 'معتمد ومرفوع للرؤساء والأدمن',
-        dateStr: new Date().toLocaleDateString('ar-SA'),
-        createdAt: Date.now()
-      };
-
-      // الحفظ في أرشيف الجودة والتقارير العامة بترميز نصي صريح
-      await addDoc(collection(db, 'quality_reports_archive'), cleanReportObj);
-      await addDoc(collection(db, 'reports'), cleanReportObj);
-
-      // إرسال الإشعارات
-      for (const usr of allUsersList) {
-        if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
-          try {
-            await setDoc(doc(db, 'users', usr.id), {
-              latestNotification: `🏆 [تقرير جودة جديد مرفوع]: ${smartReportTitle} (أفضل لجنة: ${manualBestCommittee})`
-            }, { merge: true });
-          } catch (er) { console.error(er); }
-        }
-      }
-
-      alert('🎉 تم رفع التقرير وحفظه في لوحة الأدمن والأرشيف بوضوح تام، وإرسال الإشعارات بنجاح!');
-      fetchQualityArchives();
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ أثناء رفع التقرير.');
+    // إنشاء رابط Blob موثوق يتجاوز حظر المتصفحات تماماً
+    const blob = new Blob(['\uFEFF' + reportHTML], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const newWindow = window.open(url, '_blank');
+    
+    if (!newWindow) {
+      alert('الرجاء السماح للنوافذ المنبثقة (Pop-ups) في المتصفح لفتح التقرير.');
     }
   };
 
