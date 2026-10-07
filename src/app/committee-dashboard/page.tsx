@@ -90,7 +90,7 @@ export default function CommitteeDashboard() {
   const [partnerNotes, setPartnerNotes] = useState('');
   const [publicPartnersList, setPublicPartnersList] = useState<any[]>([]);
 
-  // حقول تقرير الجودة الذكي واليدوي الجديد (مدعومة بالكامل بالكتابة اليدوية)
+  // حقول تقرير الجودة الذكي واليدوي الجديد
   const [smartReportTitle, setSmartReportTitle] = useState('تقرير إنجاز الفعالية والأداء العام للجان');
   const [smartReportErrors, setSmartReportErrors] = useState('');
   const [smartReportAdvantages, setSmartReportAdvantages] = useState('');
@@ -107,7 +107,7 @@ export default function CommitteeDashboard() {
     'لجنة الجودة والتطوير': 'ريما العنزي (متابعة جودة متميزة)'
   });
 
-  // حقول لوحة الشرف اليدوية (إضافة وتعديل وحذف من قِبل القائد)
+  // حقول لوحة الشرف اليدوية
   const [honorBoardList, setHonorBoardList] = useState<any[]>([]);
   const [newHonorMemberName, setNewHonorMemberName] = useState('');
   const [newHonorScore, setNewHonorScore] = useState('');
@@ -985,7 +985,125 @@ export default function CommitteeDashboard() {
     }
   };
 
-// دالة طباعة وتصدير الأرشيف التاريخي (محدثة بتقنية Blob لضمان عدم حظرها من المتصفح وفتحها فوراً)
+  // دالة تصدير تقرير الجودة المتقدم واليدوي كملف PDF
+  const handleExportSmartQualityPDF = () => {
+    const reportHTML = `
+      <!DOCTYPE html>
+      <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <title>${smartReportTitle || 'تقرير إنجاز الفعالية والأداء العام'}</title>
+        <style>
+          body { font-family: Tahoma, Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; direction: rtl; line-height: 1.8; }
+          .header { text-align: center; border-bottom: 3px solid #630517; padding-bottom: 20px; margin-bottom: 30px; }
+          .header h1 { color: #630517; font-size: 22px; margin: 0 0 8px 0; font-weight: 900; }
+          .header p { color: #64748b; font-size: 12px; margin: 0; }
+          .section-box { background: #f8fafc; border-right: 5px solid #630517; padding: 20px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; color: #334155; }
+          .section-title { font-size: 15px; font-weight: bold; color: #630517; margin-top: 25px; margin-bottom: 12px; border-bottom: 2px solid #f1f5f9; padding-bottom: 6px; }
+          .print-btn { background: #630517; color: white; padding: 14px 28px; border: none; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; display: block; margin: 0 auto 30px auto; box-shadow: 0 4px 12px rgba(99,5,23,0.3); }
+          .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+          .badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; background: #fef3c7; color: #92400e; }
+          @media print { .no-print { display: none !important; } }
+        </style>
+      </head>
+      <body>
+        <div class="no-print">
+          <button class="print-btn" onclick="window.print()">🖨️ طباعة التقرير أو الحفظ كـ PDF (Save as PDF)</button>
+        </div>
+
+        <div class="header">
+          <h1>نادي كلية التمريض - جامعة حفر الباطن</h1>
+          <p>تقرير إنجاز الفعالية والأداء العام للجان • لجنة الجودة والتطوير</p>
+          <p>العنوان: ${smartReportTitle || 'تقرير إنجاز الفعالية'} | التاريخ: ${new Date().toLocaleDateString('ar-SA')}</p>
+        </div>
+
+        <div class="section-box">
+          <strong style="color: #630517; font-size: 14px; display: block; margin-bottom: 8px;">🏆 اللجنة الأفضل أداءً:</strong>
+          <span class="badge" style="background: #dcfce7; color: #166534; font-size: 13px;">${manualBestCommittee}</span>
+        </div>
+
+        <div class="section-title">⭐ الأعضاء المتميزون حسب اللجان:</div>
+        <div style="margin-bottom: 25px;">
+          ${Object.entries(manualBestMembers).map(([comm, member]) => `
+            <div style="margin-bottom: 8px; font-size: 12px; background: #f8fafc; padding: 10px; border-radius: 6px;">
+              <strong style="color: #630517;">${comm}:</strong> ${member || 'لم يتم التحديد'}
+            </div>
+          `).join('')}
+        </div>
+
+        ${smartReportAdvantages ? `
+          <div class="section-title">✅ المميزات والإيجابيات البارزة:</div>
+          <div class="section-box" style="border-right-color: #10b981;">
+            ${smartReportAdvantages.replace(/\n/g, '<br/>')}
+          </div>
+        ` : ''}
+
+        ${smartReportErrors ? `
+          <div class="section-title">⚠️ الملاحظات والتحديات المرصودة للتحسين:</div>
+          <div class="section-box" style="border-right-color: #ef4444;">
+            ${smartReportErrors.replace(/\n/g, '<br/>')}
+          </div>
+        ` : ''}
+
+        <div class="footer">
+          <p>تقرير معتمد وموثق من لجنة الجودة والتطوير • نادي التمريض بجامعة حفر الباطن 2026</p>
+        </div>
+
+        <script>
+          setTimeout(() => { window.print(); }, 400);
+        </script>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\uFEFF' + reportHTML], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const newWindow = window.open(url, '_blank');
+    if (!newWindow) {
+      alert('الرجاء السماح للنوافذ المنبثقة (Pop-ups) لفتح وتصدير التقرير.');
+    }
+  };
+
+  // دالة اعتماد ورفع التقرير اليدوي للرؤساء والأدمن
+  const handlePublishSmartReportToPresidents = async () => {
+    if (!confirm('هل أنت متأكد من اعتماد هذا التقرير وأرشفته سحابياً ورفعه رسمياً لمكتب الرؤساء والأدمن؟')) return;
+
+    try {
+      const newReportObj = {
+        title: smartReportTitle || 'تقرير تقييم الأداء العام والفعاليات',
+        advantages: smartReportAdvantages,
+        errors: smartReportErrors,
+        bestCommittee: manualBestCommittee,
+        bestMembers: manualBestMembers,
+        details: `🏆 اللجنة المتميزة: ${manualBestCommittee}\n\n✅ المميزات: ${smartReportAdvantages || 'لا يوجد'}\n\n⚠️ الملاحظات: ${smartReportErrors || 'لا يوجد'}`,
+        createdAt: Date.now(),
+        dateStr: new Date().toLocaleDateString('ar-SA'),
+        status: 'معتمد ومؤرشف رسمياً',
+        author: userData?.fullName || 'لجنة الجودة والتطوير'
+      };
+
+      const docRef = await addDoc(collection(db, 'quality_reports_archive'), newReportObj);
+      setQualityArchives([{ id: docRef.id, ...newReportObj }, ...qualityArchives]);
+
+      for (const usr of allUsersList) {
+        if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
+          try {
+            await setDoc(doc(db, 'users', usr.id), {
+              latestNotification: `🏆 [تقرير جودة جديد معتمد]: تم رفع (${smartReportTitle}) المعتمد من لجنة الجودة والتطوير.`
+            }, { merge: true });
+          } catch (er) { console.error(er); }
+        }
+      }
+
+      alert('🎉 تم اعتماد ورفع التقرير بنجاح وأرشفته رسمياً لمكتب الرؤساء والأدمن!');
+      fetchQualityArchives();
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء رفع التقرير.');
+    }
+  };
+
+  // دالة طباعة وتصدير الأرشيف التاريخي
   const handlePrintArchiveReport = (arch: any) => {
     const reportHTML = `
       <!DOCTYPE html>
@@ -1025,24 +1143,21 @@ export default function CommitteeDashboard() {
         </div>
 
         <script>
-          // فتح نافذة الطباعة تلقائياً
           setTimeout(() => { window.print(); }, 400);
         </script>
       </body>
       </html>
     `;
 
-    // إنشاء رابط Blob موثوق يتجاوز حظر المتصفحات تماماً
     const blob = new Blob(['\uFEFF' + reportHTML], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const newWindow = window.open(url, '_blank');
     
     if (!newWindow) {
-      alert('الرجاء السماح للنوافذ المنبثقة (Pop-ups) في المتصفح لفتح التقرير.');
+      alert('الرجاء السماح بالنوافذ المنبثقة (Pop-ups) في المتصفح لفتح التقرير.');
     }
   };
 
-  // 3. خاصية حذف تقرير من الأرشيف التاريخي (مطلوبة)
   const handleDeleteQualityArchive = async (archiveId: string) => {
     if (!confirm('هل أنت متأكد من حذف هذا التقرير من الأرشيف نهائياً؟')) return;
     try {
@@ -1175,7 +1290,6 @@ export default function CommitteeDashboard() {
   const displayedTasks = committeeTasks.filter(t => isSameCommittee(t.committee, currentActiveComm));
   const committeeExcusesFiltered = eventExcuses.filter(ex => matchesTargetCommittee(ex.committee, currentActiveComm));
 
-  // تصنيف أعضاء لوحة الشرف الخاصة باللجنة الحالية يدوياً
   const currentCommitteeHonorMembers = honorBoardList.filter(h => isSameCommittee(h.committee, currentActiveComm));
 
   const committeeReports = Array.from(
@@ -1223,7 +1337,7 @@ export default function CommitteeDashboard() {
           </div>
         </div>
 
-        {/* قسم تقارير الجودة الذكية والمتقدمة (إدخال وإدارة يدوية بالكامل من قائد/قائدة الجودة) */}
+        {/* قسم تقارير الجودة الذكية والمتقدمة */}
         {isQualityTeam && (
           <div className="bg-white rounded-3xl p-8 border-2 border-[#630517] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
@@ -2255,7 +2369,6 @@ export default function CommitteeDashboard() {
             )}
           </div>
 
-          {/* لوحة الشرف ونقاط العضو الفردي (مخصصة للإدخال اليدوي المباشر من قائد/قائدة اللجنة) */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-1">
               <h3 className="text-sm font-black text-slate-900">🏆 لوحة الشرف ونقاط العضو الفردي</h3>
@@ -2382,38 +2495,53 @@ export default function CommitteeDashboard() {
 
       </div>
 
-     {qualityArchives.length === 0 ? (
-  <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير مؤرشفة حالياً</p>
-) : (
-  qualityArchives.map((arch) => (
-    <div key={arch.id} className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl flex justify-between items-center flex-wrap gap-3">
-      <div>
-        <h4 className="font-extrabold text-slate-900 text-xs">{arch.title}</h4>
-        <p className="text-[10px] text-slate-500 mt-0.5">تاريخ الاعتماد: {arch.dateStr || 'غير محدد'} | بواسطة: {arch.author || 'لجنة الجودة'}</p>
-      </div>
-      
-      <div className="flex items-center gap-2">
-        {/* زر الطباعة والتصدير القديم الموجود عندك */}
-        <button
-          type="button"
-          onClick={() => handlePrintArchiveReport(arch)}
-          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
-        >
-          📄 طباعة وتصدير PDF
-        </button>
+      {/* نافذة مودال الأرشيف التاريخي */}
+      {showArchiveModal && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
+          <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-3xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-indigo-500">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">📂 الأرشيف التاريخي للتقارير المعتمدة</h3>
+                <p className="text-xs text-slate-500">سجل التقارير المؤرشفة للجنة الجودة والتطوير</p>
+              </div>
+              <button type="button" onClick={() => setShowArchiveModal(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕ إغلاق</button>
+            </div>
 
-        {/* 🗑️ زر الحذف الجديد اللي طلبته */}
-        <button
-          type="button"
-          onClick={() => handleDeleteQualityArchive(arch.id)}
-          className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
-        >
-          🗑️ حذف
-        </button>
-      </div>
-    </div>
-  ))
-)}
+            <div className="space-y-3">
+              {qualityArchives.length === 0 ? (
+                <p className="text-center py-8 text-slate-400 font-bold text-xs">لا توجد تقارير مؤرشفة حالياً.</p>
+              ) : (
+                qualityArchives.map((arch) => (
+                  <div key={arch.id} className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl flex justify-between items-center flex-wrap gap-3">
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-xs">{arch.title}</h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5">تاريخ الاعتماد: {arch.dateStr || 'غير محدد'} | بواسطة: {arch.author || 'لجنة الجودة'}</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintArchiveReport(arch)}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      >
+                        📄 طباعة وتصدير PDF
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteQualityArchive(arch.id)}
+                        className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      >
+                        🗑️ حذف
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAcceptModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
