@@ -4,7 +4,7 @@ import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, getDoc, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, getDoc, addDoc, deleteDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 
 export default function CommitteeDashboard() {
@@ -126,16 +126,31 @@ export default function CommitteeDashboard() {
     fetchAllUsers();
     fetchQualityArchives();
     fetchMediaGallery();
-    fetchScientificTexts();
     fetchEventExcuses();
     fetchPublicPartners();
     fetchCommitteeWhatsappLinks();
     fetchHonorBoard();
 
+    // ربط استماع لحظي وسحابي لبنك النصوص العلمية للتحديث والتزامن الفوري عند الجميع
+    const unsubScientific = onSnapshot(
+      collection(db, 'scientific_committee_texts'),
+      (snap) => {
+        const texts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setScientificTextsList(texts);
+      },
+      (err) => {
+        console.error('Error listening to scientific texts:', err);
+      }
+    );
+
     const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
     if (isHiddenLocally === 'true') {
       setWarningHidden(true);
     }
+
+    return () => {
+      unsubScientific();
+    };
   }, [router]);
 
   const fetchCommitteeWhatsappLinks = async () => {
@@ -454,15 +469,14 @@ export default function CommitteeDashboard() {
     if (!textBannerTitle.trim() || !textBannerContent.trim()) return;
     const textId = `txt_${Date.now()}`;
     const newTextObj = {
-      id: textId,
       title: textBannerTitle.trim(),
       content: textBannerContent.trim(),
       author: userData?.fullName || 'لجنة المحتوى العلمي',
       createdAt: new Date().toLocaleDateString('ar-SA')
     };
     try {
-      await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
-      setScientificTextsList([newTextObj, ...scientificTextsList]);
+      // حفظ المستند سحابياً باستخدام معرّف محدد لمنع تضارب الـ ID عند الحذف
+      await setDoc(doc(db, 'scientific_committee_texts', textId), newTextObj);
 
       for (const usr of allUsersList) {
         const cStr = usr.assignedCommittee || usr.committee || '';
@@ -483,8 +497,13 @@ export default function CommitteeDashboard() {
 
   const handleDeleteScientificText = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا النص؟')) {
-      await deleteDoc(doc(db, 'scientific_committee_texts', id));
-      setScientificTextsList(scientificTextsList.filter(t => t.id !== id));
+      try {
+        await deleteDoc(doc(db, 'scientific_committee_texts', id));
+        alert('تم حذف النص سحابياً وتحديثه لدى جميع اللجان بنجاح! 🗑️');
+      } catch (err) {
+        console.error('Error deleting document:', err);
+        alert('حدث خطأ أثناء حذف النص.');
+      }
     }
   };
 
