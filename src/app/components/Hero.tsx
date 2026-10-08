@@ -191,24 +191,26 @@ export default function Hero() {
           </h1>
         </div>
 
-        {/* تعديل حاوية التصميم لتكون بعرض أوسع وارتفاع متناسب يبرز البوستر بحجمه الطبيعي */}
-        <div className="relative w-full max-w-5xl mx-auto rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#F5D061]/30 group transition-all duration-700 hover:border-[#F5D061]/70 bg-black/40">
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-30 group-hover:opacity-50 transition-opacity pointer-events-none z-10" />
+        {/* حاوية متكيفة تلقائياً بدون إطار أسود/أحمر وبدون اقتطاع لأي مقاس صورة */}
+        <div className="relative w-full max-w-4xl mx-auto rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#F5D061]/30 group transition-all duration-500 hover:border-[#F5D061]/70">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-40 transition-opacity pointer-events-none z-10" />
 
-          <div className="relative z-0 w-full flex items-center justify-center bg-black/20 min-h-[300px] sm:min-h-[500px]">
-            {currentBanner.image?.startsWith('data:video') || currentBanner.image?.includes('.mp4') ? (
-              <video src={currentBanner.image} autoPlay loop muted className="w-full h-auto max-h-[650px] object-cover sm:object-contain mx-auto" />
-            ) : (
-              <Image
-                src={currentBanner.image || '/header-banner.png'} 
-                alt={currentBanner.title || "بانر نادي التمريض"}
-                width={1920}
-                height={1080}
-                className="w-full h-auto max-h-[650px] object-cover sm:object-contain mx-auto transition-transform duration-700 group-hover:scale-[1.02]"
-                priority
-              />
-            )}
-          </div>
+          {currentBanner.image?.startsWith('data:video') || currentBanner.image?.includes('.mp4') ? (
+            <video 
+              src={currentBanner.image} 
+              autoPlay 
+              loop 
+              muted 
+              playsInline
+              className="w-full h-auto block object-cover max-h-[75vh] mx-auto" 
+            />
+          ) : (
+            <img
+              src={currentBanner.image || '/header-banner.png'} 
+              alt={currentBanner.title || "بانر نادي التمريض"}
+              className="w-full h-auto block object-cover max-h-[75vh] mx-auto transition-transform duration-700 group-hover:scale-[1.01]"
+            />
+          )}
         </div>
 
         <p className="max-w-2xl mx-auto text-base sm:text-lg text-amber-50/90 leading-relaxed text-center font-medium px-6 py-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-inner">
