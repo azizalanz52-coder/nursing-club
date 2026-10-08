@@ -553,7 +553,8 @@ export default function CommitteeDashboard() {
   };
 
   const currentActiveComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
-  
+  const userAssignedComm = userData?.assignedCommittee || userData?.committee || '';
+
   const filteredRequests = (requests || []).filter(req => {
     if (req.acceptedCommittee && !isSameCommittee(req.acceptedCommittee, currentActiveComm)) {
       return false;
@@ -985,7 +986,6 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // دالة تصدير تقرير الجودة المطابقة 100% للتصميم التاريخي في الصورة
   const handleExportSmartQualityPDF = () => {
     const reportTitle = smartReportTitle || 'الصحة النفسية 3';
     const reportHTML = `
@@ -1328,6 +1328,22 @@ export default function CommitteeDashboard() {
         .map(item => [item.reason + '-' + item.status, item])
     ).values()
   );
+
+  // التأكد من صلاحيات رؤية واستعراض بنك النصوص العلمي والعبارات للبنرات والتصاميم
+  const canAccessScientificTexts = 
+    isSameCommittee(currentActiveComm, 'لجنة المحتوى العلمي') ||
+    isSameCommittee(userAssignedComm, 'لجنة المحتوى العلمي') ||
+    isSameCommittee(currentActiveComm, 'لجنة التصميم') ||
+    isSameCommittee(userAssignedComm, 'لجنة التصميم') ||
+    isQualityTeam ||
+    userData?.role?.includes('رئيس') ||
+    userData?.role === 'System Admin';
+
+  const canAddScientificTexts = 
+    isSameCommittee(currentActiveComm, 'لجنة المحتوى العلمي') ||
+    isSameCommittee(userAssignedComm, 'لجنة المحتوى العلمي') ||
+    userData?.role?.includes('رئيس') ||
+    userData?.role === 'System Admin';
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 p-6 md:p-10 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
@@ -1898,66 +1914,78 @@ export default function CommitteeDashboard() {
           </div>
         )}
 
-        {isSameCommittee(currentActiveComm, 'لجنة المحتوى العلمي') && isCommitteeLeader && (
+        {/* قسم بنك صياغة النصوص الطبية والعبارات - متاح لأعضاء وقادة لجنة المحتوى العلمي ولجنة التصميم والأدمن والرؤساء */}
+        {canAccessScientificTexts && (
           <div className="bg-white rounded-3xl p-8 border border-emerald-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">🔬 بنك صياغة النصوص الطبية والعبارات (مربوط بلجنة التصميم ومكتب الرؤساء والأدمن)</h3>
-                <p className="text-xs text-slate-500">هنا تكتبون النصوص والعبارات التوعوية التي تستخدمها لجان التصميم والإعلام، وتصل مباشرة للأدمن والرؤساء.</p>
+                <p className="text-xs text-slate-500">هنا يُكتب ويُعرض المحتوى التوعوي والعبارات التي تستخدمها لجنة التصميم والإعلام، وتصل مباشرة للأدمن والرؤساء.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-xs">
                 إجمالي النصوص المعتمدة: {scientificTextsList.length}
               </span>
             </div>
 
-            <form onSubmit={handleAddScientificTextSubmit} className="grid grid-cols-1 gap-4 bg-emerald-50/40 p-6 rounded-2xl border border-emerald-200">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">عنوان البانر أو التصميم المستهدف</label>
-                <input
-                  type="text"
-                  placeholder="مثال: عبارات بوستر اليوم العالمي للتمريض"
-                  value={textBannerTitle}
-                  onChange={(e) => setTextBannerTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">النصوص والعبارات الدقيقة المعتمدة (تصل للجنة التصميم والرؤساء)</label>
-                <textarea
-                  rows={3}
-                  placeholder="اكتب النص العلمي أو العبارة الإبداعية هنا لتكون مرجعاً للبنرات والتصاميم..."
-                  value={textBannerContent}
-                  onChange={(e) => setTextBannerContent(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-                  required
-                />
-              </div>
-
-              <div>
-                <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">
-                  + اعتماد ونشر النص للبنرات والتصاميم وللأدمن والرؤساء 📝✨
-                </button>
-              </div>
-            </form>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-              {scientificTextsList.map((txt) => (
-                <div key={txt.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">موصول بلجنة التصميم والرؤساء ✓</span>
-                      <span className="text-[10px] text-slate-400">{txt.createdAt}</span>
-                    </div>
-                    <h5 className="font-black text-slate-900 text-sm">{txt.title}</h5>
-                    <p className="text-xs text-slate-700 bg-white p-3 rounded-xl border border-slate-100 leading-relaxed font-semibold">"{txt.content}"</p>
-                  </div>
-                  <div className="flex justify-end pt-2">
-                    <button type="button" onClick={() => handleDeleteScientificText(txt.id)} className="px-3 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-lg">حذف ✕</button>
-                  </div>
+            {/* نموذج إضافة النص العلمي - متاح لأعضاء ورؤساء لجنة المحتوى العلمي والرؤساء والأدمن */}
+            {canAddScientificTexts && (
+              <form onSubmit={handleAddScientificTextSubmit} className="grid grid-cols-1 gap-4 bg-emerald-50/40 p-6 rounded-2xl border border-emerald-200">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">عنوان البانر أو التصميم المستهدف</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: عبارات بوستر اليوم العالمي للتمريض"
+                    value={textBannerTitle}
+                    onChange={(e) => setTextBannerTitle(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                    required
+                  />
                 </div>
-              ))}
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">النصوص والعبارات الدقيقة المعتمدة (تصل للجنة التصميم والرؤساء)</label>
+                  <textarea
+                    rows={3}
+                    placeholder="اكتب النص العلمي أو العبارة الإبداعية هنا لتكون مرجعاً للبنرات والتصاميم..."
+                    value={textBannerContent}
+                    onChange={(e) => setTextBannerContent(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">
+                    + اعتماد ونشر النص للبنرات والتصاميم وللأدمن والرؤساء 📝✨
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* عرض قوائم النصوص المرفوعة لجميع الأطراف المسموح لها (لجنة المحتوى العلمي، لجنة التصميم، الأدمن والرؤساء) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+              {scientificTextsList.length === 0 ? (
+                <p className="col-span-2 text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد نصوص علمية معتمدة مرفوعة حالياً.</p>
+              ) : (
+                scientificTextsList.map((txt) => (
+                  <div key={txt.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">موصول بلجنة التصميم والرؤساء ✓</span>
+                        <span className="text-[10px] text-slate-400">{txt.createdAt}</span>
+                      </div>
+                      <h5 className="font-black text-slate-900 text-sm">{txt.title}</h5>
+                      <p className="text-xs text-slate-700 bg-white p-3 rounded-xl border border-slate-100 leading-relaxed font-semibold">"{txt.content}"</p>
+                      {txt.author && <p className="text-[10px] text-slate-400">بواسطة: {txt.author}</p>}
+                    </div>
+                    {canAddScientificTexts && (
+                      <div className="flex justify-end pt-2">
+                        <button type="button" onClick={() => handleDeleteScientificText(txt.id)} className="px-3 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-lg">حذف ✕</button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
