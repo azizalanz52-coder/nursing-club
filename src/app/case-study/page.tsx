@@ -20,84 +20,85 @@ interface LeaderboardItem {
   totalScore: number;
 }
 
+// بنك الحالات الإكلينيكية الخاص بأسبوع الصحة النفسية (Mental Health Nursing Cases)
 const masterCasePool: Omit<CaseQuestion, 'id'>[] = [
   {
     difficulty: 'Easy',
-    title: 'Case: Vital Signs Assessment',
-    scenario: 'A 45-year-old admitted patient has a body temperature of 38.5°C, HR 110 bpm, and RR 22 breaths/min. What is the most appropriate initial nursing intervention?',
+    title: 'Case 1: Major Depressive Disorder & Suicide Safety Assessment',
+    scenario: 'A 28-year-old admitted patient with Major Depressive Disorder states: "I feel like a burden to everyone, and things would be better if I just went to sleep forever." What is the immediate priority nursing action?',
     options: [
-      'Administer antipyretic medication immediately without notifying the physician',
-      'Notify the physician and document the vital signs accurately in the patient chart',
-      'Cover the patient with heavy blankets to induce sweating',
-      'Wait for 4 hours and recheck the temperature'
+      'Encourage the patient to join a group therapy session immediately to distract their thoughts',
+      'Ask the patient directly: "Are you thinking about suicide or harming yourself right now?" and initiate 1-to-1 observation',
+      'Reassure the patient that everything will get better soon and leave them alone to rest',
+      'Document the statement and re-evaluate the patient during the next shift round'
     ],
-    correctIndexString: 'Notify the physician and document the vital signs accurately in the patient chart',
-    explanation: 'The correct action is to notify the physician and document findings for prompt medical collaboration.'
-  } as any,
-  {
-    difficulty: 'Moderate',
-    title: 'Case: IV Fluid Management',
-    scenario: 'A nurse notices swelling, coolness, and pain around an intravenous (IV) insertion site. What is the immediate nursing action?',
-    options: [
-      'Slow down the infusion rate and continue monitoring',
-      'Apply a hot compress directly over the site',
-      'Stop the infusion immediately, remove the IV catheter, and elevate the limb',
-      'Administer an analgesic through the same IV line'
-    ],
-    correctIndexString: 'Stop the infusion immediately, remove the IV catheter, and elevate the limb',
-    explanation: 'These are classic signs of infiltration. The IV must be stopped and removed immediately to prevent tissue damage.'
-  } as any,
-  {
-    difficulty: 'Hard',
-    title: 'Case: Advanced Hemodynamic Crisis (Sepsis)',
-    scenario: 'A postoperative patient develops a temperature of 39.2°C, blood pressure of 82/50 mmHg, heart rate of 135 bpm, and acute confusion. Serum lactate is 4.2 mmol/L. What is the priority nursing and medical intervention bundle within the first hour?',
-    options: [
-      'Administer scheduled oral antihypertensives and reassess in 2 hours',
-      'Initiate rapid IV fluid resuscitation (crystalloids 30 mL/kg), draw blood cultures, and administer broad-spectrum IV antibiotics immediately',
-      'Apply a cooling blanket and restrict fluid intake to prevent pulmonary edema',
-      'Prepare the patient for immediate emergency surgery'
-    ],
-    correctIndexString: 'Initiate rapid IV fluid resuscitation (crystalloids 30 mL/kg), draw blood cultures, and administer broad-spectrum IV antibiotics immediately',
-    explanation: 'In septic shock, early goal-directed therapy requires immediate fluid resuscitation, obtaining blood cultures before antibiotics, and administering broad-spectrum IV antibiotics within the 1-hour bundle to prevent multi-organ failure.'
+    correctIndexString: 'Ask the patient directly: "Are you thinking about suicide or harming yourself right now?" and initiate 1-to-1 observation',
+    explanation: 'Directly assessing for suicidal ideation and intent is the gold standard in psychiatric nursing safety. Immediate continuous suicide precautions (1-to-1 observation) are mandatory to protect patient life.'
   } as any,
   {
     difficulty: 'Easy',
-    title: 'Case: Wound Care Evaluation',
-    scenario: 'While changing a surgical dressing, the nurse observes mild erythema and well-approximated wound edges with no drainage. How should this be classified?',
+    title: 'Case 2: Acute Panic Attack & Hyperventilation Crisis',
+    scenario: 'A nursing student presents to the student clinic experiencing a severe panic attack with hyperventilation, chest tightness, rapid heart rate, and an overwhelming feeling of impending doom. What is the priority nursing intervention?',
     options: [
-      'An infected wound requiring immediate antibiotic therapy',
-      'A normal wound in the primary intention healing stage',
-      'A dehisced wound requiring surgical re-suturing',
-      'A chronic non-healing ulcer'
+      'Instruct the student to sit down, speak in short, calm sentences, and guide them to practice slow, deep diaphragmatic breathing',
+      'Leave the student alone in a quiet dark room so they can calm down without pressure',
+      'Administer high-flow oxygen via non-rebreather mask immediately',
+      'Provide detailed health teaching regarding the pathophysiology of panic disorders'
     ],
-    correctIndexString: 'A normal wound in the primary intention healing stage',
-    explanation: 'Mild erythema with well-approximated edges is a normal presentation in primary intention healing.'
+    correctIndexString: 'Instruct the student to sit down, speak in short, calm sentences, and guide them to practice slow, deep diaphragmatic breathing',
+    explanation: 'During an acute panic attack, the nurse must remain calm, minimize environmental stimuli, use clear, simple sentences, and guide slow breathing to reduce hyperventilation and acute respiratory alkalosis.'
   } as any,
   {
     difficulty: 'Moderate',
-    title: 'Case: Medication Safety',
-    scenario: 'The nurse is scheduled to administer an oral medication to a patient, but the patient is found sleeping deeply. What is the correct protocol?',
+    title: 'Case 3: Acute Bipolar Mania & Environmental Management',
+    scenario: 'A patient with Bipolar I Disorder in an acute manic phase is hyperactive, pacing continuously, talking rapidly with grandiosity, and refusing to sit for meals. Which nursing strategy is most effective for maintaining adequate nutrition and safety?',
     options: [
-      'Wake the patient forcefully to take the medication',
-      'Crush the medication in water and leave it on the bedside table',
-      'Hold the medication temporarily and notify the charge nurse or physician',
-      'Administer the medication via feeding tube without checking'
+      'Force the patient to sit quietly at the dining table until they finish a full 3-course meal',
+      'Provide high-calorie, high-protein finger foods and drinks that the patient can eat while moving',
+      'Restrict all physical movement by applying soft wrist restraints until calm',
+      'Hold all nutritional intake until the patient’s mood stabilizes with mood stabilizers'
     ],
-    correctIndexString: 'Hold the medication temporarily and notify the charge nurse or physician',
-    explanation: 'Medications should not be given to unresponsive or deeply sleeping patients to prevent aspiration risks.'
+    correctIndexString: 'Provide high-calorie, high-protein finger foods and drinks that the patient can eat while moving',
+    explanation: 'Manic patients have extreme energy expenditure and short attention spans. High-calorie, portable "finger foods" (e.g., sandwiches, smoothies, protein bars) ensure adequate nutritional intake without conflict.'
+  } as any,
+  {
+    difficulty: 'Moderate',
+    title: 'Case 4: Schizophrenia & Command Hallucinations',
+    scenario: 'A patient diagnosed with Schizophrenia looks terrified, stares at the corner of the unit, and whispers: "The voices are telling me to jump out of the window." What is the therapeutic response by the nurse?',
+    options: [
+      'Argue with the patient and state: "There are no voices here, you are imagining things."',
+      'Acknowledge the fear, validate feelings without reinforcing the hallucination: "I know the voices feel real to you, but you are safe here, and I do not hear them."',
+      'Validate the hallucination by asking: "What do the voices look like and what else do they say?"',
+      'Ignore the statement and immediately escort the patient to the television room'
+    ],
+    correctIndexString: 'Acknowledge the fear, validate feelings without reinforcing the hallucination: "I know the voices feel real to you, but you are safe here, and I do not hear them."',
+    explanation: 'Command hallucinations present a critical safety risk. The nurse must validate the patient’s feelings (fear/distress) while presenting reality clearly without arguing or agreeing with the hallucination.'
   } as any,
   {
     difficulty: 'Hard',
-    title: 'Case: Critical Arrhythmia & Cardiac Arrest',
-    scenario: 'A telemetry-monitored patient suddenly exhibits ventricular fibrillation (V-Fib) on the monitor. The patient is unresponsive and pulseless. What is the immediate, non-negotiable sequence of actions?',
+    title: 'Case 5: Severe Alcohol Withdrawal & Delirium Tremens (DTs)',
+    scenario: 'On day 3 of hospitalization, a patient with a history of chronic severe alcohol use disorder develops coarse hand tremors, severe agitation, diaphoresis, visual hallucinations, blood pressure 180/110 mmHg, and heart rate 130 bpm. What is the priority medication category prescribed under CIWA protocol?',
     options: [
-      'Check patient pupillary response, administer IV atropine, and call family members',
-      'Begin high-quality CPR immediately, charge and check rhythm for defibrillation as soon as the AED/Defibrillator is available, and establish emergency airway management',
-      'Administer sublingual nitroglycerin and check blood pressure',
-      'Document the exact time of arrest in the chart and wait for the code team'
+      'Administer IV Benzodiazepines (e.g., Lorazepam or Diazepam) titrated according to CIWA score',
+      'Administer IV Antihypertensives to lower blood pressure and delay psychiatric treatment',
+      'Administer high-dose antipsychotics (e.g., Haloperidol) as first-line monotherapy',
+      'Administer oral antidepressant SSRIs to manage agitation'
     ],
-    correctIndexString: 'Begin high-quality CPR immediately, charge and check rhythm for defibrillation as soon as the AED/Defibrillator is available, and establish emergency airway management',
-    explanation: 'In cardiac arrest due to V-Fib, immediate high-quality CPR and rapid defibrillation are the primary determinants of survival under ACLS guidelines.'
+    correctIndexString: 'Administer IV Benzodiazepines (e.g., Lorazepam or Diazepam) titrated according to CIWA score',
+    explanation: 'Delirium Tremens (DTs) is a medical emergency with high mortality. Benzodiazepines are the cornerstone treatment to enhance GABA activity, prevent alcohol withdrawal seizures, and control autonomic hyperarousal.'
+  } as any,
+  {
+    difficulty: 'Hard',
+    title: 'Case 6: Lithium Toxicity & Psychopharmacology Monitoring',
+    scenario: 'A patient receiving Lithium Carbonate for Bipolar Disorder presents with severe nausea, persistent vomiting, coarse hand tremors, blurred vision, ataxia, and confusion. Laboratory results reveal a serum lithium level of 2.2 mEq/L. What is the critical nursing action?',
+    options: [
+      'Continue the morning lithium dose as scheduled and reassess in 24 hours',
+      'Withhold the lithium dose immediately, notify the physician, and prepare for hydration and toxicity protocols',
+      'Increase oral fluid restriction to prevent hyponatremia',
+      'Administer an extra dose of lithium to stabilize mood swings'
+    ],
+    correctIndexString: 'Withhold the lithium dose immediately, notify the physician, and prepare for hydration and toxicity protocols',
+    explanation: 'Therapeutic Lithium level is 0.6 - 1.2 mEq/L. Levels above 2.0 mEq/L cause severe toxicity manifested by coarse tremors, ataxia, vomiting, and confusion. Lithium must be withheld immediately and medical intervention initiated.'
   } as any
 ];
 
@@ -174,10 +175,9 @@ export default function CaseStudyPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // دالة جلب لوحة الصدارة مع مطابقة الأسماء الحالية المحدثة من جدول الحسابات (users)
+  // دالة جلب لوحة الصدارة
   const fetchLeaderboard = async () => {
     try {
-      // 1. جلب خريطة الأسماء المحدثة من جدول المستخدمين (users) لضمان دقة الأسماء
       const usersSnap = await getDocs(query(collection(db, 'users')));
       const userNamesMap: Record<string, string> = {};
       usersSnap.forEach(userDoc => {
@@ -188,10 +188,8 @@ export default function CaseStudyPage() {
         }
       });
 
-      // استثناء خاص للمشرف العام إذا لزم
       userNamesMap['0553731265'] = 'عبدالعزيز سليمان العنزي (المشرف العام)';
 
-      // 2. جلب المشاركات وتجميع النقاط مع اعتماد الاسم الأحدث من جدول users
       const snap = await getDocs(query(collection(db, 'case_study_submissions')));
       const scoreMap: Record<string, number> = {};
 
@@ -200,7 +198,6 @@ export default function CaseStudyPage() {
         const phoneKey = (data.phone || data.phoneNumber || '').trim();
         const fallbackName = (data.studentName || 'مشارك').trim();
         
-        // استخدام الاسم من جدول users إن وجد، وإلا فالاسم المخزن
         const finalName = (phoneKey && userNamesMap[phoneKey]) ? userNamesMap[phoneKey] : fallbackName;
         const score = Number(data.score) || 0;
         
@@ -299,19 +296,22 @@ export default function CaseStudyPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 pb-20 relative" dir="ltr">
       
-      <div className="bg-[#630517] text-white py-10 px-4 sm:px-6 shadow-md">
+      {/* هيدر التحدي اليومي بهوية اليوم العالمي للصحة النفسية (Teal & Emerald & Gold) */}
+      <div className="bg-gradient-to-r from-[#064e3b] via-[#047857] to-[#0d9488] text-white py-12 px-4 sm:px-6 shadow-xl border-b-4 border-[#F5D061]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
-          <div className="space-y-2 text-center sm:text-left">
-            <span className="bg-[#F5D061] text-[#630517] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider inline-block">
-              ⏱️ Daily Advanced Clinical Challenge
-            </span>
-            <h1 className="text-2xl sm:text-4xl font-black">Nursing Clinical Case Studies</h1>
-            <p className="text-xs sm:text-sm text-white/80">
-              Test your advanced knowledge. Next daily rotation in: <span className="text-[#F5D061] font-bold">{timeLeft}</span>
+          <div className="space-y-3 text-center sm:text-left">
+            <div className="inline-flex items-center gap-2 bg-[#F5D061] text-[#064e3b] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
+              <span>💚 🧠 World Mental Health Day Special</span>
+            </div>
+            <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
+              Psychiatric & Mental Health Nursing Challenge
+            </h1>
+            <p className="text-xs sm:text-sm text-emerald-100 font-medium">
+              تحدي التمريض النفسي والصحة النفسية 🌿 - التحديث القادم بعد: <span className="text-[#F5D061] font-bold">{timeLeft}</span>
             </p>
             <div>
-              <Link href="/" className="text-xs text-[#F5D061] underline font-bold inline-block pt-1">
-                ← Back to Home
+              <Link href="/" className="text-xs text-[#F5D061] hover:underline font-bold inline-block pt-1">
+                ← Back to Home | العودة للرئيسية
               </Link>
             </div>
           </div>
@@ -319,7 +319,7 @@ export default function CaseStudyPage() {
           <button
             type="button"
             onClick={() => setShowLeaderboardModal(true)}
-            className="flex items-center gap-2 bg-[#F5D061] text-[#630517] px-5 py-3 rounded-2xl font-black text-xs shadow-lg hover:scale-105 transition-all cursor-pointer shrink-0"
+            className="flex items-center gap-2 bg-gradient-to-r from-[#F5D061] to-[#E2B739] text-[#064e3b] px-6 py-3.5 rounded-2xl font-black text-xs shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border border-white/30"
           >
             <span className="text-lg">🏆</span>
             <span>لوحة الصدارة</span>
@@ -327,12 +327,13 @@ export default function CaseStudyPage() {
         </div>
       </div>
 
+      {/* نافذة لوحة الصدارة المنبثقة */}
       {showLeaderboardModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-slate-200 text-right" dir="rtl">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-              <h3 className="text-xl font-black text-[#630517] flex items-center gap-2">
-                <span>🏆</span> لوحة الصدارة
+              <h3 className="text-xl font-black text-[#047857] flex items-center gap-2">
+                <span>🏆</span> لوحة صدارة أسبوع الصحة النفسية
               </h3>
               <button
                 type="button"
@@ -348,18 +349,18 @@ export default function CaseStudyPage() {
                 <p className="text-center text-xs text-slate-400 py-8 font-medium">لا توجد سجلات صدارة حتى الآن، كن أول المشاركين!</p>
               ) : (
                 leaderboard.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs font-bold">
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-emerald-50/50 border border-emerald-100 text-xs font-bold">
                     <div className="flex items-center gap-3">
                       <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black ${
                         idx === 0 ? 'bg-amber-400 text-slate-900 shadow-sm' :
                         idx === 1 ? 'bg-slate-300 text-slate-800' :
-                        idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-600'
+                        idx === 2 ? 'bg-amber-700 text-white' : 'bg-emerald-200 text-emerald-800'
                       }`}>
                         {idx + 1}
                       </span>
                       <span className="text-slate-800">{item.studentName}</span>
                     </div>
-                    <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-mono font-bold">
+                    <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-mono font-bold">
                       ⭐ {item.totalScore} نقطة
                     </span>
                   </div>
@@ -370,7 +371,7 @@ export default function CaseStudyPage() {
             <button
               type="button"
               onClick={() => setShowLeaderboardModal(false)}
-              className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow-md cursor-pointer hover:brightness-110"
+              className="w-full py-3 rounded-2xl bg-[#047857] text-[#F5D061] font-black text-xs shadow-md cursor-pointer hover:brightness-110"
             >
               إغلاق
             </button>
@@ -378,36 +379,39 @@ export default function CaseStudyPage() {
         </div>
       )}
 
+      {/* قائمة الأسماء والحالات الإكلينيكية */}
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8" dir="ltr">
         {activeCases.map((item) => (
-          <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+          <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-emerald-100 shadow-sm space-y-6 relative overflow-hidden">
             <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
-              <span className="font-black text-[#630517] text-base">{item.title}</span>
+              <span className="font-black text-[#047857] text-base flex items-center gap-2">
+                <span>🧠</span> {item.title}
+              </span>
               <span className={`text-xs font-bold px-3 py-1 rounded-full ${
                 item.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-800' : 
-                item.difficulty === 'Moderate' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                item.difficulty === 'Moderate' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
               }`}>
                 Level: {item.difficulty}
               </span>
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-sm font-medium leading-relaxed text-slate-800">
+            <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-100/80 text-sm font-medium leading-relaxed text-slate-800">
               {item.scenario}
             </div>
 
             <div className="space-y-3">
-              <span className="text-xs font-bold text-slate-500 block">Select the correct answer:</span>
+              <span className="text-xs font-bold text-slate-500 block">Select the correct evidence-based nursing action:</span>
               <div className="grid grid-cols-1 gap-2.5">
                 {item.options.map((opt, optIdx) => {
                   const isSelected = selectedAnswers[item.id] === optIdx;
                   const isCorrect = optIdx === item.correctIndex;
 
-                  let btnStyle = 'bg-white border-slate-200 hover:bg-slate-50 text-slate-800';
+                  let btnStyle = 'bg-white border-slate-200 hover:bg-emerald-50/30 text-slate-800';
                   if (showResults) {
-                    if (isCorrect) btnStyle = 'bg-emerald-500 text-white border-emerald-600 font-bold';
-                    else if (isSelected && !isCorrect) btnStyle = 'bg-red-500 text-white border-red-600 font-bold';
+                    if (isCorrect) btnStyle = 'bg-emerald-600 text-white border-emerald-700 font-bold';
+                    else if (isSelected && !isCorrect) btnStyle = 'bg-rose-600 text-white border-rose-700 font-bold';
                   } else if (isSelected) {
-                    btnStyle = 'bg-[#630517] text-white border-[#630517] font-bold shadow-sm';
+                    btnStyle = 'bg-[#047857] text-white border-[#047857] font-bold shadow-md';
                   }
 
                   return (
@@ -418,8 +422,8 @@ export default function CaseStudyPage() {
                       disabled={showResults || hasSubmittedToday}
                       className={`w-full text-left p-4 rounded-2xl border text-xs sm:text-sm transition-all cursor-pointer flex items-center justify-between ${btnStyle}`}
                     >
-                      <span>{opt}</span>
-                      <span className="w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-bold">
+                      <span className="pr-4">{opt}</span>
+                      <span className="w-6 h-6 rounded-full border flex items-center justify-center text-[11px] font-bold shrink-0">
                         {optIdx + 1}
                       </span>
                     </button>
@@ -429,36 +433,36 @@ export default function CaseStudyPage() {
             </div>
 
             {showResults && (
-              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
-                <strong>💡 Clinical Rationale:</strong>
-                <p>{item.explanation}</p>
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 space-y-1">
+                <strong className="text-[#047857]">💡 Mental Health Clinical Rationale:</strong>
+                <p className="leading-relaxed">{item.explanation}</p>
               </div>
             )}
           </div>
         ))}
 
         {!showResults ? (
-          <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 text-center">
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-700 font-medium">
-              🔒 Connected as: <strong className="text-[#630517]">{studentName || 'مستخدم مسجل'}</strong> (Phone: <span dir="ltr">{studentPhone || '---'}</span>)
-              <p className="text-[10px] text-slate-400 mt-1">Your submission will be recorded automatically with your profile credentials and timestamp.</p>
+          <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm space-y-4 text-center">
+            <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 text-xs text-slate-700 font-medium">
+              🔒 Connected Profile: <strong className="text-[#047857]">{studentName || 'مستخدم مسجل'}</strong> (Phone: <span dir="ltr">{studentPhone || '---'}</span>)
+              <p className="text-[10px] text-slate-400 mt-1">Your response will be recorded for Mental Health Week Clinical Leaderboard.</p>
             </div>
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-[#630517] text-[#F5D061] py-4 rounded-2xl font-black text-sm shadow-xl hover:brightness-110 transition-all cursor-pointer"
+              className="w-full bg-gradient-to-r from-[#064e3b] to-[#047857] text-[#F5D061] py-4 rounded-2xl font-black text-sm shadow-xl hover:brightness-110 active:scale-98 transition-all cursor-pointer border border-white/20"
             >
-              {submitting ? 'Submitting...' : 'Submit Answers & Save Score 🎯'}
+              {submitting ? 'Submitting...' : 'Submit Answers & Save Mental Health Score 🧠🎯'}
             </button>
           </form>
         ) : (
           <div className="bg-emerald-50 border-2 border-emerald-300 p-6 rounded-3xl space-y-3 text-center">
             <h3 className="text-xl font-black text-emerald-900">Your Score: {calculateScore()} / {activeCases.length} Correct! 🎉</h3>
-            <p className="text-xs text-emerald-700 font-medium">
-              Thank you for participating. Your response has been linked to your profile and recorded in the admin dashboard successfully.
+            <p className="text-xs text-emerald-800 font-medium">
+              شكراً لمشاركتك في أسبوع التوعية بالصحة النفسية. تم تسكيل إجابتك وتحديث نقاطك بنجاح.
             </p>
             <div className="bg-white/80 p-3 rounded-2xl border border-emerald-200 text-xs text-slate-700 font-bold">
-              ⏳ Next daily rotation available after: <span className="text-[#630517]">{timeLeft}</span>
+              ⏳ Next Mental Health rotation available after: <span className="text-[#047857]">{timeLeft}</span>
             </div>
           </div>
         )}
