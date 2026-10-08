@@ -67,7 +67,7 @@ interface PartnerItem {
   name: string;
   category: string;
   logo: string;
-  websiteUrl?: string; // أُضيف لدعم رابط الشريك أو الراعي
+  websiteUrl?: string;
 }
 
 export default function DiscoverPage() {
@@ -138,6 +138,78 @@ export default function DiscoverPage() {
   }, []);
 
   const activeSlide = passionSlides[currentSlide] || passionSlides[0];
+
+  // دالة تحديد الأولوية الهرمية للرعاة
+  const getCategoryPriority = (category: string = '') => {
+    const cat = category.trim();
+    if (cat.includes('إستراتيجي') || cat.includes('استراتيجي') || cat.includes('ماسي')) return 1;
+    if (cat.includes('ذهبي')) return 2;
+    if (cat.includes('فضي')) return 3;
+    if (cat.includes('برونزي')) return 4;
+    return 5;
+  };
+
+  const sortedPartners = [...partners].sort((a, b) => {
+    return getCategoryPriority(a.category) - getCategoryPriority(b.category);
+  });
+
+  const goldAndStrategic = sortedPartners.filter((p) => getCategoryPriority(p.category) <= 2);
+  const silverPartners = sortedPartners.filter((p) => getCategoryPriority(p.category) === 3);
+  const bronzeAndOthers = sortedPartners.filter((p) => getCategoryPriority(p.category) >= 4);
+
+  const renderPartnerCard = (partner: PartnerItem) => {
+    const isGoldOrStrategic = partner.category?.includes('ذهبي') || partner.category?.includes('إستراتيجي') || partner.category?.includes('استراتيجي') || partner.category?.includes('ماسي');
+    const isSilver = partner.category?.includes('فضي');
+    const isBronze = partner.category?.includes('برونزي');
+
+    const badgeColorClass = isGoldOrStrategic 
+      ? 'text-amber-700 font-black' 
+      : isSilver 
+      ? 'text-slate-600 font-extrabold' 
+      : isBronze 
+      ? 'text-amber-900 font-bold' 
+      : 'text-[#630517] font-bold';
+
+    const partnerContent = (
+      <div 
+        className={`p-6 rounded-3xl bg-slate-50 border shadow-md flex flex-col items-center justify-center w-60 h-52 hover:border-[#630517] hover:scale-105 transition-all overflow-hidden space-y-3 group cursor-pointer ${
+          isGoldOrStrategic ? 'border-amber-300 bg-gradient-to-b from-amber-50/50 to-slate-50 shadow-lg' : 'border-slate-200'
+        }`}
+      >
+        <div className="w-28 h-28 bg-white rounded-2xl p-2.5 shadow-inner flex items-center justify-center overflow-hidden border border-slate-100">
+          <img 
+            src={partner.logo && partner.logo.trim() !== '' ? partner.logo : '/logo.png'} 
+            alt={partner.name} 
+            className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/logo.png';
+            }}
+          />
+        </div>
+        <div>
+          <h4 className="font-extrabold text-slate-900 text-sm truncate max-w-[180px]">{partner.name}</h4>
+          <span className={`text-xs ${badgeColorClass}`}>{partner.category || 'شريك إستراتيجي'}</span>
+        </div>
+      </div>
+    );
+
+    return partner.websiteUrl ? (
+      <a
+        key={partner.id || partner.name}
+        href={partner.websiteUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block transition-transform"
+        title={`زيارة صفحة أو موقع ${partner.name}`}
+      >
+        {partnerContent}
+      </a>
+    ) : (
+      <div key={partner.id || partner.name}>
+        {partnerContent}
+      </div>
+    );
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
@@ -301,7 +373,7 @@ export default function DiscoverPage() {
                   <img src="/logo.png" alt="شعار النادي" className="w-full h-full object-contain" />
                 </div>
                 <span className="text-xs px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#F5D061] font-bold border border-white/10">
-                  شغف، عطاء، واحترافية
+                  شغف، عطاء، وااحترافية
                 </span>
               </div>
 
@@ -440,9 +512,9 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      {/* قسم شركاء النجاح والرعاة (مرتبط سحابياً لوحة التحكم مع تفعيل روابط الـ <a>) */}
+      {/* قسم شركاء النجاح والرعاة (مرتب هرمياً: الأعلى فوق والأسفل تحت) */}
       <section className="py-16 border-t border-slate-200 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-12">
           <div className="space-y-3">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
               شركاء النجاح والرعاة
@@ -452,46 +524,52 @@ export default function DiscoverPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
-            {partners.map((partner) => {
-              const partnerContent = (
-                <div 
-                  className="p-6 rounded-3xl bg-slate-50 border border-slate-200 shadow-md flex flex-col items-center justify-center w-60 h-52 hover:border-[#630517] hover:scale-105 transition-all overflow-hidden space-y-3 group cursor-pointer"
-                >
-                  <div className="w-28 h-28 bg-white rounded-2xl p-2.5 shadow-inner flex items-center justify-center overflow-hidden border border-slate-100">
-                    <img 
-                      src={partner.logo && partner.logo.trim() !== '' ? partner.logo : '/logo.png'} 
-                      alt={partner.name} 
-                      className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/logo.png';
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-slate-900 text-sm truncate max-w-[180px]">{partner.name}</h4>
-                    <span className="text-xs text-[#630517] font-bold">{partner.category || 'شريك إستراتيجي'}</span>
-                  </div>
+          <div className="space-y-12">
+            {/* المستوى الأول: الشركاء الاستراتيجيون والرعاة الذهبيون (قمة الهرم) */}
+            {goldAndStrategic.length > 0 && (
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-black shadow-sm">
+                  <span>👑</span>
+                  <span>الرعاة الذهبيون والشركاء الاستراتيجيون</span>
                 </div>
-              );
+                <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
+                  {goldAndStrategic.map((partner) => renderPartnerCard(partner))}
+                </div>
+              </div>
+            )}
 
-              return partner.websiteUrl ? (
-                <a
-                  key={partner.id || partner.name}
-                  href={partner.websiteUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block transition-transform"
-                  title={`زيارة صفحة أو موقع ${partner.name}`}
-                >
-                  {partnerContent}
-                </a>
-              ) : (
-                <div key={partner.id || partner.name}>
-                  {partnerContent}
+            {/* المستوى الثاني: الرعاة الفضيون (وسط الهرم) */}
+            {silverPartners.length > 0 && (
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 border border-slate-300 text-slate-800 text-xs font-black shadow-sm">
+                  <span>🥈</span>
+                  <span>الرعاة الفضيون</span>
                 </div>
-              );
-            })}
+                <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
+                  {silverPartners.map((partner) => renderPartnerCard(partner))}
+                </div>
+              </div>
+            )}
+
+            {/* المستوى الثالث: الرعاة البرونزيون وباقي الشركاء (قاعدة الهرم) */}
+            {bronzeAndOthers.length > 0 && (
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-900/10 border border-amber-900/20 text-amber-950 text-xs font-black shadow-sm">
+                  <span>🥉</span>
+                  <span>الرعاة البرونزيون والشركاء</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
+                  {bronzeAndOthers.map((partner) => renderPartnerCard(partner))}
+                </div>
+              </div>
+            )}
+
+            {/* احتياطي في حال وجود شركاء فئاتهم مخصصة أو غير مصنفة */}
+            {goldAndStrategic.length === 0 && silverPartners.length === 0 && bronzeAndOthers.length === 0 && (
+              <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
+                {sortedPartners.map((partner) => renderPartnerCard(partner))}
+              </div>
+            )}
           </div>
         </div>
       </section>
