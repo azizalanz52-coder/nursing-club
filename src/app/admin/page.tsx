@@ -3012,26 +3012,30 @@ export default function AdminDashboard() {
                   </tr>
 
                   {filteredAndSortedUsers.map((usr, idx) => {
-                    const isOnline = usr.lastActive && (Date.now() - usr.lastActive < 4 * 60 * 1000);
+  const isOnline = usr.lastActive && (Date.now() - usr.lastActive < 4 * 60 * 1000);
+  
+  // البحث عن اسم الطالب الحقيقي تلقائياً برقم الجوال من قائمة الطلبات في حال عدم وجوده بالمستخدمين
+  const matchedReq = requests.find(r => String(r.phone).trim() === String(usr.phone).trim());
+  const displayName = usr.fullName || matchedReq?.fullName || 'مستخدم مسجل';
 
-                    return (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="py-4 pr-2 font-bold text-slate-900">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span>{usr.fullName || 'مستخدم مسجل'}</span>
-                            <button
-                              type="button"
-                              onClick={() => openNameModal(usr.phone, usr.fullName || '')}
-                              className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-bold hover:bg-indigo-100 cursor-pointer shadow-sm transition-all"
-                              title="تعديل الاسم الكامل"
-                            >
-                              ✏️ تعديل الاسم
-                            </button>
-                          </div>
-                          <span className={`block text-[10px] font-bold mt-0.5 ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
-                            {isOnline ? '🟢 نشط الآن في الموقع' : '⚪ غير متصل حالياً'}
-                          </span>
-                        </td>
+  return (
+    <tr key={idx} className="hover:bg-slate-50">
+      <td className="py-4 pr-2 font-bold text-slate-900">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span>{displayName}</span>
+          <button
+            type="button"
+            onClick={() => openNameModal(usr.phone, displayName !== 'مستخدم مسجل' ? displayName : '')}
+            className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-bold hover:bg-indigo-100 cursor-pointer shadow-sm transition-all"
+            title="تعديل الاسم الكامل"
+          >
+            ✏️ تعديل الاسم
+          </button>
+        </div>
+        <span className={`block text-[10px] font-bold mt-0.5 ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>
+          {isOnline ? '🟢 نشط الآن في الموقع' : '⚪ غير متصل حالياً'}
+        </span>
+      </td>
                         <td className="py-4 text-slate-600 font-mono" dir="ltr">
                           <div className="flex items-center gap-2">
                             <span>{usr.phone}</span>
