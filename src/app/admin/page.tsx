@@ -1433,14 +1433,14 @@ export default function AdminDashboard() {
       setNewDiscImages([]);
       setModalMessage('تم إنشاء الفعالية ونشر الصور سحابياً للجميع بنجاح! 🖼️🚀');
       setModalType('success');
-    } catch (err) {
-      console.error('Error saving event:', err);
-      setModalMessage('حدث خطأ أثناء رفع الفعالية بالسحابة.');
-      setModalType('success');
-    } font-black {
-      setIsUploadingDiscover(false);
-    }
-  };
+   } catch (err) {
+    console.error('Error saving event:', err);
+    setModalMessage('حدث خطأ أثناء رفع الفعالية بالسحابة.');
+    setModalType('error'); // يُفضّل اختيار 'error' بدلاً من 'success' في حالة الخطأ
+  } finally {
+    setIsUploadingDiscover(false);
+  }
+};
 
   const handleSelectMediaFiles = async (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
