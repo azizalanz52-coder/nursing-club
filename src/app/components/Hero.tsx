@@ -40,7 +40,7 @@ export default function Hero() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    // 1. التحقق الفوري محلياً هل سبق إغلاق النافذة لعدم تكرارها نهائياً
+    // التحقق الفوري محلياً هل سبق إغلاق النافذة لعدم تكرارها نهائياً
     const hasSeenLocal = localStorage.getItem('hasSeenAcceptanceModal');
     if (hasSeenLocal === 'true') {
       setShowModal(false);
@@ -104,7 +104,6 @@ export default function Hero() {
                 await updateDoc(userDocRef, { pendingCongratulation: false });
               }
 
-              // إذا سبق ورأاها سحابياً أو محلياً، لا تظهر
               if (uData.hasSeenCongrats === true || hasSeenLocal === 'true') {
                 return;
               }
@@ -120,7 +119,6 @@ export default function Hero() {
             }
           }
 
-          // فحص applications فقط إذا لم يتم إغلاقها مسبقاً
           if (hasSeenLocal !== 'true') {
             const querySnapshot = await getDocs(collection(db, 'applications'));
             querySnapshot.forEach((docSnap) => {
@@ -149,7 +147,6 @@ export default function Hero() {
     }
   }, []);
 
-  // دالة إغلاق نافذة القبول (تحفظ محلياً وسحابياً لتختفي بلا رجعة)
   const handleCloseAcceptanceModal = async () => {
     setShowModal(false);
     localStorage.setItem('hasSeenAcceptanceModal', 'true');
@@ -194,19 +191,20 @@ export default function Hero() {
           </h1>
         </div>
 
-        <div className="relative w-full max-w-3xl mx-auto rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#F5D061]/30 group transition-all duration-700 hover:scale-[1.01] hover:border-[#F5D061]/70 bg-black/30">
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-30 group-hover:opacity-60 transition-opacity pointer-events-none z-10" />
+        {/* تعديل حاوية التصميم لتكون بعرض أوسع وارتفاع متناسب يبرز البوستر بحجمه الطبيعي */}
+        <div className="relative w-full max-w-5xl mx-auto rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#F5D061]/30 group transition-all duration-700 hover:border-[#F5D061]/70 bg-black/40">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-30 group-hover:opacity-50 transition-opacity pointer-events-none z-10" />
 
-          <div className="relative z-0 w-full flex items-center justify-center bg-black/40">
+          <div className="relative z-0 w-full flex items-center justify-center bg-black/20 min-h-[300px] sm:min-h-[500px]">
             {currentBanner.image?.startsWith('data:video') || currentBanner.image?.includes('.mp4') ? (
-              <video src={currentBanner.image} autoPlay loop muted className="w-full h-auto max-h-[480px] object-contain mx-auto" />
+              <video src={currentBanner.image} autoPlay loop muted className="w-full h-auto max-h-[650px] object-cover sm:object-contain mx-auto" />
             ) : (
               <Image
                 src={currentBanner.image || '/header-banner.png'} 
-                alt="بانر نادي التمريض"
-                width={1200}
-                height={600}
-                className="w-full h-auto max-h-[480px] object-contain mx-auto transition-transform duration-700 group-hover:scale-105"
+                alt={currentBanner.title || "بانر نادي التمريض"}
+                width={1920}
+                height={1080}
+                className="w-full h-auto max-h-[650px] object-cover sm:object-contain mx-auto transition-transform duration-700 group-hover:scale-[1.02]"
                 priority
               />
             )}
@@ -279,7 +277,7 @@ export default function Hero() {
         </div>
       )}
 
-      {/* نافذة التهنئة بالقبول (تظهر مرة واحدة وتختفي للأبد عند الإغلاق) */}
+      {/* نافذة التهنئة بالقبول */}
       {showModal && acceptedData && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300" dir="rtl">
           <div className="bg-gradient-to-br from-[#F5D061] via-[#dfb64d] to-[#630517] rounded-[32px] p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative text-slate-900">
