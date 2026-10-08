@@ -141,6 +141,11 @@ export default function CommitteeDetailPage() {
   const [mediaBase64, setMediaBase64] = useState('');
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
 
+  // خصائص لجنة المحتوى العلمي ولجنة التصميم (بنك النصوص والعبارات)
+  const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
+  const [textBannerTitle, setTextBannerTitle] = useState('');
+  const [textBannerContent, setTextBannerContent] = useState('');
+
   // نافذة معاينة الميديا الكبيرة داخل الصفحة
   const [previewItem, setPreviewItem] = useState<any | null>(null);
 
@@ -263,6 +268,10 @@ export default function CommitteeDetailPage() {
         // جلب المعرض الإعلامي (للإعلام)
         const mediaSnap = await getDocs(collection(db, 'media_committee_gallery'));
         setMediaGallery(mediaSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        // جلب بنك النصوص والعبارات العلمية (للمحتوى العلمي ولجنة التصميم)
+        const scientificSnap = await getDocs(collection(db, 'scientific_committee_texts'));
+        setScientificTextsList(scientificSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
       } catch (err) {
         console.error('Error fetching cloud data:', err);
@@ -421,6 +430,50 @@ export default function CommitteeDetailPage() {
       alert('حدث خطأ أثناء الحذف.');
     }
   };
+
+  // إضافة نص/عبارة توعوية جديدة للبنرات (خاص بلجنة المحتوى العلمي)
+  const handleAddScientificTextSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!textBannerTitle.trim() || !textBannerContent.trim()) {
+      alert('يرجى تعبئة عنوان البانر والنص المطلوب.');
+      return;
+    }
+    const newTextObj = {
+      title: textBannerTitle.trim(),
+      content: textBannerContent.trim(),
+      author: currentUserName || 'عضو المحتوى العلمي',
+      createdAt: new Date().toLocaleDateString('ar-SA')
+    };
+    try {
+      const docRef = await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
+      setScientificTextsList([{ id: docRef.id, ...newTextObj }, ...scientificTextsList]);
+      setTextBannerTitle('');
+      setTextBannerContent('');
+      alert('تم اعتماد ونشر النص وعرضه مباشرة للجنة التصميم وإرساله للوحة الإدارة بنجاح! 🔬✨');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء حفظ النص، يرجى المحاولة مرة أخرى.');
+    }
+  };
+
+  // حذف نص من بنك النصوص
+  const handleDeleteScientificText = async (textId: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا النص من البنك؟')) return;
+    try {
+      await deleteDoc(doc(db, 'scientific_committee_texts', textId));
+      setScientificTextsList(scientificTextsList.filter(t => t.id !== textId));
+      alert('تم حذف النص بنجاح 🗑️');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء الحذف.');
+    }
+  };
+
+  // التثبت من صلاحيات المحتوى العلمي ولجنة التصميم
+  const isScientificCommittee = id === 'scientific' || normalizeArabic(committee?.name || '').includes('علمي');
+  const isDesignCommittee = id === 'design' || normalizeArabic(committee?.name || '').includes('تصميم');
+  const canAccessScientificTexts = isScientificCommittee || isDesignCommittee || isAdmin;
+  const canAddScientificTexts = isScientificCommittee || isAdmin;
 
   if (!baseDetails) {
     return (
@@ -758,6 +811,93 @@ export default function CommitteeDetailPage() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 🔬 الخاصية المخصصة: بنك النصوص والعبارات الطبية (لجنة المحتوى العلمي ولجنة التصميم) */}
+        {canAccessScientificTexts && (
+          <div className="bg-white rounded-3xl p-8 sm:p-10 border border-emerald-200 shadow-xl space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">🔬 بنك صياغة النصوص الطبية والعبارات للبنرات والتصاميم</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  {isScientificCommittee
+                    ? 'اكتب واعتمد النصوص التوعوية والعبارات الطبية ليصل إشعارها وتعرض مباشرة لأعضاء لجنة التصميم لتجهيز البنرات.'
+                    : 'استقبل واستعرض العبارات والنصوص الدقيقة المعتمدة من لجنة المحتوى العلمي لاستخدامها المباشر في التصاميم والبوسترات.'}
+                </p>
+              </div>
+              <span className="px-3.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-xs">
+                إجمالي النصوص المعتمدة: {scientificTextsList.length}
+              </span>
+            </div>
+
+            {/* نموذج إضافة نص جديد (يظهر حصرياً للجنة المحتوى العلمي والأدمن) */}
+            {canAddScientificTexts && (
+              <form onSubmit={handleAddScientificTextSubmit} className="grid grid-cols-1 gap-4 bg-emerald-50/40 p-6 rounded-2xl border border-emerald-200">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">عنوان البانر أو التصميم المستهدف</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: عبارات بوستر اليوم العالمي للتمريض"
+                    value={textBannerTitle}
+                    onChange={(e) => setTextBannerTitle(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">النصوص والعبارات الدقيقة المعتمدة (ستظهر فوراً للجنة التصميم)</label>
+                  <textarea
+                    rows={3}
+                    placeholder="اكتب النص العلمي أو العبارة الإبداعية هنا لتكون مرجعاً للبنرات والتصاميم..."
+                    value={textBannerContent}
+                    onChange={(e) => setTextBannerContent(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">
+                    + نشر واعتماد النص للجنة التصميم وللإدارة 📝✨
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* عرض بنك النصوص المعتمدة لكلا اللجنتين (المحتوى العلمي والتصميم) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+              {scientificTextsList.length === 0 ? (
+                <p className="col-span-2 text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد نصوص علمية معتمدة مرفوعة حالياً.</p>
+              ) : (
+                scientificTextsList.map((txt) => (
+                  <div key={txt.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold">جاهز للاستخدام في التصاميم ✓</span>
+                        <span className="text-[10px] text-slate-400">{txt.createdAt}</span>
+                      </div>
+                      <h5 className="font-black text-slate-900 text-sm">{txt.title}</h5>
+                      <p className="text-xs text-slate-700 bg-white p-3 rounded-xl border border-slate-100 leading-relaxed font-semibold">"{txt.content}"</p>
+                      {txt.author && <p className="text-[10px] text-slate-400">بواسطة: {txt.author}</p>}
+                    </div>
+
+                    {canAddScientificTexts && (
+                      <div className="flex justify-end pt-2">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteScientificText(txt.id)}
+                          className="px-3 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-lg hover:bg-red-100 transition-all cursor-pointer"
+                        >
+                          حذف ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
               )}
             </div>
           </div>
