@@ -131,11 +131,11 @@ export default function CommitteeDashboard() {
     fetchCommitteeWhatsappLinks();
     fetchHonorBoard();
 
-    // ربط استماع لحظي وسحابي لبنك النصوص العلمية للتحديث والتزامن الفوري عند الجميع
+    // ربط استماع لحظي وسحابي لبنك النصوص العلمية مع ضمان تطابق معرّف المستند السحابي الحقيقي
     const unsubScientific = onSnapshot(
       collection(db, 'scientific_committee_texts'),
       (snap) => {
-        const texts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const texts = snap.docs.map(d => ({ ...d.data(), id: d.id }));
         setScientificTextsList(texts);
       },
       (err) => {
@@ -169,7 +169,7 @@ export default function CommitteeDashboard() {
   const fetchHonorBoard = async () => {
     try {
       const snap = await getDocs(collection(db, 'committee_honor_board'));
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const items = snap.docs.map(d => ({ ...d.data(), id: d.id }));
       setHonorBoardList(items);
     } catch (e) {
       console.error(e);
@@ -193,7 +193,7 @@ export default function CommitteeDashboard() {
 
     try {
       const docRef = await addDoc(collection(db, 'committee_honor_board'), newEntry);
-      setHonorBoardList([{ id: docRef.id, ...newEntry }, ...honorBoardList]);
+      setHonorBoardList([{ ...newEntry, id: docRef.id }, ...honorBoardList]);
       setNewHonorMemberName('');
       setNewHonorScore('');
       alert('تم إضافة العضو ونقاطه بنجاح إلى لوحة الشرف! 🏆');
@@ -288,7 +288,7 @@ export default function CommitteeDashboard() {
       }
 
       const reqSnap = await getDocs(collection(db, 'applications'));
-      const allReqs = reqSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allReqs = reqSnap.docs.map(d => ({ ...d.data(), id: d.id }));
       setRequests(allReqs);
 
       setLoading(false);
@@ -301,7 +301,7 @@ export default function CommitteeDashboard() {
   const fetchAllUsers = async () => {
     try {
       const snap = await getDocs(collection(db, 'users'));
-      const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const users = snap.docs.map(d => ({ ...d.data(), id: d.id }));
       setAllUsersList(users);
     } catch (e) { console.error(e); }
   };
@@ -309,49 +309,49 @@ export default function CommitteeDashboard() {
   const fetchEscalatedReports = async () => {
     try {
       const snap = await getDocs(collection(db, 'escalated_reports'));
-      setEscalatedReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setEscalatedReports(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     } catch (e) { console.error(e); }
   };
 
   const fetchCommitteeTasks = async () => {
     try {
       const snap = await getDocs(collection(db, 'committee_tasks'));
-      setCommitteeTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setCommitteeTasks(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     } catch (e) { console.error(e); }
   };
 
   const fetchQualityArchives = async () => {
     try {
       const snap = await getDocs(collection(db, 'quality_reports_archive'));
-      setQualityArchives(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setQualityArchives(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     } catch (e) { console.error(e); }
   };
 
   const fetchMediaGallery = async () => {
     try {
       const snap = await getDocs(collection(db, 'media_committee_gallery'));
-      setMediaGallery(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setMediaGallery(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     } catch (e) { console.error(e); }
   };
 
   const fetchScientificTexts = async () => {
     try {
       const snap = await getDocs(collection(db, 'scientific_committee_texts'));
-      setScientificTextsList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setScientificTextsList(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     } catch (e) { console.error(e); }
   };
 
   const fetchEventExcuses = async () => {
     try {
       const snap = await getDocs(collection(db, 'event_excuses'));
-      setEventExcuses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setEventExcuses(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     } catch (e) { console.error(e); }
   };
 
   const fetchPublicPartners = async () => {
     try {
       const snap = await getDocs(collection(db, 'public_partners_relations'));
-      setPublicPartnersList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setPublicPartnersList(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     } catch (e) { console.error(e); }
   };
 
@@ -372,7 +372,7 @@ export default function CommitteeDashboard() {
 
     try {
       const docRef = await addDoc(collection(db, 'public_partners_relations'), newPartnerObj);
-      setPublicPartnersList([{ id: docRef.id, ...newPartnerObj }, ...publicPartnersList]);
+      setPublicPartnersList([{ ...newPartnerObj, id: docRef.id }, ...publicPartnersList]);
 
       if (partnerStatus === 'وافقوا') {
         for (const usr of allUsersList) {
@@ -428,17 +428,15 @@ export default function CommitteeDashboard() {
   const handleUploadMediaSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!mediaTitle.trim()) return;
-    const mediaId = `media_${Date.now()}`;
     const newObj = {
-      id: mediaId,
       title: mediaTitle.trim(),
       category: mediaCategory,
       imageUrl: mediaBase64,
       createdAt: new Date().toLocaleDateString('ar-SA')
     };
     try {
-      await addDoc(collection(db, 'media_committee_gallery'), newObj);
-      setMediaGallery([newObj, ...mediaGallery]);
+      const docRef = await addDoc(collection(db, 'media_committee_gallery'), newObj);
+      setMediaGallery([{ ...newObj, id: docRef.id }, ...mediaGallery]);
       setMediaTitle('');
       setMediaBase64('/header-banner.png');
 
@@ -467,7 +465,7 @@ export default function CommitteeDashboard() {
   const handleAddScientificTextSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!textBannerTitle.trim() || !textBannerContent.trim()) return;
-    const textId = `txt_${Date.now()}`;
+    
     const newTextObj = {
       title: textBannerTitle.trim(),
       content: textBannerContent.trim(),
@@ -475,8 +473,8 @@ export default function CommitteeDashboard() {
       createdAt: new Date().toLocaleDateString('ar-SA')
     };
     try {
-      // حفظ المستند سحابياً باستخدام معرّف محدد لمنع تضارب الـ ID عند الحذف
-      await setDoc(doc(db, 'scientific_committee_texts', textId), newTextObj);
+      // إضافة المستند بـ addDoc للفايربيس مباشرة للحصول على ID سحابي دقيق
+      const docRef = await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
 
       for (const usr of allUsersList) {
         const cStr = usr.assignedCommittee || usr.committee || '';
@@ -496,9 +494,15 @@ export default function CommitteeDashboard() {
   };
 
   const handleDeleteScientificText = async (id: string) => {
+    if (!id) {
+      alert('لم يتم التعرف على معرّف النص بشكل صحيح.');
+      return;
+    }
     if (confirm('هل أنت متأكد من حذف هذا النص؟')) {
       try {
         await deleteDoc(doc(db, 'scientific_committee_texts', id));
+        // تحديث الـ state المحلي فوراً لضمان الاختفاء المباشر من الواجهة
+        setScientificTextsList(prev => prev.filter(t => t.id !== id));
         alert('تم حذف النص سحابياً وتحديثه لدى جميع اللجان بنجاح! 🗑️');
       } catch (err) {
         console.error('Error deleting document:', err);
@@ -524,7 +528,7 @@ export default function CommitteeDashboard() {
 
     try {
       const docRef = await addDoc(collection(db, 'event_excuses'), newExcuseObj);
-      setEventExcuses([{ id: docRef.id, ...newExcuseObj }, ...eventExcuses]);
+      setEventExcuses([{ ...newExcuseObj, id: docRef.id }, ...eventExcuses]);
 
       for (const usr of allUsersList) {
         const cStr = usr.assignedCommittee || usr.committee || '';
@@ -757,7 +761,7 @@ export default function CommitteeDashboard() {
       };
 
       const docRef = await addDoc(collection(db, 'committee_tasks'), newTaskObj);
-      setCommitteeTasks([{ id: docRef.id, ...newTaskObj }, ...committeeTasks]);
+      setCommitteeTasks([{ ...newTaskObj, id: docRef.id }, ...committeeTasks]);
 
       const acceptedList = requests.filter(r => isSameCommittee(r.acceptedCommittee, targetComm));
       for (const mem of acceptedList) {
@@ -1132,7 +1136,7 @@ export default function CommitteeDashboard() {
       };
 
       const docRef = await addDoc(collection(db, 'quality_reports_archive'), newReportObj);
-      setQualityArchives([{ id: docRef.id, ...newReportObj }, ...qualityArchives]);
+      setQualityArchives([{ ...newReportObj, id: docRef.id }, ...qualityArchives]);
 
       for (const usr of allUsersList) {
         if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
@@ -1946,7 +1950,7 @@ export default function CommitteeDashboard() {
               </span>
             </div>
 
-            {/* نموذج إضافة النص العلمي - متاح لأعضاء ورؤساء لجنة المحتوى العلمي والرؤساء والأدمن */}
+            {/* نموذج إضافة النص العلمي */}
             {canAddScientificTexts && (
               <form onSubmit={handleAddScientificTextSubmit} className="grid grid-cols-1 gap-4 bg-emerald-50/40 p-6 rounded-2xl border border-emerald-200">
                 <div className="space-y-1.5">
@@ -1981,7 +1985,7 @@ export default function CommitteeDashboard() {
               </form>
             )}
 
-            {/* عرض قوائم النصوص المرفوعة لجميع الأطراف المسموح لها (لجنة المحتوى العلمي، لجنة التصميم، الأدمن والرؤساء) */}
+            {/* عرض قوائم النصوص المرفوعة */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
               {scientificTextsList.length === 0 ? (
                 <p className="col-span-2 text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد نصوص علمية معتمدة مرفوعة حالياً.</p>
@@ -1999,7 +2003,13 @@ export default function CommitteeDashboard() {
                     </div>
                     {canAddScientificTexts && (
                       <div className="flex justify-end pt-2">
-                        <button type="button" onClick={() => handleDeleteScientificText(txt.id)} className="px-3 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-lg">حذف ✕</button>
+                        <button 
+                          type="button" 
+                          onClick={() => handleDeleteScientificText(txt.id)} 
+                          className="px-3 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-lg hover:bg-red-100 cursor-pointer"
+                        >
+                          حذف ✕
+                        </button>
                       </div>
                     )}
                   </div>
