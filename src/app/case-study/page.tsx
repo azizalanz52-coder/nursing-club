@@ -13,6 +13,7 @@ interface CaseQuestion {
   options: string[];
   correctIndex: number;
   explanation: string;
+  bonusPoints?: number; // بونص إضافي 1 أو 2
 }
 
 interface LeaderboardItem {
@@ -142,6 +143,13 @@ export default function CaseStudyPage() {
         [optionsWithOriginalIndex[i], optionsWithOriginalIndex[j]] = [optionsWithOriginalIndex[j], optionsWithOriginalIndex[i]];
       }
 
+      // حساب البونص السري بنسبة متوسطة متوازنة (~40% احتمال ظهور بونص 1 أو 2)
+      const bonusSeed = Math.abs(Math.sin(seed * 7 + index * 13));
+      let bonusPoints = 0;
+      if (bonusSeed > 0.58) {
+        bonusPoints = bonusSeed > 0.82 ? 2 : 1;
+      }
+
       return {
         id: index + 1,
         difficulty: item.difficulty,
@@ -149,7 +157,8 @@ export default function CaseStudyPage() {
         scenario: item.scenario,
         options: optionsWithOriginalIndex.map(o => o.text),
         correctIndex: optionsWithOriginalIndex.findIndex(o => o.isCorrect),
-        explanation: item.explanation
+        explanation: item.explanation,
+        bonusPoints: bonusPoints
       };
     });
 
@@ -165,11 +174,12 @@ export default function CaseStudyPage() {
       checkIfAlreadySubmitted(savedPhone);
     }
 
+    // العداد التنازلي بصيغة عربية متناسقة وغير مقلوبة
     const timer = setInterval(() => {
       const currentTime = new Date();
       const hoursLeft = 23 - currentTime.getHours();
       const minsLeft = 59 - currentTime.getMinutes();
-      setTimeLeft(`${hoursLeft} hours and ${minsLeft} minutes`);
+      setTimeLeft(`${hoursLeft} ساعة و ${minsLeft} دقيقة`);
     }, 1000);
 
     return () => clearInterval(timer);
@@ -247,12 +257,20 @@ export default function CaseStudyPage() {
     setSelectedAnswers(prev => ({ ...prev, [caseId]: optionIndex }));
   };
 
+  // دالة حساب مجموع النقاط الفعلية (تشمل نقاط الأساسي + نقاط البونص)
   const calculateScore = () => {
     let score = 0;
     activeCases.forEach(c => {
-      if (selectedAnswers[c.id] === c.correctIndex) score++;
+      if (selectedAnswers[c.id] === c.correctIndex) {
+        score += 1 + (c.bonusPoints || 0);
+      }
     });
     return score;
+  };
+
+  // دالة حساب المجموع الأقصى الممكن للنقاط اليومية
+  const getMaxPossibleScore = () => {
+    return activeCases.reduce((acc, c) => acc + 1 + (c.bonusPoints || 0), 0);
   };
 
   const handleSubmitAnswers = async (e: React.FormEvent) => {
@@ -296,7 +314,7 @@ export default function CaseStudyPage() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 pb-20 relative" dir="ltr">
       
-      {/* هيدر التحدي اليومي بهوية اليوم العالمي للصحة النفسية (Teal & Emerald & Gold) */}
+      {/* هيدر التحدي اليومي بهوية اليوم العالمي للصحة النفسية */}
       <div className="bg-gradient-to-r from-[#064e3b] via-[#047857] to-[#0d9488] text-white py-12 px-4 sm:px-6 shadow-xl border-b-4 border-[#F5D061]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
           <div className="space-y-3 text-center sm:text-left">
@@ -306,9 +324,13 @@ export default function CaseStudyPage() {
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
               Psychiatric & Mental Health Nursing Challenge
             </h1>
-            <p className="text-xs sm:text-sm text-emerald-100 font-medium">
-              تحدي أسبوع الصحة النفسية 🌿 - التحديث القادم بعد: <span className="text-[#F5D061] font-bold">{timeLeft}</span>
-            </p>
+            
+            {/* فقرة الوقت المعدلة بصياغة واضحة ومرتبة */}
+            <div className="bg-emerald-950/40 border border-emerald-400/30 px-4 py-2 rounded-2xl text-xs sm:text-sm text-emerald-100 font-medium inline-block" dir="rtl">
+              ⏱️ <span>يتجدد التحدي اليومي بعد: </span>
+              <strong className="text-[#F5D061] font-black px-1">{timeLeft || 'جاري التحديث...'}</strong>
+            </div>
+
             <div>
               <Link href="/" className="text-xs text-[#F5D061] hover:underline font-bold inline-block pt-1">
                 ← Back to Home | العودة للرئيسية
@@ -383,6 +405,20 @@ export default function CaseStudyPage() {
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8" dir="ltr">
         {activeCases.map((item) => (
           <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-emerald-100 shadow-sm space-y-6 relative overflow-hidden">
+            
+            {/* تنبيه البونص السري في حال وجوده بالسؤال */}
+            {item.bonusPoints && item.bonusPoints > 0 ? (
+              <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white p-3 rounded-2xl shadow-md flex items-center justify-between font-extrabold text-xs" dir="rtl">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🎉</span>
+                  <span>مبروك! وصلك بونص سري على هذا السؤال</span>
+                </div>
+                <span className="bg-white text-amber-900 px-3 py-1 rounded-xl shadow-sm">
+                  +{item.bonusPoints} {item.bonusPoints === 1 ? 'نقطة إضافية' : 'نقاط إضافية'}
+                </span>
+              </div>
+            ) : null}
+
             <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
               <span className="font-black text-[#047857] text-base flex items-center gap-2">
                 <span>🧠</span> {item.title}
@@ -457,12 +493,13 @@ export default function CaseStudyPage() {
           </form>
         ) : (
           <div className="bg-emerald-50 border-2 border-emerald-300 p-6 rounded-3xl space-y-3 text-center">
-            <h3 className="text-xl font-black text-emerald-900">Your Score: {calculateScore()} / {activeCases.length} Correct! 🎉</h3>
+            <h3 className="text-xl font-black text-emerald-900">Your Score: {calculateScore()} / {getMaxPossibleScore()} Points! 🎉</h3>
             <p className="text-xs text-emerald-800 font-medium">
-              شكراً لمشاركتك في أسبوع التوعية بالصحة النفسية. تم تشكيل إجابتك وتحديث نقاطك بنجاح.
+              شكراً لمشاركتك في أسبوع التوعية بالصحة النفسية. تم تسجيل إجابتك وتحديث نقاطك بنجاح.
             </p>
-            <div className="bg-white/80 p-3 rounded-2xl border border-emerald-200 text-xs text-slate-700 font-bold">
-              ⏳ Next Mental Health rotation available after: <span className="text-[#047857]">{timeLeft}</span>
+            <div className="bg-white/80 p-3 rounded-2xl border border-emerald-200 text-xs text-slate-700 font-bold" dir="rtl">
+              ⏱️ <span>التحدي اليومي القادم متاح بعد: </span>
+              <span className="text-[#047857] font-black">{timeLeft}</span>
             </div>
           </div>
         )}
