@@ -13,7 +13,7 @@ interface CaseQuestion {
   options: string[];
   correctIndex: number;
   explanation: string;
-  bonusPoints?: number; // بونص إضافي 1 أو 2
+  bonusPoints?: number; // بونص إضافي 1 أو 2 لسؤال واحد فقط
 }
 
 interface LeaderboardItem {
@@ -131,6 +131,14 @@ export default function CaseStudyPage() {
       [shuffledPool[i], shuffledPool[j]] = [shuffledPool[j], shuffledPool[i]];
     }
 
+    // --- منطق البونص السري لليوم (سؤال واحد فقط بحد أقصى) ---
+    // فحص هل يوجد بونص اليوم أم لا (احتمالية 50%)
+    const hasBonusToday = Math.abs(Math.sin(seed * 11)) > 0.5;
+    // تحديد السؤال الذي سيحصل على البونص (0 أو 1 أو 2)
+    const bonusTargetIndex = Math.floor(Math.abs(Math.sin(seed * 17)) * 3);
+    // تحديد قيمة البونص (1 أو 2 نقطة حسب الحظ)
+    const bonusAmount = Math.abs(Math.sin(seed * 23)) > 0.5 ? 2 : 1;
+
     const selectedDaily = shuffledPool.slice(0, 3).map((item, index) => {
       const optionsWithOriginalIndex = item.options.map((opt) => ({
         text: opt,
@@ -143,12 +151,8 @@ export default function CaseStudyPage() {
         [optionsWithOriginalIndex[i], optionsWithOriginalIndex[j]] = [optionsWithOriginalIndex[j], optionsWithOriginalIndex[i]];
       }
 
-      // حساب البونص السري بنسبة متوسطة متوازنة (~40% احتمال ظهور بونص 1 أو 2)
-      const bonusSeed = Math.abs(Math.sin(seed * 7 + index * 13));
-      let bonusPoints = 0;
-      if (bonusSeed > 0.58) {
-        bonusPoints = bonusSeed > 0.82 ? 2 : 1;
-      }
+      // يمنح البونص فقط للسؤال المختار تحديداً
+      const isThisBonusQuestion = hasBonusToday && index === bonusTargetIndex;
 
       return {
         id: index + 1,
@@ -158,7 +162,7 @@ export default function CaseStudyPage() {
         options: optionsWithOriginalIndex.map(o => o.text),
         correctIndex: optionsWithOriginalIndex.findIndex(o => o.isCorrect),
         explanation: item.explanation,
-        bonusPoints: bonusPoints
+        bonusPoints: isThisBonusQuestion ? bonusAmount : 0
       };
     });
 
@@ -174,7 +178,7 @@ export default function CaseStudyPage() {
       checkIfAlreadySubmitted(savedPhone);
     }
 
-    // العداد التنازلي بصيغة عربية متناسقة وغير مقلوبة
+    // العداد التنازلي بصيغة عربية متناسقة
     const timer = setInterval(() => {
       const currentTime = new Date();
       const hoursLeft = 23 - currentTime.getHours();
@@ -257,7 +261,7 @@ export default function CaseStudyPage() {
     setSelectedAnswers(prev => ({ ...prev, [caseId]: optionIndex }));
   };
 
-  // دالة حساب مجموع النقاط الفعلية (تشمل نقاط الأساسي + نقاط البونص)
+  // دالة حساب مجموع النقاط الفعلية (تضيف البونص فقط إذا كانت إجابة السؤال الصحيحة مختارة)
   const calculateScore = () => {
     let score = 0;
     activeCases.forEach(c => {
@@ -325,7 +329,7 @@ export default function CaseStudyPage() {
               Psychiatric & Mental Health Nursing Challenge
             </h1>
             
-            {/* فقرة الوقت المعدلة بصياغة واضحة ومرتبة */}
+            {/* فقرة الوقت المنسقة */}
             <div className="bg-emerald-950/40 border border-emerald-400/30 px-4 py-2 rounded-2xl text-xs sm:text-sm text-emerald-100 font-medium inline-block" dir="rtl">
               ⏱️ <span>يتجدد التحدي اليومي بعد: </span>
               <strong className="text-[#F5D061] font-black px-1">{timeLeft || 'جاري التحديث...'}</strong>
@@ -406,7 +410,7 @@ export default function CaseStudyPage() {
         {activeCases.map((item) => (
           <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-emerald-100 shadow-sm space-y-6 relative overflow-hidden">
             
-            {/* تنبيه البونص السري في حال وجوده بالسؤال */}
+            {/* يظهر البونص فقط للسؤال الوحيد الذي وقع عليه الاختيار اليوم */}
             {item.bonusPoints && item.bonusPoints > 0 ? (
               <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white p-3 rounded-2xl shadow-md flex items-center justify-between font-extrabold text-xs" dir="rtl">
                 <div className="flex items-center gap-2">
