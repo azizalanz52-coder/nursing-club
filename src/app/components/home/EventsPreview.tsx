@@ -47,8 +47,28 @@ export default function EventsPreview() {
           eventsSnap.forEach((d) => {
             list.push({ id: d.id, ...d.data() });
           });
+
           if (list.length > 0) {
-            setEventsList(list);
+            // دالة فرز الأولوية: إظهار الفعاليات القادمة أولاً ثم المنتهية
+            const sortedList = list.sort((a, b) => {
+              const isAUpcoming = a.status === 'upcoming' || a.status === 'قريباً';
+              const isBUpcoming = b.status === 'upcoming' || b.status === 'قريباً';
+
+              // 1. الأولوية للفعالية القادمة على المنتهية
+              if (isAUpcoming && !isBUpcoming) return -1;
+              if (!isAUpcoming && isBUpcoming) return 1;
+
+              // 2. إذا تساوت الحالة، يتم الترتيب حسب الأحدث إنشاءً أو تاريخاً
+              const timeA = a.createdAt || a.timestamp || a.date || 0;
+              const timeB = b.createdAt || b.timestamp || b.date || 0;
+
+              const dateA = typeof timeA === 'number' ? timeA : new Date(timeA).getTime() || 0;
+              const dateB = typeof timeB === 'number' ? timeB : new Date(timeB).getTime() || 0;
+
+              return dateB - dateA; // الأحدث أولاً
+            });
+
+            setEventsList(sortedList);
           }
         }
       } catch (err) {
