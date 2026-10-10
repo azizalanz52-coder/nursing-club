@@ -228,7 +228,7 @@ export default function CaseStudyPage() {
       }));
 
       list.sort((a, b) => b.totalScore - a.totalScore);
-      setLeaderboard(list.slice(0, 10));
+      setLeaderboard(list.slice(0, 30));
     } catch (err) {
       console.error(err);
     }
