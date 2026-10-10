@@ -307,7 +307,7 @@ export default function CaseStudyPage() {
               Psychiatric & Mental Health Nursing Challenge
             </h1>
             <p className="text-xs sm:text-sm text-emerald-100 font-medium">
-              تحدي التمريض النفسي والصحة النفسية 🌿 - التحديث القادم بعد: <span className="text-[#F5D061] font-bold">{timeLeft}</span>
+              تحدي أسبوع الصحة النفسية 🌿 - التحديث القادم بعد: <span className="text-[#F5D061] font-bold">{timeLeft}</span>
             </p>
             <div>
               <Link href="/" className="text-xs text-[#F5D061] hover:underline font-bold inline-block pt-1">
@@ -459,7 +459,7 @@ export default function CaseStudyPage() {
           <div className="bg-emerald-50 border-2 border-emerald-300 p-6 rounded-3xl space-y-3 text-center">
             <h3 className="text-xl font-black text-emerald-900">Your Score: {calculateScore()} / {activeCases.length} Correct! 🎉</h3>
             <p className="text-xs text-emerald-800 font-medium">
-              شكراً لمشاركتك في أسبوع التوعية بالصحة النفسية. تم تسكيل إجابتك وتحديث نقاطك بنجاح.
+              شكراً لمشاركتك في أسبوع التوعية بالصحة النفسية. تم تشكيل إجابتك وتحديث نقاطك بنجاح.
             </p>
             <div className="bg-white/80 p-3 rounded-2xl border border-emerald-200 text-xs text-slate-700 font-bold">
               ⏳ Next Mental Health rotation available after: <span className="text-[#047857]">{timeLeft}</span>
