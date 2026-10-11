@@ -142,7 +142,6 @@ export default function CommitteeDashboard() {
     fetchCommitteeWhatsappLinks();
     fetchHonorBoard();
 
-    // ربط استماع لحظي وسحابي لبنك النصوص العلمية مع ضمان تطابق معرّف المستند السحابي الحقيقي
     const unsubScientific = onSnapshot(
       collection(db, 'scientific_committee_texts'),
       (snap) => {
@@ -253,7 +252,7 @@ export default function CommitteeDashboard() {
     }
   };
 
-  // دالة رفع ملفات الجودة (PDF, Word, Excel) للرؤساء
+  // ✅ دالة رفع ملفات الجودة المعدلة بالكامل (PDF, Word, Excel) والمربوطة مباشرة بالأرشيف التاريخي للرؤساء والأدمن
   const handleUploadQualityFileSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!qualityFileTitle.trim() || !qualityFileBase64) {
@@ -266,19 +265,28 @@ export default function CommitteeDashboard() {
         title: qualityFileTitle.trim(),
         fileName: qualityFileName,
         fileUrl: qualityFileBase64,
+        details: `📄 ملف تقرير مرفوع (${qualityFileName}): ${qualityFileTitle.trim()}`,
         author: userData?.fullName || 'لجنة الجودة والتطوير',
         createdAt: Date.now(),
         dateStr: new Date().toLocaleDateString('ar-SA'),
-        status: 'مرفوع للرؤساء والأدمن'
+        status: 'مرفوع ومؤرشف رسمياً للرؤساء والأدمن'
       };
 
+      // 1. الحفظ في مجموعة الملفات المرفوعة
       await addDoc(collection(db, 'quality_uploaded_files'), newFileObj);
 
+      // 2. الحفظ المباشر في الأرشيف التاريخي المربوط بالأدمن
+      const archiveRef = await addDoc(collection(db, 'quality_reports_archive'), newFileObj);
+
+      // 3. تحديث قائمة الأرشيف في واجهة الجودة فوراً
+      setQualityArchives(prev => [{ ...newFileObj, id: archiveRef.id }, ...prev]);
+
+      // 4. إرسال الإشعار للرؤساء والأدمن
       for (const usr of allUsersList) {
-        if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor') {
+        if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
           try {
             await setDoc(doc(db, 'users', usr.id), {
-              latestNotification: `📄 [ملف جديد من الجودة]: تم رفع ملف (${qualityFileTitle}) بصيغة (${qualityFileName}).`
+              latestNotification: `📄 [تقرير/ملف جديد بالأرشيف]: تم رفع وأرشفة ملف (${qualityFileTitle}) بصيغة (${qualityFileName}).`
             }, { merge: true });
           } catch (er) { console.error(er); }
         }
@@ -287,10 +295,10 @@ export default function CommitteeDashboard() {
       setQualityFileTitle('');
       setQualityFileName('');
       setQualityFileBase64('');
-      alert('تم رفع الملف بنجاح وإرساله للرؤساء والأدمن! 📄🚀');
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ أثناء رفع الملف.');
+      alert('تم رفع الملف بنجاح وربطه بالأرشيف التاريخي للرؤساء والأدمن! 📄🚀');
+    } catch (err: any) {
+      console.error('Error uploading file:', err);
+      alert(`حدث خطأ أثناء رفع الملف: ${err?.message || 'تأكد من حجم الملف والاتصال'}`);
     }
   };
 
@@ -2169,7 +2177,7 @@ export default function CommitteeDashboard() {
               </span>
             </div>
 
-            {/* قسم رفع الملفات المستقلة للرؤساء (Word / Excel / PDF) */}
+            {/* قسم رفع الملفات المستقلة للرؤساء والأدمن مع فحص الحد الأقصى لحجم الملف */}
             <form onSubmit={handleUploadQualityFileSubmit} className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-200 space-y-4 my-6">
               <h4 className="font-extrabold text-sm text-indigo-900">📁 رفع تقرير أو ملف للرؤساء والأدمن (PDF, Word, Excel):</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2192,6 +2200,13 @@ export default function CommitteeDashboard() {
                     onChange={async (e: ChangeEvent<HTMLInputElement>) => {
                       if (e.target.files && e.target.files[0]) {
                         const file = e.target.files[0];
+                        if (file.size > 800 * 1024) {
+                          alert('⚠️ حجم الملف كبير جداً بالنسبة لقاعدة البيانات المباشرة (الحد الأقصى هو 800 كيلوبايت). يُرجى اختيار ملف أصغر حجماً.');
+                          e.target.value = '';
+                          setQualityFileName('');
+                          setQualityFileBase64('');
+                          return;
+                        }
                         setQualityFileName(file.name);
                         setQualityFileBase64(await convertFileToBase64(file));
                       }
@@ -2203,7 +2218,7 @@ export default function CommitteeDashboard() {
               </div>
 
               <button type="submit" className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:bg-indigo-700 cursor-pointer">
-                📤 رفع الملف وإرساله لمكتب الرؤساء
+                📤 رفع الملف وإرساله لمكتب الرؤساء والأدمن
               </button>
             </form>
 
