@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import LoginModal from './LoginModal';
 import { db } from '../lib/firebase';
-import { doc, updateDoc, onSnapshot, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot, collection, getDocs, query, where } from 'firebase/firestore';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
@@ -111,20 +111,57 @@ export default function Navbar() {
     }
   };
 
+  // دالة البحث المحدثة والمربوطة مع الموارد البشرية والتحقق الأمني من كلمة المرور
   const handleFetchCertificatesFromNav = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phoneInput.trim()) return;
+    const cleanPhone = phoneInput.trim();
+    const cleanPassword = passwordInput.trim();
 
-    setSearchStatus('جاري التحقق من سجل الشهائد سحابياً...');
+    if (!cleanPhone || !cleanPassword) {
+      setSearchStatus('الرجاء إدخال رقم الجوال وكلمة المرور كاملين.');
+      return;
+    }
+
+    setSearchStatus('جاري التحقق من الحساب واستعلام الشهادات...');
     try {
-      const certsRef = collection(db, 'site_certificates');
-      const q = query(certsRef, where('phone', '==', phoneInput.trim()));
+      // 1. التحقق من كلمة المرور من سجل المستخدمين أو الطلبات للحماية والخصوصية
+      const userRef = doc(db, 'users', cleanPhone);
+      const userSnap = await getDoc(userRef);
+
+      let storedPassword = null;
+      if (userSnap.exists()) {
+        storedPassword = userSnap.data().password;
+      } else {
+        const appRef = doc(db, 'applications', cleanPhone);
+        const appSnap = await getDoc(appRef);
+        if (appSnap.exists()) {
+          storedPassword = appSnap.data().password;
+        }
+      }
+
+      // إذا كانت كلمة المرور مسجلة ولا تطابق المدخل
+      if (storedPassword && storedPassword !== cleanPassword) {
+        setSearchStatus('❌ كلمة المرور غير صحيحة، يرجى التأكد وإعادة المحاولة.');
+        setMemberCertificates([]);
+        return;
+      }
+
+      // 2. البحث في كولكشن شهادات الموارد البشرية (certificates)
+      const certsRef = collection(db, 'certificates');
+      const q = query(certsRef, where('phone', '==', cleanPhone));
       const snap = await getDocs(q);
 
       let foundCerts = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
 
-      if (passwordInput.trim()) {
-        foundCerts = foundCerts.filter(c => !c.password || c.password === passwordInput.trim());
+      // 3. البحث في كولكشن الشهادات الإضافية (site_certificates) كمرجع إضافي
+      try {
+        const altCertsRef = collection(db, 'site_certificates');
+        const qAlt = query(altCertsRef, where('phone', '==', cleanPhone));
+        const snapAlt = await getDocs(qAlt);
+        const altCerts = snapAlt.docs.map(d => ({ id: d.id, ...d.data() }));
+        foundCerts = [...foundCerts, ...altCerts];
+      } catch (e) {
+        console.log('Alt certs collection skip');
       }
 
       setMemberCertificates(foundCerts);
@@ -136,7 +173,7 @@ export default function Navbar() {
       }
     } catch (err) {
       console.error(err);
-      setSearchStatus('حدث خطأ أثناء البحث.');
+      setSearchStatus('حدث خطأ أثناء البحث، يرجى المحاولة لاحقاً.');
     }
   };
 
@@ -243,7 +280,7 @@ export default function Navbar() {
                         : 'bg-amber-600 text-white hover:bg-amber-700'
                     }`}
                   >
-                    <span>{isQualityOperationsRoom ? '⚡' : '🛠️️'}</span>
+                    <span>{isQualityOperationsRoom ? '⚡' : '🛠'}</span>
                     <span>{isQualityOperationsRoom ? 'غرفة العمليات المركزية' : 'لوحة اللجنة'}</span>
                   </Link>
                 )}
@@ -417,6 +454,7 @@ export default function Navbar() {
         )}
       </header>
 
+      {/* نافذة مودال استعراض وتحميل الشهادات مع الحماية من كلمة المرور */}
       {showCertModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
           <div className="bg-white text-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-400">
@@ -463,23 +501,32 @@ export default function Navbar() {
 
             {memberCertificates.length > 0 && (
               <div className="space-y-3 max-h-60 overflow-y-auto pt-2">
-                {memberCertificates.map((cert) => (
-                  <div key={cert.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs">
-                    <div>
-                      <span className="font-extrabold text-slate-900 block">{cert.certTitle}</span>
-                      <span className="text-[10px] text-slate-500">المستفيد: {cert.recipientName}</span>
+                {memberCertificates.map((cert) => {
+                  const certTitle = cert.title || cert.certTitle || 'شهادة شكر وتقدير';
+                  const recipientName = cert.fullName || cert.recipientName || 'المستفيد';
+                  const certFile = cert.fileUrl || cert.image;
+
+                  return (
+                    <div key={cert.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs">
+                      <div>
+                        <span className="font-extrabold text-slate-900 block">{certTitle}</span>
+                        <span className="text-[10px] text-slate-500">المستفيد: {recipientName}</span>
+                        {cert.dateStr && <span className="text-[9px] text-slate-400 block mt-0.5">التاريخ: {cert.dateStr}</span>}
+                      </div>
+                      {certFile && (
+                        <a
+                          href={certFile}
+                          download={`Certificate_${certTitle}.pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-amber-600 text-white font-bold rounded-lg shadow hover:bg-amber-700 transition-all flex items-center gap-1"
+                        >
+                          تحميل 📥
+                        </a>
+                      )}
                     </div>
-                    {cert.image && (
-                      <a
-                        href={cert.image}
-                        download="certificate.jpg"
-                        className="px-3 py-1.5 bg-amber-600 text-white font-bold rounded-lg shadow hover:bg-amber-700"
-                      >
-                        تحميل 📥
-                      </a>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
