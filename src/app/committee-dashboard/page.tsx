@@ -14,7 +14,30 @@ export default function CommitteeDashboard() {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<any[]>([]);
   const [whatsappLink, setWhatsappLink] = useState('');
-  
+  // 1. تعريف حالة الملفات المرفوعة المستقلة
+const [qualityUploadedFiles, setQualityUploadedFiles] = useState<any[]>([]);
+
+// 2. دالة جلب الملفات الخارجية المرفوعة
+const fetchQualityUploadedFiles = async () => {
+  try {
+    const snap = await getDocs(collection(db, 'quality_uploaded_files'));
+    setQualityUploadedFiles(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+// 3. دالة حذف ملف خارجي مرفوع
+const handleDeleteQualityUploadedFile = async (fileId: string) => {
+  if (!confirm('هل أنت متأكد من حذف هذا الملف المرفوع نهائياً؟')) return;
+  try {
+    await deleteDoc(doc(db, 'quality_uploaded_files', fileId));
+    setQualityUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+    alert('تم حذف الملف بنجاح 🗑️');
+  } catch (e) {
+    console.error(e);
+  }
+};
   const [committeeWhatsappLinks, setCommitteeWhatsappLinks] = useState<{ [key: string]: string }>({});
   const [currentCommitteeWhatsappInput, setCurrentCommitteeWhatsappInput] = useState('');
 
@@ -122,6 +145,11 @@ export default function CommitteeDashboard() {
   const [qualityFileTitle, setQualityFileTitle] = useState('');
   const [qualityFileName, setQualityFileName] = useState('');
   const [qualityFileBase64, setQualityFileBase64] = useState('');
+
+useEffect(() => {
+  // ... الكود الحالي ...
+  fetchQualityUploadedFiles(); // <-- أضف هذا السطر هنا
+}, [router]); 
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -253,55 +281,48 @@ export default function CommitteeDashboard() {
   };
 
   // ✅ دالة رفع ملفات الجودة المعدلة بالكامل (PDF, Word, Excel) والمربوطة مباشرة بالأرشيف التاريخي للرؤساء والأدمن
-  const handleUploadQualityFileSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!qualityFileTitle.trim() || !qualityFileBase64) {
-      alert('الرجاء إدخال عنوان التقرير واختيار الملف.');
-      return;
-    }
+ const handleUploadQualityFileSubmit = async (e: FormEvent) => {
+  e.preventDefault();
+  if (!qualityFileTitle.trim() || !qualityFileBase64) {
+    alert('الرجاء إدخال عنوان التقرير واختيار الملف.');
+    return;
+  }
 
-    try {
-      const newFileObj = {
-        title: qualityFileTitle.trim(),
-        fileName: qualityFileName,
-        fileUrl: qualityFileBase64,
-        details: `📄 ملف تقرير مرفوع (${qualityFileName}): ${qualityFileTitle.trim()}`,
-        author: userData?.fullName || 'لجنة الجودة والتطوير',
-        createdAt: Date.now(),
-        dateStr: new Date().toLocaleDateString('ar-SA'),
-        status: 'مرفوع ومؤرشف رسمياً للرؤساء والأدمن'
-      };
+  try {
+    const newFileObj = {
+      title: qualityFileTitle.trim(),
+      fileName: qualityFileName,
+      fileUrl: qualityFileBase64,
+      author: userData?.fullName || 'لجنة الجودة والتطوير',
+      createdAt: Date.now(),
+      dateStr: new Date().toLocaleDateString('ar-SA'),
+      status: 'ملف خارجي مرفوع'
+    };
 
-      // 1. الحفظ في مجموعة الملفات المرفوعة
-      await addDoc(collection(db, 'quality_uploaded_files'), newFileObj);
+    // الحفظ في كولكشن الملفات الخارجية فقط
+    const docRef = await addDoc(collection(db, 'quality_uploaded_files'), newFileObj);
+    setQualityUploadedFiles(prev => [{ ...newFileObj, id: docRef.id }, ...prev]);
 
-      // 2. الحفظ المباشر في الأرشيف التاريخي المربوط بالأدمن
-      const archiveRef = await addDoc(collection(db, 'quality_reports_archive'), newFileObj);
-
-      // 3. تحديث قائمة الأرشيف في واجهة الجودة فوراً
-      setQualityArchives(prev => [{ ...newFileObj, id: archiveRef.id }, ...prev]);
-
-      // 4. إرسال الإشعار للرؤساء والأدمن
-      for (const usr of allUsersList) {
-        if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
-          try {
-            await setDoc(doc(db, 'users', usr.id), {
-              latestNotification: `📄 [تقرير/ملف جديد بالأرشيف]: تم رفع وأرشفة ملف (${qualityFileTitle}) بصيغة (${qualityFileName}).`
-            }, { merge: true });
-          } catch (er) { console.error(er); }
-        }
+    // إرسال إشعار للرؤساء والأدمن
+    for (const usr of allUsersList) {
+      if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
+        try {
+          await setDoc(doc(db, 'users', usr.id), {
+            latestNotification: `📄 [ملف خارجي جديد]: تم رفع ملف (${qualityFileTitle}) بصيغة (${qualityFileName}).`
+          }, { merge: true });
+        } catch (er) { console.error(er); }
       }
-
-      setQualityFileTitle('');
-      setQualityFileName('');
-      setQualityFileBase64('');
-      alert('تم رفع الملف بنجاح وربطه بالأرشيف التاريخي للرؤساء والأدمن! 📄🚀');
-    } catch (err: any) {
-      console.error('Error uploading file:', err);
-      alert(`حدث خطأ أثناء رفع الملف: ${err?.message || 'تأكد من حجم الملف والاتصال'}`);
     }
-  };
 
+    setQualityFileTitle('');
+    setQualityFileName('');
+    setQualityFileBase64('');
+    alert('تم رفع الملف وحفظه في سجل الملفات الخارجية المستقلة بنجاح! 📄✅');
+  } catch (err: any) {
+    console.error('Error uploading file:', err);
+    alert(`حدث خطأ أثناء رفع الملف: ${err?.message || 'تأكد من حجم الملف'}`);
+  }
+};
   const handleDeleteHonorMember = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا العضو من لوحة الشرف؟')) {
       try {
@@ -1519,7 +1540,56 @@ export default function CommitteeDashboard() {
                 </button>
               </div>
             </div>
+{/* قسم مستقل لعرض الملفات الخارجية المرفوعة (PDF, Word, Excel) */}
+{isQualityTeam && (
+  <div className="bg-white rounded-3xl p-6 border border-indigo-200 shadow-sm space-y-4 my-4">
+    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+      <div>
+        <h4 className="font-extrabold text-sm text-indigo-900">📂 سجل الملفات الخارجية المرفوعة (PDF / Word / Excel)</h4>
+        <p className="text-xs text-slate-500">ملفات مرفوعة مستقّلة تماماً عن تقارير الموقع الإلكتروني.</p>
+      </div>
+      <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-xl font-bold text-xs">
+        إجمالي الملفات: {qualityUploadedFiles.length}
+      </span>
+    </div>
 
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      {qualityUploadedFiles.length === 0 ? (
+        <p className="col-span-full text-center py-6 text-slate-400 font-bold text-xs">لا توجد ملفات خارجية مرفوعة حالياً.</p>
+      ) : (
+        qualityUploadedFiles.map((file) => (
+          <div key={file.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3">
+            <div>
+              <span className="text-[10px] font-bold px-2.5 py-0.5 bg-indigo-100 text-indigo-800 rounded-md dir-ltr inline-block">
+                {file.fileName || 'ملف مرفوع'}
+              </span>
+              <h5 className="font-black text-xs text-slate-900 mt-2">{file.title}</h5>
+              <p className="text-[10px] text-slate-400 mt-1">بواسطة: {file.author || 'الجودة'} • {file.dateStr}</p>
+            </div>
+            <div className="flex gap-2 pt-2 border-t border-slate-200">
+              <a
+                href={file.fileUrl}
+                download={file.fileName || 'report.pdf'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-center py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all"
+              >
+                📥 فتح / تنزيل
+              </a>
+              <button
+                type="button"
+                onClick={() => handleDeleteQualityUploadedFile(file.id)}
+                className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                حذف ✕
+              </button>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  </div>
+)}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
                 <h4 className="font-extrabold text-sm text-slate-900">✏️ التحديد اليدوي لأفضل اللجان والأعضاء:</h4>
