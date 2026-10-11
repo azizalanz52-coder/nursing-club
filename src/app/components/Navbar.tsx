@@ -500,35 +500,40 @@ export default function Navbar() {
             )}
 
             {memberCertificates.length > 0 && (
-              <div className="space-y-3 max-h-60 overflow-y-auto pt-2">
-                {memberCertificates.map((cert) => {
-                  const certTitle = cert.title || cert.certTitle || 'شهادة شكر وتقدير';
-                  const recipientName = cert.fullName || cert.recipientName || 'المستفيد';
-                  const certFile = cert.fileUrl || cert.image;
+  <div className="space-y-3 max-h-60 overflow-y-auto pt-2">
+    {memberCertificates.map((cert) => {
+      const certTitle = cert.title || cert.certTitle || 'شهادة شكر وتقدير';
+      const recipientName = cert.fullName || cert.recipientName || 'المستفيد';
+      const certFile = cert.fileUrl || cert.image;
 
-                  return (
-                    <div key={cert.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs">
-                      <div>
-                        <span className="font-extrabold text-slate-900 block">{certTitle}</span>
-                        <span className="text-[10px] text-slate-500">المستفيد: {recipientName}</span>
-                        {cert.dateStr && <span className="text-[9px] text-slate-400 block mt-0.5">التاريخ: {cert.dateStr}</span>}
-                      </div>
-                      {certFile && (
-                        <a
-                          href={certFile}
-                          download={`Certificate_${certTitle}.pdf`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 bg-amber-600 text-white font-bold rounded-lg shadow hover:bg-amber-700 transition-all flex items-center gap-1"
-                        >
-                          تحميل 📥
-                        </a>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+      // فحص هل الملف المرفوع هو PDF أم صورة
+      const isPdf = certFile && (certFile.includes('.pdf') || certFile.startsWith('data:application/pdf'));
+
+      return (
+        <div key={cert.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs">
+          <div>
+            <span className="font-extrabold text-slate-900 block">{certTitle}</span>
+            <span className="text-[10px] text-slate-500">المستفيد: {recipientName}</span>
+            {cert.dateStr && <span className="text-[9px] text-slate-400 block mt-0.5">التاريخ: {cert.dateStr}</span>}
+          </div>
+          
+          {certFile && (
+            <a
+              href={certFile}
+              target="_blank"
+              rel="noopener noreferrer"
+              // عدم تغيير صيغة الملف إذا كان صورة وتركه يفتح بصيغته الأصلية
+              download={isPdf ? `Certificate_${cert.id}.pdf` : undefined}
+              className="px-3 py-1.5 bg-amber-600 text-white font-bold rounded-lg shadow hover:bg-amber-700 transition-all flex items-center gap-1"
+            >
+              {isPdf ? 'تحميل PDF 📄' : 'عرض / تحميل الصورة 🖼️'}
+            </a>
+          )}
+        </div>
+      );
+    })}
+  </div>
+)}
 
             <button
               type="button"
