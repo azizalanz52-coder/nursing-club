@@ -111,16 +111,17 @@ export default function CommitteeDashboard() {
   const [honorBoardList, setHonorBoardList] = useState<any[]>([]);
   const [newHonorMemberName, setNewHonorMemberName] = useState('');
   const [newHonorScore, setNewHonorScore] = useState('');
-  // حقول رفع الشهادات (لجنة الموارد البشرية)
-const [certStudentName, setCertStudentName] = useState('');
-const [certStudentPhone, setCertStudentPhone] = useState('');
-const [certTitle, setCertTitle] = useState('');
-const [certFileBase64, setCertFileBase64] = useState('');
 
-// حقول رفع ملفات الجودة (Word, Excel, PDF)
-const [qualityFileTitle, setQualityFileTitle] = useState('');
-const [qualityFileName, setQualityFileName] = useState('');
-const [qualityFileBase64, setQualityFileBase64] = useState('');
+  // حقول رفع الشهادات (لجنة الموارد البشرية)
+  const [certStudentName, setCertStudentName] = useState('');
+  const [certStudentPhone, setCertStudentPhone] = useState('');
+  const [certTitle, setCertTitle] = useState('');
+  const [certFileBase64, setCertFileBase64] = useState('');
+
+  // حقول رفع ملفات الجودة (Word, Excel, PDF)
+  const [qualityFileTitle, setQualityFileTitle] = useState('');
+  const [qualityFileName, setQualityFileName] = useState('');
+  const [qualityFileBase64, setQualityFileBase64] = useState('');
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone');
@@ -192,89 +193,7 @@ const [qualityFileBase64, setQualityFileBase64] = useState('');
       alert('الرجاء إدخال اسم العضو وعدد النقاط أو التقييم.');
       return;
     }
-// دالة رفع الشهادات للمستفيدين (الموارد البشرية)
-const handleUploadCertificateSubmit = async (e: FormEvent) => {
-  e.preventDefault();
-  if (!certStudentPhone.trim() || !certStudentName.trim() || !certTitle.trim() || !certFileBase64) {
-    alert('الرجاء تعبئة كافة الحقول ورفع ملف الشهادة.');
-    return;
-  }
 
-  try {
-    const newCertObj = {
-      fullName: certStudentName.trim(),
-      phone: certStudentPhone.trim(),
-      title: certTitle.trim(),
-      fileUrl: certFileBase64,
-      issuedBy: userData?.fullName || 'لجنة الموارد البشرية',
-      createdAt: Date.now(),
-      dateStr: new Date().toLocaleDateString('ar-SA')
-    };
-
-    // حفظ الشهادة في مجموعة خاصة للاستعلام برقم الجوال
-    await addDoc(collection(db, 'certificates'), newCertObj);
-
-    // إرسال إشعار للمستفيد برقم جواله
-    try {
-      const userRef = doc(db, 'users', certStudentPhone.trim());
-      await setDoc(userRef, {
-        latestNotification: `🎓 تم إصدار شهادة جديدة لك بعنوان: (${certTitle}). يمكنك الاستعلام عنها وتحميلها الآن.`
-      }, { merge: true });
-    } catch (er) { console.error(er); }
-
-    setCertStudentName('');
-    setCertStudentPhone('');
-    setCertTitle('');
-    setCertFileBase64('');
-    alert('تم رفع الشهادة وإرسال الإشعار للمستفيد بنجاح! 🎓✅');
-  } catch (err) {
-    console.error(err);
-    alert('حدث خطأ أثناء رفع الشهادة.');
-  }
-};
-
-// دالة رفع ملفات الجودة (PDF, Word, Excel) للرؤساء
-const handleUploadQualityFileSubmit = async (e: FormEvent) => {
-  e.preventDefault();
-  if (!qualityFileTitle.trim() || !qualityFileBase64) {
-    alert('الرجاء إدخال عنوان التقرير واختيار الملف.');
-    return;
-  }
-
-  try {
-    const newFileObj = {
-      title: qualityFileTitle.trim(),
-      fileName: qualityFileName,
-      fileUrl: qualityFileBase64,
-      author: userData?.fullName || 'لجنة الجودة والتطوير',
-      createdAt: Date.now(),
-      dateStr: new Date().toLocaleDateString('ar-SA'),
-      status: 'مرفوع للرؤساء والأدمن'
-    };
-
-    // إضافة الملف لأرشيف ملفات الجودة
-    await addDoc(collection(db, 'quality_uploaded_files'), newFileObj);
-
-    // إرسال إشعار للرؤساء والأدمن
-    for (const usr of allUsersList) {
-      if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor') {
-        try {
-          await setDoc(doc(db, 'users', usr.id), {
-            latestNotification: `📄 [ملف جديد من الجودة]: تم رفع ملف (${qualityFileTitle}) بصيغة (${qualityFileName}).`
-          }, { merge: true });
-        } catch (er) { console.error(er); }
-      }
-    }
-
-    setQualityFileTitle('');
-    setQualityFileName('');
-    setQualityFileBase64('');
-    alert('تم رفع الملف بنجاح وإرساله للرؤساء والأدمن! 📄🚀');
-  } catch (err) {
-    console.error(err);
-    alert('حدث خطأ أثناء رفع الملف.');
-  }
-};
     const currentComm = currentActiveComm;
     const newEntry = {
       name: newHonorMemberName.trim(),
@@ -292,6 +211,86 @@ const handleUploadQualityFileSubmit = async (e: FormEvent) => {
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء حفظ بيانات لوحة الشرف.');
+    }
+  };
+
+  // دالة رفع الشهادات للمستفيدين (الموارد البشرية)
+  const handleUploadCertificateSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!certStudentPhone.trim() || !certStudentName.trim() || !certTitle.trim() || !certFileBase64) {
+      alert('الرجاء تعبئة كافة الحقول ورفع ملف الشهادة.');
+      return;
+    }
+
+    try {
+      const newCertObj = {
+        fullName: certStudentName.trim(),
+        phone: certStudentPhone.trim(),
+        title: certTitle.trim(),
+        fileUrl: certFileBase64,
+        issuedBy: userData?.fullName || 'لجنة الموارد البشرية',
+        createdAt: Date.now(),
+        dateStr: new Date().toLocaleDateString('ar-SA')
+      };
+
+      await addDoc(collection(db, 'certificates'), newCertObj);
+
+      try {
+        const userRef = doc(db, 'users', certStudentPhone.trim());
+        await setDoc(userRef, {
+          latestNotification: `🎓 تم إصدار شهادة جديدة لك بعنوان: (${certTitle}). يمكنك الاستعلام عنها وتحميلها الآن.`
+        }, { merge: true });
+      } catch (er) { console.error(er); }
+
+      setCertStudentName('');
+      setCertStudentPhone('');
+      setCertTitle('');
+      setCertFileBase64('');
+      alert('تم رفع الشهادة وإرسال الإشعار للمستفيد بنجاح! 🎓✅');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء رفع الشهادة.');
+    }
+  };
+
+  // دالة رفع ملفات الجودة (PDF, Word, Excel) للرؤساء
+  const handleUploadQualityFileSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!qualityFileTitle.trim() || !qualityFileBase64) {
+      alert('الرجاء إدخال عنوان التقرير واختيار الملف.');
+      return;
+    }
+
+    try {
+      const newFileObj = {
+        title: qualityFileTitle.trim(),
+        fileName: qualityFileName,
+        fileUrl: qualityFileBase64,
+        author: userData?.fullName || 'لجنة الجودة والتطوير',
+        createdAt: Date.now(),
+        dateStr: new Date().toLocaleDateString('ar-SA'),
+        status: 'مرفوع للرؤساء والأدمن'
+      };
+
+      await addDoc(collection(db, 'quality_uploaded_files'), newFileObj);
+
+      for (const usr of allUsersList) {
+        if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor') {
+          try {
+            await setDoc(doc(db, 'users', usr.id), {
+              latestNotification: `📄 [ملف جديد من الجودة]: تم رفع ملف (${qualityFileTitle}) بصيغة (${qualityFileName}).`
+            }, { merge: true });
+          } catch (er) { console.error(er); }
+        }
+      }
+
+      setQualityFileTitle('');
+      setQualityFileName('');
+      setQualityFileBase64('');
+      alert('تم رفع الملف بنجاح وإرساله للرؤساء والأدمن! 📄🚀');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء رفع الملف.');
     }
   };
 
@@ -423,13 +422,6 @@ const handleUploadQualityFileSubmit = async (e: FormEvent) => {
     try {
       const snap = await getDocs(collection(db, 'media_committee_gallery'));
       setMediaGallery(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-    } catch (e) { console.error(e); }
-  };
-
-  const fetchScientificTexts = async () => {
-    try {
-      const snap = await getDocs(collection(db, 'scientific_committee_texts'));
-      setScientificTextsList(snap.docs.map(d => ({ ...d.data(), id: d.id })));
     } catch (e) { console.error(e); }
   };
 
@@ -565,8 +557,7 @@ const handleUploadQualityFileSubmit = async (e: FormEvent) => {
       createdAt: new Date().toLocaleDateString('ar-SA')
     };
     try {
-      // إضافة المستند بـ addDoc للفايربيس مباشرة للحصول على ID سحابي دقيق
-      const docRef = await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
+      await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
 
       for (const usr of allUsersList) {
         const cStr = usr.assignedCommittee || usr.committee || '';
@@ -593,7 +584,6 @@ const handleUploadQualityFileSubmit = async (e: FormEvent) => {
     if (confirm('هل أنت متأكد من حذف هذا النص؟')) {
       try {
         await deleteDoc(doc(db, 'scientific_committee_texts', id));
-        // تحديث الـ state المحلي فوراً لضمان الاختفاء المباشر من الواجهة
         setScientificTextsList(prev => prev.filter(t => t.id !== id));
         alert('تم حذف النص سحابياً وتحديثه لدى جميع اللجان بنجاح! 🗑️');
       } catch (err) {
@@ -1013,7 +1003,7 @@ const handleUploadQualityFileSubmit = async (e: FormEvent) => {
         status: `💬 تم استلام رد وتبرير اللجنة (بانتظار اعتماد الجودة)`
       });
 
-      alert('تم إرسال ردك وتبريرك لجنتة الجودة بنجاح! 🎯');
+      alert('تم إرسال ردك وتبريرك للجنة الجودة بنجاح! 🎯');
       setShowReplyModal(false);
       setLeaderDefenseReply('');
       setActiveReportToReply(null);
@@ -1444,7 +1434,6 @@ const handleUploadQualityFileSubmit = async (e: FormEvent) => {
     ).values()
   );
 
-  // التأكد من صلاحيات رؤية واستعراض بنك النصوص العلمي والعبارات للبنرات والتصاميم
   const canAccessScientificTexts = 
     isSameCommittee(currentActiveComm, 'لجنة المحتوى العلمي') ||
     isSameCommittee(userAssignedComm, 'لجنة المحتوى العلمي') ||
@@ -1909,65 +1898,67 @@ const handleUploadQualityFileSubmit = async (e: FormEvent) => {
                 إجمالي المحولين: {transferredRequestsList.length}
               </span>
             </div>
-{/* نموذج رفع الشهادات للأعضاء */}
-<form onSubmit={handleUploadCertificateSubmit} className="bg-sky-50/40 p-6 rounded-2xl border border-sky-200 space-y-4 mb-6">
-  <h4 className="font-extrabold text-sm text-[#630517]">🎓 رفع شهادة عضو / مستفيد (تظهر في النافبار عند الاستعلام):</h4>
-  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-    <div className="space-y-1">
-      <label className="text-xs font-bold text-slate-700">اسم المستفيد الثلاثي</label>
-      <input
-        type="text"
-        placeholder="مثال: عبد العزيز سليمان"
-        value={certStudentName}
-        onChange={(e) => setCertStudentName(e.target.value)}
-        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-        required
-      />
-    </div>
-    <div className="space-y-1">
-      <label className="text-xs font-bold text-slate-700">رقم جوال المستفيد (للاستعلام)</label>
-      <input
-        type="text"
-        placeholder="05xxxxxxxx"
-        value={certStudentPhone}
-        onChange={(e) => setCertStudentPhone(e.target.value)}
-        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-mono"
-        dir="ltr"
-        required
-      />
-    </div>
-    <div className="space-y-1">
-      <label className="text-xs font-bold text-slate-700">مسمى الشهادة / الفعالية</label>
-      <input
-        type="text"
-        placeholder="مثال: شهادة تنظيم ورشة التمريض"
-        value={certTitle}
-        onChange={(e) => setCertTitle(e.target.value)}
-        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-        required
-      />
-    </div>
-  </div>
 
-  <div className="space-y-1">
-    <label className="text-xs font-bold text-slate-700">اختر ملف الشهادة (PDF أو صورة)</label>
-    <input
-      type="file"
-      accept="image/*,application/pdf"
-      onChange={async (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-          setCertFileBase64(await convertFileToBase64(e.target.files[0]));
-        }
-      }}
-      className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-white cursor-pointer"
-      required
-    />
-  </div>
+            {/* نموذج رفع الشهادات للأعضاء */}
+            <form onSubmit={handleUploadCertificateSubmit} className="bg-sky-50/40 p-6 rounded-2xl border border-sky-200 space-y-4 mb-6">
+              <h4 className="font-extrabold text-sm text-[#630517]">🎓 رفع شهادة عضو / مستفيد (تظهر في النافبار عند الاستعلام):</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">اسم المستفيد الثلاثي</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: عبد العزيز سليمان"
+                    value={certStudentName}
+                    onChange={(e) => setCertStudentName(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">رقم جوال المستفيد (للاستعلام)</label>
+                  <input
+                    type="text"
+                    placeholder="05xxxxxxxx"
+                    value={certStudentPhone}
+                    onChange={(e) => setCertStudentPhone(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-mono"
+                    dir="ltr"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">مسمى الشهادة / الفعالية</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: شهادة تنظيم ورشة التمريض"
+                    value={certTitle}
+                    onChange={(e) => setCertTitle(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                    required
+                  />
+                </div>
+              </div>
 
-  <button type="submit" className="bg-[#630517] text-[#F5D061] px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:brightness-110 cursor-pointer">
-    + رفع وتننزيل الشهادة للمستفيد 🎓
-  </button>
-</form>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">اختر ملف الشهادة (PDF أو صورة)</label>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setCertFileBase64(await convertFileToBase64(e.target.files[0]));
+                    }
+                  }}
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-white cursor-pointer"
+                  required
+                />
+              </div>
+
+              <button type="submit" className="bg-[#630517] text-[#F5D061] px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:brightness-110 cursor-pointer">
+                + رفع وتنزيل الشهادة للمستفيد 🎓
+              </button>
+            </form>
+
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs">
                 <thead>
@@ -2177,43 +2168,45 @@ const handleUploadQualityFileSubmit = async (e: FormEvent) => {
                 ⚠️ آلية العمل: إرسال تنبيه أو تحذير للقادة أو الأعضاء، وعند عدم التجاوب يتم إحالة البلاغ للرؤساء
               </span>
             </div>
-            {/* قسم رفع الملفات المستقلة للرؤساء (Word / Excel / PDF) */}
-<form onSubmit={handleUploadQualityFileSubmit} className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-200 space-y-4 my-6">
-  <h4 className="font-extrabold text-sm text-indigo-900">📁 رفع تقرير أو ملف للرؤساء والأدمن (PDF, Word, Excel):</h4>
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-    <div className="space-y-1">
-      <label className="text-xs font-bold text-slate-700">عنوان التقرير / الملف</label>
-      <input
-        type="text"
-        placeholder="مثال: تقرير التقييم الشامل لشهر أكتوبر"
-        value={qualityFileTitle}
-        onChange={(e) => setQualityFileTitle(e.target.value)}
-        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-        required
-      />
-    </div>
-    <div className="space-y-1">
-      <label className="text-xs font-bold text-slate-700">اختر الملف من جهازك (.pdf, .docx, .xlsx)</label>
-      <input
-        type="file"
-        accept=".pdf,.doc,.docx,.xls,.xlsx"
-        onChange={async (e: ChangeEvent<HTMLInputElement>) => {
-          if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            setQualityFileName(file.name);
-            setQualityFileBase64(await convertFileToBase64(file));
-          }
-        }}
-        className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white cursor-pointer"
-        required
-      />
-    </div>
-  </div>
 
-  <button type="submit" className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:bg-indigo-700 cursor-pointer">
-    📤 رفع الملف وإرساله لمكتب الرؤساء
-  </button>
-</form>
+            {/* قسم رفع الملفات المستقلة للرؤساء (Word / Excel / PDF) */}
+            <form onSubmit={handleUploadQualityFileSubmit} className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-200 space-y-4 my-6">
+              <h4 className="font-extrabold text-sm text-indigo-900">📁 رفع تقرير أو ملف للرؤساء والأدمن (PDF, Word, Excel):</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">عنوان التقرير / الملف</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: تقرير التقييم الشامل لشهر أكتوبر"
+                    value={qualityFileTitle}
+                    onChange={(e) => setQualityFileTitle(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">اختر الملف من جهازك (.pdf, .docx, .xlsx)</label>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx"
+                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const file = e.target.files[0];
+                        setQualityFileName(file.name);
+                        setQualityFileBase64(await convertFileToBase64(file));
+                      }
+                    }}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white cursor-pointer"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:bg-indigo-700 cursor-pointer">
+                📤 رفع الملف وإرساله لمكتب الرؤساء
+              </button>
+            </form>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {allCommitteesList.map((commName, idx) => {
                 const count = requests.filter(r => isSameCommittee(r.acceptedCommittee, commName)).length;
