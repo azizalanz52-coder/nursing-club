@@ -2780,7 +2780,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === 'student-achievements' && (
+       {activeTab === 'student-achievements' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-amber-300 shadow-sm space-y-6">
               <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
@@ -2788,7 +2788,7 @@ export default function AdminDashboard() {
                   <h3 className="text-xl font-black text-amber-900">
                     {editingAchievementId ? '✏️ تعديل الإنجاز الجماعي أو الفردي' : '🏆 إضافة إنجاز جماعي أو فردي جديد من كلية التمريض'}
                   </h3>
-                  <p className="text-xs text-slate-500">أدخل أسماء الطلبة، اسم الجائزة، صورة التكريم، وتفاصيل الإنجاز لعرضها في الصفحة الرئيسية.</p>
+                  <p className="text-xs text-slate-500">أدخل أسماء الطلبة (مفصولة بفواصل)، اسم الجائزة، صورة التكريم، وتفاصيل الإنجاز لعرضها في الصفحة الرئيسية.</p>
                 </div>
                 {editingAchievementId && (
                   <button
@@ -2879,16 +2879,30 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {studentAchievements.map((ach) => (
                     <div key={ach.id} className="p-6 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-sm flex flex-col justify-between space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <img src={ach.image || '/logo.png'} alt={ach.awardName} className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400 shadow" />
+                      <div className="space-y-4">
+                        {/* رأس الكرت: الشعار واسم الجائزة */}
+                        <div className="flex items-start gap-3">
+                          <img src={ach.image || '/logo.png'} alt={ach.awardName} className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400 shadow shrink-0" />
                           <div>
-                            <h4 className="font-black text-slate-900 text-sm">👥 {ach.studentName}</h4>
-                            <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-bold inline-block mt-1">
-                              {ach.awardName}
+                            <span className="text-[11px] bg-amber-200/90 text-amber-950 px-2.5 py-1 rounded-lg font-black inline-block">
+                              🏆 {ach.awardName}
                             </span>
                           </div>
                         </div>
+
+                        {/* تفكيك وعرض أسماء الطلاب بشكل مرتب ومفصول */}
+                        <div className="space-y-1.5 bg-white/90 p-3 rounded-xl border border-amber-100 shadow-xs">
+                          <span className="text-[10px] font-black text-amber-800 block">👥 الطلبة المشاركون / المكرمون:</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {ach.studentName.split(/[,،\n]+/).filter(Boolean).map((name, idx) => (
+                              <span key={idx} className="bg-amber-100/80 text-amber-950 font-bold text-xs px-2.5 py-1 rounded-lg border border-amber-200/80 shadow-2xs flex items-center gap-1">
+                                👤 {name.trim()}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* الوصف */}
                         <p className="text-slate-700 text-xs font-semibold bg-white p-3 rounded-xl border border-amber-100 shadow-inner leading-relaxed">
                           "{ach.description}"
                         </p>
@@ -2920,7 +2934,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-
         {activeTab === 'media-committee' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm space-y-6">
