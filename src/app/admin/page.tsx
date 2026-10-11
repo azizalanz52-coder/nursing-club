@@ -569,50 +569,76 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSaveStudentAchievement = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!studentNameInput.trim() || !awardNameInput.trim()) return;
+  // 1. استبدال state اسم الطالب القديم بهذه الـ State الجديدة
+const [studentNamesList, setStudentNamesList] = useState<string[]>(['']);
 
-    const achId = editingAchievementId ? editingAchievementId : Date.now().toString();
-    const updatedAch: StudentAchievement = {
-      id: achId,
-      studentName: studentNameInput.trim(),
-      awardName: awardNameInput.trim(),
-      image: studentImageInput,
-      description: achievementDescInput.trim() || 'إنجاز جماعي مشرف ومميز يضاف لسجل طلبة كلية التمريض.',
-      createdAt: new Date().toISOString()
-    };
+// 2. إضافة هذه الدوال للتحكم في إضافة/حذف وتحديث حقول أسماء الطلاب
+const handleAddStudentNameField = () => {
+  setStudentNamesList([...studentNamesList, '']);
+};
 
-    try {
-      await setDoc(doc(db, 'student_achievements', achId), updatedAch);
-      if (editingAchievementId) {
-        setStudentAchievements(studentAchievements.map(a => a.id === achId ? updatedAch : a));
-        setModalMessage('تم تعديل وتحديث الإنجاز بنجاح سحابياً! ✏️✨');
-      } else {
-        setStudentAchievements([updatedAch, ...studentAchievements]);
-        setModalMessage('تم إضافة الإنجاز الجماعي بنجاح ونشره سحابياً للموقع! 🏆✨');
-      }
-      setEditingAchievementId(null);
-      setStudentNameInput('');
-      setAwardNameInput('');
-      setAchievementDescInput('');
-      setStudentImageInput('/logo.png');
-      setModalType('success');
-    } catch (err) {
-      console.error(err);
-      setModalMessage('حدث خطأ أثناء حفظ الإنجاز.');
-      setModalType('success');
+const handleRemoveStudentNameField = (index: number) => {
+  if (studentNamesList.length === 1) {
+    setStudentNamesList(['']);
+  } else {
+    setStudentNamesList(studentNamesList.filter((_, idx) => idx !== index));
+  }
+};
+
+const handleStudentNameChange = (index: number, value: string) => {
+  const updated = [...studentNamesList];
+  updated[index] = value;
+  setStudentNamesList(updated);
+};
+
+// 3. تحديث دالة الحفظ لتدمج الأسماء بإنضباط وترتيب
+const handleSaveStudentAchievement = async (e: FormEvent) => {
+  e.preventDefault();
+  const joinedNames = studentNamesList.map(n => n.trim()).filter(Boolean).join(', ');
+  if (!joinedNames || !awardNameInput.trim()) return;
+
+  const achId = editingAchievementId ? editingAchievementId : Date.now().toString();
+  const updatedAch: StudentAchievement = {
+    id: achId,
+    studentName: joinedNames,
+    awardName: awardNameInput.trim(),
+    image: studentImageInput,
+    description: achievementDescInput.trim() || 'إنجاز جماعي مشرف ومميز يضاف لسجل طلبة كلية التمريض.',
+    createdAt: new Date().toISOString()
+  };
+
+  try {
+    await setDoc(doc(db, 'student_achievements', achId), updatedAch);
+    if (editingAchievementId) {
+      setStudentAchievements(studentAchievements.map(a => a.id === achId ? updatedAch : a));
+      setModalMessage('تم تعديل وتحديث الإنجاز بنجاح سحابياً! ✏️✨');
+    } else {
+      setStudentAchievements([updatedAch, ...studentAchievements]);
+      setModalMessage('تم إضافة الإنجاز الجماعي بنجاح ونشره سحابياً للموقع! 🏆✨');
     }
-  };
+    setEditingAchievementId(null);
+    setStudentNamesList(['']);
+    setAwardNameInput('');
+    setAchievementDescInput('');
+    setStudentImageInput('/logo.png');
+    setModalType('success');
+  } catch (err) {
+    console.error(err);
+    setModalMessage('حدث خطأ أثناء حفظ الإنجاز.');
+    setModalType('success');
+  }
+};
 
-  const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
-    setEditingAchievementId(ach.id);
-    setStudentNameInput(ach.studentName);
-    setAwardNameInput(ach.awardName);
-    setAchievementDescInput(ach.description);
-    setStudentImageInput(ach.image || '/logo.png');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+// 4. تحديث دالة التعديل لتفكيك الأسماء السابقة وحطها في الحقول المنظمة
+const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
+  setEditingAchievementId(ach.id);
+  const parsedNames = ach.studentName ? ach.studentName.split(/[,،\n]+/).map(n => n.trim()).filter(Boolean) : [''];
+  setStudentNamesList(parsedNames.length > 0 ? parsedNames : ['']);
+  setAwardNameInput(ach.awardName);
+  setAchievementDescInput(ach.description);
+  setStudentImageInput(ach.image || '/logo.png');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
   const handleDeleteStudentAchievement = (id: string) => {
     triggerConfirmModal('هل أنت متأكد من حذف هذا الإنجاز من السحابة؟', async () => {
@@ -2780,160 +2806,193 @@ export default function AdminDashboard() {
           </div>
         )}
 
-       {activeTab === 'student-achievements' && (
-          <div className="space-y-8">
-            <div className="bg-white rounded-3xl p-8 border border-amber-300 shadow-sm space-y-6">
-              <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
-                <div>
-                  <h3 className="text-xl font-black text-amber-900">
-                    {editingAchievementId ? '✏️ تعديل الإنجاز الجماعي أو الفردي' : '🏆 إضافة إنجاز جماعي أو فردي جديد من كلية التمريض'}
-                  </h3>
-                  <p className="text-xs text-slate-500">أدخل أسماء الطلبة (مفصولة بفواصل)، اسم الجائزة، صورة التكريم، وتفاصيل الإنجاز لعرضها في الصفحة الرئيسية.</p>
-                </div>
-                {editingAchievementId && (
+      {activeTab === 'student-achievements' && (
+  <div className="space-y-8">
+    <div className="bg-white rounded-3xl p-8 border border-amber-300 shadow-sm space-y-6">
+      <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+        <div>
+          <h3 className="text-xl font-black text-amber-900">
+            {editingAchievementId ? '✏️ تعديل الإنجاز الجماعي أو الفردي' : '🏆 إضافة إنجاز جماعي أو فردي جديد من كلية التمريض'}
+          </h3>
+          <p className="text-xs text-slate-500">أدخل أسماء الطلبة بشكل منظم بضغط زر (+)، اسم الجائزة، صورة التكريم، وتفاصيل الإنجاز.</p>
+        </div>
+        {editingAchievementId && (
+          <button
+            type="button"
+            onClick={() => {
+              setEditingAchievementId(null);
+              setStudentNamesList(['']);
+              setAwardNameInput('');
+              setAchievementDescInput('');
+              setStudentImageInput('/logo.png');
+            }}
+            className="text-xs text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-xl hover:bg-red-100"
+          >
+            إلغاء التعديل ✕
+          </button>
+        )}
+      </div>
+
+      <form onSubmit={handleSaveStudentAchievement} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-amber-50/40 p-6 rounded-2xl border border-amber-200">
+        
+        {/* نظام إضافة أسماء الطلاب بالزر الديناميكي (+) */}
+        <div className="space-y-2 sm:col-span-2 bg-white p-4 rounded-2xl border border-amber-200 shadow-sm">
+          <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+            <label className="text-xs font-black text-slate-800">
+              👥 أسماء الطلبة المشاركين / المكرمين:
+            </label>
+            <button
+              type="button"
+              onClick={handleAddStudentNameField}
+              className="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center gap-1 cursor-pointer"
+            >
+              ➕ إضافة اسم طالب آخر
+            </button>
+          </div>
+
+          <div className="space-y-2.5 pt-2">
+            {studentNamesList.map((nameVal, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-3 py-2.5 rounded-xl shrink-0">
+                  طالب #{index + 1}
+                </span>
+                <input
+                  type="text"
+                  placeholder={`اكتب اسم الطالب (مثال: عبد العزيز العنزي)`}
+                  value={nameVal}
+                  onChange={(e) => handleStudentNameChange(index, e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50/50 focus:bg-white focus:outline-none focus:border-amber-600 transition-all font-medium"
+                  required={index === 0}
+                />
+                {studentNamesList.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setEditingAchievementId(null);
-                      setStudentNameInput('');
-                      setAwardNameInput('');
-                      setAchievementDescInput('');
-                      setStudentImageInput('/logo.png');
-                    }}
-                    className="text-xs text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-xl hover:bg-red-100"
+                    onClick={() => handleRemoveStudentNameField(index)}
+                    className="p-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 font-bold text-xs shrink-0 cursor-pointer transition-all"
+                    title="حذف هذا الاسم"
                   >
-                    إلغاء التعديل ✕
+                    🗑️
                   </button>
                 )}
               </div>
+            ))}
+          </div>
+        </div>
 
-              <form onSubmit={handleSaveStudentAchievement} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-amber-50/40 p-6 rounded-2xl border border-amber-200">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">أسماء الطلبة المشاركين (فردي أو جماعي)</label>
-                  <input
-                    type="text"
-                    placeholder="مثال: عبد العزيز العنزي, طارق الشمري"
-                    value={studentNameInput}
-                    onChange={(e) => setStudentNameInput(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
-                    required
-                  />
+        <div className="space-y-1.5 sm:col-span-2">
+          <label className="text-xs font-bold text-slate-700">اسم الجائزة أو الإنجاز</label>
+          <input
+            type="text"
+            placeholder="مثال: المركز الأول في مسار الابتكار الطبي"
+            value={awardNameInput}
+            onChange={(e) => setAwardNameInput(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
+            required
+          />
+        </div>
+
+        <div className="space-y-1.5 sm:col-span-2">
+          <label className="text-xs font-bold text-slate-700">صورة الإنجاز أو فريق العمل / التكريم (📁 بدون قيود حجمية)</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+              if (e.target.files && e.target.files[0]) {
+                const base64 = await convertFileToBase64(e.target.files[0]);
+                setStudentImageInput(base64);
+              }
+            }}
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-600 file:text-white cursor-pointer"
+          />
+        </div>
+
+        <div className="space-y-1.5 sm:col-span-2">
+          <label className="text-xs font-bold text-slate-700">وصف الإنجاز والتفاصيل</label>
+          <textarea
+            rows={3}
+            placeholder="اكتب نبذة مختصرة عن الإنجاز..."
+            value={achievementDescInput}
+            onChange={(e) => setAchievementDescInput(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
+          />
+        </div>
+
+        <div className="sm:col-span-2 pt-2">
+          <button
+            type="submit"
+            className="bg-amber-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-amber-700 cursor-pointer"
+          >
+            {editingAchievementId ? '💾 حفظ التعديلات وتحديث الإنجاز سحابياً' : '+ نشر الإنجاز الجماعي في الموقع سحابياً 🚀'}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+      <h3 className="text-xl font-black text-slate-900">سجل إنجازات طلبة كلية التمريض المعتمدة ({studentAchievements.length})</h3>
+      {studentAchievements.length === 0 ? (
+        <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+          <p className="text-sm font-bold">لم تتم إضافة أي إنجاز للطلبة حتى الآن.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {studentAchievements.map((ach) => (
+            <div key={ach.id} className="p-6 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-sm flex flex-col justify-between space-y-4">
+              <div className="space-y-4">
+                {/* رأس الكرت: الشعار واسم الجائزة */}
+                <div className="flex items-start gap-3">
+                  <img src={ach.image || '/logo.png'} alt={ach.awardName} className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400 shadow shrink-0" />
+                  <div>
+                    <span className="text-[11px] bg-amber-200/90 text-amber-950 px-2.5 py-1 rounded-lg font-black inline-block">
+                      🏆 {ach.awardName}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">اسم الجائزة أو الإنجاز</label>
-                  <input
-                    type="text"
-                    placeholder="مثال: المركز الأول في مسار الابتكار الطبي"
-                    value={awardNameInput}
-                    onChange={(e) => setAwardNameInput(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
-                    required
-                  />
+                {/* تفكيك وعرض أسماء الطلاب بشكل مرتب ومفصول */}
+                <div className="space-y-1.5 bg-white/90 p-3 rounded-xl border border-amber-100 shadow-xs">
+                  <span className="text-[10px] font-black text-amber-800 block">👥 الطلبة المشاركون / المكرمون:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ach.studentName.split(/[,،\n]+/).filter(Boolean).map((name, idx) => (
+                      <span key={idx} className="bg-amber-100/80 text-amber-950 font-bold text-xs px-2.5 py-1 rounded-lg border border-amber-200/80 shadow-2xs flex items-center gap-1">
+                        👤 {name.trim()}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">صورة الإنجاز أو فريق العمل / التكريم (📁 بدون قيود حجمية)</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const base64 = await convertFileToBase64(e.target.files[0]);
-                        setStudentImageInput(base64);
-                      }
-                    }}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-600 file:text-white cursor-pointer"
-                  />
-                </div>
+                {/* الوصف */}
+                <p className="text-slate-700 text-xs font-semibold bg-white p-3 rounded-xl border border-amber-100 shadow-inner leading-relaxed">
+                  "{ach.description}"
+                </p>
+              </div>
 
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">وصف الإنجاز والتفاصيل</label>
-                  <textarea
-                    rows={3}
-                    placeholder="اكتب نبذة مختصرة عن الإنجاز..."
-                    value={achievementDescInput}
-                    onChange={(e) => setAchievementDescInput(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-amber-600"
-                  />
-                </div>
-
-                <div className="sm:col-span-2 pt-2">
+              <div className="pt-2 border-t border-amber-200 flex justify-between items-center text-[11px]">
+                <span className="text-slate-400">{new Date(ach.createdAt).toLocaleDateString('ar-SA')}</span>
+                <div className="flex gap-2">
                   <button
-                    type="submit"
-                    className="bg-amber-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-amber-700 cursor-pointer"
+                    type="button"
+                    onClick={() => handleEditStudentAchievementClick(ach)}
+                    className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold hover:bg-amber-200 cursor-pointer"
                   >
-                    {editingAchievementId ? '💾 حفظ التعديلات وتحديث الإنجاز سحابياً' : '+ نشر الإنجاز الجماعي في الموقع سحابياً 🚀'}
+                    تعديل ✏️
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteStudentAchievement(ach.id)}
+                    className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                  >
+                    حذف ✕
                   </button>
                 </div>
-              </form>
+              </div>
             </div>
-
-            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">سجل إنجازات طلبة كلية التمريض المعتمدة ({studentAchievements.length})</h3>
-              {studentAchievements.length === 0 ? (
-                <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <p className="text-sm font-bold">لم تتم إضافة أي إنجاز للطلبة حتى الآن.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {studentAchievements.map((ach) => (
-                    <div key={ach.id} className="p-6 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-sm flex flex-col justify-between space-y-4">
-                      <div className="space-y-4">
-                        {/* رأس الكرت: الشعار واسم الجائزة */}
-                        <div className="flex items-start gap-3">
-                          <img src={ach.image || '/logo.png'} alt={ach.awardName} className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400 shadow shrink-0" />
-                          <div>
-                            <span className="text-[11px] bg-amber-200/90 text-amber-950 px-2.5 py-1 rounded-lg font-black inline-block">
-                              🏆 {ach.awardName}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* تفكيك وعرض أسماء الطلاب بشكل مرتب ومفصول */}
-                        <div className="space-y-1.5 bg-white/90 p-3 rounded-xl border border-amber-100 shadow-xs">
-                          <span className="text-[10px] font-black text-amber-800 block">👥 الطلبة المشاركون / المكرمون:</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {ach.studentName.split(/[,،\n]+/).filter(Boolean).map((name, idx) => (
-                              <span key={idx} className="bg-amber-100/80 text-amber-950 font-bold text-xs px-2.5 py-1 rounded-lg border border-amber-200/80 shadow-2xs flex items-center gap-1">
-                                👤 {name.trim()}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* الوصف */}
-                        <p className="text-slate-700 text-xs font-semibold bg-white p-3 rounded-xl border border-amber-100 shadow-inner leading-relaxed">
-                          "{ach.description}"
-                        </p>
-                      </div>
-
-                      <div className="pt-2 border-t border-amber-200 flex justify-between items-center text-[11px]">
-                        <span className="text-slate-400">{new Date(ach.createdAt).toLocaleDateString('ar-SA')}</span>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleEditStudentAchievementClick(ach)}
-                            className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold hover:bg-amber-200 cursor-pointer"
-                          >
-                            تعديل ✏️
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteStudentAchievement(ach.id)}
-                            className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
-                          >
-                            حذف ✕
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+)}
         {activeTab === 'media-committee' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm space-y-6">
