@@ -111,6 +111,63 @@ export default function Navbar() {
     }
   };
 
+  // دالة فتح واستعراض الملفات سواء كانت Base64 أو PDF أو روابط مباشرة
+  const handleViewOrDownloadFile = (fileData: string, certTitle: string) => {
+    if (!fileData) return;
+
+    // 1. إذا كان رابطاً مباشراً بروتوكول http/https
+    if (fileData.startsWith('http://') || fileData.startsWith('https://')) {
+      window.open(fileData, '_blank');
+      return;
+    }
+
+    // 2. إذا كان الملف نصاً مشفراً Base64 أو Data URI
+    try {
+      let mimeType = 'image/jpeg';
+      let base64Pure = fileData.trim();
+
+      if (base64Pure.startsWith('data:')) {
+        const parts = base64Pure.split(',');
+        const match = parts[0].match(/:(.*?);/);
+        if (match) mimeType = match[1];
+        base64Pure = parts[1] || '';
+      } else {
+        // اكتشاف الصيغة تلقائياً في حال عدم وجود البادئة
+        if (base64Pure.startsWith('JVBERi0')) {
+          mimeType = 'application/pdf';
+        } else if (base64Pure.startsWith('iVBORw0KGgo')) {
+          mimeType = 'image/png';
+        } else if (base64Pure.startsWith('/9j/')) {
+          mimeType = 'image/jpeg';
+        }
+      }
+
+      base64Pure = base64Pure.replace(/\s/g, '');
+
+      const byteCharacters = atob(base64Pure);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mimeType });
+      const blobUrl = URL.createObjectURL(blob);
+
+      const win = window.open(blobUrl, '_blank');
+      if (!win) {
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `${certTitle || 'الشهادة'}.${mimeType.includes('pdf') ? 'pdf' : 'jpg'}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    } catch (err) {
+      console.error('Error decoding file:', err);
+      alert('حدث خطأ أثناء قراءة ملف الشهادة. يرجى التأكد من إعادة رفع الملف بصيغة سليمة.');
+    }
+  };
+
   // دالة البحث المحدثة والمربوطة مع الموارد البشرية والتحقق الأمني من كلمة المرور
   const handleFetchCertificatesFromNav = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -454,7 +511,7 @@ export default function Navbar() {
         )}
       </header>
 
-      {/* نافذة مودال استعراض وتحميل الشهادات مع الحماية من كلمة المرور */}
+      {/* نافذة استعراض وتحميل الشهادات المعتمدة */}
       {showCertModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
           <div className="bg-white text-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-400">
@@ -500,40 +557,34 @@ export default function Navbar() {
             )}
 
             {memberCertificates.length > 0 && (
-  <div className="space-y-3 max-h-60 overflow-y-auto pt-2">
-    {memberCertificates.map((cert) => {
-      const certTitle = cert.title || cert.certTitle || 'شهادة شكر وتقدير';
-      const recipientName = cert.fullName || cert.recipientName || 'المستفيد';
-      const certFile = cert.fileUrl || cert.image;
+              <div className="space-y-3 max-h-60 overflow-y-auto pt-2">
+                {memberCertificates.map((cert) => {
+                  const certTitle = cert.title || cert.certTitle || 'شهادة شكر وتقدير';
+                  const recipientName = cert.fullName || cert.recipientName || 'المستفيد';
+                  const certFile = cert.fileUrl || cert.image || cert.file;
 
-      // فحص هل الملف المرفوع هو PDF أم صورة
-      const isPdf = certFile && (certFile.includes('.pdf') || certFile.startsWith('data:application/pdf'));
-
-      return (
-        <div key={cert.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs">
-          <div>
-            <span className="font-extrabold text-slate-900 block">{certTitle}</span>
-            <span className="text-[10px] text-slate-500">المستفيد: {recipientName}</span>
-            {cert.dateStr && <span className="text-[9px] text-slate-400 block mt-0.5">التاريخ: {cert.dateStr}</span>}
-          </div>
-          
-          {certFile && (
-            <a
-              href={certFile}
-              target="_blank"
-              rel="noopener noreferrer"
-              // عدم تغيير صيغة الملف إذا كان صورة وتركه يفتح بصيغته الأصلية
-              download={isPdf ? `Certificate_${cert.id}.pdf` : undefined}
-              className="px-3 py-1.5 bg-amber-600 text-white font-bold rounded-lg shadow hover:bg-amber-700 transition-all flex items-center gap-1"
-            >
-              {isPdf ? 'تحميل PDF 📄' : 'عرض / تحميل الصورة 🖼️'}
-            </a>
-          )}
-        </div>
-      );
-    })}
-  </div>
-)}
+                  return (
+                    <div key={cert.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs">
+                      <div>
+                        <span className="font-extrabold text-slate-900 block">{certTitle}</span>
+                        <span className="text-[10px] text-slate-500">المستفيد: {recipientName}</span>
+                        {cert.dateStr && <span className="text-[9px] text-slate-400 block mt-0.5">التاريخ: {cert.dateStr}</span>}
+                      </div>
+                      
+                      {certFile && (
+                        <button
+                          type="button"
+                          onClick={() => handleViewOrDownloadFile(certFile, certTitle)}
+                          className="px-3.5 py-1.5 bg-amber-600 text-white font-bold rounded-xl shadow hover:bg-amber-700 transition-all text-xs cursor-pointer flex items-center gap-1"
+                        >
+                          استعراض / تحميل 📥
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             <button
               type="button"
