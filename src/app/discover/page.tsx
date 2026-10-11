@@ -255,7 +255,7 @@ export default function DiscoverPage() {
                 إنجازات طلبة كلية التمريض
               </h2>
               <p className="text-slate-600 text-sm sm:text-base font-medium">
-                نحتهبي بنخبة من طلاب وطالبات كلية التمريض بجامعة حفر الباطن الحاصلين على جوائز ومراكز متقدمة تشرف الكلية والنادي.
+                نحتفي بنخبة من طلاب وطالبات كلية التمريض بجامعة حفر الباطن الحاصلين على جوائز ومراكز متقدمة تشرف الكلية والنادي.
               </p>
             </div>
 
@@ -263,7 +263,7 @@ export default function DiscoverPage() {
               {studentAchievements.map((ach) => {
                 const namesList = ach.studentNames && ach.studentNames.length > 0 
                   ? ach.studentNames 
-                  : (ach.studentName ? ach.studentName.split(/[\n,]+/).map(n => n.trim()).filter(Boolean) : []);
+                  : (ach.studentName ? ach.studentName.split(/[,،\n]+/).map(n => n.trim()).filter(Boolean) : []);
 
                 return (
                   <div 
@@ -293,11 +293,12 @@ export default function DiscoverPage() {
                             {ach.awardName}
                           </span>
                           
-                          <div className="space-y-1 pt-1">
+                          <div className="space-y-1.5 pt-1">
                             {namesList.length > 0 ? (
                               namesList.map((name, idx) => (
-                                <p key={idx} className="font-extrabold text-slate-900 text-sm">
-                                  {name}
+                                <p key={idx} className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5 justify-center sm:justify-start">
+                                  <span className="text-amber-600 text-xs">👤</span>
+                                  <span>{name}</span>
                                 </p>
                               ))
                             ) : (
