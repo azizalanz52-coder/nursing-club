@@ -5,7 +5,15 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
+import { storage } from '../../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
+// دالة رفع الملفات إلى Firebase Storage واسترجاع رابط سحابي مباشر
+const uploadFileToStorage = async (file: File, folderPath: string): Promise<string> => {
+  const storageRef = ref(storage, `${folderPath}/${Date.now()}_${file.name}`);
+  await uploadBytes(storageRef, file);
+  return await getDownloadURL(storageRef);
+};
 // دالة ذكية لتطبيع النصوص العربية وتوحيد الهمزات والمسافات
 const normalizeArabic = (str: string) => {
   if (!str) return '';
@@ -138,8 +146,8 @@ export default function CommitteeDetailPage() {
   const [mediaGallery, setMediaGallery] = useState<any[]>([]);
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaCategory, setMediaCategory] = useState('تغطيات مرئية وفيديوهات 🎥');
-  const [mediaBase64, setMediaBase64] = useState('');
-  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+ const [mediaFile, setMediaFile] = useState<File | null>(null);
+const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
 
   // خصائص لجنة المحتوى العلمي ولجنة التصميم (بنك النصوص والعبارات)
   const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
@@ -392,31 +400,49 @@ export default function CommitteeDetailPage() {
   };
 
   // رفع صورة أو فيديو (خاص بلجنة الإعلام) - مربوط بقاعدة البيانات المركزية
-  const handleUploadMediaSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!mediaTitle.trim() || !mediaBase64) {
-      alert('يرجى كتابة عنوان التغطية واختيار ملف الصورة أو الفيديو.');
-      return;
-    }
+ const handleUploadMediaSubmit = async (e: FormEvent) => {
+  e.preventDefault();
+  if (!mediaTitle.trim() || !mediaFile) {
+    alert('يرجى كتابة عنوان التغطية واختيار ملف الصورة أو الفيديو.');
+    return;
+  }
+
+  try {
+    setIsUploadingMedia(true);
+
+    // رفع الملف سحابياً للحصول على رابط مباشر غير محدود الحجم
+    const downloadUrl = await uploadFileToStorage(mediaFile, 'media_gallery');
+    const isVideo = mediaFile.type.startsWith('video');
+
     const newObj = {
       title: mediaTitle.trim(),
       category: mediaCategory,
-      mediaUrl: mediaBase64,
-      mediaType: mediaType,
+      mediaUrl: downloadUrl,
+      imageUrl: downloadUrl, // للتوافق مع جميع اللوحات
+      mediaType: isVideo ? 'video' : 'image',
       createdAt: new Date().toLocaleDateString('ar-SA'),
-      addedBy: currentUserName || 'عضو الإعلام'
+      timestamp: Date.now(),
+      addedBy: currentUserName || 'عضو الإعلام',
+      uploadedBy: currentUserName || 'عضو الإعلام',
+      uploaderRole: 'عضو لجنة',
+      committee: 'لجنة الإعلام',
+      status: 'معتمد'
     };
-    try {
-      const docRef = await addDoc(collection(db, 'media_committee_gallery'), newObj);
-      setMediaGallery([{ id: docRef.id, ...newObj }, ...mediaGallery]);
-      setMediaTitle('');
-      setMediaBase64('');
-      alert('تم رفع ونشر محتوى لجنة الإعلام وتخزينها سحابياً لتظهر للجميع ولوحة الأدمن بنجاح! 📸🚀');
-    } catch (err) { 
-      console.error(err); 
-      alert('حدث خطأ أثناء رفع الملف، يرجى المحاولة مرة أخرى.');
-    }
-  };
+
+    const docRef = await addDoc(collection(db, 'media_committee_gallery'), newObj);
+    setMediaGallery([{ id: docRef.id, ...newObj }, ...mediaGallery]);
+
+    setMediaTitle('');
+    setMediaFile(null);
+    setIsUploadingMedia(false);
+
+    alert('تم رفع ونشر محتوى لجنة الإعلام سحابياً وتخزينه لجميع اللوحات بنجاح! 📸🚀');
+  } catch (err: any) {
+    console.error('Error uploading media:', err);
+    setIsUploadingMedia(false);
+    alert('حدث خطأ أثناء رفع الملف، يرجى المحاولة مرة أخرى.');
+  }
+};
 
   // حذف عنصر ميديا من الأرشيف
   const handleDeleteMediaItem = async (itemId: string) => {
@@ -707,66 +733,69 @@ export default function CommitteeDetailPage() {
               </span>
             </div>
 
-            {/* نموذج رفع المادة */}
-            <form onSubmit={handleUploadMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">عنوان التغطية أو الفعالية</label>
-                <input
-                  type="text"
-                  placeholder="مثال: تغطية ملتقى التمريض المرئي"
-                  value={mediaTitle}
-                  onChange={(e) => setMediaTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">تصنيف المحتوى</label>
-                <select
-                  value={mediaCategory}
-                  onChange={(e) => setMediaCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
-                >
-                  <option value="تغطيات مرئية وفيديوهات 🎥">تغطيات مرئية وفيديوهات 🎥</option>
-                  <option value="صور فعاليات وتوثيق 📸">صور فعاليات وتوثيق 📸</option>
-                  <option value="تصاميم وبوسترات 🎨">تصاميم وبوسترات 🎨</option>
-                </select>
-              </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-bold text-slate-700">اختر الملفات والفيديوهات (📁 بدون أي قيود على الحجم)</label>
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  onChange={async (e: ChangeEvent<HTMLInputElement>) => {
-                    if (e.target.files && e.target.files[0]) {
-                      const file = e.target.files[0];
-                      setMediaType(file.type.startsWith('video') ? 'video' : 'image');
-                      setMediaBase64(await convertFileToBase64(file));
-                    }
-                  }}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white cursor-pointer"
-                  required
-                />
-              </div>
+           <form onSubmit={handleUploadMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
+  <div className="space-y-1.5">
+    <label className="text-xs font-bold text-slate-700">عنوان التغطية أو الفعالية</label>
+    <input
+      type="text"
+      placeholder="مثال: تغطية ملتقى التمريض المرئي"
+      value={mediaTitle}
+      onChange={(e) => setMediaTitle(e.target.value)}
+      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+      required
+    />
+  </div>
 
-              {/* معاينة فورية للملف المختار قبل الرفع */}
-              {mediaBase64 && (
-                <div className="sm:col-span-2 p-4 bg-white rounded-2xl border border-purple-200 space-y-2">
-                  <span className="text-xs font-bold text-purple-800">👁️ معاينة الملف قبل النشر:</span>
-                  {mediaType === 'video' ? (
-                    <video src={mediaBase64} controls className="w-full h-48 object-cover rounded-xl border" />
-                  ) : (
-                    <img src={mediaBase64} alt="معاينة" className="w-full h-48 object-cover rounded-xl border" />
-                  )}
-                </div>
-              )}
+  <div className="space-y-1.5">
+    <label className="text-xs font-bold text-slate-700">تصنيف المحتوى</label>
+    <select
+      value={mediaCategory}
+      onChange={(e) => setMediaCategory(e.target.value)}
+      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
+    >
+      <option value="تغطيات مرئية وفيديوهات 🎥">تغطيات مرئية وفيديوهات 🎥</option>
+      <option value="صور فعاليات وتوثيق 📸">صور فعاليات وتوثيق 📸</option>
+      <option value="تصاميم وبوسترات 🎨">تصاميم وبوسترات 🎨</option>
+    </select>
+  </div>
 
-              <div className="sm:col-span-2 pt-2">
-                <button type="submit" className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer">
-                  + رفع ونشر محتوى لجنة الإعلام سحابياً 🎬
-                </button>
-              </div>
-            </form>
+  <div className="space-y-1.5 sm:col-span-2">
+    <label className="text-xs font-bold text-slate-700">اختر الملف (📁 دعم كامل للصور والفيديوهات عالية الدقة)</label>
+    <input
+      type="file"
+      accept="image/*,video/*"
+      onChange={(e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+          setMediaFile(e.target.files[0]);
+        }
+      }}
+      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white cursor-pointer"
+      required
+    />
+  </div>
+
+  {/* معاينة الملف قبل الرفع النهائي */}
+  {mediaFile && (
+    <div className="sm:col-span-2 p-4 bg-white rounded-2xl border border-purple-200 space-y-2">
+      <span className="text-xs font-bold text-purple-800">👁️ ملف جاهز للرفع السحابي: {mediaFile.name}</span>
+      {mediaFile.type.startsWith('video') ? (
+        <video src={URL.createObjectURL(mediaFile)} controls className="w-full h-48 object-cover rounded-xl border" />
+      ) : (
+        <img src={URL.createObjectURL(mediaFile)} alt="معاينة" className="w-full h-48 object-cover rounded-xl border" />
+      )}
+    </div>
+  )}
+
+  <div className="sm:col-span-2 pt-2">
+    <button
+      type="submit"
+      disabled={isUploadingMedia}
+      className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 disabled:bg-slate-400 cursor-pointer"
+    >
+      {isUploadingMedia ? 'جاري الرفع السحابي... ⏳' : '+ رفع ونشر محتوى لجنة الإعلام سحابياً 🎬'}
+    </button>
+  </div>
+</form>
 
             {/* عرض أرشيف ومقاطع لجنة الإعلام المرئية مع أزرار المعاينة والحذف */}
             <div className="space-y-4 pt-4 border-t border-slate-100">
@@ -784,12 +813,12 @@ export default function CommitteeDetailPage() {
                       </div>
 
                       <div className="rounded-xl overflow-hidden border border-slate-200 bg-black/5 relative group h-36">
-                        {item.mediaType === 'video' ? (
-                          <video src={item.mediaUrl} className="w-full h-full object-cover" />
-                        ) : (
-                          <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
-                        )}
-                      </div>
+  {item.mediaType === 'video' || item.mediaUrl?.includes('.mp4') || item.imageUrl?.includes('.mp4') ? (
+    <video src={item.mediaUrl || item.imageUrl} controls className="w-full h-full object-cover" />
+  ) : (
+    <img src={item.mediaUrl || item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+  )}
+</div>
 
                       <div className="flex gap-2 pt-1">
                         <button
