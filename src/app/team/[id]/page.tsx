@@ -482,6 +482,10 @@ export default function CommitteeDetailPage() {
   // إضافة نص/عبارة توعوية جديدة للبنرات (خاص بلجنة المحتوى العلمي)
   const handleAddScientificTextSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (id !== 'scientific') {
+      alert('إرسال النصوص متاح فقط للجنة المحتوى العلمي.');
+      return;
+    }
     if (!textBannerTitle.trim() || !textBannerContent.trim()) {
       alert('يرجى تعبئة عنوان البانر والنص المطلوب.');
       return;
@@ -506,6 +510,10 @@ export default function CommitteeDetailPage() {
 
   // حذف نص من بنك النصوص
   const handleDeleteScientificText = async (textId: string) => {
+    if (id !== 'scientific') {
+      alert('حذف النصوص متاح فقط للجنة المحتوى العلمي.');
+      return;
+    }
     if (!confirm('هل أنت متأكد من حذف هذا النص من البنك؟')) return;
     try {
       await deleteDoc(doc(db, 'scientific_committee_texts', textId));
@@ -520,8 +528,8 @@ export default function CommitteeDetailPage() {
   // التثبت من صلاحيات المحتوى العلمي ولجنة التصميم
   const isScientificCommittee = id === 'scientific' || normalizeArabic(committee?.name || '').includes('علمي');
   const isDesignCommittee = id === 'design' || normalizeArabic(committee?.name || '').includes('تصميم');
-  const canAccessScientificTexts = isScientificCommittee || isDesignCommittee || isAdmin;
-  const canAddScientificTexts = isScientificCommittee || isAdmin;
+  const canAccessScientificTexts = isScientificCommittee || isDesignCommittee;
+  const canAddScientificTexts = isScientificCommittee;
 
   if (!baseDetails) {
     return (
@@ -916,7 +924,7 @@ export default function CommitteeDetailPage() {
 
                 <div>
                   <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">
-                    + نشر واعتماد النص للجنة التصميم وللإدارة 📝✨
+                    + نشر واعتماد النص للجنة التصميم 📝✨
                   </button>
                 </div>
               </form>

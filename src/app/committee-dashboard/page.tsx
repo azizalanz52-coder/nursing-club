@@ -584,6 +584,11 @@ useEffect(() => {
 
   const handleAddScientificTextSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const senderComm = userData?.assignedCommittee || userData?.committee || '';
+    if (!(senderComm || '').includes('علمي')) {
+      alert('إرسال النصوص متاح فقط للجنة المحتوى العلمي.');
+      return;
+    }
     if (!textBannerTitle.trim() || !textBannerContent.trim()) return;
     
     const newTextObj = {
@@ -597,10 +602,11 @@ useEffect(() => {
 
       for (const usr of allUsersList) {
         const cStr = usr.assignedCommittee || usr.committee || '';
-        if (cStr.includes('التصميم') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
+        const isDesignReceiver = (cStr || '').includes('تصميم');
+        if (isDesignReceiver) {
           try {
             await setDoc(doc(db, 'users', usr.id), {
-              latestNotification: `🔬 [محتوى علمي جديد موجه للبنرات والتصميم]: "${textBannerTitle}" - النص: ${textBannerContent}`
+              latestNotification: `🔬 [نص معتمد من المحتوى العلمي]: "${textBannerTitle}" - جاهز للاستخدام في التصاميم.`
             }, { merge: true });
           } catch (er) { console.error(er); }
         }
@@ -608,11 +614,16 @@ useEffect(() => {
 
       setTextBannerTitle('');
       setTextBannerContent('');
-      alert('تم اعتماد ونشر النص وعرضه مباشرة للجنة التصميم وإرساله لمكتب الرؤساء والأدمن بنجاح! 🔬✨');
+      alert('تم اعتماد النص وإرساله للجنة التصميم فقط بنجاح! 🔬✨');
     } catch (err) { console.error(err); }
   };
 
   const handleDeleteScientificText = async (id: string) => {
+    const senderComm = userData?.assignedCommittee || userData?.committee || '';
+    if (!(senderComm || '').includes('علمي')) {
+      alert('حذف النصوص متاح فقط للجنة المحتوى العلمي.');
+      return;
+    }
     if (!id) {
       alert('لم يتم التعرف على معرّف النص بشكل صحيح.');
       return;
@@ -621,7 +632,7 @@ useEffect(() => {
       try {
         await deleteDoc(doc(db, 'scientific_committee_texts', id));
         setScientificTextsList(prev => prev.filter(t => t.id !== id));
-        alert('تم حذف النص سحابياً وتحديثه لدى جميع اللجان بنجاح! 🗑️');
+        alert('تم حذف النص سحابياً وتحديثه لدى لجنة التصميم بنجاح! 🗑️');
       } catch (err) {
         console.error('Error deleting document:', err);
         alert('حدث خطأ أثناء حذف النص.');
@@ -1470,20 +1481,14 @@ useEffect(() => {
     ).values()
   );
 
-  const canAccessScientificTexts = 
-    isSameCommittee(currentActiveComm, 'لجنة المحتوى العلمي') ||
-    isSameCommittee(userAssignedComm, 'لجنة المحتوى العلمي') ||
-    isSameCommittee(currentActiveComm, 'لجنة التصميم') ||
-    isSameCommittee(userAssignedComm, 'لجنة التصميم') ||
-    isQualityTeam ||
-    userData?.role?.includes('رئيس') ||
-    userData?.role === 'System Admin';
+  const belongsToScientificContent =
+    matchesTargetCommittee(userAssignedComm, 'لجنة المحتوى العلمي');
+  const belongsToDesignCommittee =
+    matchesTargetCommittee(userAssignedComm, 'لجنة التصميم');
 
-  const canAddScientificTexts = 
-    isSameCommittee(currentActiveComm, 'لجنة المحتوى العلمي') ||
-    isSameCommittee(userAssignedComm, 'لجنة المحتوى العلمي') ||
-    userData?.role?.includes('رئيس') ||
-    userData?.role === 'System Admin';
+  // بنك النصوص قناة خاصة: المحتوى العلمي يرسل، ولجنة التصميم تستقبل فقط
+  const canAccessScientificTexts = belongsToScientificContent || belongsToDesignCommittee;
+  const canAddScientificTexts = belongsToScientificContent;
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 p-6 md:p-10 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
@@ -2163,13 +2168,17 @@ useEffect(() => {
           </div>
         )}
 
-        {/* قسم بنك صياغة النصوص الطبية والعبارات - متاح لأعضاء وقادة لجنة المحتوى العلمي ولجنة التصميم والأدمن والرؤساء */}
+        {/* بنك النصوص: حصري للجنة المحتوى العلمي (مرسل) ولجنة التصميم (مستقبل) */}
         {canAccessScientificTexts && (
           <div className="bg-white rounded-3xl p-8 border border-emerald-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900">🔬 بنك صياغة النصوص الطبية والعبارات (مربوط بلجنة التصميم ومكتب الرؤساء والأدمن)</h3>
-                <p className="text-xs text-slate-500">هنا يُكتب ويُعرض المحتوى التوعوي والعبارات التي تستخدمها لجنة التصميم والإعلام، وتصل مباشرة للأدمن والرؤساء.</p>
+                <h3 className="text-xl font-black text-slate-900">🔬 بنك صياغة النصوص الطبية والعبارات</h3>
+                <p className="text-xs text-slate-500">
+                  {belongsToScientificContent
+                    ? 'أنت المرسل: اكتب واعتمد النصوص التوعوية لتصل مباشرة إلى لجنة التصميم فقط.'
+                    : 'أنت المستقبل: هذه النصوص معتمدة من لجنة المحتوى العلمي لاستخدامها في التصاميم والبوسترات.'}
+                </p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-xs">
                 إجمالي النصوص المعتمدة: {scientificTextsList.length}
@@ -2192,7 +2201,7 @@ useEffect(() => {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">النصوص والعبارات الدقيقة المعتمدة (تصل للجنة التصميم والرؤساء)</label>
+                  <label className="text-xs font-bold text-slate-700">النصوص والعبارات الدقيقة المعتمدة (تصل للجنة التصميم فقط)</label>
                   <textarea
                     rows={3}
                     placeholder="اكتب النص العلمي أو العبارة الإبداعية هنا لتكون مرجعاً للبنرات والتصاميم..."
@@ -2205,7 +2214,7 @@ useEffect(() => {
 
                 <div>
                   <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">
-                    + اعتماد ونشر النص للبنرات والتصاميم وللأدمن والرؤساء 📝✨
+                    + اعتماد وإرسال النص للجنة التصميم 📝✨
                   </button>
                 </div>
               </form>
@@ -2220,7 +2229,9 @@ useEffect(() => {
                   <div key={txt.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">موصول بلجنة التصميم والرؤساء ✓</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                          {belongsToDesignCommittee ? 'مستلم من المحتوى العلمي ✓' : 'مُرسل للجنة التصميم ✓'}
+                        </span>
                         <span className="text-[10px] text-slate-400">{txt.createdAt}</span>
                       </div>
                       <h5 className="font-black text-slate-900 text-sm">{txt.title}</h5>
