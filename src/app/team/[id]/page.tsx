@@ -14,6 +14,7 @@ const uploadFileToStorage = async (file: File, folderPath: string): Promise<stri
   await uploadBytes(storageRef, file);
   return await getDownloadURL(storageRef);
 };
+
 // دالة ذكية لتطبيع النصوص العربية وتوحيد الهمزات والمسافات
 const normalizeArabic = (str: string) => {
   if (!str) return '';
@@ -146,8 +147,8 @@ export default function CommitteeDetailPage() {
   const [mediaGallery, setMediaGallery] = useState<any[]>([]);
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaCategory, setMediaCategory] = useState('تغطيات مرئية وفيديوهات 🎥');
- const [mediaFile, setMediaFile] = useState<File | null>(null);
-const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
 
   // خصائص لجنة المحتوى العلمي ولجنة التصميم (بنك النصوص والعبارات)
   const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
@@ -400,49 +401,49 @@ const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
   };
 
   // رفع صورة أو فيديو (خاص بلجنة الإعلام) - مربوط بقاعدة البيانات المركزية
- const handleUploadMediaSubmit = async (e: FormEvent) => {
-  e.preventDefault();
-  if (!mediaTitle.trim() || !mediaFile) {
-    alert('يرجى كتابة عنوان التغطية واختيار ملف الصورة أو الفيديو.');
-    return;
-  }
+  const handleUploadMediaSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!mediaTitle.trim() || !mediaFile) {
+      alert('يرجى كتابة عنوان التغطية واختيار ملف الصورة أو الفيديو.');
+      return;
+    }
 
-  try {
-    setIsUploadingMedia(true);
+    try {
+      setIsUploadingMedia(true);
 
-    // رفع الملف سحابياً للحصول على رابط مباشر غير محدود الحجم
-    const downloadUrl = await uploadFileToStorage(mediaFile, 'media_gallery');
-    const isVideo = mediaFile.type.startsWith('video');
+      // رفع الملف سحابياً للحصول على رابط مباشر غير محدود الحجم
+      const downloadUrl = await uploadFileToStorage(mediaFile, 'media_gallery');
+      const isVideo = mediaFile.type.startsWith('video');
 
-    const newObj = {
-      title: mediaTitle.trim(),
-      category: mediaCategory,
-      mediaUrl: downloadUrl,
-      imageUrl: downloadUrl, // للتوافق مع جميع اللوحات
-      mediaType: isVideo ? 'video' : 'image',
-      createdAt: new Date().toLocaleDateString('ar-SA'),
-      timestamp: Date.now(),
-      addedBy: currentUserName || 'عضو الإعلام',
-      uploadedBy: currentUserName || 'عضو الإعلام',
-      uploaderRole: 'عضو لجنة',
-      committee: 'لجنة الإعلام',
-      status: 'معتمد'
-    };
+      const newObj = {
+        title: mediaTitle.trim(),
+        category: mediaCategory,
+        mediaUrl: downloadUrl,
+        imageUrl: downloadUrl, // للتوافق مع جميع اللوحات
+        mediaType: isVideo ? 'video' : 'image',
+        createdAt: new Date().toLocaleDateString('ar-SA'),
+        timestamp: Date.now(),
+        addedBy: currentUserName || 'عضو الإعلام',
+        uploadedBy: currentUserName || 'عضو الإعلام',
+        uploaderRole: 'عضو لجنة',
+        committee: 'لجنة الإعلام',
+        status: 'معتمد'
+      };
 
-    const docRef = await addDoc(collection(db, 'media_committee_gallery'), newObj);
-    setMediaGallery([{ id: docRef.id, ...newObj }, ...mediaGallery]);
+      const docRef = await addDoc(collection(db, 'media_committee_gallery'), newObj);
+      setMediaGallery([{ id: docRef.id, ...newObj }, ...mediaGallery]);
 
-    setMediaTitle('');
-    setMediaFile(null);
-    setIsUploadingMedia(false);
+      setMediaTitle('');
+      setMediaFile(null);
+      setIsUploadingMedia(false);
 
-    alert('تم رفع ونشر محتوى لجنة الإعلام سحابياً وتخزينه لجميع اللوحات بنجاح! 📸🚀');
-  } catch (err: any) {
-    console.error('Error uploading media:', err);
-    setIsUploadingMedia(false);
-    alert('حدث خطأ أثناء رفع الملف، يرجى المحاولة مرة أخرى.');
-  }
-};
+      alert('تم رفع ونشر محتوى لجنة الإعلام سحابياً وتخزينه لجميع اللوحات بنجاح! 📸🚀');
+    } catch (err: any) {
+      console.error('Error uploading media:', err);
+      setIsUploadingMedia(false);
+      alert('حدث خطأ أثناء رفع الملف، يرجى المحاولة مرة أخرى.');
+    }
+  };
 
   // حذف عنصر ميديا من الأرشيف
   const handleDeleteMediaItem = async (itemId: string) => {
@@ -733,92 +734,95 @@ const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
               </span>
             </div>
 
-           <form onSubmit={handleUploadMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
-  <div className="space-y-1.5">
-    <label className="text-xs font-bold text-slate-700">عنوان التغطية أو الفعالية</label>
-    <input
-      type="text"
-      placeholder="مثال: تغطية ملتقى التمريض المرئي"
-      value={mediaTitle}
-      onChange={(e) => setMediaTitle(e.target.value)}
-      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-      required
-    />
-  </div>
+            <form onSubmit={handleUploadMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">عنوان التغطية أو الفعالية</label>
+                <input
+                  type="text"
+                  placeholder="مثال: تغطية ملتقى التمريض المرئي"
+                  value={mediaTitle}
+                  onChange={(e) => setMediaTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  required
+                />
+              </div>
 
-  <div className="space-y-1.5">
-    <label className="text-xs font-bold text-slate-700">تصنيف المحتوى</label>
-    <select
-      value={mediaCategory}
-      onChange={(e) => setMediaCategory(e.target.value)}
-      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
-    >
-      <option value="تغطيات مرئية وفيديوهات 🎥">تغطيات مرئية وفيديوهات 🎥</option>
-      <option value="صور فعاليات وتوثيق 📸">صور فعاليات وتوثيق 📸</option>
-      <option value="تصاميم وبوسترات 🎨">تصاميم وبوسترات 🎨</option>
-    </select>
-  </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">تصنيف المحتوى</label>
+                <select
+                  value={mediaCategory}
+                  onChange={(e) => setMediaCategory(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
+                >
+                  <option value="تغطيات مرئية وفيديوهات 🎥">تغطيات مرئية وفيديوهات 🎥</option>
+                  <option value="صور فعاليات وتوثيق 📸">صور فعاليات وتوثيق 📸</option>
+                  <option value="تصاميم وبوسترات 🎨">تصاميم وبوسترات 🎨</option>
+                </select>
+              </div>
 
-  <div className="space-y-1.5 sm:col-span-2">
-    <label className="text-xs font-bold text-slate-700">اختر الملف (📁 دعم كامل للصور والفيديوهات عالية الدقة)</label>
-    <input
-      type="file"
-      accept="image/*,video/*"
-      onChange={(e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-          setMediaFile(e.target.files[0]);
-        }
-      }}
-      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white cursor-pointer"
-      required
-    />
-  </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-slate-700">اختر الملف (📁 دعم كامل للصور والفيديوهات عالية الدقة)</label>
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setMediaFile(e.target.files[0]);
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white cursor-pointer"
+                  required
+                />
+              </div>
 
-  {/* معاينة الملف قبل الرفع النهائي */}
-  {mediaFile && (
-    <div className="sm:col-span-2 p-4 bg-white rounded-2xl border border-purple-200 space-y-2">
-      <span className="text-xs font-bold text-purple-800">👁️ ملف جاهز للرفع السحابي: {mediaFile.name}</span>
-      {mediaFile.type.startsWith('video') ? (
-        <video src={URL.createObjectURL(mediaFile)} controls className="w-full h-48 object-cover rounded-xl border" />
-      ) : (
-        <img src={URL.createObjectURL(mediaFile)} alt="معاينة" className="w-full h-48 object-cover rounded-xl border" />
-      )}
-    </div>
-  )}
+              {/* معاينة الملف قبل الرفع النهائي بأبعاد متناسبة */}
+              {mediaFile && (
+                <div className="sm:col-span-2 p-4 bg-white rounded-2xl border border-purple-200 space-y-2">
+                  <span className="text-xs font-bold text-purple-800">👁️ ملف جاهز للرفع السحابي: {mediaFile.name}</span>
+                  <div className="max-h-72 overflow-hidden rounded-xl bg-slate-900/5 flex items-center justify-center p-2">
+                    {mediaFile.type.startsWith('video') ? (
+                      <video src={URL.createObjectURL(mediaFile)} controls className="max-h-72 w-auto object-contain rounded-xl" />
+                    ) : (
+                      <img src={URL.createObjectURL(mediaFile)} alt="معاينة" className="max-h-72 w-auto object-contain rounded-xl" />
+                    )}
+                  </div>
+                </div>
+              )}
 
-  <div className="sm:col-span-2 pt-2">
-    <button
-      type="submit"
-      disabled={isUploadingMedia}
-      className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 disabled:bg-slate-400 cursor-pointer"
-    >
-      {isUploadingMedia ? 'جاري الرفع السحابي... ⏳' : '+ رفع ونشر محتوى لجنة الإعلام سحابياً 🎬'}
-    </button>
-  </div>
-</form>
+              <div className="sm:col-span-2 pt-2">
+                <button
+                  type="submit"
+                  disabled={isUploadingMedia}
+                  className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 disabled:bg-slate-400 cursor-pointer"
+                >
+                  {isUploadingMedia ? 'جاري الرفع السحابي... ⏳' : '+ رفع ونشر محتوى لجنة الإعلام سحابياً 🎬'}
+                </button>
+              </div>
+            </form>
 
-            {/* عرض أرشيف ومقاطع لجنة الإعلام المرئية مع أزرار المعاينة والحذف */}
+            {/* عرض أرشيف ومقاطع لجنة الإعلام المرئية بالتصميم الميسونري الحافظ للأبعاد الطولية والعريضة بدون انكسار */}
             <div className="space-y-4 pt-4 border-t border-slate-100">
               <h3 className="font-black text-slate-900 text-sm">أرشيف تغطيات لجنة الإعلام ({mediaGallery.length})</h3>
               {mediaGallery.length === 0 ? (
                 <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لم يتم رفع أي محتوى مرئي أو صور للجنة الإعلام حتى الآن.</p>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <div className="columns-1 sm:columns-2 md:columns-3 gap-6 space-y-6">
                   {mediaGallery.map((item) => (
-                    <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
+                    <div key={item.id} className="break-inside-avoid p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between shadow-sm hover:shadow-md transition-all">
                       <div className="space-y-2">
                         <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{item.category}</span>
-                        <h5 className="font-extrabold text-slate-900 text-sm">{item.title}</h5>
-                        <p className="text-[10px] text-slate-400">بواسطة: {item.addedBy} ({item.createdAt})</p>
+                        <h5 className="font-extrabold text-slate-900 text-sm leading-snug">{item.title}</h5>
+                        <p className="text-[10px] text-slate-400">بواسطة: {item.addedBy || item.uploadedBy} ({item.createdAt})</p>
                       </div>
 
-                      <div className="rounded-xl overflow-hidden border border-slate-200 bg-black/5 relative group h-36">
-  {item.mediaType === 'video' || item.mediaUrl?.includes('.mp4') || item.imageUrl?.includes('.mp4') ? (
-    <video src={item.mediaUrl || item.imageUrl} controls className="w-full h-full object-cover" />
-  ) : (
-    <img src={item.mediaUrl || item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
-  )}
-</div>
+                      {/* حاوية مرنة تستعرض الصورة أو الفيديو بأبعاده الأصلية الكاملة */}
+                      <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900/5 flex items-center justify-center min-h-[140px]">
+                        {item.mediaType === 'video' || item.mediaUrl?.includes('.mp4') || item.imageUrl?.includes('.mp4') ? (
+                          <video src={item.mediaUrl || item.imageUrl} controls className="w-full h-auto max-h-[450px] object-contain rounded-xl" />
+                        ) : (
+                          <img src={item.mediaUrl || item.imageUrl} alt={item.title} className="w-full h-auto max-h-[450px] object-contain rounded-xl" />
+                        )}
+                      </div>
 
                       <div className="flex gap-2 pt-1">
                         <button
@@ -1006,15 +1010,15 @@ const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
             </div>
 
             <div className="rounded-2xl overflow-hidden border max-h-[60vh] flex items-center justify-center bg-black">
-              {previewItem.mediaType === 'video' ? (
-                <video src={previewItem.mediaUrl} controls autoPlay className="max-h-[60vh] w-auto mx-auto" />
+              {previewItem.mediaType === 'video' || previewItem.mediaUrl?.includes('.mp4') || previewItem.imageUrl?.includes('.mp4') ? (
+                <video src={previewItem.mediaUrl || previewItem.imageUrl} controls autoPlay className="max-h-[60vh] w-auto mx-auto object-contain" />
               ) : (
-                <img src={previewItem.mediaUrl} alt={previewItem.title} className="max-h-[60vh] w-auto mx-auto object-contain" />
+                <img src={previewItem.mediaUrl || previewItem.imageUrl} alt={previewItem.title} className="max-h-[60vh] w-auto mx-auto object-contain" />
               )}
             </div>
 
             <div className="flex justify-between items-center text-xs text-slate-500 pt-2">
-              <span>تم الرفع بواسطة: <strong>{previewItem.addedBy}</strong> ({previewItem.createdAt})</span>
+              <span>تم الرفع بواسطة: <strong>{previewItem.addedBy || previewItem.uploadedBy}</strong> ({previewItem.createdAt})</span>
               <button
                 type="button"
                 onClick={() => setPreviewItem(null)}
