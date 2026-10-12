@@ -8,11 +8,39 @@ import { doc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from '
 import { storage } from '../../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// دالة رفع الملفات إلى Firebase Storage واسترجاع رابط سحابي مباشر
+// دالة تحويل الملف إلى Base64 كخيار احتياطي ومضمون
+const convertFileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+};
+
+// دالة رفع الملفات إلى Firebase Storage واسترجاع رابط سحابي مباشر مع حماية وتعليق زر الرفع
 const uploadFileToStorage = async (file: File, folderPath: string): Promise<string> => {
-  const storageRef = ref(storage, `${folderPath}/${Date.now()}_${file.name}`);
-  await uploadBytes(storageRef, file);
-  return await getDownloadURL(storageRef);
+  try {
+    // تنظيف اسم الملف من الأحرف غير اللاتينية والرموز لتجنب أخطاء المسار في Firebase Storage
+    const fileExt = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '';
+    const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${fileExt}`;
+    const storageRef = ref(storage, `${folderPath}/${safeFileName}`);
+
+    // سباق بين رفع الملف والمهلة الزمنية (8 ثوانٍ) لمنع تعليق الزر
+    const storagePromise = (async () => {
+      await uploadBytes(storageRef, file);
+      return await getDownloadURL(storageRef);
+    })();
+
+    const timeoutPromise = new Promise<string>((_, reject) =>
+      setTimeout(() => reject(new Error('Storage Upload Timeout')), 8000)
+    );
+
+    return await Promise.race([storagePromise, timeoutPromise]);
+  } catch (error) {
+    console.warn('تنبيه: تعذر الرفع عبر Storage أو انتهت المهلة، تم تحويل الرفع تلقائياً لضمان النجاح:', error);
+    return await convertFileToBase64(file);
+  }
 };
 
 // دالة ذكية لتطبيع النصوص العربية وتوحيد الهمزات والمسافات
@@ -284,7 +312,8 @@ export default function CommitteeDetailPage() {
 
       } catch (err) {
         console.error('Error fetching cloud data:', err);
-      } finally {
+      } font-bold
+      finally {
         setLoading(false);
       }
     };
@@ -389,15 +418,6 @@ export default function CommitteeDetailPage() {
       console.error(err);
       alert('حدث خطأ أثناء حفظ بيانات الشركة.');
     }
-  };
-
-  const convertFileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
   };
 
   // رفع صورة أو فيديو (خاص بلجنة الإعلام) - مربوط بقاعدة البيانات المركزية
