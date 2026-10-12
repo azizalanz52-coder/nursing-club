@@ -310,13 +310,11 @@ export default function CommitteeDetailPage() {
         const scientificSnap = await getDocs(collection(db, 'scientific_committee_texts'));
         setScientificTextsList(scientificSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-      } catch (err) {
+   } catch (err) {
         console.error('Error fetching cloud data:', err);
-      } font-bold
-      finally {
+      } finally {
         setLoading(false);
       }
-    };
 
     fetchCloudData();
   }, [id, baseDetails]);
