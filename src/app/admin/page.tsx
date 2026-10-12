@@ -138,6 +138,8 @@ export default function AdminDashboard() {
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
   const [historicalVaultReports, setHistoricalVaultReports] = useState<any[]>([]);
+  const [qualityEvaluationReports, setQualityEvaluationReports] = useState<any[]>([]);
+  const [qualityUploadedFiles, setQualityUploadedFiles] = useState<any[]>([]);
 
   const [caseSubmissions, setCaseSubmissions] = useState<any[]>([]);
 
@@ -228,13 +230,15 @@ export default function AdminDashboard() {
   };
 
   const formatVaultDate = (vaultItem: any) => {
-    const d = vaultItem.archivedAt || vaultItem.dateStr || vaultItem.createdAt || vaultItem.warningSentAt;
-    if (!d) return 'تاريخ غير محدد';
-    try {
-      return new Date(d).toLocaleDateString('ar-SA');
-    } catch {
-      return String(d);
+    const d = vaultItem.createdAt || vaultItem.archivedAt || vaultItem.warningSentAt;
+    if (typeof d === 'number') return new Date(d).toLocaleDateString('ar-SA');
+    if (typeof d === 'string' && (d.includes('T') || /^\d{4}-/.test(d))) {
+      const parsed = new Date(d);
+      if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleDateString('ar-SA');
     }
+    if (vaultItem.dateStr) return String(vaultItem.dateStr);
+    if (d) return String(d);
+    return 'تاريخ غير محدد';
   };
 
   const togglePasswordVisibility = (phone: string) => {
@@ -696,17 +700,56 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
   const fetchHistoricalVault = async () => {
     try {
-      const snap1 = await getDocs(collection(db, 'historical_vault_reports'));
-      const snap2 = await getDocs(collection(db, 'quality_reports_archive'));
-      
-      const reports1 = snap1.docs.map(d => ({ id: d.id, ...d.data() }));
-      const reports2 = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
-      
-      const combined = [...reports1, ...reports2];
-      setHistoricalVaultReports(combined);
+      const evalSnap = await getDocs(collection(db, 'quality_reports_archive'));
+      const fileSnap = await getDocs(collection(db, 'quality_uploaded_files'));
+
+      const evaluations = evalSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter((item: any) => {
+          if (item.reportType === 'uploaded_file' || item.fileUrl) return false;
+          if (item.reportType === 'committee_evaluation') return true;
+          return Boolean(item.advantages || item.errors || item.bestCommittee || item.bestMembers || item.featuredMembers);
+        })
+        .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      const files = fileSnap.docs
+        .map(d => ({ id: d.id, ...d.data(), reportType: 'uploaded_file' }))
+        .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      setQualityEvaluationReports(evaluations);
+      setQualityUploadedFiles(files);
+      setHistoricalVaultReports([...evaluations, ...files]);
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleDeleteQualityEvaluation = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من حذف تقييم اللجان هذا من الأرشيف؟', async () => {
+      try {
+        await deleteDoc(doc(db, 'quality_reports_archive', id));
+        setQualityEvaluationReports(prev => prev.filter(item => item.id !== id));
+        setHistoricalVaultReports(prev => prev.filter(item => item.id !== id));
+        setModalMessage('تم حذف تقييم اللجان من الأرشيف.');
+        setModalType('success');
+      } catch (err) {
+        console.error(err);
+      }
+    });
+  };
+
+  const handleDeleteQualityUploadedFile = (id: string) => {
+    triggerConfirmModal('هل أنت متأكد من حذف هذا الملف المرفوع من الأرشيف؟', async () => {
+      try {
+        await deleteDoc(doc(db, 'quality_uploaded_files', id));
+        setQualityUploadedFiles(prev => prev.filter(item => item.id !== id));
+        setHistoricalVaultReports(prev => prev.filter(item => item.id !== id));
+        setModalMessage('تم حذف الملف المرفوع من الأرشيف.');
+        setModalType('success');
+      } catch (err) {
+        console.error(err);
+      }
+    });
   };
 
   const handlePrintArchiveReport = (arch: any) => {
@@ -716,47 +759,36 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       return;
     }
 
-    const reportTitle = arch.title || arch.activityName || arch.eventName || arch.targetCommittee || 'الصحة النفسية 3';
+    const reportTitle = arch.title || arch.activityName || arch.eventName || 'تقييم اللجان والأعضاء';
     const reportDate = arch.dateStr || (arch.archivedAt 
       ? new Date(arch.archivedAt).toLocaleDateString('ar-SA') 
-      : (arch.createdAt ? new Date(arch.createdAt).toLocaleDateString('ar-SA') : '2026/10/7'));
+      : (arch.createdAt ? new Date(arch.createdAt).toLocaleDateString('ar-SA') : 'غير محدد'));
     const reportAuthor = arch.reporter || arch.author || arch.createdByName || 'لجنة الجودة والتطوير';
 
-    const rawContent = arch.details || arch.reason || arch.description || arch.content || '';
+    const rawContent = arch.details || arch.description || arch.content || '';
 
     let featuredCommittee = arch.featuredCommittee || arch.bestCommittee || arch.topCommittee || '';
     if (!featuredCommittee && rawContent.includes('اللجنة المتميزة:')) {
       const match = rawContent.match(/اللجنة المتميزة:\s*([^\n✔️⚠️]+)/);
       if (match) featuredCommittee = match[1].trim();
     }
-    if (!featuredCommittee) featuredCommittee = 'لجنة التصميم';
+    if (!featuredCommittee) featuredCommittee = 'لم يتم التحديد';
 
-    let positives = arch.positives || arch.features || arch.positivesText || '';
+    let positives = arch.advantages || arch.positives || arch.features || arch.positivesText || '';
     if (!positives && rawContent.includes('المميزات:')) {
       const match = rawContent.match(/المميزات:\s*([^\n⚠️]+)/);
       if (match) positives = match[1].trim();
     }
-    if (!positives && !rawContent.includes('المميزات:') && !rawContent.includes('الملاحظات:')) {
-      positives = rawContent;
-    }
     if (!positives) positives = 'لا توجد ملاحظات إيجابية مضافة';
 
-    let notes = arch.notes || arch.negatives || arch.negativesText || '';
+    let notes = arch.errors || arch.notes || arch.negatives || arch.negativesText || '';
     if (!notes && rawContent.includes('الملاحظات:')) {
       const match = rawContent.match(/الملاحظات:\s*([\s\S]+)/);
       if (match) notes = match[1].trim();
     }
     if (!notes) notes = 'لا توجد ملاحظات مرصودة';
 
-    const rawMembers = arch.topMembers || arch.featuredMembers || arch.members || arch.distinguishedMembers || [
-      { committee: 'لجنة التصميم', member: 'أحمد العنزي (تصاميم احترافية متميزة)' },
-      { committee: 'لجنة الإعلام', member: 'سارة الشمري (تغطيات فورية استثنائية)' },
-      { committee: 'لجنة تنظيم الفعاليات', member: 'محمد الدوسري (تنظيم وانضباط عالٍ)' },
-      { committee: 'لجنة الموارد البشرية', member: 'فاطمة الرشيدي (متابعة دقيقة للأعضاء)' },
-      { committee: 'لجنة العلاقات العامة', member: 'عبدالله العتيبي (عقد شراكات ناجحة)' },
-      { committee: 'لجنة المحتوى العلمي', member: 'منيرة الحربي (صياغة محتوى دقيق)' },
-      { committee: 'لجنة الجودة والتطوير', member: 'ريما العنزي (متابعة جودة متميزة)' },
-    ];
+    const rawMembers = arch.featuredMembers || arch.topMembers || arch.members || arch.distinguishedMembers || arch.bestMembers;
 
     let membersRows = '';
     if (Array.isArray(rawMembers)) {
@@ -765,6 +797,13 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         const membName = m.member || m.memberName || m.name || m.details || '-';
         return '<tr><td style="font-weight: 900; color: #0f172a;">' + commName + '</td><td>' + membName + '</td></tr>';
       }).join('');
+    } else if (rawMembers && typeof rawMembers === 'object') {
+      membersRows = Object.entries(rawMembers).map(([commName, membName]) => {
+        return '<tr><td style="font-weight: 900; color: #0f172a;">' + commName + '</td><td>' + (membName || 'لم يتم التحديد') + '</td></tr>';
+      }).join('');
+    }
+    if (!membersRows) {
+      membersRows = '<tr><td colspan="2">لم يتم إدخال أعضاء متميزين في هذا التقييم.</td></tr>';
     }
 
     const reportHTML = `
@@ -947,12 +986,12 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
         <div class="section-title">ثانياً: المميزات والإيجابيات البارزة</div>
         <div class="box-green">
-          ${positives}
+          ${String(positives).replace(/\n/g, '<br/>')}
         </div>
 
         <div class="section-title">ثالثاً: الأخطاء والملاحظات المرصودة للتحسين المستقبلي</div>
         <div class="box-red">
-          ${notes}
+          ${String(notes).replace(/\n/g, '<br/>')}
         </div>
       </body>
       </html>
@@ -2234,7 +2273,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'historical-vault' ? 'bg-amber-700 text-white shadow-md scale-105' : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
             }`}
           >
-            📦 أرشيف التقارير التاريخية ({historicalVaultReports.length})
+            📦 أرشيف التقارير التاريخية ({qualityEvaluationReports.length + qualityUploadedFiles.length})
           </button>
 
           <button
@@ -3245,51 +3284,127 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         )}
 
         {activeTab === 'historical-vault' && (
-          <div className="bg-white rounded-3xl p-8 border border-amber-300 shadow-sm space-y-6">
-            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
-              <div>
-                <h3 className="text-xl font-black text-slate-900">📦 أرشيف التقارير التاريخية (Historical Vault)</h3>
-                <p className="text-xs text-slate-500">سجل كامل ومؤرشف سحابياً لكافة التقارير المعتمدة وتقارير أدلة الجودة.</p>
+          <div className="space-y-8">
+            <div className="bg-white rounded-3xl p-8 border border-indigo-300 shadow-sm space-y-6">
+              <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">📁 الملفات المرفوعة (وورد / إكسل / PDF)</h3>
+                  <p className="text-xs text-slate-500">الملفات التي ترفعها لجنة الجودة بنفسها من جهازها. هذا القسم منفصل عن تقييم اللجان.</p>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-900 font-bold text-xs">
+                  إجمالي الملفات: {qualityUploadedFiles.length}
+                </span>
               </div>
-              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-bold text-xs">
-                إجمالي المؤرشف: {historicalVaultReports.length}
-              </span>
-            </div>
 
-            {historicalVaultReports.length === 0 ? (
-              <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <p className="text-sm font-bold">لا توجد تقارير في الأرشيف التاريخي حتى الآن.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {historicalVaultReports.map((vaultItem, idx) => (
-                  <div key={vaultItem.id || idx} className="p-6 rounded-2xl border border-amber-200 bg-amber-50/40 shadow-sm space-y-3">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <span className="font-black text-amber-900 text-sm">العنوان / اللجنة: {vaultItem.title || vaultItem.targetCommittee || 'تقرير مؤرشف'}</span>
-                      <span className="text-[10px] bg-amber-200 text-amber-900 font-mono px-2 py-0.5 rounded font-bold">
-                        {formatVaultDate(vaultItem)}
-                      </span>
-                    </div>
-                    <p className="text-slate-800 text-xs sm:text-sm font-semibold bg-white p-3 rounded-xl border border-amber-100 shadow-inner">
-                      <strong>التفاصيل:</strong> {vaultItem.reason || vaultItem.status || vaultItem.description || 'معتمد ومؤرشف في محفظة أدلة الجودة'}
-                    </p>
-                    <div className="pt-2 border-t border-amber-200 flex justify-between items-center text-[11px] text-slate-600 font-bold flex-wrap gap-2">
-                      <span>الرافع والموثق: {vaultItem.reporter || vaultItem.author || 'لجنة الجودة والتطوير'}</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handlePrintArchiveReport(vaultItem)}
-                          className="px-3.5 py-1.5 bg-[#630517] text-[#F5D061] rounded-xl font-black text-xs shadow-md hover:bg-[#80071D] transition-all cursor-pointer flex items-center gap-1.5"
-                        >
-                          📄 فتح التقرير / طباعة و PDF ↗
-                        </button>
-                        <span className="text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg">✅ معتمد</span>
+              {qualityUploadedFiles.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <p className="text-sm font-bold">لا توجد ملفات وورد أو إكسل مرفوعة حتى الآن.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {qualityUploadedFiles.map((fileItem, idx) => (
+                    <div key={fileItem.id || idx} className="p-6 rounded-2xl border border-indigo-200 bg-indigo-50/40 shadow-sm space-y-3">
+                      <div className="flex justify-between items-center flex-wrap gap-2">
+                        <span className="font-black text-indigo-900 text-sm">{fileItem.title || 'ملف مرفوع'}</span>
+                        <span className="text-[10px] bg-indigo-200 text-indigo-900 font-mono px-2 py-0.5 rounded font-bold">
+                          {formatVaultDate(fileItem)}
+                        </span>
+                      </div>
+                      <p className="text-slate-700 text-xs font-semibold bg-white p-3 rounded-xl border border-indigo-100">
+                        اسم الملف: {fileItem.fileName || 'غير محدد'}
+                        {fileItem.fileKind ? ` • النوع: ${fileItem.fileKind === 'word' ? 'وورد' : fileItem.fileKind === 'excel' ? 'إكسل' : fileItem.fileKind === 'pdf' ? 'PDF' : fileItem.fileKind}` : ''}
+                      </p>
+                      <div className="pt-2 border-t border-indigo-200 flex justify-between items-center text-[11px] text-slate-600 font-bold flex-wrap gap-2">
+                        <span>الرافع: {fileItem.author || 'لجنة الجودة والتطوير'}</span>
+                        <div className="flex items-center gap-2">
+                          {fileItem.fileUrl ? (
+                            <a
+                              href={fileItem.fileUrl}
+                              download={fileItem.fileName || 'quality-file'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3.5 py-1.5 bg-indigo-700 text-white rounded-xl font-black text-xs shadow-md hover:bg-indigo-800 transition-all"
+                            >
+                              📥 فتح / تنزيل الملف
+                            </a>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteQualityUploadedFile(fileItem.id)}
+                            className="px-3 py-1.5 bg-red-100 text-red-700 rounded-xl font-bold text-xs hover:bg-red-200 cursor-pointer"
+                          >
+                            حذف
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 border border-amber-300 shadow-sm space-y-6">
+              <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">📊 تقييم اللجان والأعضاء</h3>
+                  <p className="text-xs text-slate-500">تقارير تقييم الأداء والإيجابيات والسلبيات وأبرز الأعضاء. هذا القسم منفصل عن الملفات المرفوعة.</p>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-bold text-xs">
+                  إجمالي التقييمات: {qualityEvaluationReports.length}
+                </span>
               </div>
-            )}
+
+              {qualityEvaluationReports.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <p className="text-sm font-bold">لا توجد تقييمات لجان مرفوعة حتى الآن.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {qualityEvaluationReports.map((vaultItem, idx) => (
+                    <div key={vaultItem.id || idx} className="p-6 rounded-2xl border border-amber-200 bg-amber-50/40 shadow-sm space-y-3">
+                      <div className="flex justify-between items-center flex-wrap gap-2">
+                        <span className="font-black text-amber-900 text-sm">{vaultItem.title || 'تقييم لجان'}</span>
+                        <span className="text-[10px] bg-amber-200 text-amber-900 font-mono px-2 py-0.5 rounded font-bold">
+                          {formatVaultDate(vaultItem)}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-[#630517] bg-white p-2.5 rounded-xl border border-amber-100">
+                        أفضل لجنة: {vaultItem.bestCommittee || 'لم يتم التحديد'}
+                      </p>
+                      {vaultItem.advantages ? (
+                        <p className="text-slate-800 text-xs font-semibold bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+                          <strong>الإيجابيات:</strong> {vaultItem.advantages}
+                        </p>
+                      ) : null}
+                      {vaultItem.errors ? (
+                        <p className="text-slate-800 text-xs font-semibold bg-red-50 p-3 rounded-xl border border-red-100">
+                          <strong>السلبيات:</strong> {vaultItem.errors}
+                        </p>
+                      ) : null}
+                      <div className="pt-2 border-t border-amber-200 flex justify-between items-center text-[11px] text-slate-600 font-bold flex-wrap gap-2">
+                        <span>الرافع: {vaultItem.author || 'لجنة الجودة والتطوير'}</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handlePrintArchiveReport(vaultItem)}
+                            className="px-3.5 py-1.5 bg-[#630517] text-[#F5D061] rounded-xl font-black text-xs shadow-md hover:bg-[#80071D] transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            📄 فتح التقييم / طباعة
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteQualityEvaluation(vaultItem.id)}
+                            className="px-3 py-1.5 bg-red-100 text-red-700 rounded-xl font-bold text-xs hover:bg-red-200 cursor-pointer"
+                          >
+                            حذف
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

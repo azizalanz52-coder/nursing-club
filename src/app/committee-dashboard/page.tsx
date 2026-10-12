@@ -3,8 +3,9 @@
 import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { db } from '../lib/firebase';
+import { db, storage } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, getDoc, addDoc, deleteDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as XLSX from 'xlsx';
 
 export default function CommitteeDashboard() {
@@ -141,10 +142,11 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [certTitle, setCertTitle] = useState('');
   const [certFileBase64, setCertFileBase64] = useState('');
 
-  // حقول رفع ملفات الجودة (Word, Excel, PDF)
+  // حقول رفع ملفات الجودة (Word, Excel, PDF) — مسار مستقل عن تقييم اللجان
   const [qualityFileTitle, setQualityFileTitle] = useState('');
   const [qualityFileName, setQualityFileName] = useState('');
-  const [qualityFileBase64, setQualityFileBase64] = useState('');
+  const [qualityUploadFile, setQualityUploadFile] = useState<File | null>(null);
+  const [isUploadingQualityFile, setIsUploadingQualityFile] = useState(false);
 
 useEffect(() => {
   // ... الكود الحالي ...
@@ -169,6 +171,7 @@ useEffect(() => {
     fetchPublicPartners();
     fetchCommitteeWhatsappLinks();
     fetchHonorBoard();
+    fetchQualityUploadedFiles();
 
     const unsubScientific = onSnapshot(
       collection(db, 'scientific_committee_texts'),
@@ -280,49 +283,60 @@ useEffect(() => {
     }
   };
 
-  // ✅ دالة رفع ملفات الجودة المعدلة بالكامل (PDF, Word, Excel) والمربوطة مباشرة بالأرشيف التاريخي للرؤساء والأدمن
- const handleUploadQualityFileSubmit = async (e: FormEvent) => {
-  e.preventDefault();
-  if (!qualityFileTitle.trim() || !qualityFileBase64) {
-    alert('الرجاء إدخال عنوان التقرير واختيار الملف.');
-    return;
-  }
-
-  try {
-    const newFileObj = {
-      title: qualityFileTitle.trim(),
-      fileName: qualityFileName,
-      fileUrl: qualityFileBase64,
-      author: userData?.fullName || 'لجنة الجودة والتطوير',
-      createdAt: Date.now(),
-      dateStr: new Date().toLocaleDateString('ar-SA'),
-      status: 'ملف خارجي مرفوع'
-    };
-
-    // الحفظ في كولكشن الملفات الخارجية فقط
-    const docRef = await addDoc(collection(db, 'quality_uploaded_files'), newFileObj);
-    setQualityUploadedFiles(prev => [{ ...newFileObj, id: docRef.id }, ...prev]);
-
-    // إرسال إشعار للرؤساء والأدمن
-    for (const usr of allUsersList) {
-      if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
-        try {
-          await setDoc(doc(db, 'users', usr.id), {
-            latestNotification: `📄 [ملف خارجي جديد]: تم رفع ملف (${qualityFileTitle}) بصيغة (${qualityFileName}).`
-          }, { merge: true });
-        } catch (er) { console.error(er); }
-      }
+  const handleUploadQualityFileSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!qualityFileTitle.trim() || !qualityUploadFile) {
+      alert('الرجاء إدخال عنوان التقرير واختيار ملف وورد أو إكسل أو PDF.');
+      return;
     }
 
-    setQualityFileTitle('');
-    setQualityFileName('');
-    setQualityFileBase64('');
-    alert('تم رفع الملف وحفظه في سجل الملفات الخارجية المستقلة بنجاح! 📄✅');
-  } catch (err: any) {
-    console.error('Error uploading file:', err);
-    alert(`حدث خطأ أثناء رفع الملف: ${err?.message || 'تأكد من حجم الملف'}`);
-  }
-};
+    const maxBytes = 10 * 1024 * 1024;
+    if (qualityUploadFile.size > maxBytes) {
+      alert('حجم الملف كبير جداً. الحد الأقصى 10 ميغابايت.');
+      return;
+    }
+
+    setIsUploadingQualityFile(true);
+    try {
+      let fileUrl = '';
+      try {
+        const safeName = qualityUploadFile.name.replace(/[^\w.\-()\u0600-\u06FF ]+/g, '_');
+        const storageRef = ref(storage, `quality_uploaded_files/${Date.now()}_${safeName}`);
+        await uploadBytes(storageRef, qualityUploadFile);
+        fileUrl = await getDownloadURL(storageRef);
+      } catch (storageErr) {
+        if (qualityUploadFile.size > 800 * 1024) throw storageErr;
+        fileUrl = await convertFileToBase64(qualityUploadFile);
+      }
+
+      const newFileObj = {
+        reportType: 'uploaded_file',
+        title: qualityFileTitle.trim(),
+        fileName: qualityUploadFile.name,
+        fileUrl,
+        fileKind: detectQualityFileKind(qualityUploadFile.name),
+        author: userData?.fullName || 'لجنة الجودة والتطوير',
+        createdAt: Date.now(),
+        dateStr: new Date().toLocaleDateString('ar-SA'),
+        status: 'ملف مرفوع لأرشيف الأدمن'
+      };
+
+      const docRef = await addDoc(collection(db, 'quality_uploaded_files'), newFileObj);
+      setQualityUploadedFiles(prev => [{ ...newFileObj, id: docRef.id }, ...prev]);
+
+      await notifyAdminOffice(`📄 [ملف جودة مرفوع]: تم رفع (${qualityFileTitle.trim()}) بصيغة (${qualityUploadFile.name}) إلى أرشيف التقارير التاريخية.`);
+
+      setQualityFileTitle('');
+      setQualityFileName('');
+      setQualityUploadFile(null);
+      alert('تم رفع الملف إلى أرشيف التقارير التاريخية في صفحة الأدمن بنجاح. هذا المسار منفصل عن تقييم اللجان. 📄✅');
+    } catch (err: any) {
+      console.error('Error uploading file:', err);
+      alert(`تعذر رفع الملف عبر التخزين السحابي. جرّب ملفاً أصغر أو تحقق من الاتصال.\n${err?.message || ''}`);
+    } finally {
+      setIsUploadingQualityFile(false);
+    }
+  };
   const handleDeleteHonorMember = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا العضو من لوحة الشرف؟')) {
       try {
@@ -536,6 +550,35 @@ useEffect(() => {
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = (error) => reject(error);
     });
+  };
+
+  const notifyAdminOffice = async (message: string) => {
+    for (const usr of allUsersList) {
+      const role = usr.role || '';
+      const isOffice =
+        usr.phone === '0553731265' ||
+        role === 'System Admin' ||
+        role === 'General Supervisor' ||
+        role.includes('رئيس النادي') ||
+        role.includes('رئيسة النادي') ||
+        role.includes('نائب رئيس') ||
+        role.includes('نائبة رئيس') ||
+        role.includes('نائبة الرئيس');
+      if (!isOffice) continue;
+      try {
+        await setDoc(doc(db, 'users', usr.id), { latestNotification: message }, { merge: true });
+      } catch (er) {
+        console.error(er);
+      }
+    }
+  };
+
+  const detectQualityFileKind = (fileName: string) => {
+    const name = (fileName || '').toLowerCase();
+    if (name.endsWith('.pdf')) return 'pdf';
+    if (name.endsWith('.doc') || name.endsWith('.docx')) return 'word';
+    if (name.endsWith('.xls') || name.endsWith('.xlsx')) return 'excel';
+    return 'file';
   };
 
   const handleUploadMediaSubmit = async (e: FormEvent) => {
@@ -1095,46 +1138,44 @@ useEffect(() => {
     alert('تم تصدير ملف الأكسل بنجاح وجاهز لرفعه للآدمن! 📊');
   };
 
-  const handleApproveAndSubmitToPresidents = async () => {
-    if (!confirm('هل أنت متأكد من اعتماد التقرير الختامي لمحفظة الجودة وحفظه في الأرشيف التاريخي وإرساله رسمياً لمكتب الرؤساء والأدمن؟')) return;
+  const handlePublishSmartReportToPresidents = async () => {
+    if (!smartReportTitle.trim()) {
+      alert('الرجاء إدخال عنوان تقرير التقييم أولاً.');
+      return;
+    }
+    if (!confirm('هل أنت متأكد من اعتماد تقييم اللجان ورفعه إلى أرشيف الأدمن؟ هذا التقرير منفصل عن ملفات الوورد والإكسل.')) return;
 
     try {
-      const reportTitle = `تقرير محفظة أدلة الجودة الختامي (${new Date().toLocaleDateString('ar-SA')})`;
-      const reportSummaryText = `🏆 [اعتماد تقرير محفظة الجودة الختامي]: تمت مراجعة إنجازات اللجان السبع، وحفظ الأرشيف، ورفع التقرير بنجاح تام.`;
+      const featuredMembers = allCommitteesList.map((comm) => ({
+        committee: comm,
+        member: manualBestMembers[comm] || 'لم يتم التحديد'
+      }));
 
-      await addDoc(collection(db, 'quality_reports_archive'), {
-        title: reportTitle,
+      const newReportObj = {
+        reportType: 'committee_evaluation',
+        title: smartReportTitle.trim(),
+        advantages: smartReportAdvantages,
+        errors: smartReportErrors,
+        bestCommittee: manualBestCommittee,
+        bestMembers: manualBestMembers,
+        featuredMembers,
+        details: `🏆 اللجنة المتميزة: ${manualBestCommittee}\n\n✅ المميزات: ${smartReportAdvantages || 'لا يوجد'}\n\n⚠️ الملاحظات: ${smartReportErrors || 'لا يوجد'}`,
         createdAt: Date.now(),
         dateStr: new Date().toLocaleDateString('ar-SA'),
-        status: 'معتمد ومؤرشف رسمياً',
+        status: 'تقييم لجان معتمد',
         author: userData?.fullName || 'لجنة الجودة والتطوير'
-      });
+      };
 
-      for (const usr of allUsersList) {
-        if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
-          try {
-            await setDoc(doc(db, 'users', usr.id), {
-              latestNotification: reportSummaryText
-            }, { merge: true });
-          } catch (er) { console.error(er); }
-        }
-      }
+      const docRef = await addDoc(collection(db, 'quality_reports_archive'), newReportObj);
+      setQualityArchives([{ ...newReportObj, id: docRef.id }, ...qualityArchives]);
 
-      await addDoc(collection(db, 'escalated_reports'), {
-        targetCommittee: 'جميع اللجان السبع',
-        reporter: userData?.fullName || 'لجنة الجودة والتطوير',
-        reason: 'تم إعداد واعتماد تقرير محفظة أدلة الجودة الختامي وأرشفته ورفعه رسمياً لمكتب الرؤساء.',
-        status: '✅ معتمد ومنجز ومؤرشف ومرفوع للرؤساء',
-        leaderDefenseReply: 'تم الإنجاز والاعتماد والأرشفة بنجاح',
-        createdAt: Date.now()
-      });
+      await notifyAdminOffice(`🏆 [تقييم لجان جديد]: تم رفع (${smartReportTitle.trim()}) من لجنة الجودة إلى أرشيف التقارير التاريخية.`);
 
-      alert('🎉 تم اعتماد التقرير، حفظه في الأرشيف التاريخي، وترحيله بنجاح تام لمكتب الرؤساء والأدمن!');
-      fetchEscalatedReports();
+      alert('تم اعتماد تقييم اللجان ورفعه إلى أرشيف الأدمن بنجاح. هذا المسار منفصل عن الملفات المرفوعة. 🎉');
       fetchQualityArchives();
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء اعتماد ورفع التقرير.');
+      alert('حدث خطأ أثناء رفع تقييم اللجان.');
     }
   };
 
@@ -1247,44 +1288,6 @@ useEffect(() => {
     }
   };
 
-  const handlePublishSmartReportToPresidents = async () => {
-    if (!confirm('هل أنت متأكد من اعتماد هذا التقرير وأرشفته سحابياً ورفعه رسمياً لمكتب الرؤساء والأدمن؟')) return;
-
-    try {
-      const newReportObj = {
-        title: smartReportTitle || 'تقرير تقييم الأداء العام والفعاليات',
-        advantages: smartReportAdvantages,
-        errors: smartReportErrors,
-        bestCommittee: manualBestCommittee,
-        bestMembers: manualBestMembers,
-        details: `🏆 اللجنة المتميزة: ${manualBestCommittee}\n\n✅ المميزات: ${smartReportAdvantages || 'لا يوجد'}\n\n⚠️ الملاحظات: ${smartReportErrors || 'لا يوجد'}`,
-        createdAt: Date.now(),
-        dateStr: new Date().toLocaleDateString('ar-SA'),
-        status: 'معتمد ومؤرشف رسمياً',
-        author: userData?.fullName || 'لجنة الجودة والتطوير'
-      };
-
-      const docRef = await addDoc(collection(db, 'quality_reports_archive'), newReportObj);
-      setQualityArchives([{ ...newReportObj, id: docRef.id }, ...qualityArchives]);
-
-      for (const usr of allUsersList) {
-        if (usr.role?.includes('رئيس') || usr.role === 'System Admin' || usr.role === 'General Supervisor' || usr.phone === '0553731265') {
-          try {
-            await setDoc(doc(db, 'users', usr.id), {
-              latestNotification: `🏆 [تقرير جودة جديد معتمد]: تم رفع (${smartReportTitle}) المعتمد من لجنة الجودة والتطوير.`
-            }, { merge: true });
-          } catch (er) { console.error(er); }
-        }
-      }
-
-      alert('🎉 تم اعتماد ورفع التقرير بنجاح وأرشفته رسمياً لمكتب الرؤساء والأدمن!');
-      fetchQualityArchives();
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ أثناء رفع التقرير.');
-    }
-  };
-
   const handlePrintArchiveReport = (arch: any) => {
     const reportHTML = `
       <!DOCTYPE html>
@@ -1315,8 +1318,20 @@ useEffect(() => {
         </div>
 
         <div class="section-box">
-          <strong style="color: #630517; font-size: 14px; display: block; margin-bottom: 10px;">📂 تفاصيل التقرير المؤرشف:</strong>
-          ${arch.details ? arch.details.replace(/\n/g, '<br/>') : (arch.content ? arch.content.replace(/\n/g, '<br/>') : 'تم اعتماد هذا التقرير وأرشفته سحابياً بنجاح تام وفق معايير الجودة الشاملة.')}
+          <strong style="color: #630517; font-size: 14px; display: block; margin-bottom: 10px;">🏆 أفضل لجنة:</strong>
+          ${arch.bestCommittee || 'لم يتم التحديد'}
+        </div>
+        <div class="section-box">
+          <strong style="color: #166534; font-size: 14px; display: block; margin-bottom: 10px;">✅ الإيجابيات:</strong>
+          ${(arch.advantages || '').replace(/\n/g, '<br/>') || 'لا توجد إيجابيات مسجلة.'}
+        </div>
+        <div class="section-box">
+          <strong style="color: #991b1b; font-size: 14px; display: block; margin-bottom: 10px;">⚠️ السلبيات والملاحظات:</strong>
+          ${(arch.errors || '').replace(/\n/g, '<br/>') || 'لا توجد ملاحظات مسجلة.'}
+        </div>
+        <div class="section-box">
+          <strong style="color: #630517; font-size: 14px; display: block; margin-bottom: 10px;">📂 تفاصيل التقييم:</strong>
+          ${arch.details ? arch.details.replace(/\n/g, '<br/>') : (arch.content ? arch.content.replace(/\n/g, '<br/>') : '')}
         </div>
 
         <div class="footer">
@@ -1511,10 +1526,7 @@ useEffect(() => {
                   <span>📄</span><span>التقرير الاستشاري (PDF)</span>
                 </button>
                 <button type="button" onClick={() => setShowArchiveModal(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black shadow hover:bg-indigo-700 flex items-center gap-1.5 cursor-pointer">
-                  <span>📂</span><span>الأرشيف التاريخي ({qualityArchives.length})</span>
-                </button>
-                <button type="button" onClick={handleApproveAndSubmitToPresidents} className="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-black shadow hover:bg-amber-700 flex items-center gap-1.5 cursor-pointer animate-pulse">
-                  <span>🚀</span><span>اعتماد الرفع للإدارة العليا</span>
+                  <span>📂</span><span>تقييمات اللجان المعتمدة ({qualityArchives.length})</span>
                 </button>
                 <button type="button" onClick={() => setShowReportsModal(true)} className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5 cursor-pointer">
                   <span>🚨</span><span>مركز الشكاوى ({escalatedReports.length})</span>
@@ -1527,13 +1539,107 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* قسم تقارير الجودة المتقدمة واليدوية */}
+        {isQualityTeam && (
+          <div className="bg-white rounded-3xl p-8 border-2 border-indigo-300 shadow-md space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-3">
+              <div>
+                <h3 className="text-lg font-black text-indigo-900">📁 التقرير الأول: رفع ملف وورد أو إكسل أو PDF</h3>
+                <p className="text-xs text-slate-500 mt-1">اكتب التقرير على جهازك ثم ارفعه هنا ليصل إلى أرشيف التقارير التاريخية في صفحة الأدمن. هذا المسار منفصل تماماً عن تقييم اللجان.</p>
+              </div>
+              <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-xl font-bold text-xs">
+                الملفات المرفوعة: {qualityUploadedFiles.length}
+              </span>
+            </div>
+
+            <form onSubmit={handleUploadQualityFileSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-indigo-50/50 p-6 rounded-2xl border border-indigo-200">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">عنوان التقرير / الملف</label>
+                <input
+                  type="text"
+                  placeholder="مثال: تقرير شهر أكتوبر - ملف وورد"
+                  value={qualityFileTitle}
+                  onChange={(e) => setQualityFileTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">اختر الملف (.pdf, .docx, .xlsx)</label>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx"
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    const file = e.target.files?.[0];
+                    if (!file) {
+                      setQualityUploadFile(null);
+                      setQualityFileName('');
+                      return;
+                    }
+                    setQualityUploadFile(file);
+                    setQualityFileName(file.name);
+                  }}
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white cursor-pointer"
+                  required
+                />
+                {qualityFileName && (
+                  <p className="text-[10px] text-indigo-700 font-bold">الملف المحدد: {qualityFileName}</p>
+                )}
+              </div>
+              <div className="sm:col-span-2">
+                <button
+                  type="submit"
+                  disabled={isUploadingQualityFile}
+                  className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:bg-indigo-700 cursor-pointer disabled:opacity-60"
+                >
+                  {isUploadingQualityFile ? 'جاري الرفع...' : '📤 رفع الملف إلى أرشيف الأدمن'}
+                </button>
+              </div>
+            </form>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {qualityUploadedFiles.length === 0 ? (
+                <p className="col-span-full text-center py-6 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد ملفات مرفوعة حالياً.</p>
+              ) : (
+                qualityUploadedFiles.map((file) => (
+                  <div key={file.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3">
+                    <div>
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 bg-indigo-100 text-indigo-800 rounded-md inline-block">
+                        {file.fileKind === 'word' ? 'وورد' : file.fileKind === 'excel' ? 'إكسل' : file.fileKind === 'pdf' ? 'PDF' : (file.fileName || 'ملف مرفوع')}
+                      </span>
+                      <h5 className="font-black text-xs text-slate-900 mt-2">{file.title}</h5>
+                      <p className="text-[10px] text-slate-400 mt-1">بواسطة: {file.author || 'الجودة'} • {file.dateStr}</p>
+                    </div>
+                    <div className="flex gap-2 pt-2 border-t border-slate-200">
+                      <a
+                        href={file.fileUrl}
+                        download={file.fileName || 'report.pdf'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 text-center py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all"
+                      >
+                        📥 فتح / تنزيل
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteQualityUploadedFile(file.id)}
+                        className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      >
+                        حذف ✕
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
         {isQualityTeam && (
           <div className="bg-white rounded-3xl p-8 border-2 border-[#630517] shadow-md space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-lg font-black text-[#630517]">📊 منصة كتابة وتقييم التقارير اليدوية (أفضل اللجان، الأعضاء، الأخطاء، والمميزات)</h3>
-                <p className="text-xs text-slate-500">قم بتعبئة التقرير يدوياً بالكامل واختيار أفضل اللجان والأعضاء لتصدير التقرير بالتصميم التاريخي الرسمي كـ PDF.</p>
+                <h3 className="text-lg font-black text-[#630517]">📊 التقرير الثاني: تقييم اللجان والأعضاء</h3>
+                <p className="text-xs text-slate-500">قيّم اللجان وأبرز الأعضاء والإيجابيات والسلبيات، ثم ارفعه لأرشيف الأدمن. هذا المسار منفصل عن رفع ملفات الوورد والإكسل.</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -1546,62 +1652,12 @@ useEffect(() => {
                 <button
                   type="button"
                   onClick={handlePublishSmartReportToPresidents}
-                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow transition-all cursor-pointer flex items-center gap-1.5 animate-pulse"
+                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>🚀</span><span>رفع واعتماد التقرير للرؤساء والأدمن</span>
+                  <span>🚀</span><span>رفع تقييم اللجان لأرشيف الأدمن</span>
                 </button>
               </div>
             </div>
-{/* قسم مستقل لعرض الملفات الخارجية المرفوعة (PDF, Word, Excel) */}
-{isQualityTeam && (
-  <div className="bg-white rounded-3xl p-6 border border-indigo-200 shadow-sm space-y-4 my-4">
-    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-      <div>
-        <h4 className="font-extrabold text-sm text-indigo-900">📂 سجل الملفات الخارجية المرفوعة (PDF / Word / Excel)</h4>
-        <p className="text-xs text-slate-500">ملفات مرفوعة مستقّلة تماماً عن تقارير الموقع الإلكتروني.</p>
-      </div>
-      <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-xl font-bold text-xs">
-        إجمالي الملفات: {qualityUploadedFiles.length}
-      </span>
-    </div>
-
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-      {qualityUploadedFiles.length === 0 ? (
-        <p className="col-span-full text-center py-6 text-slate-400 font-bold text-xs">لا توجد ملفات خارجية مرفوعة حالياً.</p>
-      ) : (
-        qualityUploadedFiles.map((file) => (
-          <div key={file.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between space-y-3">
-            <div>
-              <span className="text-[10px] font-bold px-2.5 py-0.5 bg-indigo-100 text-indigo-800 rounded-md dir-ltr inline-block">
-                {file.fileName || 'ملف مرفوع'}
-              </span>
-              <h5 className="font-black text-xs text-slate-900 mt-2">{file.title}</h5>
-              <p className="text-[10px] text-slate-400 mt-1">بواسطة: {file.author || 'الجودة'} • {file.dateStr}</p>
-            </div>
-            <div className="flex gap-2 pt-2 border-t border-slate-200">
-              <a
-                href={file.fileUrl}
-                download={file.fileName || 'report.pdf'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 text-center py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all"
-              >
-                📥 فتح / تنزيل
-              </a>
-              <button
-                type="button"
-                onClick={() => handleDeleteQualityUploadedFile(file.id)}
-                className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
-              >
-                حذف ✕
-              </button>
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  </div>
-)}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
                 <h4 className="font-extrabold text-sm text-slate-900">✏️ التحديد اليدوي لأفضل اللجان والأعضاء:</h4>
@@ -2265,51 +2321,6 @@ useEffect(() => {
               </span>
             </div>
 
-            {/* قسم رفع الملفات المستقلة للرؤساء والأدمن مع فحص الحد الأقصى لحجم الملف */}
-            <form onSubmit={handleUploadQualityFileSubmit} className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-200 space-y-4 my-6">
-              <h4 className="font-extrabold text-sm text-indigo-900">📁 رفع تقرير أو ملف للرؤساء والأدمن (PDF, Word, Excel):</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">عنوان التقرير / الملف</label>
-                  <input
-                    type="text"
-                    placeholder="مثال: تقرير التقييم الشامل لشهر أكتوبر"
-                    value={qualityFileTitle}
-                    onChange={(e) => setQualityFileTitle(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">اختر الملف من جهازك (.pdf, .docx, .xlsx)</label>
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx"
-                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const file = e.target.files[0];
-                        if (file.size > 800 * 1024) {
-                          alert('⚠️ حجم الملف كبير جداً بالنسبة لقاعدة البيانات المباشرة (الحد الأقصى هو 800 كيلوبايت). يُرجى اختيار ملف أصغر حجماً.');
-                          e.target.value = '';
-                          setQualityFileName('');
-                          setQualityFileBase64('');
-                          return;
-                        }
-                        setQualityFileName(file.name);
-                        setQualityFileBase64(await convertFileToBase64(file));
-                      }
-                    }}
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white cursor-pointer"
-                    required
-                  />
-                </div>
-              </div>
-
-              <button type="submit" className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:bg-indigo-700 cursor-pointer">
-                📤 رفع الملف وإرساله لمكتب الرؤساء والأدمن
-              </button>
-            </form>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {allCommitteesList.map((commName, idx) => {
                 const count = requests.filter(r => isSameCommittee(r.acceptedCommittee, commName)).length;
@@ -2869,8 +2880,8 @@ useEffect(() => {
           <div className="bg-white rounded-[32px] p-6 sm:p-8 max-w-3xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto border-2 border-indigo-500">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900">📂 الأرشيف التاريخي للتقارير المعتمدة</h3>
-                <p className="text-xs text-slate-500">سجل التقارير المؤرشفة للجنة الجودة والتطوير</p>
+                <h3 className="text-xl font-black text-slate-900">📂 تقييمات اللجان المعتمدة</h3>
+                <p className="text-xs text-slate-500">سجل تقييم اللجان والأعضاء فقط. ملفات الوورد والإكسل تظهر في القسم المستقل أعلاه وفي أرشيف الأدمن.</p>
               </div>
               <button type="button" onClick={() => setShowArchiveModal(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕ إغلاق</button>
             </div>
