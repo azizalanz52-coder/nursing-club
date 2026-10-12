@@ -545,7 +545,14 @@ useEffect(() => {
       title: mediaTitle.trim(),
       category: mediaCategory,
       imageUrl: mediaBase64,
-      createdAt: new Date().toLocaleDateString('ar-SA')
+      mediaUrl: mediaBase64,
+      files: [mediaBase64],
+      createdAt: new Date().toLocaleDateString('ar-SA'),
+      timestamp: Date.now(),
+      addedBy: userData?.fullName || 'لجنة الإعلام',
+      uploadedBy: userData?.fullName || 'لجنة الإعلام',
+      committee: 'لجنة الإعلام',
+      source: 'لوحة اللجنة'
     };
     try {
       const docRef = await addDoc(collection(db, 'media_committee_gallery'), newObj);

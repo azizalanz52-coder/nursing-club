@@ -420,6 +420,7 @@ export default function CommitteeDetailPage() {
         category: mediaCategory,
         mediaUrl: downloadUrl,
         imageUrl: downloadUrl, // للتوافق مع جميع اللوحات
+        files: [downloadUrl],
         mediaType: isVideo ? 'video' : 'image',
         createdAt: new Date().toLocaleDateString('ar-SA'),
         timestamp: Date.now(),
@@ -427,6 +428,7 @@ export default function CommitteeDetailPage() {
         uploadedBy: currentUserName || 'عضو الإعلام',
         uploaderRole: 'عضو لجنة',
         committee: 'لجنة الإعلام',
+        source: 'صفحة الأعضاء',
         status: 'معتمد'
       };
 
