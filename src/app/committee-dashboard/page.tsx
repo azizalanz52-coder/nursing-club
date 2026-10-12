@@ -290,22 +290,35 @@ useEffect(() => {
       return;
     }
 
-    const maxBytes = 10 * 1024 * 1024;
+    const maxBytes = 8 * 1024 * 1024;
     if (qualityUploadFile.size > maxBytes) {
-      alert('حجم الملف كبير جداً. الحد الأقصى 10 ميغابايت.');
+      alert('حجم الملف كبير جداً. الحد الأقصى 8 ميغابايت. صغّر الملف ثم أعد المحاولة.');
       return;
     }
 
     setIsUploadingQualityFile(true);
     try {
+      const fileExt = qualityUploadFile.name.includes('.')
+        ? qualityUploadFile.name.substring(qualityUploadFile.name.lastIndexOf('.'))
+        : '';
+      const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${fileExt}`;
+      const storageRef = ref(storage, `quality_uploaded_files/${safeFileName}`);
+
       let fileUrl = '';
       try {
-        const safeName = qualityUploadFile.name.replace(/[^\w.\-()\u0600-\u06FF ]+/g, '_');
-        const storageRef = ref(storage, `quality_uploaded_files/${Date.now()}_${safeName}`);
-        await uploadBytes(storageRef, qualityUploadFile);
-        fileUrl = await getDownloadURL(storageRef);
+        const storagePromise = (async () => {
+          await uploadBytes(storageRef, qualityUploadFile);
+          return await getDownloadURL(storageRef);
+        })();
+        const timeoutPromise = new Promise<string>((_, reject) =>
+          setTimeout(() => reject(new Error('Storage Upload Timeout')), 8000)
+        );
+        fileUrl = await Promise.race([storagePromise, timeoutPromise]);
       } catch (storageErr) {
-        if (qualityUploadFile.size > 800 * 1024) throw storageErr;
+        console.warn('تعذر الرفع عبر Storage أو انتهت المهلة، التحويل الاحتياطي:', storageErr);
+        if (qualityUploadFile.size > 700 * 1024) {
+          throw new Error('تعذر الرفع السحابي والملف أكبر من 700 كيلوبايت. صغّر الملف (ضغط PDF أو حفظه بحجم أصغر) ثم أعد المحاولة.');
+        }
         fileUrl = await convertFileToBase64(qualityUploadFile);
       }
 
@@ -324,15 +337,15 @@ useEffect(() => {
       const docRef = await addDoc(collection(db, 'quality_uploaded_files'), newFileObj);
       setQualityUploadedFiles(prev => [{ ...newFileObj, id: docRef.id }, ...prev]);
 
-      await notifyAdminOffice(`📄 [ملف جودة مرفوع]: تم رفع (${qualityFileTitle.trim()}) بصيغة (${qualityUploadFile.name}) إلى أرشيف التقارير التاريخية.`);
+      notifyAdminOffice(`📄 [ملف جودة مرفوع]: تم رفع (${qualityFileTitle.trim()}) بصيغة (${qualityUploadFile.name}) إلى أرشيف التقارير التاريخية.`).catch((er) => console.error(er));
 
       setQualityFileTitle('');
       setQualityFileName('');
       setQualityUploadFile(null);
-      alert('تم رفع الملف إلى أرشيف التقارير التاريخية في صفحة الأدمن بنجاح. هذا المسار منفصل عن تقييم اللجان. 📄✅');
+      alert('تم رفع الملف إلى أرشيف التقارير التاريخية في صفحة الأدمن بنجاح. 📄✅');
     } catch (err: any) {
       console.error('Error uploading file:', err);
-      alert(`تعذر رفع الملف عبر التخزين السحابي. جرّب ملفاً أصغر أو تحقق من الاتصال.\n${err?.message || ''}`);
+      alert(err?.message || 'تعذر رفع الملف. صغّر حجمه ثم أعد المحاولة.');
     } finally {
       setIsUploadingQualityFile(false);
     }
@@ -1582,7 +1595,10 @@ useEffect(() => {
                   required
                 />
                 {qualityFileName && (
-                  <p className="text-[10px] text-indigo-700 font-bold">الملف المحدد: {qualityFileName}</p>
+                  <p className="text-[10px] text-indigo-700 font-bold">
+                    الملف المحدد: {qualityFileName}
+                    {qualityUploadFile ? ` (${(qualityUploadFile.size / 1024).toFixed(0)} كيلوبايت)` : ''}
+                  </p>
                 )}
               </div>
               <div className="sm:col-span-2">
@@ -1591,7 +1607,7 @@ useEffect(() => {
                   disabled={isUploadingQualityFile}
                   className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:bg-indigo-700 cursor-pointer disabled:opacity-60"
                 >
-                  {isUploadingQualityFile ? 'جاري الرفع...' : '📤 رفع الملف إلى أرشيف الأدمن'}
+                  {isUploadingQualityFile ? 'جاري الرفع... انتظر حتى 8 ثوانٍ' : '📤 رفع الملف إلى أرشيف الأدمن'}
                 </button>
               </div>
             </form>
