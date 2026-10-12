@@ -14,17 +14,31 @@ export default function OpeningSplash() {
           0%, 100% { transform: scale(0.85); opacity: 0.45; }
           50% { transform: scale(1); opacity: 1; }
         }
+        @keyframes nursGlowA {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(-8%, 6%) scale(1.12); }
+        }
+        @keyframes nursGlowB {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(10%, -8%) scale(1.08); }
+        }
         .nurs-cover-in { animation: nursCoverIn 0.75s ease both; }
         .nurs-cover-late { animation: nursCoverIn 0.8s 0.15s ease both; }
         .nurs-sweep { animation: nursSweep 1.8s ease-in-out infinite; }
         .nurs-breath { animation: nursBreath 1.6s ease-in-out infinite; }
+        .nurs-glow-a { animation: nursGlowA 7s ease-in-out infinite; }
+        .nurs-glow-b { animation: nursGlowB 9s ease-in-out infinite; }
       `}</style>
 
-      <section className="relative flex-[1.2] bg-[#F6EFE0] flex items-center justify-center px-6">
+      <section className="relative flex-[1.2] bg-[#F6EFE0] flex items-center justify-center px-6 overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="nurs-glow-a absolute -top-24 right-[-8%] h-80 w-80 rounded-full bg-[#F5D061]/22 blur-3xl" />
+          <div className="nurs-glow-b absolute -bottom-28 left-[-10%] h-96 w-96 rounded-full bg-[#E8C96A]/16 blur-3xl" />
+        </div>
         <img
           src="/nurs-wordmark.png?v=full"
           alt="شعار نادي التمريض NURSS - جامعة حفر الباطن"
-          className="nurs-cover-in w-[min(58vw,240px)] h-auto object-contain"
+          className="nurs-cover-in relative z-10 w-[min(58vw,240px)] h-auto object-contain"
         />
       </section>
 
