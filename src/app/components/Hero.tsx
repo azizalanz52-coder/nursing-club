@@ -186,7 +186,7 @@ export default function Hero() {
         </div>
 
         <div className="space-y-3">
-          <h1 className="text-4xl sm:text-7xl font-black text-white tracking-tight drop-shadow-md transition-all duration-700">
+          <h1 className="text-4xl sm:text-7xl font-black text-white drop-shadow-md transition-all duration-700">
             {currentBanner.title}
           </h1>
         </div>

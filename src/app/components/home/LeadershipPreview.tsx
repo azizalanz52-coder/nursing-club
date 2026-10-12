@@ -58,7 +58,7 @@ export default function LeadershipPreview() {
                 </h3>
 
                 <div className="mt-3 inline-block bg-[#D4AF37]/15 border border-[#D4AF37]/40 px-5 py-1.5 rounded-full">
-                  <p className="text-[#997A15] font-black text-sm tracking-wide">
+                  <p className="text-[#997A15] font-black text-sm">
                     {leader.position}
                   </p>
                 </div>

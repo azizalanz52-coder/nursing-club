@@ -33,14 +33,12 @@ export default function OpeningSplash() {
       </div>
 
       <section className="flex-1 bg-[#4A030F] flex flex-col items-center justify-center px-6 text-center">
-        <h1 className="nurs-cover-late text-white font-black leading-[1.75] text-[clamp(1.4rem,4.4vw,2.2rem)]">
-          اللهم صل وسلم
-          <br />
-          على نبينا محمد
+        <h1 className="nurs-cover-late text-white font-black leading-[1.9] text-[clamp(1.15rem,4.8vw,1.85rem)] px-3">
+          اللهم صل وسلم على نبينا محمد
         </h1>
-        <p className="nurs-cover-late mt-2 text-[#F5D061] text-xl tracking-[0.28em]">ﷺ</p>
+        <p className="nurs-cover-late mt-2 text-[#F5D061] text-lg">ﷺ</p>
         <span className="nurs-breath mt-6 inline-block w-2.5 h-2.5 rounded-full bg-[#F5D061] shadow-[0_0_12px_#F5D061]" />
-        <p className="nurs-cover-late mt-5 text-[11px] text-[#F5D061]/75 font-semibold tracking-[0.22em]">
+        <p className="nurs-cover-late mt-5 text-[11px] text-[#F5D061]/75 font-semibold px-4">
           نادي التمريض • جامعة حفر الباطن
         </p>
       </section>

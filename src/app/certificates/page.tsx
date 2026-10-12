@@ -132,13 +132,13 @@ export default function CertificatesPortal() {
                     <span className="w-16 h-16 rounded-2xl bg-amber-600 text-white mx-auto flex items-center justify-center text-3xl shadow-md">
                       🏆
                     </span>
-                    <h2 className="text-lg font-black text-amber-900 tracking-wider">جامعة حفر الباطن - كلية التمريض</h2>
+                    <h2 className="text-lg font-black text-amber-900">جامعة حفر الباطن - كلية التمريض</h2>
                     <p className="text-xs text-slate-500 font-semibold">نادي التمريض الطلابي | وحدة الاعتماد والأنشطة</p>
                   </div>
 
                   <div className="space-y-4 relative z-10 py-4 border-y border-amber-200/60">
                     <p className="text-xs text-slate-600 font-bold">تشهد إدارة نادي التمريض بأن المكرم /ـة:</p>
-                    <h3 className="text-2xl sm:text-3xl font-black text-[#630517] tracking-wide underline decoration-amber-400 decoration-2 underline-offset-8">
+                    <h3 className="text-2xl sm:text-3xl font-black text-[#630517] underline decoration-amber-400 decoration-2 underline-offset-8">
                       {cert.recipientName}
                     </h3>
                     <p className="text-xs text-slate-600 font-bold">وذلك نظير مشاركته/ها الفعالة وإتمامه/ها بنجاح لـ:</p>

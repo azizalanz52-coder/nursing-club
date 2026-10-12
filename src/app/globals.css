@@ -28,3 +28,8 @@ body {
   color: var(--foreground);
   font-family: var(--font-readex), "Segoe UI", Tahoma, Arial, sans-serif;
 }
+
+/* التباعد بين الحروف يقطع اتصال النص العربي في العناوين */
+html[lang="ar"] :is(h1, h2, h3, h4) {
+  letter-spacing: 0;
+}
