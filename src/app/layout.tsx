@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import "./globals.css";
-import { Kufam } from "next/font/google";
+import { Readex_Pro } from "next/font/google";
 import Navbar from "./components/Navbar";
 import Image from "next/image";
 
-const kufam = Kufam({
-  variable: "--font-kufam",
+const readex = Readex_Pro({
+  variable: "--font-readex",
   subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export default function RootLayout({
@@ -26,7 +27,7 @@ export default function RootLayout({
   }, []);
 
   return (
-    <html lang="ar" className={`${kufam.variable} h-full antialiased`}>
+    <html lang="ar" className={`${readex.variable} ${readex.className} h-full antialiased`}>
       <head>
         <title>نادي التمريض - جامعة حفر الباطن</title>
         <meta name="application-name" content="نادي التمريض" />
