@@ -33,3 +33,7 @@ body {
 html[lang="ar"] :is(h1, h2, h3, h4) {
   letter-spacing: 0;
 }
+
+html[lang="ar"] :is(header, footer) :is(a, button, span, p) {
+  letter-spacing: 0;
+}

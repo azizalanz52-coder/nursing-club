@@ -274,16 +274,16 @@ export default function Navbar() {
     <>
       <header className={`w-full bg-white border-b border-slate-100 fixed top-0 z-50 transition-transform duration-300 ${showNavbar ? 'translate-y-0' : '-translate-y-full'}`}>
         
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between" dir="rtl">
+        <div className="max-w-7xl mx-auto px-3 sm:px-5 xl:px-8 h-20 flex items-center justify-between gap-3" dir="rtl">
           
-          <Link href="/" className="flex items-center gap-3 shrink-0" onClick={() => setMobileMenuOpen(false)}>
+          <Link href="/" className="flex items-center gap-2 xl:gap-3 shrink-0" onClick={() => setMobileMenuOpen(false)}>
             <div className="flex items-center gap-2">
               <Image
                 src="/logo.png"
                 alt="شعار نادي التمريض"
                 width={36}
                 height={36}
-                className="object-contain"
+                className="object-contain w-9 h-auto"
               />
               <div className="w-[1px] h-8 bg-slate-200"></div>
               <Image
@@ -291,37 +291,37 @@ export default function Navbar() {
                 alt="شعار جامعة حفر الباطن"
                 width={36}
                 height={36}
-                className="object-contain rounded-lg"
+                className="object-contain w-9 h-auto rounded-lg"
               />
             </div>
-            <div>
-              <h1 className="font-bold text-rose-950 text-sm sm:text-base leading-tight">نادي التمريض</h1>
-              <p className="text-[11px] text-slate-500">جامعة حفر الباطن</p>
+            <div className="min-w-0">
+              <h1 className="font-bold text-rose-950 text-sm sm:text-base leading-tight whitespace-nowrap">نادي التمريض</h1>
+              <p className="text-[11px] text-slate-500 whitespace-nowrap">جامعة حفر الباطن</p>
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-700">
-            <Link href="/" className="hover:text-rose-900 transition-colors">الرئيسية</Link>
-            <Link href="/check-status" className="hover:text-rose-900 transition-colors text-[#630517] font-black">🔍 استعلام عن القبول</Link>
-            <Link href="/events" className="hover:text-rose-900 transition-colors">الفعاليات</Link>
-            <Link href="/case-study" className="hover:text-rose-900 transition-colors text-[#630517] font-black">Case Study 🩺</Link>
+          <nav className="hidden xl:flex items-center gap-3 2xl:gap-5 text-sm font-semibold text-slate-700 shrink-0">
+            <Link href="/" className="hover:text-rose-900 transition-colors whitespace-nowrap">الرئيسية</Link>
+            <Link href="/check-status" className="hover:text-rose-900 transition-colors text-[#630517] font-black whitespace-nowrap">استعلام القبول</Link>
+            <Link href="/events" className="hover:text-rose-900 transition-colors whitespace-nowrap">الفعاليات</Link>
+            <Link href="/case-study" className="hover:text-rose-900 transition-colors text-[#630517] font-black whitespace-nowrap">CASE STUDY</Link>
             
             <button
               type="button"
               onClick={() => setShowCertModal(true)}
-              className="px-3.5 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all font-black text-xs shadow-sm flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all font-black text-xs shadow-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
-              🎖️ الشهادات
+              الشهادات
             </button>
           </nav>
 
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden xl:flex items-center gap-2 2xl:gap-3 shrink-0">
             {userName ? (
               <div className="flex items-center gap-2">
                 {isAdmin && (
                   <Link 
                     href="/admin"
-                    className="bg-[#630517] text-[#F5D061] px-3.5 py-2 rounded-xl text-xs font-black shadow hover:brightness-110 transition-all flex items-center gap-1.5"
+                    className="bg-[#630517] text-[#F5D061] px-3 py-2 rounded-xl text-xs font-black shadow hover:brightness-110 transition-all flex items-center gap-1.5 whitespace-nowrap"
                   >
                     <span>⚙️</span>
                     <span>لوحة التحكم</span>
@@ -331,25 +331,25 @@ export default function Navbar() {
                 {isCommitteeLeader && !isAdmin && (
                   <Link 
                     href="/committee-dashboard"
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black shadow transition-all flex items-center gap-1.5 ${
+                    className={`px-3 py-2 rounded-xl text-xs font-black shadow transition-all flex items-center gap-1.5 whitespace-nowrap ${
                       isQualityOperationsRoom 
                         ? 'bg-rose-950 text-[#F5D061] border border-amber-400 animate-pulse' 
                         : 'bg-amber-600 text-white hover:bg-amber-700'
                     }`}
                   >
                     <span>{isQualityOperationsRoom ? '⚡' : '🛠'}</span>
-                    <span>{isQualityOperationsRoom ? 'غرفة العمليات المركزية' : 'لوحة اللجنة'}</span>
+                    <span>{isQualityOperationsRoom ? 'غرفة العمليات' : 'لوحة اللجنة'}</span>
                   </Link>
                 )}
 
-                <div className="flex flex-col text-right bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 max-w-[140px]">
-                  <span className="text-xs font-bold text-rose-950 truncate">{userName}</span>
-                  <span className="text-[10px] font-black text-[#630517] truncate">{userRole || 'عضو أساسي'}</span>
+                <div className="flex flex-col text-right bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 min-w-0 max-w-[10.5rem] 2xl:max-w-[13rem]">
+                  <span className="text-xs font-bold text-rose-950 truncate whitespace-nowrap">{userName}</span>
+                  <span className="text-[10px] font-black text-[#630517] truncate whitespace-nowrap">{userRole || 'عضو أساسي'}</span>
                 </div>
 
                 <button 
                   onClick={handleLogout}
-                  className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 cursor-pointer"
+                  className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 cursor-pointer whitespace-nowrap"
                   title="تسجيل خروج"
                 >
                   خروج
@@ -359,7 +359,7 @@ export default function Navbar() {
               <button 
                 type="button"
                 onClick={() => setIsLoginModalOpen(true)}
-                className="text-slate-600 hover:text-rose-900 text-sm font-semibold px-3 py-2 cursor-pointer"
+                className="text-slate-600 hover:text-rose-900 text-sm font-semibold px-3 py-2 cursor-pointer whitespace-nowrap"
               >
                 تسجيل الدخول
               </button>
@@ -368,7 +368,7 @@ export default function Navbar() {
             {!isRegistrationClosed ? (
               <Link
                 href="/join"
-                className="px-4 py-2.5 rounded-2xl bg-[#F5D061] text-[#630517] font-black text-xs shadow-md hover:brightness-105 transition-all flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-2xl bg-[#F5D061] text-[#630517] font-black text-xs shadow-md hover:brightness-105 transition-all flex items-center gap-1.5 whitespace-nowrap"
               >
                 <span>✨</span>
                 <span>الانضمام للنادي</span>
@@ -378,15 +378,15 @@ export default function Navbar() {
                 type="button"
                 disabled
                 title="تم إغلاق فترة التقديم والانضمام للنادي"
-                className="px-4 py-2.5 rounded-2xl bg-slate-100 text-slate-400 font-bold text-xs shadow-inner cursor-not-allowed flex items-center gap-1.5 border border-slate-200"
+                className="px-3.5 py-2 rounded-2xl bg-slate-100 text-slate-400 font-bold text-xs shadow-inner cursor-not-allowed flex items-center gap-1.5 border border-slate-200 whitespace-nowrap"
               >
                 <span>🔒</span>
-                <span>الانضمام (مغلق)</span>
+                <span>الانضمام مغلق</span>
               </button>
             )}
           </div>
 
-          <div className="flex md:hidden items-center gap-2">
+          <div className="flex xl:hidden items-center gap-2">
             {!userName && (
               <button
                 type="button"
@@ -431,12 +431,12 @@ export default function Navbar() {
         )}
 
         {mobileMenuOpen && (
-          <div className="md:hidden absolute top-full right-0 left-0 bg-white border-b border-slate-200 shadow-2xl p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-200" dir="rtl">
+          <div className="xl:hidden absolute top-full right-0 left-0 bg-white border-b border-slate-200 shadow-2xl p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-200" dir="rtl">
             <nav className="flex flex-col space-y-3 text-sm font-bold text-slate-700 pb-4 border-b border-slate-100">
               <Link href="/" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الرئيسية</Link>
-              <Link href="/check-status" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">🔍 استعلام عن القبول</Link>
+              <Link href="/check-status" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">استعلام عن القبول</Link>
               <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الفعاليات</Link>
-              <Link href="/case-study" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">Case Study 🩺</Link>
+              <Link href="/case-study" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">CASE STUDY</Link>
               
               <div className="py-1">
                 {!isRegistrationClosed ? (
