@@ -3,12 +3,13 @@
 import React, { useEffect, useMemo, useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { findCertificatesByLookup } from './../lib/certificatesLookup';
 
 interface CertificateItem {
   id: string;
   recipientName: string;
   phone: string;
+  universityId?: string;
   password?: string;
   certTitle: string;
   category: string;
@@ -69,29 +70,20 @@ export default function CertificatesPortal() {
 
     setLoading(true);
     try {
-      const phone = phoneInput.trim();
-      const [siteSnap, hrSnap] = await Promise.all([
-        getDocs(query(collection(db, 'site_certificates'), where('phone', '==', phone))),
-        getDocs(query(collection(db, 'certificates'), where('phone', '==', phone))),
-      ]);
+      const found = await findCertificatesByLookup(db, phoneInput);
+      let list: CertificateItem[] = found.map((data) => ({
+        id: data.id,
+        recipientName: data.recipientName || data.fullName || 'المستفيد',
+        phone: data.phone || '',
+        universityId: data.universityId || '',
+        password: data.password,
+        certTitle: data.certTitle || data.title || 'شهادة مشاركة',
+        category: data.category || 'شهادة مشاركة فعالية',
+        image: data.image || data.fileUrl || '',
+        issueDate: data.issueDate || data.dateStr || '',
+        description: data.description || '',
+      }));
 
-      const mapped = new Map<string, CertificateItem>();
-      [...siteSnap.docs, ...hrSnap.docs].forEach((d) => {
-        const data = d.data() as any;
-        mapped.set(d.id, {
-          id: d.id,
-          recipientName: data.recipientName || data.fullName || 'المستفيد',
-          phone: data.phone || phone,
-          password: data.password,
-          certTitle: data.certTitle || data.title || 'شهادة مشاركة',
-          category: data.category || 'شهادة مشاركة فعالية',
-          image: data.image || data.fileUrl || '',
-          issueDate: data.issueDate || data.dateStr || '',
-          description: data.description || '',
-        });
-      });
-
-      let list = Array.from(mapped.values());
       if (passwordInput.trim()) {
         list = list.filter((c) => !c.password || c.password === passwordInput.trim());
       }
@@ -113,7 +105,7 @@ export default function CertificatesPortal() {
           <p className="text-[#F5D061] text-xs font-black">نادي التمريض • جامعة حفر الباطن</p>
           <h1 className="text-3xl sm:text-4xl font-black">استعلام الشهادات</h1>
           <p className="text-sm text-amber-50/85 max-w-lg mx-auto leading-relaxed">
-            أدخل رقم الجوال وكلمة المرور لاستعراض شهاداتك، مع تصنيف كل شهادة: شكر وتقدير، مشاركة بفعالية، تنظيم، أو دورة.
+            استعلم برقم الجوال أو الرقم الجامعي. كلمة المرور اختيارية إذا كان استعلامك بالرقم الجامعي.
           </p>
         </div>
       </section>
@@ -125,10 +117,10 @@ export default function CertificatesPortal() {
         >
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-stone-700">رقم الجوال</label>
+              <label className="text-xs font-bold text-stone-700">رقم الجوال أو الرقم الجامعي</label>
               <input
                 type="text"
-                placeholder="05xxxxxxxx"
+                placeholder="05xxxxxxxx أو الرقم الجامعي"
                 value={phoneInput}
                 onChange={(e) => setPhoneInput(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm font-mono font-bold text-stone-900 focus:outline-none focus:border-[#630517]"
@@ -137,14 +129,13 @@ export default function CertificatesPortal() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-stone-700">كلمة المرور</label>
+              <label className="text-xs font-bold text-stone-700">كلمة المرور (اختيارية للرقم الجامعي)</label>
               <input
                 type="password"
-                placeholder="كلمة مرور حسابك في النادي"
+                placeholder="إذا كان لديك حساب في النادي"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm font-bold text-stone-900 focus:outline-none focus:border-[#630517]"
-                required
               />
             </div>
           </div>
@@ -162,7 +153,7 @@ export default function CertificatesPortal() {
             {userCertificates.length === 0 ? (
               <div className="bg-white p-10 rounded-3xl border border-dashed border-stone-300 text-center space-y-2 print:hidden">
                 <p className="text-base font-black text-[#630517]">لا توجد شهادات على هذا الحساب</p>
-                <p className="text-xs text-stone-500">تأكد من رقم الجوال وكلمة المرور، أو تواصل مع لجنة الموارد البشرية.</p>
+                <p className="text-xs text-stone-500">تأكد من رقم الجوال أو الرقم الجامعي، أو تواصل مع لجنة الموارد البشرية.</p>
               </div>
             ) : (
               <>

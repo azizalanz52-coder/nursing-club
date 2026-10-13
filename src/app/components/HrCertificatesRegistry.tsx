@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react';
 type CertRecord = {
   id: string;
   phone?: string;
+  universityId?: string;
   fullName?: string;
   recipientName?: string;
   title?: string;
@@ -35,20 +36,23 @@ export default function HrCertificatesRegistry({
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   const groups = useMemo(() => {
-    const map = new Map<string, { key: string; name: string; phone: string; certs: CertRecord[] }>();
+    const map = new Map<string, { key: string; name: string; phone: string; universityId: string; certs: CertRecord[] }>();
     certificates.forEach((cert) => {
       const phone = String(cert.phone || '').trim();
+      const universityId = String(cert.universityId || '').trim();
       const name = cert.fullName || cert.recipientName || 'بدون اسم';
-      const key = phone || name;
-      if (!map.has(key)) map.set(key, { key, name, phone, certs: [] });
+      const key = phone || universityId || name;
+      if (!map.has(key)) map.set(key, { key, name, phone, universityId, certs: [] });
       const group = map.get(key)!;
       group.certs.push(cert);
       if (group.name === 'بدون اسم' && name !== 'بدون اسم') group.name = name;
+      if (!group.phone && phone) group.phone = phone;
+      if (!group.universityId && universityId) group.universityId = universityId;
     });
 
     const q = queryText.trim();
     return Array.from(map.values())
-      .filter((group) => !q || group.name.includes(q) || group.phone.includes(q))
+      .filter((group) => !q || group.name.includes(q) || group.phone.includes(q) || group.universityId.includes(q))
       .sort((a, b) => b.certs.length - a.certs.length || a.name.localeCompare(b.name, 'ar'));
   }, [certificates, queryText]);
 
@@ -68,7 +72,7 @@ export default function HrCertificatesRegistry({
       <input
         value={queryText}
         onChange={(e) => setQueryText(e.target.value)}
-        placeholder="ابحث بالاسم أو رقم الجوال..."
+        placeholder="ابحث بالاسم أو الجوال أو الرقم الجامعي..."
         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white"
       />
 
@@ -89,6 +93,7 @@ export default function HrCertificatesRegistry({
                   <div className="min-w-0">
                     <p className="font-black text-sm text-slate-900">{group.name}</p>
                     {group.phone && <p className="text-[11px] text-slate-500 font-mono" dir="ltr">{group.phone}</p>}
+                    {group.universityId && <p className="text-[11px] text-slate-500 font-mono" dir="ltr">جامعي: {group.universityId}</p>}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[11px] font-black bg-white border border-slate-200 px-2.5 py-1 rounded-full">

@@ -190,6 +190,7 @@ export default function CommitteeDetailPage() {
   // رفع الشهادات (لجنة الموارد البشرية: القادة والأعضاء)
   const [certStudentName, setCertStudentName] = useState('');
   const [certStudentPhone, setCertStudentPhone] = useState('');
+  const [certStudentUniversityId, setCertStudentUniversityId] = useState('');
   const [certTitle, setCertTitle] = useState('');
   const [certCategory, setCertCategory] = useState('شهادة مشاركة فعالية');
   const [certUploadFile, setCertUploadFile] = useState<File | null>(null);
@@ -590,8 +591,12 @@ export default function CommitteeDetailPage() {
 
   const handleUploadCertificateSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!certStudentPhone.trim() || !certStudentName.trim() || !certTitle.trim() || !certUploadFile) {
-      alert('الرجاء تعبئة كافة الحقول ورفع ملف الشهادة.');
+    if (!certStudentName.trim() || !certTitle.trim() || !certUploadFile) {
+      alert('الرجاء تعبئة الاسم ومسمى الشهادة ورفع الملف.');
+      return;
+    }
+    if (!certStudentPhone.trim() && !certStudentUniversityId.trim()) {
+      alert('أدخل رقم الجوال أو الرقم الجامعي على الأقل حتى يستطيع المستفيد الاستعلام.');
       return;
     }
 
@@ -605,19 +610,23 @@ export default function CommitteeDetailPage() {
     try {
       const fileUrl = await uploadFileToStorage(certUploadFile, 'certificates');
       const phone = certStudentPhone.trim();
+      const universityId = certStudentUniversityId.trim();
       const title = certTitle.trim();
       const name = certStudentName.trim();
       const issuer = currentUserName || 'لجنة الموارد البشرية';
       let storedPassword = '';
-      try {
-        const recipientSnap = await getDoc(doc(db, 'users', phone));
-        if (recipientSnap.exists()) storedPassword = recipientSnap.data()?.password || '';
-      } catch (er) { console.error(er); }
+      if (phone) {
+        try {
+          const recipientSnap = await getDoc(doc(db, 'users', phone));
+          if (recipientSnap.exists()) storedPassword = recipientSnap.data()?.password || '';
+        } catch (er) { console.error(er); }
+      }
 
       const newCertObj = {
         fullName: name,
         recipientName: name,
         phone,
+        universityId,
         title,
         certTitle: title,
         category: certCategory,
@@ -634,18 +643,21 @@ export default function CommitteeDetailPage() {
       const certRef = await addDoc(collection(db, 'certificates'), newCertObj);
       await setDoc(doc(db, 'site_certificates', certRef.id), newCertObj);
 
-      try {
-        await setDoc(doc(db, 'users', phone), {
-          latestNotification: `🎓 تم إصدار شهادة جديدة لك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
-        }, { merge: true });
-      } catch (er) { console.error(er); }
+      if (phone) {
+        try {
+          await setDoc(doc(db, 'users', phone), {
+            latestNotification: `🎓 تم إصدار شهادة جديدة لك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
+          }, { merge: true });
+        } catch (er) { console.error(er); }
+      }
 
       setIssuedHrCertificates(prev => [{ id: certRef.id, ...newCertObj }, ...prev]);
       setCertStudentName('');
       setCertStudentPhone('');
+      setCertStudentUniversityId('');
       setCertTitle('');
       setCertUploadFile(null);
-      alert('تم رفع الشهادة، وأصبحت متاحة للمستفيد من الاستعلام في الموقع. 🎓✅');
+      alert('تم رفع الشهادة. المستفيد يستعلم بالجوال أو الرقم الجامعي.');
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'حدث خطأ أثناء رفع الشهادة.');
@@ -794,7 +806,7 @@ export default function CommitteeDetailPage() {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h2 className="text-xl font-black text-slate-900">رفع شهادات المشاركين في الفعاليات</h2>
-                <p className="text-xs text-slate-500 mt-1">متاح لقادة وأعضاء لجنة الموارد البشرية. الشهادة تظهر للطالب عند الاستعلام برقم الجوال.</p>
+                <p className="text-xs text-slate-500 mt-1">ارفع بالاسم مع الجوال أو الرقم الجامعي. الطالب يستعلم بأي واحد منهما.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-sky-100 text-sky-800 font-bold text-xs">
                 صادرة: {issuedHrCertificates.length}
@@ -814,7 +826,7 @@ export default function CommitteeDetailPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">رقم جوال المستفيد</label>
+                <label className="text-xs font-bold text-slate-700">رقم الجوال (إن وجد)</label>
                 <input
                   type="text"
                   placeholder="05xxxxxxxx"
@@ -822,7 +834,17 @@ export default function CommitteeDetailPage() {
                   onChange={(e) => setCertStudentPhone(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-mono"
                   dir="ltr"
-                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">الرقم الجامعي (إن وجد)</label>
+                <input
+                  type="text"
+                  placeholder="الرقم الجامعي"
+                  value={certStudentUniversityId}
+                  onChange={(e) => setCertStudentUniversityId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-mono"
+                  dir="ltr"
                 />
               </div>
               <div className="space-y-1.5">

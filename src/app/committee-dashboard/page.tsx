@@ -140,6 +140,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   // حقول رفع الشهادات (لجنة الموارد البشرية: القادة والأعضاء)
   const [certStudentName, setCertStudentName] = useState('');
   const [certStudentPhone, setCertStudentPhone] = useState('');
+  const [certStudentUniversityId, setCertStudentUniversityId] = useState('');
   const [certTitle, setCertTitle] = useState('');
   const [certCategory, setCertCategory] = useState('شهادة مشاركة فعالية');
   const [certUploadFile, setCertUploadFile] = useState<File | null>(null);
@@ -281,8 +282,12 @@ useEffect(() => {
   // دالة رفع الشهادات للمستفيدين (قادة وأعضاء الموارد البشرية)
   const handleUploadCertificateSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!certStudentPhone.trim() || !certStudentName.trim() || !certTitle.trim() || !certUploadFile) {
-      alert('الرجاء تعبئة كافة الحقول ورفع ملف الشهادة.');
+    if (!certStudentName.trim() || !certTitle.trim() || !certUploadFile) {
+      alert('الرجاء تعبئة الاسم ومسمى الشهادة ورفع الملف.');
+      return;
+    }
+    if (!certStudentPhone.trim() && !certStudentUniversityId.trim()) {
+      alert('أدخل رقم الجوال أو الرقم الجامعي على الأقل حتى يستطيع المستفيد الاستعلام.');
       return;
     }
 
@@ -319,19 +324,23 @@ useEffect(() => {
       }
 
       const phone = certStudentPhone.trim();
+      const universityId = certStudentUniversityId.trim();
       const title = certTitle.trim();
       const name = certStudentName.trim();
       const issuer = userData?.fullName || 'لجنة الموارد البشرية';
       let storedPassword = '';
-      try {
-        const recipientSnap = await getDoc(doc(db, 'users', phone));
-        if (recipientSnap.exists()) storedPassword = recipientSnap.data()?.password || '';
-      } catch (er) { console.error(er); }
+      if (phone) {
+        try {
+          const recipientSnap = await getDoc(doc(db, 'users', phone));
+          if (recipientSnap.exists()) storedPassword = recipientSnap.data()?.password || '';
+        } catch (er) { console.error(er); }
+      }
 
       const newCertObj = {
         fullName: name,
         recipientName: name,
         phone,
+        universityId,
         title,
         certTitle: title,
         category: certCategory,
@@ -348,18 +357,21 @@ useEffect(() => {
       const certRef = await addDoc(collection(db, 'certificates'), newCertObj);
       await setDoc(doc(db, 'site_certificates', certRef.id), newCertObj);
 
-      try {
-        await setDoc(doc(db, 'users', phone), {
-          latestNotification: `🎓 تم إصدار شهادة جديدة لك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
-        }, { merge: true });
-      } catch (er) { console.error(er); }
+      if (phone) {
+        try {
+          await setDoc(doc(db, 'users', phone), {
+            latestNotification: `🎓 تم إصدار شهادة جديدة لك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
+          }, { merge: true });
+        } catch (er) { console.error(er); }
+      }
 
       setIssuedHrCertificates(prev => [{ id: certRef.id, ...newCertObj }, ...prev]);
       setCertStudentName('');
       setCertStudentPhone('');
+      setCertStudentUniversityId('');
       setCertTitle('');
       setCertUploadFile(null);
-      alert('تم رفع الشهادة، وأصبحت متاحة للمستفيد من الاستعلام في الموقع. 🎓✅');
+      alert('تم رفع الشهادة. المستفيد يستعلم بالجوال أو الرقم الجامعي.');
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'حدث خطأ أثناء رفع الشهادة.');
@@ -2148,7 +2160,7 @@ useEffect(() => {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">رفع شهادات المشاركين في الفعاليات</h3>
-                <p className="text-xs text-slate-500">لقادة وأعضاء لجنة الموارد البشرية. الشهادة تظهر للطالب فوراً عند الاستعلام برقم الجوال.</p>
+                <p className="text-xs text-slate-500">ارفع بالاسم مع الجوال أو الرقم الجامعي. الطالب يستعلم بأي واحد منهما.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-sky-100 text-sky-800 font-bold text-xs">
                 {isCommitteeLeader ? 'صلاحية قائد اللجنة' : 'صلاحية عضو اللجنة'}
@@ -2157,7 +2169,7 @@ useEffect(() => {
 
             <form onSubmit={handleUploadCertificateSubmit} className="bg-sky-50/40 p-6 rounded-2xl border border-sky-200 space-y-4">
               <h4 className="font-extrabold text-sm text-[#630517]">بيانات المستفيد وملف الشهادة</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">اسم المستفيد الثلاثي</label>
                   <input
@@ -2170,7 +2182,7 @@ useEffect(() => {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">رقم جوال المستفيد</label>
+                  <label className="text-xs font-bold text-slate-700">رقم الجوال (إن وجد)</label>
                   <input
                     type="text"
                     placeholder="05xxxxxxxx"
@@ -2178,7 +2190,17 @@ useEffect(() => {
                     onChange={(e) => setCertStudentPhone(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-mono"
                     dir="ltr"
-                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">الرقم الجامعي (إن وجد)</label>
+                  <input
+                    type="text"
+                    placeholder="الرقم الجامعي"
+                    value={certStudentUniversityId}
+                    onChange={(e) => setCertStudentUniversityId(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-mono"
+                    dir="ltr"
                   />
                 </div>
                 <div className="space-y-1">

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import LoginModal from './LoginModal';
 import { db } from '../lib/firebase';
-import { doc, getDoc, updateDoc, onSnapshot, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { findCertificatesByLookup } from '../lib/certificatesLookup';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
@@ -168,65 +169,30 @@ export default function Navbar() {
     }
   };
 
-  // دالة البحث المحدثة والمربوطة مع الموارد البشرية والتحقق الأمني من كلمة المرور
   const handleFetchCertificatesFromNav = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanPhone = phoneInput.trim();
+    const lookup = phoneInput.trim();
     const cleanPassword = passwordInput.trim();
 
-    if (!cleanPhone || !cleanPassword) {
-      setSearchStatus('الرجاء إدخال رقم الجوال وكلمة المرور كاملين.');
+    if (!lookup) {
+      setSearchStatus('أدخل رقم الجوال أو الرقم الجامعي.');
       return;
     }
 
-    setSearchStatus('جاري التحقق من الحساب واستعلام الشهادات...');
+    setSearchStatus('جاري استعلام الشهادات...');
     try {
-      // 1. التحقق من كلمة المرور من سجل المستخدمين أو الطلبات للحماية والخصوصية
-      const userRef = doc(db, 'users', cleanPhone);
-      const userSnap = await getDoc(userRef);
+      let foundCerts = await findCertificatesByLookup(db, lookup);
 
-      let storedPassword = null;
-      if (userSnap.exists()) {
-        storedPassword = userSnap.data().password;
-      } else {
-        const appRef = doc(db, 'applications', cleanPhone);
-        const appSnap = await getDoc(appRef);
-        if (appSnap.exists()) {
-          storedPassword = appSnap.data().password;
-        }
-      }
-
-      // إذا كانت كلمة المرور مسجلة ولا تطابق المدخل
-      if (storedPassword && storedPassword !== cleanPassword) {
-        setSearchStatus('❌ كلمة المرور غير صحيحة، يرجى التأكد وإعادة المحاولة.');
-        setMemberCertificates([]);
-        return;
-      }
-
-      // 2. البحث في كولكشن شهادات الموارد البشرية (certificates)
-      const certsRef = collection(db, 'certificates');
-      const q = query(certsRef, where('phone', '==', cleanPhone));
-      const snap = await getDocs(q);
-
-      let foundCerts = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-
-      // 3. البحث في كولكشن الشهادات الإضافية (site_certificates) كمرجع إضافي
-      try {
-        const altCertsRef = collection(db, 'site_certificates');
-        const qAlt = query(altCertsRef, where('phone', '==', cleanPhone));
-        const snapAlt = await getDocs(qAlt);
-        const altCerts = snapAlt.docs.map(d => ({ id: d.id, ...d.data() }));
-        foundCerts = [...foundCerts, ...altCerts];
-      } catch (e) {
-        console.log('Alt certs collection skip');
+      if (cleanPassword) {
+        foundCerts = foundCerts.filter((cert: any) => !cert.password || cert.password === cleanPassword);
       }
 
       setMemberCertificates(foundCerts);
 
       if (foundCerts.length > 0) {
-        setSearchStatus(`تم العثور على (${foundCerts.length}) شهادة معتمدة بنجاح! 🎉`);
+        setSearchStatus(`تم العثور على (${foundCerts.length}) شهادة معتمدة بنجاح.`);
       } else {
-        setSearchStatus('لا توجد شهائد مسجلة لهذا الرقم وكلمة المرور حتى الآن.');
+        setSearchStatus('لا توجد شهادات مسجلة لهذا الجوال أو الرقم الجامعي.');
       }
     } catch (err) {
       console.error(err);
@@ -521,13 +487,13 @@ export default function Navbar() {
             
             <div className="space-y-1 text-center">
               <h3 className="text-xl font-black">بوابة استعراض وتحميل الشهائد</h3>
-              <p className="text-xs text-slate-500">أدخل رقم جوالك وكلمة المرور لتحميل شهاداتك الفخرية المعتمدة فوراً:</p>
+              <p className="text-xs text-slate-500">أدخل رقم الجوال أو الرقم الجامعي. كلمة المرور اختيارية إذا كان الاستعلام بالرقم الجامعي.</p>
             </div>
 
             <form onSubmit={handleFetchCertificatesFromNav} className="space-y-4">
               <input
                 type="text"
-                placeholder="رقم الجوال (05XXXXXXXX)"
+                placeholder="رقم الجوال أو الرقم الجامعي"
                 value={phoneInput}
                 onChange={(e) => setPhoneInput(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-amber-500 bg-white"
@@ -536,11 +502,10 @@ export default function Navbar() {
               />
               <input
                 type="password"
-                placeholder="كلمة المرور"
+                placeholder="كلمة المرور (اختيارية للرقم الجامعي)"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500 bg-white"
-                required
               />
               <button
                 type="submit"
