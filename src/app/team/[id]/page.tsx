@@ -8,6 +8,7 @@ import { doc, getDoc, updateDoc, setDoc, collection, getDocs, addDoc, deleteDoc 
 import { storage } from '../../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import HrCertificatesRegistry from '../../components/HrCertificatesRegistry';
+import { notifyExistingUser } from '../../lib/userAccounts';
 
 // دالة تحويل الملف إلى Base64 كخيار احتياطي ومضمون
 const convertFileToBase64 = (file: File): Promise<string> => {
@@ -645,9 +646,9 @@ export default function CommitteeDetailPage() {
 
       if (phone) {
         try {
-          await setDoc(doc(db, 'users', phone), {
+          await notifyExistingUser(db, phone, {
             latestNotification: `🎓 تم إصدار شهادة جديدة لك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
-          }, { merge: true });
+          });
         } catch (er) { console.error(er); }
       }
 

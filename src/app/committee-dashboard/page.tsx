@@ -8,6 +8,7 @@ import { collection, getDocs, doc, updateDoc, getDoc, addDoc, deleteDoc, setDoc,
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as XLSX from 'xlsx';
 import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
+import { notifyExistingUser } from '../lib/userAccounts';
 
 export default function CommitteeDashboard() {
   const router = useRouter();
@@ -359,9 +360,9 @@ useEffect(() => {
 
       if (phone) {
         try {
-          await setDoc(doc(db, 'users', phone), {
+          await notifyExistingUser(db, phone, {
             latestNotification: `🎓 تم إصدار شهادة جديدة لك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
-          }, { merge: true });
+          });
         } catch (er) { console.error(er); }
       }
 

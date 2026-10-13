@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db, storage } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot } from 'firebase/firestore';
+import { isIncompleteUserAccount } from '../lib/userAccounts';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -1135,6 +1136,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const [warningMessageText, setWarningMessageText] = useState<string>('');
 
   const [usersList, setUsersList] = useState<UserAccount[]>([]);
+  const [showIncompleteUsers, setShowIncompleteUsers] = useState(false);
+  const [isCleaningIncompleteUsers, setIsCleaningIncompleteUsers] = useState(false);
 
   useEffect(() => {
     const fetchCloudData = async () => {
@@ -1225,6 +1228,29 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
     return () => unsubMedia();
   }, []);
+
+  const handleDeleteIncompleteAccounts = async () => {
+    const stubs = usersList.filter((u) => isIncompleteUserAccount(u) && u.phone !== '0553731265');
+    if (stubs.length === 0) return;
+    if (!window.confirm(`سيتم حذف ${stubs.length} حساب غير مكتمل (بدون كلمة مرور). الشهادات وطلبات الانضمام تبقى، والطالب يقدر ينشئ حسابه بنفسه. هل أنت متأكد؟`)) return;
+
+    setIsCleaningIncompleteUsers(true);
+    try {
+      for (const usr of stubs) {
+        await deleteDoc(doc(db, 'users', usr.phone));
+      }
+      setUsersList(usersList.filter((u) => !isIncompleteUserAccount(u) || u.phone === '0553731265'));
+      setShowIncompleteUsers(false);
+      setModalMessage(`تم حذف ${stubs.length} حساب غير مكتمل. اللي يبون يسجلون يكملون إنشاء الحساب بأنفسهم.`);
+      setModalType('success');
+    } catch (err) {
+      console.error(err);
+      setModalMessage('حدث خطأ أثناء حذف الحسابات غير المكتملة.');
+      setModalType('success');
+    } finally {
+      setIsCleaningIncompleteUsers(false);
+    }
+  };
 
   const handleRoleChange = async (phone: string, newRole: string) => {
     if (!isSystemAdminUser) return;
@@ -2162,17 +2188,31 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     return nameA.localeCompare(nameB, 'ar');
   });
 
-  const filteredAndSortedUsers = [...usersList].filter(usr => {
+  const matchesUserSearch = (usr: UserAccount) => {
     if (!userSearchQuery.trim()) return true;
     const q = userSearchQuery.trim().toLowerCase();
-    const name = (usr.fullName || '').toLowerCase();
+    const matchedReq = requests.find((r) => String(r.phone).trim() === String(usr.phone).trim());
+    const name = (usr.fullName || matchedReq?.fullName || '').toLowerCase();
     const phone = (usr.phone || '').toLowerCase();
     return name.includes(q) || phone.includes(q);
-  }).sort((a, b) => {
-    const nameA = (a.fullName || a.phone || '').trim();
-    const nameB = (b.fullName || b.phone || '').trim();
-    return nameA.localeCompare(nameB, 'ar');
-  });
+  };
+
+  const sortUsersByName = (list: UserAccount[]) =>
+    [...list].sort((a, b) => {
+      const matchedA = requests.find((r) => String(r.phone).trim() === String(a.phone).trim());
+      const matchedB = requests.find((r) => String(r.phone).trim() === String(b.phone).trim());
+      const nameA = (a.fullName || matchedA?.fullName || a.phone || '').trim();
+      const nameB = (b.fullName || matchedB?.fullName || b.phone || '').trim();
+      return nameA.localeCompare(nameB, 'ar');
+    });
+
+  const filteredAndSortedUsers = sortUsersByName(
+    usersList.filter((usr) => !isIncompleteUserAccount(usr) && matchesUserSearch(usr))
+  );
+  const incompleteUsers = sortUsersByName(
+    usersList.filter((usr) => isIncompleteUserAccount(usr) && matchesUserSearch(usr))
+  );
+  const incompleteAccountsCount = usersList.filter((usr) => isIncompleteUserAccount(usr)).length;
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
@@ -3632,7 +3672,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، الأسماء، كلمات المرور، والرتب (مرتبة أبجدياً 🔤)</h3>
-                <p className="text-xs text-slate-500">يمكنك البحث بالاسم أو رقم الجوال، وتعديل بيانات أي عضو وتحديثها سحابياً.</p>
+                <p className="text-xs text-slate-500">الحسابات الحقيقية تظهر هنا. الأرقام بدون كلمة مرور احذفها من الصندوق الأصفر فوق.</p>
               </div>
               <input
                 type="text"
@@ -3642,6 +3682,61 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 className="px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50 focus:outline-none focus:border-[#630517] w-64"
               />
             </div>
+
+            {incompleteAccountsCount > 0 && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-black text-amber-900">حسابات غير مكتملة: {incompleteAccountsCount}</p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    هذه أرقام انحفظت بدون تسجيل حقيقي ولا كلمة مرور. احذفها من هنا، وبعدها يقدر صاحب الرقم ينشئ حسابه بنفسه.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowIncompleteUsers((prev) => !prev)}
+                    className="px-3 py-2 rounded-xl bg-white text-amber-800 border border-amber-200 font-bold text-xs hover:bg-amber-100 cursor-pointer"
+                  >
+                    {showIncompleteUsers ? 'إخفاء القائمة' : 'عرض الأرقام'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteIncompleteAccounts}
+                    disabled={isCleaningIncompleteUsers}
+                    className="px-3 py-2 rounded-xl bg-red-600 text-white font-bold text-xs hover:bg-red-700 cursor-pointer disabled:opacity-60"
+                  >
+                    {isCleaningIncompleteUsers ? 'جاري الحذف...' : 'حذف الحسابات غير المكتملة'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showIncompleteUsers && incompleteUsers.length > 0 && (
+              <div className="rounded-2xl border border-dashed border-amber-300 bg-white overflow-x-auto">
+                <table className="w-full text-right text-xs">
+                  <thead>
+                    <tr className="border-b border-amber-100 text-amber-700 font-bold">
+                      <th className="py-3 pr-4">الاسم</th>
+                      <th className="py-3">رقم الجوال</th>
+                      <th className="py-3 pl-4">الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-50">
+                    {incompleteUsers.map((usr) => {
+                      const matchedReq = requests.find((r) => String(r.phone).trim() === String(usr.phone).trim());
+                      const displayName = usr.fullName || matchedReq?.fullName || 'بدون اسم';
+                      return (
+                        <tr key={usr.phone}>
+                          <td className="py-3 pr-4 font-bold text-slate-800">{displayName}</td>
+                          <td className="py-3 font-mono text-slate-600" dir="ltr">{usr.phone}</td>
+                          <td className="py-3 pl-4 text-amber-700 font-bold">بانتظار إكمال الحساب</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
             
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs">

@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import { completeOrCreateUserAccount, isIncompleteUserAccount } from '../lib/userAccounts';
 
 export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [phone, setPhone] = useState('');
@@ -46,6 +47,11 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
       if (userSnap.exists()) {
         const userData = userSnap.data();
+        if (isIncompleteUserAccount(userData)) {
+          alert('هذا الرقم لم يكمل إنشاء الحساب بعد. استخدم "إنشاء حساب جديد" واختر كلمة المرور بنفسك.');
+          setIsRegistering(true);
+          return;
+        }
         if (userData.password === password) {
           sessionStorage.removeItem('adminToken'); // منع أي مستخدم عادي من أخذ صلاحية الأدمن
           localStorage.setItem('userPhone', cleanPhone);
@@ -80,33 +86,27 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
     try {
       const cleanPhone = phone.trim();
-      const userDocRef = doc(db, 'users', cleanPhone);
-      
-      // التأكد أن الرقم غير مسجل مسبقاً
-      const userSnap = await getDoc(userDocRef);
-      if (userSnap.exists()) {
-        alert('رقم الجوال مسجل مسبقاً! قم بتسجيل الدخول مباشرة.');
+      const result = await completeOrCreateUserAccount(db, {
+        phone: cleanPhone,
+        fullName: fullName.trim(),
+        password,
+      });
+
+      if (result.status === 'exists') {
+        alert('رقم الجوال مسجل مسبقاً بكلمة مرور. قم بتسجيل الدخول مباشرة.');
         setIsRegistering(false);
         return;
       }
 
-      // حفظ الحساب الجديد في فايربيس مع حماية الرتبة الافتراضية
-      const newUserObj = {
-        fullName: fullName.trim(),
-        phone: cleanPhone,
-        password: password,
-        role: 'عضو أساسي',
-        createdAt: new Date().toISOString()
-      };
-
-      await setDoc(userDocRef, newUserObj);
-
-      // تسجيل دخول العضو مباشرة
       sessionStorage.removeItem('adminToken');
       localStorage.setItem('userPhone', cleanPhone);
       localStorage.setItem('userName', fullName.trim());
 
-      alert(`مرحباً بك يا ${fullName.trim()}! تم إنشاء حسابك وتسجيل دخولك بنجاح 🎉`);
+      alert(
+        result.status === 'claimed'
+          ? `مرحباً بك يا ${fullName.trim()}! تم إكمال حسابك وتعيين كلمة المرور بنجاح.`
+          : `مرحباً بك يا ${fullName.trim()}! تم إنشاء حسابك وتسجيل دخولك بنجاح.`
+      );
       onClose();
       window.location.reload();
     } catch (err) {
@@ -129,7 +129,9 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
             {isRegistering ? 'إنشاء حساب جديد 📝' : 'تسجيل الدخول / حسابي'}
           </h3>
           <p className="text-xs text-slate-500">
-            {isRegistering ? 'أدخل بياناتك للانضمام فوراً لنظام النادي' : 'أدخل رقم جوالك وكلمة المرور للمتابعة'}
+            {isRegistering
+              ? 'إذا ظهر رقمك سابقاً بدون كلمة مرور، أكمل الحساب هنا واختر كلمة المرور بنفسك.'
+              : 'أدخل رقم جوالك وكلمة المرور للمتابعة'}
           </p>
         </div>
 
