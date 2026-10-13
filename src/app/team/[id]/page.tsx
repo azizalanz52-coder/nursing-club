@@ -4,9 +4,10 @@ import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { db } from '../../lib/firebase';
-import { doc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, collection, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 import { storage } from '../../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import HrCertificatesRegistry from '../../components/HrCertificatesRegistry';
 
 // دالة تحويل الملف إلى Base64 كخيار احتياطي ومضمون
 const convertFileToBase64 = (file: File): Promise<string> => {
@@ -186,6 +187,15 @@ export default function CommitteeDetailPage() {
   // نافذة معاينة الميديا الكبيرة داخل الصفحة
   const [previewItem, setPreviewItem] = useState<any | null>(null);
 
+  // رفع الشهادات (لجنة الموارد البشرية: القادة والأعضاء)
+  const [certStudentName, setCertStudentName] = useState('');
+  const [certStudentPhone, setCertStudentPhone] = useState('');
+  const [certTitle, setCertTitle] = useState('');
+  const [certCategory, setCertCategory] = useState('شهادة مشاركة فعالية');
+  const [certUploadFile, setCertUploadFile] = useState<File | null>(null);
+  const [isUploadingCert, setIsUploadingCert] = useState(false);
+  const [issuedHrCertificates, setIssuedHrCertificates] = useState<any[]>([]);
+
   useEffect(() => {
     const phone = localStorage.getItem('userPhone') || '';
     const name = localStorage.getItem('userName') || '';
@@ -278,6 +288,44 @@ export default function CommitteeDetailPage() {
         if (!userAuthorized && normUserPhone !== '') {
           const foundInDirect = mergedMembers.some((m: any) => m.phone && normalizePhone(m.phone) === normUserPhone);
           if (foundInDirect) userAuthorized = true;
+        }
+
+        if (!userAuthorized && trimmedPhone !== '') {
+          try {
+            const userSnap = await getDoc(doc(db, 'users', trimmedPhone));
+            if (userSnap.exists()) {
+              const uData = userSnap.data();
+              const assigned = String(uData.assignedCommittee || uData.committee || '');
+              const roleStr = String(uData.role || '');
+              const normAssigned = normalizeArabic(assigned);
+              const normRole = normalizeArabic(roleStr);
+              const normBaseName = normalizeArabic(baseDetails.name);
+              const matchesAssigned =
+                normAssigned.includes(normBaseName) ||
+                normBaseName.includes(normAssigned) ||
+                (id === 'hr' && (normAssigned.includes('موارد') || normAssigned.includes('بشري') || normRole.includes('موارد'))) ||
+                (id === 'media' && (normAssigned.includes('اعلام') || normRole.includes('اعلام'))) ||
+                (id === 'design' && normAssigned.includes('تصميم')) ||
+                (id === 'pr' && normAssigned.includes('علاقات')) ||
+                (id === 'quality' && (normAssigned.includes('جوده') || normAssigned.includes('تطوير'))) ||
+                (id === 'scientific' && normAssigned.includes('علمي')) ||
+                (id === 'events-org' && (normAssigned.includes('تنظيم') || normAssigned.includes('فعاليات')));
+              if (matchesAssigned) userAuthorized = true;
+            }
+          } catch (userErr) {
+            console.error(userErr);
+          }
+        }
+
+        if (id === 'hr' || normalizeArabic(baseDetails.name).includes('موارد')) {
+          const [hrSnap, siteSnap] = await Promise.all([
+            getDocs(collection(db, 'certificates')),
+            getDocs(collection(db, 'site_certificates')),
+          ]);
+          const mapped = new Map<string, any>();
+          [...hrSnap.docs, ...siteSnap.docs].forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
+          const certList = Array.from(mapped.values()).sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+          setIssuedHrCertificates(certList);
         }
 
         setIsAuthorizedMember(userAuthorized);
@@ -525,11 +573,93 @@ export default function CommitteeDetailPage() {
     }
   };
 
+  const handleDeleteHrCertificate = async (certId: string) => {
+    if (!confirm('حذف هذه الشهادة نهائياً من حساب المستفيد ومن سجل النادي؟')) return;
+    try {
+      await Promise.all([
+        deleteDoc(doc(db, 'certificates', certId)).catch(() => undefined),
+        deleteDoc(doc(db, 'site_certificates', certId)).catch(() => undefined),
+      ]);
+      setIssuedHrCertificates((prev) => prev.filter((cert) => cert.id !== certId));
+      alert('تم حذف الشهادة بنجاح.');
+    } catch (err) {
+      console.error(err);
+      alert('تعذر حذف الشهادة. حاول مرة أخرى.');
+    }
+  };
+
+  const handleUploadCertificateSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!certStudentPhone.trim() || !certStudentName.trim() || !certTitle.trim() || !certUploadFile) {
+      alert('الرجاء تعبئة كافة الحقول ورفع ملف الشهادة.');
+      return;
+    }
+
+    const maxBytes = 8 * 1024 * 1024;
+    if (certUploadFile.size > maxBytes) {
+      alert('حجم الملف كبير جداً. الحد الأقصى 8 ميغابايت.');
+      return;
+    }
+
+    setIsUploadingCert(true);
+    try {
+      const fileUrl = await uploadFileToStorage(certUploadFile, 'certificates');
+      const phone = certStudentPhone.trim();
+      const title = certTitle.trim();
+      const name = certStudentName.trim();
+      const issuer = currentUserName || 'لجنة الموارد البشرية';
+      let storedPassword = '';
+      try {
+        const recipientSnap = await getDoc(doc(db, 'users', phone));
+        if (recipientSnap.exists()) storedPassword = recipientSnap.data()?.password || '';
+      } catch (er) { console.error(er); }
+
+      const newCertObj = {
+        fullName: name,
+        recipientName: name,
+        phone,
+        title,
+        certTitle: title,
+        category: certCategory,
+        fileUrl,
+        image: fileUrl,
+        issuedBy: issuer,
+        createdAt: Date.now(),
+        dateStr: new Date().toLocaleDateString('ar-SA'),
+        issueDate: new Date().toISOString(),
+        description: `صادرة من لجنة الموارد البشرية • ${issuer}`,
+        password: storedPassword,
+      };
+
+      const certRef = await addDoc(collection(db, 'certificates'), newCertObj);
+      await setDoc(doc(db, 'site_certificates', certRef.id), newCertObj);
+
+      try {
+        await setDoc(doc(db, 'users', phone), {
+          latestNotification: `🎓 تم إصدار شهادة جديدة لك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
+        }, { merge: true });
+      } catch (er) { console.error(er); }
+
+      setIssuedHrCertificates(prev => [{ id: certRef.id, ...newCertObj }, ...prev]);
+      setCertStudentName('');
+      setCertStudentPhone('');
+      setCertTitle('');
+      setCertUploadFile(null);
+      alert('تم رفع الشهادة، وأصبحت متاحة للمستفيد من الاستعلام في الموقع. 🎓✅');
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'حدث خطأ أثناء رفع الشهادة.');
+    } finally {
+      setIsUploadingCert(false);
+    }
+  };
+
   // التثبت من صلاحيات المحتوى العلمي ولجنة التصميم
   const isScientificCommittee = id === 'scientific' || normalizeArabic(committee?.name || '').includes('علمي');
   const isDesignCommittee = id === 'design' || normalizeArabic(committee?.name || '').includes('تصميم');
   const canAccessScientificTexts = isScientificCommittee || isDesignCommittee;
   const canAddScientificTexts = isScientificCommittee;
+  const canIssueCertificates = id === 'hr' || normalizeArabic(committee?.name || '').includes('موارد');
 
   if (!baseDetails) {
     return (
@@ -658,6 +788,94 @@ export default function CommitteeDetailPage() {
             </div>
           </div>
         </div>
+
+        {canIssueCertificates && (
+          <div className="bg-white rounded-3xl p-8 sm:p-10 border border-sky-200 shadow-xl space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">رفع شهادات المشاركين في الفعاليات</h2>
+                <p className="text-xs text-slate-500 mt-1">متاح لقادة وأعضاء لجنة الموارد البشرية. الشهادة تظهر للطالب عند الاستعلام برقم الجوال.</p>
+              </div>
+              <span className="px-3.5 py-1.5 rounded-xl bg-sky-100 text-sky-800 font-bold text-xs">
+                صادرة: {issuedHrCertificates.length}
+              </span>
+            </div>
+
+            <form onSubmit={handleUploadCertificateSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-sky-50/40 p-6 rounded-2xl border border-sky-200">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">اسم المستفيد الثلاثي</label>
+                <input
+                  type="text"
+                  placeholder="مثال: عبدالعزيز سليمان العنزي"
+                  value={certStudentName}
+                  onChange={(e) => setCertStudentName(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">رقم جوال المستفيد</label>
+                <input
+                  type="text"
+                  placeholder="05xxxxxxxx"
+                  value={certStudentPhone}
+                  onChange={(e) => setCertStudentPhone(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-mono"
+                  dir="ltr"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">مسمى الشهادة / الفعالية</label>
+                <input
+                  type="text"
+                  placeholder="مثال: شهادة مشاركة ملتقى التمريض"
+                  value={certTitle}
+                  onChange={(e) => setCertTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">نوع الشهادة</label>
+                <select
+                  value={certCategory}
+                  onChange={(e) => setCertCategory(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
+                >
+                  <option value="شهادة مشاركة فعالية">شهادة مشاركة فعالية</option>
+                  <option value="شهادة شكر وتقدير">شهادة شكر وتقدير</option>
+                  <option value="شهادة تنظيم فعالية">شهادة تنظيم فعالية</option>
+                  <option value="شهادة اجتياز دورة">شهادة اجتياز دورة</option>
+                </select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-slate-700">ملف الشهادة (PDF أو صورة)</label>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    setCertUploadFile(e.target.files && e.target.files[0] ? e.target.files[0] : null);
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-white cursor-pointer"
+                  required
+                />
+                {certUploadFile && <p className="text-[11px] text-sky-800 font-bold">الملف الجاهز: {certUploadFile.name}</p>}
+              </div>
+              <div className="sm:col-span-2">
+                <button
+                  type="submit"
+                  disabled={isUploadingCert}
+                  className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 cursor-pointer disabled:opacity-60"
+                >
+                  {isUploadingCert ? 'جاري رفع الشهادة...' : 'رفع الشهادة للمستفيد'}
+                </button>
+              </div>
+            </form>
+
+            <HrCertificatesRegistry certificates={issuedHrCertificates} onDelete={handleDeleteHrCertificate} />
+          </div>
+        )}
 
         {/* 🤝 الخاصية المخصصة: سجل الشراكات (تظهر حصرياً لأعضاء لجنة العلاقات العامة) */}
         {(id === 'pr' || normalizeArabic(committee?.name || '').includes('علاقات')) && (

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, FormEvent } from 'react';
+import React, { useEffect, useMemo, useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -17,12 +17,51 @@ interface CertificateItem {
   description: string;
 }
 
+function categoryTone(category: string) {
+  if (category.includes('شكر')) return 'bg-amber-100 text-amber-900 border-amber-200';
+  if (category.includes('مشاركة')) return 'bg-[#630517]/10 text-[#630517] border-[#630517]/20';
+  if (category.includes('تنظيم')) return 'bg-sky-100 text-sky-800 border-sky-200';
+  if (category.includes('دورة') || category.includes('اجتياز')) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+  return 'bg-stone-100 text-stone-700 border-stone-200';
+}
+
+function formatCertDate(value?: string) {
+  if (!value) return '—';
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  return value;
+}
+
+function isPdfFile(src?: string) {
+  if (!src) return false;
+  const lower = src.toLowerCase();
+  return lower.includes('application/pdf') || lower.includes('.pdf');
+}
+
 export default function CertificatesPortal() {
   const [phoneInput, setPhoneInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [searched, setSearched] = useState(false);
   const [userCertificates, setUserCertificates] = useState<CertificateItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('الكل');
+
+  useEffect(() => {
+    const savedPhone = localStorage.getItem('userPhone');
+    if (savedPhone) setPhoneInput(savedPhone);
+  }, []);
+
+  const categories = useMemo(() => {
+    const names = Array.from(new Set(userCertificates.map((cert) => cert.category).filter(Boolean)));
+    return ['الكل', ...names];
+  }, [userCertificates]);
+
+  const visibleCertificates = useMemo(() => {
+    if (activeCategory === 'الكل') return userCertificates;
+    return userCertificates.filter((cert) => cert.category === activeCategory);
+  }, [userCertificates, activeCategory]);
 
   const handleSearchCertificates = async (e: FormEvent) => {
     e.preventDefault();
@@ -30,17 +69,35 @@ export default function CertificatesPortal() {
 
     setLoading(true);
     try {
-      // البحث في مجموعة site_certificates المعتمدة في لوحة التحكم
-      const q = query(collection(db, 'site_certificates'), where('phone', '==', phoneInput.trim()));
-      const snap = await getDocs(q);
-      let list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as CertificateItem[];
+      const phone = phoneInput.trim();
+      const [siteSnap, hrSnap] = await Promise.all([
+        getDocs(query(collection(db, 'site_certificates'), where('phone', '==', phone))),
+        getDocs(query(collection(db, 'certificates'), where('phone', '==', phone))),
+      ]);
 
-      // التحقق من كلمة المرور إذا كانت مسجلة للشهادة
+      const mapped = new Map<string, CertificateItem>();
+      [...siteSnap.docs, ...hrSnap.docs].forEach((d) => {
+        const data = d.data() as any;
+        mapped.set(d.id, {
+          id: d.id,
+          recipientName: data.recipientName || data.fullName || 'المستفيد',
+          phone: data.phone || phone,
+          password: data.password,
+          certTitle: data.certTitle || data.title || 'شهادة مشاركة',
+          category: data.category || 'شهادة مشاركة فعالية',
+          image: data.image || data.fileUrl || '',
+          issueDate: data.issueDate || data.dateStr || '',
+          description: data.description || '',
+        });
+      });
+
+      let list = Array.from(mapped.values());
       if (passwordInput.trim()) {
-        list = list.filter(c => !c.password || c.password === passwordInput.trim());
+        list = list.filter((c) => !c.password || c.password === passwordInput.trim());
       }
 
       setUserCertificates(list);
+      setActiveCategory('الكل');
       setSearched(true);
     } catch (err) {
       console.error(err);
@@ -49,155 +106,169 @@ export default function CertificatesPortal() {
     }
   };
 
-  const handleDownloadPdf = (cert: CertificateItem) => {
-    // استخدام الطباعة النظامية للمتصفح لحفظ الشهادة بدعم كامل 100% للغة العربية وبدون أي رموز
-    window.print();
-  };
-
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
-      
-      {/* النافبار */}
-      <nav className="bg-white border-b border-slate-200 py-4 px-6 flex justify-between items-center shadow-sm print:hidden">
-        <Link href="/" className="flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-[#630517] text-[#F5D061] flex items-center justify-center font-black text-lg shadow">
-            UHB
-          </span>
-          <span className="font-black text-slate-900 text-sm">نادي كلية التمريض - جامعة حفر الباطن</span>
-        </Link>
-        <Link href="/" className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all">
-          الرئيسية ←
-        </Link>
-      </nav>
-
-      <div className="max-w-4xl mx-auto px-4 py-16 space-y-10">
-        
-        <div className="text-center space-y-3 print:hidden">
-          <span className="bg-amber-100 text-amber-900 font-bold text-xs px-4 py-1.5 rounded-full">
-            بوابة الاعتماد الفخري 📜
-          </span>
-          <h1 className="text-3xl font-black text-slate-900">استعرض جميع شهاداتك الفخرية والدورات</h1>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">أدخل رقم جوالك المسجل وكلمة المرور لاستعراض وتحميل كافة شهاداتك المعتمدة من النادي فوراً.</p>
+    <main className="min-h-screen bg-[#F6F0E8] text-stone-900" dir="rtl">
+      <section className="bg-gradient-to-br from-[#3a020c] via-[#630517] to-[#4A030F] text-white print:hidden">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-3 text-center">
+          <p className="text-[#F5D061] text-xs font-black">نادي التمريض • جامعة حفر الباطن</p>
+          <h1 className="text-3xl sm:text-4xl font-black">استعلام الشهادات</h1>
+          <p className="text-sm text-amber-50/85 max-w-lg mx-auto leading-relaxed">
+            أدخل رقم الجوال وكلمة المرور لاستعراض شهاداتك، مع تصنيف كل شهادة: شكر وتقدير، مشاركة بفعالية، تنظيم، أو دورة.
+          </p>
         </div>
+      </section>
 
-        <form onSubmit={handleSearchCertificates} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm max-w-lg mx-auto space-y-4 print:hidden">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">رقم الجوال المسجل</label>
-            <input
-              type="text"
-              placeholder="مثال: 0553731265"
-              value={phoneInput}
-              onChange={(e) => setPhoneInput(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-mono text-center font-bold text-slate-900 focus:outline-none focus:border-amber-600"
-              dir="ltr"
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">كلمة المرور</label>
-            <input
-              type="password"
-              placeholder="كلمة المرور الخاصة بك..."
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm text-center font-bold text-slate-900 focus:outline-none focus:border-amber-600"
-              required
-            />
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        <form
+          onSubmit={handleSearchCertificates}
+          className="bg-white p-6 sm:p-8 rounded-3xl border border-stone-200 shadow-sm space-y-4 print:hidden"
+        >
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-stone-700">رقم الجوال</label>
+              <input
+                type="text"
+                placeholder="05xxxxxxxx"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm font-mono font-bold text-stone-900 focus:outline-none focus:border-[#630517]"
+                dir="ltr"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-stone-700">كلمة المرور</label>
+              <input
+                type="password"
+                placeholder="كلمة مرور حسابك في النادي"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm font-bold text-stone-900 focus:outline-none focus:border-[#630517]"
+                required
+              />
+            </div>
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-amber-600 text-white font-black text-xs shadow-lg hover:bg-amber-700 transition-all cursor-pointer"
+            className="w-full py-3.5 rounded-xl bg-[#630517] text-[#F5D061] font-black text-sm shadow hover:brightness-110 transition-all disabled:opacity-60"
           >
-            {loading ? 'جاري البحث...' : 'بحث واستعراض جميع الشهادات 🔍'}
+            {loading ? 'جاري البحث...' : 'استعلام عن الشهادات'}
           </button>
         </form>
 
         {searched && (
-          <div className="space-y-8">
+          <div className="space-y-5">
             {userCertificates.length === 0 ? (
-              <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-300 text-center space-y-2 print:hidden">
-                <p className="text-base font-bold text-slate-700">لا توجد شهادات مسجلة برقم الجوال ({phoneInput}) أو كلمة المرور غير صحيحة.</p>
-                <p className="text-xs text-slate-400">تأكد من إدخال البيانات الصحيحة أو تواصل مع إدارة النادي لإصدار شهادتك.</p>
+              <div className="bg-white p-10 rounded-3xl border border-dashed border-stone-300 text-center space-y-2 print:hidden">
+                <p className="text-base font-black text-[#630517]">لا توجد شهادات على هذا الحساب</p>
+                <p className="text-xs text-stone-500">تأكد من رقم الجوال وكلمة المرور، أو تواصل مع لجنة الموارد البشرية.</p>
               </div>
             ) : (
-              userCertificates.map((cert) => (
-                <div key={cert.id} className="bg-gradient-to-br from-amber-50 via-white to-amber-50/50 p-8 sm:p-12 rounded-3xl border-4 border-amber-400 shadow-2xl relative overflow-hidden space-y-8 text-center">
-                  
-                  {/* زخرفة إطار الشهادة */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200/30 rounded-bl-full pointer-events-none"></div>
-                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-amber-200/35 rounded-tr-full pointer-events-none"></div>
-
-                  <div className="space-y-2 relative z-10">
-                    <span className="w-16 h-16 rounded-2xl bg-amber-600 text-white mx-auto flex items-center justify-center text-3xl shadow-md">
-                      🏆
-                    </span>
-                    <h2 className="text-lg font-black text-amber-900">جامعة حفر الباطن - كلية التمريض</h2>
-                    <p className="text-xs text-slate-500 font-semibold">نادي التمريض الطلابي | وحدة الاعتماد والأنشطة</p>
-                  </div>
-
-                  <div className="space-y-4 relative z-10 py-4 border-y border-amber-200/60">
-                    <p className="text-xs text-slate-600 font-bold">تشهد إدارة نادي التمريض بأن المكرم /ـة:</p>
-                    <h3 className="text-2xl sm:text-3xl font-black text-[#630517] underline decoration-amber-400 decoration-2 underline-offset-8">
-                      {cert.recipientName}
-                    </h3>
-                    <p className="text-xs text-slate-600 font-bold">وذلك نظير مشاركته/ها الفعالة وإتمامه/ها بنجاح لـ:</p>
-                    <h4 className="text-lg sm:text-xl font-black text-amber-900 bg-white/80 py-2 px-4 rounded-xl border border-amber-200 w-fit mx-auto shadow-inner">
-                      {cert.certTitle}
-                    </h4>
-                    <p className="text-xs text-slate-600 font-medium max-w-md mx-auto">
-                      {cert.description}
-                    </p>
-                  </div>
-
-                  <div className="flex justify-between items-center text-xs text-slate-500 font-bold relative z-10 px-4">
-                    <div>
-                      <p>تاريخ الإصدار: <span className="font-mono text-slate-800">{new Date(cert.issueDate).toLocaleDateString('ar-SA')}</span></p>
-                    </div>
-                    <div>
-                      <p className="font-black text-[#630517]">رئيس نادي التمريض</p>
-                      <p className="text-[10px] text-slate-400">معتمد رسمياً سحابياً ✅</p>
-                    </div>
-                  </div>
-
-                  {cert.image && (
-                    <div className="relative z-10 pt-4 border-t border-amber-200">
-                      <p className="text-xs font-bold text-slate-700 mb-2">تصميم الشهادة المعتمد:</p>
-                      <img 
-                        src={cert.image} 
-                        alt="Certificate" 
-                        className="max-h-96 mx-auto rounded-2xl shadow-md border border-amber-300 object-contain"
-                      />
-                    </div>
-                  )}
-
-                  <div className="pt-2 flex justify-center gap-4 relative z-10 flex-wrap print:hidden">
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadPdf(cert)}
-                      className="px-8 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow-xl hover:brightness-110 transition-all cursor-pointer"
-                    >
-                      🖨️ طباعة أو حفظ الشهادة PDF رسمي
-                    </button>
-                    {cert.image && (
-                      <a
-                        href={cert.image}
-                        download="certificate-image.jpg"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-6 py-3 rounded-xl bg-amber-600 text-white font-black text-xs shadow hover:bg-amber-700 transition-all"
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+                  <p className="text-sm font-black text-stone-800">
+                    لديك {userCertificates.length} {userCertificates.length === 1 ? 'شهادة' : 'شهادات'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => setActiveCategory(name)}
+                        className={`px-3 py-1.5 rounded-full text-[11px] font-black whitespace-nowrap border ${
+                          activeCategory === name
+                            ? 'bg-[#630517] text-[#F5D061] border-[#630517]'
+                            : 'bg-white text-stone-600 border-stone-200'
+                        }`}
                       >
-                        🖼️ عرض وتحميل صورة الشهادة
-                      </a>
-                    )}
+                        {name}
+                      </button>
+                    ))}
                   </div>
-
                 </div>
-              ))
+
+                {visibleCertificates.map((cert) => (
+                  <article key={cert.id} className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 bg-[#630517] text-white print:bg-white print:text-[#630517]">
+                      <span className={`px-3 py-1 rounded-full text-[11px] font-black border ${categoryTone(cert.category)} bg-white`}>
+                        {cert.category}
+                      </span>
+                      <span className="text-[11px] font-bold text-white/80 print:text-stone-500">
+                        {formatCertDate(cert.issueDate)}
+                      </span>
+                    </div>
+
+                    <div className="p-6 sm:p-8 space-y-5 text-center">
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-stone-500">جامعة حفر الباطن • كلية التمريض • نادي التمريض</p>
+                        <h2 className="text-xl font-black text-[#630517]">{cert.certTitle}</h2>
+                      </div>
+
+                      <div className="space-y-2 py-4 border-y border-stone-100">
+                        <p className="text-xs font-bold text-stone-500">المكرم / المكرمة</p>
+                        <h3 className="text-2xl font-black text-stone-900">{cert.recipientName}</h3>
+                        <p className="text-xs font-black">
+                          التصنيف:{' '}
+                          <span className={`inline-block mt-1 px-3 py-1 rounded-full border ${categoryTone(cert.category)}`}>
+                            {cert.category}
+                          </span>
+                        </p>
+                        {cert.description && (
+                          <p className="text-xs text-stone-600 max-w-md mx-auto leading-relaxed">{cert.description}</p>
+                        )}
+                      </div>
+
+                      {cert.image && (
+                        isPdfFile(cert.image) ? (
+                          <a
+                            href={cert.image}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-stone-100 text-[#630517] text-xs font-black"
+                          >
+                            فتح ملف الشهادة PDF
+                          </a>
+                        ) : (
+                          <img
+                            src={cert.image}
+                            alt={cert.certTitle}
+                            className="max-h-96 mx-auto rounded-2xl shadow-md border border-stone-200 object-contain"
+                          />
+                        )
+                      )}
+
+                      <div className="flex justify-center gap-3 flex-wrap print:hidden">
+                        <button
+                          type="button"
+                          onClick={() => window.print()}
+                          className="px-6 py-3 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110"
+                        >
+                          طباعة الشهادة
+                        </button>
+                        {cert.image && (
+                          <a
+                            href={cert.image}
+                            download
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-6 py-3 rounded-xl bg-[#F5D061] text-[#630517] font-black text-xs shadow"
+                          >
+                            تحميل الملف
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </>
             )}
           </div>
         )}
 
+        <p className="text-center text-[11px] text-stone-400 print:hidden">
+          <Link href="/" className="font-bold text-[#630517]">العودة للرئيسية</Link>
+        </p>
       </div>
     </main>
   );

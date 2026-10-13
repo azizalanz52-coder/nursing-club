@@ -557,29 +557,38 @@ export default function Navbar() {
             )}
 
             {memberCertificates.length > 0 && (
-              <div className="space-y-3 max-h-60 overflow-y-auto pt-2">
+              <div className="space-y-3 max-h-72 overflow-y-auto pt-2">
                 {memberCertificates.map((cert) => {
                   const certTitle = cert.title || cert.certTitle || 'شهادة شكر وتقدير';
                   const recipientName = cert.fullName || cert.recipientName || 'المستفيد';
                   const certFile = cert.fileUrl || cert.image || cert.file;
+                  const category = cert.category || 'شهادة مشاركة فعالية';
 
                   return (
-                    <div key={cert.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs">
-                      <div>
-                        <span className="font-extrabold text-slate-900 block">{certTitle}</span>
-                        <span className="text-[10px] text-slate-500">المستفيد: {recipientName}</span>
-                        {cert.dateStr && <span className="text-[9px] text-slate-400 block mt-0.5">التاريخ: {cert.dateStr}</span>}
+                    <div key={cert.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
+                      <span className="inline-block text-[10px] font-black px-2.5 py-1 rounded-full bg-[#630517]/10 text-[#630517]">
+                        {category}
+                      </span>
+                      <div className="flex justify-between items-center gap-3">
+                        <div className="min-w-0">
+                          <span className="font-extrabold text-slate-900 block">{certTitle}</span>
+                          <span className="text-[10px] text-slate-500">المستفيد: {recipientName}</span>
+                          {(cert.dateStr || cert.issueDate) && (
+                            <span className="text-[9px] text-slate-400 block mt-0.5">
+                              التاريخ: {cert.dateStr || cert.issueDate}
+                            </span>
+                          )}
+                        </div>
+                        {certFile && (
+                          <button
+                            type="button"
+                            onClick={() => handleViewOrDownloadFile(certFile, certTitle)}
+                            className="shrink-0 px-3.5 py-1.5 bg-[#630517] text-[#F5D061] font-bold rounded-xl shadow hover:brightness-110 transition-all text-xs cursor-pointer"
+                          >
+                            استعراض
+                          </button>
+                        )}
                       </div>
-                      
-                      {certFile && (
-                        <button
-                          type="button"
-                          onClick={() => handleViewOrDownloadFile(certFile, certTitle)}
-                          className="px-3.5 py-1.5 bg-amber-600 text-white font-bold rounded-xl shadow hover:bg-amber-700 transition-all text-xs cursor-pointer flex items-center gap-1"
-                        >
-                          استعراض / تحميل 📥
-                        </button>
-                      )}
                     </div>
                   );
                 })}

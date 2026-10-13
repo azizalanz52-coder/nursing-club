@@ -106,6 +106,15 @@ interface CertificateItem {
   description: string;
 }
 
+interface ExamEntry {
+  course: string;
+  courseCode?: string;
+  date: string;
+  time?: string;
+  location?: string;
+  notes?: string;
+}
+
 interface NewsletterItem {
   id: string;
   title: string;
@@ -114,6 +123,11 @@ interface NewsletterItem {
   link?: string;
   date: string;
   image: string;
+  type?: 'article' | 'exam-schedule';
+  featured?: boolean;
+  examCohort?: string;
+  examSemester?: string;
+  exams?: ExamEntry[];
 }
 
 interface ScientificTextItem {
@@ -160,6 +174,8 @@ export default function AdminDashboard() {
   const [certImageInput, setCertImageInput] = useState<string>('/logo.png');
   const [certDescInput, setCertDescInput] = useState<string>('');
 
+  const emptyExamRow = (): ExamEntry => ({ course: '', courseCode: '', date: '', time: '', location: '', notes: '' });
+
   const [newsletters, setNewsletters] = useState<NewsletterItem[]>([]);
   const [editingNewsletterId, setEditingNewsletterId] = useState<string | null>(null);
   const [newsTitleInput, setNewsTitleInput] = useState<string>('');
@@ -167,6 +183,11 @@ export default function AdminDashboard() {
   const [newsContentInput, setNewsContentInput] = useState<string>('');
   const [newsLinkInput, setNewsLinkInput] = useState<string>('');
   const [newsImageInput, setNewsImageInput] = useState<string>('/logo.png');
+  const [newsTypeInput, setNewsTypeInput] = useState<'article' | 'exam-schedule'>('article');
+  const [newsFeaturedInput, setNewsFeaturedInput] = useState<boolean>(false);
+  const [examCohortInput, setExamCohortInput] = useState<string>('دفعة 2024');
+  const [examSemesterInput, setExamSemesterInput] = useState<string>('');
+  const [examRows, setExamRows] = useState<ExamEntry[]>([emptyExamRow()]);
 
   // حالة تبويب نصوص المحتوى العلمي
   const [scientificTexts, setScientificTexts] = useState<ScientificTextItem[]>([]);
@@ -465,35 +486,68 @@ export default function AdminDashboard() {
     });
   };
 
+  const resetNewsletterForm = () => {
+    setEditingNewsletterId(null);
+    setNewsTitleInput('');
+    setNewsCategoryInput('أخبار النادي الأسبوعية');
+    setNewsContentInput('');
+    setNewsLinkInput('');
+    setNewsImageInput('/logo.png');
+    setNewsTypeInput('article');
+    setNewsFeaturedInput(false);
+    setExamCohortInput('دفعة 2024');
+    setExamSemesterInput('');
+    setExamRows([emptyExamRow()]);
+  };
+
   const handleSaveNewsletter = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newsTitleInput.trim() || !newsContentInput.trim()) return;
+    const isExam = newsTypeInput === 'exam-schedule';
+    const cleanedExams = examRows
+      .map((row) => ({
+        course: row.course.trim(),
+        courseCode: row.courseCode?.trim() || '',
+        date: row.date,
+        time: row.time?.trim() || '',
+        location: row.location?.trim() || '',
+        notes: row.notes?.trim() || '',
+      }))
+      .filter((row) => row.course && row.date);
+
+    if (!newsTitleInput.trim()) return;
+    if (!isExam && !newsContentInput.trim()) return;
+    if (isExam && cleanedExams.length === 0) {
+      setModalMessage('أضف اختباراً واحداً على الأقل باسم المادة وتاريخه.');
+      setModalType('success');
+      return;
+    }
 
     const newsId = editingNewsletterId ? editingNewsletterId : Date.now().toString();
     const updatedNews: NewsletterItem = {
       id: newsId,
       title: newsTitleInput.trim(),
-      category: newsCategoryInput,
+      category: isExam ? 'جداول الاختبارات' : newsCategoryInput,
       content: newsContentInput.trim(),
       link: newsLinkInput.trim(),
       image: newsImageInput,
-      date: new Date().toISOString()
+      date: new Date().toISOString(),
+      type: newsTypeInput,
+      featured: newsFeaturedInput,
+      examCohort: isExam ? examCohortInput.trim() : '',
+      examSemester: isExam ? examSemesterInput.trim() : '',
+      exams: isExam ? cleanedExams : [],
     };
 
     try {
       await setDoc(doc(db, 'site_newsletters', newsId), updatedNews);
       if (editingNewsletterId) {
         setNewsletters(newsletters.map(n => n.id === newsId ? updatedNews : n));
-        setModalMessage('تم تحديث وتعديل النشرة الأسبوعية بنجاح سحابياً! ✏️📰');
+        setModalMessage(isExam ? 'تم تحديث جدول الاختبارات، ويظهر الآن في صفحة النشرة.' : 'تم تحديث النشرة الأسبوعية بنجاح.');
       } else {
         setNewsletters([updatedNews, ...newsletters]);
-        setModalMessage('تم إصدار ونشر النشرة الأسبوعية بنجاح سحابياً للموقع! 📢✨');
+        setModalMessage(isExam ? 'تم نشر جدول الاختبارات في النشرة الأكاديمية.' : 'تم إصدار النشرة وظهرت في صفحة الموقع.');
       }
-      setEditingNewsletterId(null);
-      setNewsTitleInput('');
-      setNewsContentInput('');
-      setNewsLinkInput('');
-      setNewsImageInput('/logo.png');
+      resetNewsletterForm();
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -503,12 +557,18 @@ export default function AdminDashboard() {
   };
 
   const handleEditNewsletterClick = (news: NewsletterItem) => {
+    const isExam = news.type === 'exam-schedule' || (news.exams && news.exams.length > 0);
     setEditingNewsletterId(news.id);
     setNewsTitleInput(news.title);
     setNewsCategoryInput(news.category || 'أخبار النادي الأسبوعية');
     setNewsContentInput(news.content);
     setNewsLinkInput(news.link || '');
     setNewsImageInput(news.image || '/logo.png');
+    setNewsTypeInput(isExam ? 'exam-schedule' : 'article');
+    setNewsFeaturedInput(Boolean(news.featured));
+    setExamCohortInput(news.examCohort || 'دفعة 2024');
+    setExamSemesterInput(news.examSemester || '');
+    setExamRows(news.exams && news.exams.length ? news.exams : [emptyExamRow()]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -2233,7 +2293,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'weekly-newsletter' ? 'bg-purple-700 text-white shadow-md scale-105' : 'bg-purple-50 text-purple-900 border border-purple-200 hover:bg-purple-100'
             }`}
           >
-            📰 النشرة الأسبوعية ({newsletters.length})
+            📰 النشرة وجداول الاختبارات ({newsletters.length})
           </button>
 
           <button
@@ -2472,159 +2532,240 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
         {activeTab === 'weekly-newsletter' && (
           <div className="space-y-8">
-            <div className="bg-white rounded-3xl p-8 border border-purple-300 shadow-sm space-y-6">
+            <div className="bg-white rounded-3xl p-8 border border-[#630517]/20 shadow-sm space-y-6">
               <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
                 <div>
-                  <h3 className="text-xl font-black text-purple-900">
-                    {editingNewsletterId ? '✏️ تعديل النشرة الأسبوعية وأخبار التمريض' : '📰 إصدار ونشر نشرة أسبوعية جديدة (أخبار التمريض ومصادر اختبار الهيئة)'}
+                  <h3 className="text-xl font-black text-[#630517]">
+                    {editingNewsletterId ? 'تعديل إصدار النشرة' : 'النشرة الأكاديمية وجداول اختبارات الدفعات'}
                   </h3>
-                  <p className="text-xs text-slate-500">أدخل عنوان النشرة، التصنيف، المحتوى التفصيلي، روابط مفيدة، والصورة البصرية.</p>
+                  <p className="text-xs text-slate-500">انشر جدولاً لدفعة معيّنة أو خبراً/مصدراً، ويظهر مباشرة في صفحة النشرة.</p>
                 </div>
-                {editingNewsletterId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingNewsletterId(null);
-                      setNewsTitleInput('');
-                      setNewsContentInput('');
-                      setNewsLinkInput('');
-                      setNewsImageInput('/logo.png');
-                    }}
-                    className="text-xs text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-xl hover:bg-red-100"
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/newsletter"
+                    target="_blank"
+                    className="text-xs font-black text-[#630517] bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl hover:bg-amber-100"
                   >
-                    إلغاء التعديل ✕
-                  </button>
-                )}
+                    فتح صفحة النشرة ↗
+                  </Link>
+                  {editingNewsletterId && (
+                    <button
+                      type="button"
+                      onClick={resetNewsletterForm}
+                      className="text-xs text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-xl hover:bg-red-100"
+                    >
+                      إلغاء التعديل ✕
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <form onSubmit={handleSaveNewsletter} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">عنوان النشرة أو الخبر</label>
-                  <input
-                    type="text"
-                    placeholder="مثال: النشرة الأسبوعية #4: ملخص فعاليات الشهر ومصادر الهيئة"
-                    value={newsTitleInput}
-                    onChange={(e) => setNewsTitleInput(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-purple-600"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">تصنيف النشرة</label>
-                  <select
-                    value={newsCategoryInput}
-                    onChange={(e) => setNewsCategoryInput(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
-                  >
-                    <option value="أخبار النادي الأسبوعية">أخبار النادي الأسبوعية 📢</option>
-                    <option value="مصادر اختبار الهيئة">مصادر اختبار الهيئة 🩺</option>
-                    <option value="تحديثات كلية التمريض">تحديثات كلية التمريض 🏛️</option>
-                    <option value="مقالات وابتكارات">مقالات وابتكارات 💡</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">رابط خارجي مفيد (اختياري)</label>
-                  <input
-                    type="text"
-                    placeholder="https://..."
-                    value={newsLinkInput}
-                    onChange={(e) => setNewsLinkInput(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 font-mono bg-white focus:outline-none focus:border-purple-600"
-                    dir="ltr"
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">صورة النشرة أو البوستر (📁)</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const base64 = await convertFileToBase64(e.target.files[0]);
-                        setNewsImageInput(base64);
-                      }
-                    }}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-600 file:text-white cursor-pointer"
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">محتوى النشرة والتفاصيل</label>
-                  <textarea
-                    rows={4}
-                    placeholder="اكتب تفاصيل النشرة، أبرز الإنجازات، ومصادر اختبار التمريض..."
-                    value={newsContentInput}
-                    onChange={(e) => setNewsContentInput(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-purple-600 leading-relaxed"
-                    required
-                  />
-                </div>
-
-                <div className="sm:col-span-2 pt-2">
+              <form onSubmit={handleSaveNewsletter} className="space-y-5 bg-[#630517]/5 p-6 rounded-2xl border border-[#630517]/10">
+                <div className="flex flex-wrap gap-2">
                   <button
-                    type="submit"
-                    className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer"
+                    type="button"
+                    onClick={() => setNewsTypeInput('exam-schedule')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black ${newsTypeInput === 'exam-schedule' ? 'bg-[#630517] text-[#F5D061]' : 'bg-white text-slate-600 border border-slate-200'}`}
                   >
-                    {editingNewsletterId ? '💾 حفظ التعديلات وتحديث النشرة سحابياً' : '+ إصدار ونشر النشرة الأسبوعية سحابياً للموقع 🚀'}
+                    جدول اختبارات دفعة
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewsTypeInput('article')}
+                    className={`px-4 py-2 rounded-xl text-xs font-black ${newsTypeInput === 'article' ? 'bg-[#630517] text-[#F5D061]' : 'bg-white text-slate-600 border border-slate-200'}`}
+                  >
+                    خبر أو مصدر في النشرة
                   </button>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">{newsTypeInput === 'exam-schedule' ? 'عنوان الجدول' : 'عنوان الخبر'}</label>
+                    <input
+                      type="text"
+                      placeholder={newsTypeInput === 'exam-schedule' ? 'مثال: جدول اختبارات منتصف الفصل - دفعة 2024' : 'مثال: مصادر مراجعة اختبار الهيئة هذا الأسبوع'}
+                      value={newsTitleInput}
+                      onChange={(e) => setNewsTitleInput(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-[#630517]"
+                      required
+                    />
+                  </div>
+
+                  {newsTypeInput === 'article' ? (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">التصنيف</label>
+                      <select
+                        value={newsCategoryInput}
+                        onChange={(e) => setNewsCategoryInput(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
+                      >
+                        <option value="أخبار النادي الأسبوعية">أخبار النادي الأسبوعية</option>
+                        <option value="مصادر اختبار الهيئة">مصادر اختبار الهيئة</option>
+                        <option value="تحديثات كلية التمريض">تحديثات كلية التمريض</option>
+                        <option value="نصائح دراسية">نصائح دراسية</option>
+                        <option value="مقالات وابتكارات">مقالات وابتكارات</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">الدفعة</label>
+                      <input
+                        list="nursing-cohorts"
+                        value={examCohortInput}
+                        onChange={(e) => setExamCohortInput(e.target.value)}
+                        placeholder="دفعة 2024"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
+                      />
+                      <datalist id="nursing-cohorts">
+                        <option value="دفعة 2021" />
+                        <option value="دفعة 2022" />
+                        <option value="دفعة 2023" />
+                        <option value="دفعة 2024" />
+                        <option value="دفعة 2025" />
+                        <option value="دفعة 2026" />
+                        <option value="الامتياز" />
+                        <option value="جميع الدفعات" />
+                      </datalist>
+                    </div>
+                  )}
+
+                  {newsTypeInput === 'exam-schedule' && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">الفصل الدراسي</label>
+                      <input
+                        type="text"
+                        placeholder="مثال: الفصل الأول 1447 / 2025-2026"
+                        value={examSemesterInput}
+                        onChange={(e) => setExamSemesterInput(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">رابط مفيد (اختياري)</label>
+                    <input
+                      type="text"
+                      placeholder="https://..."
+                      value={newsLinkInput}
+                      onChange={(e) => setNewsLinkInput(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 font-mono bg-white"
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-bold text-slate-700">صورة اختيارية</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const base64 = await convertFileToBase64(e.target.files[0]);
+                          setNewsImageInput(base64);
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-bold text-slate-700">{newsTypeInput === 'exam-schedule' ? 'ملاحظة للطلاب (اختياري)' : 'المحتوى'}</label>
+                    <textarea
+                      rows={newsTypeInput === 'exam-schedule' ? 2 : 4}
+                      placeholder={newsTypeInput === 'exam-schedule' ? 'مثال: يُرجى الحضور قبل الموعد بربع ساعة، والبطاقة الجامعية مطلوبة.' : 'اكتب الخبر أو المصدر أو النصيحة الدراسية...'}
+                      value={newsContentInput}
+                      onChange={(e) => setNewsContentInput(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white leading-relaxed"
+                      required={newsTypeInput === 'article'}
+                    />
+                  </div>
+
+                  {newsTypeInput === 'article' && (
+                    <label className="sm:col-span-2 flex items-center gap-2 text-xs font-bold text-slate-700">
+                      <input type="checkbox" checked={newsFeaturedInput} onChange={(e) => setNewsFeaturedInput(e.target.checked)} />
+                      تثبيت هذا الخبر في أعلى النشرة
+                    </label>
+                  )}
+                </div>
+
+                {newsTypeInput === 'exam-schedule' && (
+                  <div className="space-y-3 bg-white p-4 rounded-2xl border border-slate-200">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-black text-[#630517]">مواد الجدول</p>
+                      <button
+                        type="button"
+                        onClick={() => setExamRows([...examRows, emptyExamRow()])}
+                        className="text-[11px] font-black bg-amber-50 text-[#630517] px-3 py-1.5 rounded-lg"
+                      >
+                        + إضافة مادة
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {examRows.map((row, idx) => (
+                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-6 gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                          <input value={row.course} onChange={(e) => setExamRows(examRows.map((r, i) => i === idx ? { ...r, course: e.target.value } : r))} placeholder="المادة *" className="sm:col-span-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" required={idx === 0} />
+                          <input value={row.courseCode || ''} onChange={(e) => setExamRows(examRows.map((r, i) => i === idx ? { ...r, courseCode: e.target.value } : r))} placeholder="الرمز" className="px-3 py-2 rounded-lg border border-slate-200 text-xs" />
+                          <input type="date" value={row.date} onChange={(e) => setExamRows(examRows.map((r, i) => i === idx ? { ...r, date: e.target.value } : r))} className="px-3 py-2 rounded-lg border border-slate-200 text-xs" required={idx === 0} />
+                          <input value={row.time || ''} onChange={(e) => setExamRows(examRows.map((r, i) => i === idx ? { ...r, time: e.target.value } : r))} placeholder="الوقت" className="px-3 py-2 rounded-lg border border-slate-200 text-xs" />
+                          <div className="flex gap-2">
+                            <input value={row.location || ''} onChange={(e) => setExamRows(examRows.map((r, i) => i === idx ? { ...r, location: e.target.value } : r))} placeholder="القاعة" className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs" />
+                            {examRows.length > 1 && (
+                              <button type="button" onClick={() => setExamRows(examRows.filter((_, i) => i !== idx))} className="text-red-600 text-xs font-black px-2">✕</button>
+                            )}
+                          </div>
+                          <input value={row.notes || ''} onChange={(e) => setExamRows(examRows.map((r, i) => i === idx ? { ...r, notes: e.target.value } : r))} placeholder="ملاحظات" className="sm:col-span-6 px-3 py-2 rounded-lg border border-slate-200 text-xs" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 cursor-pointer"
+                >
+                  {editingNewsletterId ? 'حفظ التحديث في النشرة' : newsTypeInput === 'exam-schedule' ? 'نشر جدول الاختبارات في النشرة' : 'نشر في صفحة النشرة'}
+                </button>
               </form>
             </div>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">سجل النشرات الأسبوعية الصادرة ({newsletters.length})</h3>
+              <h3 className="text-xl font-black text-slate-900">ما هو منشور في النشرة ({newsletters.length})</h3>
               {newsletters.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <p className="text-sm font-bold">لم تتم إضافة أي نشرة أسبوعية حتى الآن.</p>
+                  <p className="text-sm font-bold">لا يوجد إصدار بعد. انشر جدولاً أو خبراً ليظهر للطلاب فوراً.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {newsletters.map((news) => (
-                    <div key={news.id} className="p-6 rounded-2xl border border-purple-200 bg-purple-50/20 shadow-sm flex flex-col justify-between space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <img src={news.image || '/logo.png'} alt={news.title} className="w-14 h-14 rounded-2xl object-cover border-2 border-purple-400 shadow" />
-                          <div>
-                            <span className="text-[10px] bg-purple-200 text-purple-900 px-2.5 py-0.5 rounded-full font-bold inline-block">
-                              {news.category}
+                  {newsletters.map((news) => {
+                    const isExam = news.type === 'exam-schedule' || (news.exams && news.exams.length > 0);
+                    return (
+                      <div key={news.id} className="p-6 rounded-2xl border border-[#630517]/15 bg-[#630517]/[0.03] shadow-sm flex flex-col justify-between space-y-4">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] bg-[#630517] text-[#F5D061] px-2.5 py-0.5 rounded-full font-bold">
+                              {isExam ? news.examCohort || 'جدول اختبارات' : news.category}
                             </span>
-                            <h4 className="font-black text-slate-900 text-sm mt-1">{news.title}</h4>
+                            {news.featured && <span className="text-[10px] font-black text-amber-700">مثبّت</span>}
+                          </div>
+                          <h4 className="font-black text-slate-900 text-sm">{news.title}</h4>
+                          {isExam ? (
+                            <p className="text-xs text-slate-600 font-bold">{news.exams?.length || 0} مادة • {news.examSemester || 'بدون فصل'}</p>
+                          ) : (
+                            <p className="text-slate-700 text-xs bg-white p-3 rounded-xl border border-slate-100 leading-relaxed line-clamp-4">{news.content}</p>
+                          )}
+                        </div>
+                        <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[11px]">
+                          <span className="text-slate-400">{news.date ? new Date(news.date).toLocaleDateString('ar-SA') : ''}</span>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => handleEditNewsletterClick(news)} className="px-3 py-1 rounded-lg bg-amber-50 text-[#630517] font-bold hover:bg-amber-100 cursor-pointer">تعديل</button>
+                            <button type="button" onClick={() => handleDeleteNewsletter(news.id)} className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer">حذف</button>
                           </div>
                         </div>
-                        <p className="text-slate-700 text-xs font-semibold bg-white p-3 rounded-xl border border-purple-100 shadow-inner leading-relaxed">
-                          "{news.content}"
-                        </p>
-                        {news.link && (
-                          <a href={news.link} target="_blank" rel="noopener noreferrer" className="block text-xs text-sky-600 hover:underline font-mono truncate" dir="ltr">
-                            🔗 {news.link}
-                          </a>
-                        )}
                       </div>
-
-                      <div className="pt-2 border-t border-purple-200 flex justify-between items-center text-[11px]">
-                        <span className="text-slate-400">{new Date(news.date).toLocaleDateString('ar-SA')}</span>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleEditNewsletterClick(news)}
-                            className="px-3 py-1 rounded-lg bg-purple-100 text-purple-900 font-bold hover:bg-purple-200 cursor-pointer"
-                          >
-                            تعديل ✏️
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteNewsletter(news.id)}
-                            className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
-                          >
-                            حذف ✕
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
