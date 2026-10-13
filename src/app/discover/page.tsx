@@ -88,46 +88,30 @@ export default function DiscoverPage() {
   useEffect(() => {
     const fetchCloudContent = async () => {
       try {
-        const passionSnap = await getDocs(collection(db, 'site_passion_slides'));
+        const [passionSnap, discoverSnap, partnersSnap, achievementsSnap] = await Promise.all([
+          getDocs(collection(db, 'site_passion_slides')),
+          getDocs(collection(db, 'site_discover_events')),
+          getDocs(collection(db, 'site_partners')),
+          getDocs(collection(db, 'student_achievements')),
+        ]);
+
         if (!passionSnap.empty) {
-          const slides: any[] = [];
-          passionSnap.forEach((d) => {
-            slides.push({ id: d.id, ...d.data() });
-          });
-          if (slides.length > 0) {
-            setPassionSlides(slides);
-          }
+          const slides = passionSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          if (slides.length > 0) setPassionSlides(slides);
         }
 
-        const discoverSnap = await getDocs(collection(db, 'site_discover_events'));
         if (!discoverSnap.empty) {
-          const eventsList: any[] = [];
-          discoverSnap.forEach((d) => {
-            eventsList.push({ id: d.id, ...d.data() });
-          });
-          if (eventsList.length > 0) {
-            setDiscoverEvents(eventsList);
-          }
+          const eventsList = discoverSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          if (eventsList.length > 0) setDiscoverEvents(eventsList);
         }
 
-        const partnersSnap = await getDocs(collection(db, 'site_partners'));
         if (!partnersSnap.empty) {
-          const partnersList: PartnerItem[] = [];
-          partnersSnap.forEach((d) => {
-            partnersList.push({ id: d.id, ...d.data() } as PartnerItem);
-          });
-          if (partnersList.length > 0) {
-            setPartners(partnersList);
-          }
+          const partnersList = partnersSnap.docs.map((d) => ({ id: d.id, ...d.data() } as PartnerItem));
+          if (partnersList.length > 0) setPartners(partnersList);
         }
 
-        const achievementsSnap = await getDocs(collection(db, 'student_achievements'));
         if (!achievementsSnap.empty) {
-          const achievementsList: StudentAchievement[] = [];
-          achievementsSnap.forEach((d) => {
-            achievementsList.push({ id: d.id, ...d.data() } as StudentAchievement);
-          });
-          setStudentAchievements(achievementsList);
+          setStudentAchievements(achievementsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as StudentAchievement)));
         }
       } catch (err) {
         console.error('Error fetching cloud data:', err);
@@ -432,6 +416,8 @@ export default function DiscoverPage() {
                     <img
                       src={coverImage}
                       alt={event.title}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover opacity-85 group-hover:scale-110 transition-transform duration-700"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = '/header-banner.png';
@@ -486,6 +472,8 @@ export default function DiscoverPage() {
                       <img
                         src={img}
                         alt={`صورة ${idx + 1}`}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = '/header-banner.png';

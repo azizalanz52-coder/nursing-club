@@ -4,21 +4,29 @@ import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import OpeningSplash from './components/OpeningSplash';
 
+const SPLASH_KEY = 'nurs_splash_seen';
+
 export default function AppShell({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [isLoading, setIsLoading] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
+    if (sessionStorage.getItem(SPLASH_KEY) === '1') {
+      setShowSplash(false);
+      return;
+    }
+
     const timer = setTimeout(() => {
-      setIsLoading(false);
+      sessionStorage.setItem(SPLASH_KEY, '1');
+      setShowSplash(false);
     }, 3000);
     return () => clearTimeout(timer);
   }, []);
 
-  if (isLoading) {
+  if (showSplash) {
     return <OpeningSplash />;
   }
 

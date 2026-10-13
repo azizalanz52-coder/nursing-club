@@ -14,6 +14,7 @@ import ScientificTextsShelf from '../components/ScientificTextsShelf';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { emailToPhone } from '../lib/authIdentity';
+import PageLoading from '../components/PageLoading';
 
 export default function CommitteeDashboard() {
   const router = useRouter();
@@ -531,18 +532,18 @@ useEffect(() => {
         setTargetCommitteeForTask(resolvedComm);
       }
 
-      const linkSnap = await getDoc(doc(db, 'committee_whatsapp_links', resolvedComm));
+      setLoading(false);
+
+      const [linkSnap, reqSnap] = await Promise.all([
+        getDoc(doc(db, 'committee_whatsapp_links', resolvedComm)),
+        getDocs(collection(db, 'applications')),
+      ]);
       if (linkSnap.exists()) {
         const savedLink = linkSnap.data().link || '';
         setWhatsappLink(savedLink);
         setCurrentCommitteeWhatsappInput(savedLink);
       }
-
-      const reqSnap = await getDocs(collection(db, 'applications'));
-      const allReqs = reqSnap.docs.map(d => ({ ...d.data(), id: d.id }));
-      setRequests(allReqs);
-
-      setLoading(false);
+      setRequests(reqSnap.docs.map(d => ({ ...d.data(), id: d.id })));
     } catch (err) {
       console.error(err);
       setLoading(false);
@@ -1694,7 +1695,12 @@ useEffect(() => {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center font-bold text-slate-600 bg-slate-50">جاري تحميل لوحة تحكم اللجنة التفاعلية...</div>;
+    return (
+      <PageLoading
+        title="جاري تجهيز بوابتك"
+        hint="تجهيز بيانات اللجنة"
+      />
+    );
   }
 
   const displayedTasks = committeeTasks.filter(t => isSameCommittee(t.committee, currentActiveComm));

@@ -11,6 +11,7 @@ import HrCertificatesRegistry from '../../components/HrCertificatesRegistry';
 import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
+import PageLoading from '../../components/PageLoading';
 
 // دالة تحويل الملف إلى Base64 كخيار احتياطي ومضمون
 const convertFileToBase64 = (file: File): Promise<string> => {
@@ -220,28 +221,99 @@ export default function CommitteeDetailPage() {
       return;
     }
 
+    if (!trimmedPhone) {
+      setLoading(false);
+      return;
+    }
+
+    const matchesThisCommittee = (acceptedComm: string, roleStr = '') => {
+      const normAccepted = normalizeArabic(acceptedComm);
+      const normRole = normalizeArabic(roleStr);
+      const normBaseName = normalizeArabic(baseDetails.name);
+      const normId = normalizeArabic(id);
+      return (
+        normAccepted.includes(normBaseName) ||
+        normBaseName.includes(normAccepted) ||
+        normAccepted.includes(normId) ||
+        normId.includes(normAccepted) ||
+        (id === 'media' && (normAccepted.includes('اعلام') || normRole.includes('اعلام'))) ||
+        (id === 'pr' && (normAccepted.includes('علاقات') || normRole.includes('علاقات'))) ||
+        (id === 'design' && (normAccepted.includes('تصميم') || normRole.includes('تصميم'))) ||
+        (id === 'quality' && (normAccepted.includes('جوده') || normAccepted.includes('تطوير') || normRole.includes('جوده'))) ||
+        (id === 'scientific' && (normAccepted.includes('علمي') || normRole.includes('علمي'))) ||
+        (id === 'hr' && (normAccepted.includes('موارد') || normAccepted.includes('بشري') || normRole.includes('موارد'))) ||
+        (id === 'events-org' && (normAccepted.includes('تنظيم') || normAccepted.includes('فعاليات')))
+      );
+    };
+
+    let cancelled = false;
+
     const fetchCloudData = async () => {
       try {
-        const docRef = doc(db, 'committees', id);
-        const docSnap = await getDoc(docRef);
-        
+        const [docSnap, userSnap] = await Promise.all([
+          getDoc(doc(db, 'committees', id)),
+          getDoc(doc(db, 'users', trimmedPhone)),
+        ]);
+
         let mergedMembers = baseDetails.members || [];
         if (docSnap.exists()) {
           const cloudData = docSnap.data();
           if (cloudData.members && cloudData.members.length > 0) {
             mergedMembers = cloudData.members;
           }
-          setCommittee((prev: any) => ({
-            ...prev,
-            maleLeader: cloudData.maleLeader || prev.maleLeader,
-            femaleLeader: cloudData.femaleLeader || prev.femaleLeader,
-            whatsappLink: cloudData.whatsappLink || prev.whatsappLink,
-          }));
+          if (!cancelled) {
+            setCommittee((prev: any) => ({
+              ...prev,
+              maleLeader: cloudData.maleLeader || prev.maleLeader,
+              femaleLeader: cloudData.femaleLeader || prev.femaleLeader,
+              whatsappLink: cloudData.whatsappLink || prev.whatsappLink,
+            }));
+          }
         }
 
-        const appsSnap = await getDocs(collection(db, 'applications'));
         let userAuthorized = trimmedPhone === '0553731265';
         const normUserPhone = normalizePhone(trimmedPhone);
+
+        if (userSnap.exists()) {
+          const uData = userSnap.data();
+          const assigned = String(uData.assignedCommittee || uData.committee || '');
+          const roleStr = String(uData.role || '');
+          if (matchesThisCommittee(assigned, roleStr)) userAuthorized = true;
+        }
+
+        if (!userAuthorized && normUserPhone !== '') {
+          const foundInDirect = mergedMembers.some((m: any) => m.phone && normalizePhone(m.phone) === normUserPhone);
+          if (foundInDirect) userAuthorized = true;
+        }
+
+        if (userAuthorized && !cancelled) {
+          setIsAuthorizedMember(true);
+          setLoading(false);
+        }
+
+        const needsHr = id === 'hr' || normalizeArabic(baseDetails.name).includes('موارد');
+        const emptySnap = { empty: true, docs: [] as { id: string; data: () => Record<string, unknown> }[] };
+        const [
+          appsSnap,
+          eventsSnap,
+          tasksSnap,
+          partnersSnap,
+          mediaSnap,
+          scientificSnap,
+          hrSnap,
+          siteSnap,
+        ] = await Promise.all([
+          getDocs(collection(db, 'applications')),
+          getDocs(collection(db, 'site_events')),
+          getDocs(collection(db, 'committee_tasks')),
+          getDocs(collection(db, 'public_partners_relations')),
+          getDocs(collection(db, 'media_committee_gallery')),
+          getDocs(collection(db, 'scientific_committee_texts')),
+          needsHr ? getDocs(collection(db, 'certificates')) : Promise.resolve(emptySnap),
+          needsHr ? getDocs(collection(db, 'site_certificates')) : Promise.resolve(emptySnap),
+        ]);
+
+        if (cancelled) return;
 
         if (!appsSnap.empty) {
           const acceptedFromApps: any[] = [];
@@ -250,26 +322,7 @@ export default function CommitteeDetailPage() {
             const acceptedComm = data.acceptedCommittee || data.committee || data.assignedCommittee || '';
             const statusStr = String(data.status || '');
             const isAccepted = normalizeArabic(statusStr).includes('مقبول') || statusStr === 'مقبول';
-
-            const normAccepted = normalizeArabic(acceptedComm);
-            const normBaseName = normalizeArabic(baseDetails.name);
-            const normId = normalizeArabic(id);
-
-            // مطابقة ذكية تتغلب على اختلاف الهمزات (الإعلام / الاعلام)
-            const matchesId = 
-              normAccepted.includes(normBaseName) || 
-              normBaseName.includes(normAccepted) || 
-              normAccepted.includes(normId) ||
-              normId.includes(normAccepted) ||
-              (id === 'media' && (normAccepted.includes('اعلام') || normAccepted.includes('إعلام'))) ||
-              (id === 'pr' && normAccepted.includes('علاقات')) ||
-              (id === 'design' && normAccepted.includes('تصميم')) ||
-              (id === 'quality' && (normAccepted.includes('جوده') || normAccepted.includes('تطوير'))) ||
-              (id === 'scientific' && normAccepted.includes('علمي')) ||
-              (id === 'hr' && (normAccepted.includes('موارد') || normAccepted.includes('بشري'))) ||
-              (id === 'events-org' && (normAccepted.includes('تنظيم') || normAccepted.includes('فعاليات')));
-
-            if (isAccepted && matchesId) {
+            if (isAccepted && matchesThisCommittee(acceptedComm)) {
               acceptedFromApps.push({
                 name: data.fullName || data.name || '',
                 phone: data.phone ? String(data.phone).trim() : '',
@@ -277,7 +330,6 @@ export default function CommitteeDetailPage() {
                 status: 'نشط ✓',
                 universityId: data.universityId || ''
               });
-
               const appPhoneNorm = normalizePhone(data.phone);
               if (normUserPhone !== '' && appPhoneNorm !== '' && appPhoneNorm === normUserPhone) {
                 userAuthorized = true;
@@ -292,43 +344,7 @@ export default function CommitteeDetailPage() {
           }
         }
 
-        if (!userAuthorized && normUserPhone !== '') {
-          const foundInDirect = mergedMembers.some((m: any) => m.phone && normalizePhone(m.phone) === normUserPhone);
-          if (foundInDirect) userAuthorized = true;
-        }
-
-        if (!userAuthorized && trimmedPhone !== '') {
-          try {
-            const userSnap = await getDoc(doc(db, 'users', trimmedPhone));
-            if (userSnap.exists()) {
-              const uData = userSnap.data();
-              const assigned = String(uData.assignedCommittee || uData.committee || '');
-              const roleStr = String(uData.role || '');
-              const normAssigned = normalizeArabic(assigned);
-              const normRole = normalizeArabic(roleStr);
-              const normBaseName = normalizeArabic(baseDetails.name);
-              const matchesAssigned =
-                normAssigned.includes(normBaseName) ||
-                normBaseName.includes(normAssigned) ||
-                (id === 'hr' && (normAssigned.includes('موارد') || normAssigned.includes('بشري') || normRole.includes('موارد'))) ||
-                (id === 'media' && (normAssigned.includes('اعلام') || normRole.includes('اعلام'))) ||
-                (id === 'design' && normAssigned.includes('تصميم')) ||
-                (id === 'pr' && normAssigned.includes('علاقات')) ||
-                (id === 'quality' && (normAssigned.includes('جوده') || normAssigned.includes('تطوير'))) ||
-                (id === 'scientific' && normAssigned.includes('علمي')) ||
-                (id === 'events-org' && (normAssigned.includes('تنظيم') || normAssigned.includes('فعاليات')));
-              if (matchesAssigned) userAuthorized = true;
-            }
-          } catch (userErr) {
-            console.error(userErr);
-          }
-        }
-
-        if (id === 'hr' || normalizeArabic(baseDetails.name).includes('موارد')) {
-          const [hrSnap, siteSnap] = await Promise.all([
-            getDocs(collection(db, 'certificates')),
-            getDocs(collection(db, 'site_certificates')),
-          ]);
+        if (needsHr) {
           const mapped = new Map<string, any>();
           [...hrSnap.docs, ...siteSnap.docs].forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
           const certList = Array.from(mapped.values()).sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -338,7 +354,6 @@ export default function CommitteeDetailPage() {
         setIsAuthorizedMember(userAuthorized);
         setCommittee((prev: any) => ({ ...prev, members: mergedMembers }));
 
-        const eventsSnap = await getDocs(collection(db, 'site_events'));
         if (!eventsSnap.empty) {
           const evs: any[] = [];
           eventsSnap.forEach((d) => { evs.push({ id: d.id, ...d.data() }); });
@@ -346,33 +361,26 @@ export default function CommitteeDetailPage() {
           if (evs.length > 0) setSelectedEventTitle(evs[0].title);
         }
 
-        const tasksSnap = await getDocs(collection(db, 'committee_tasks'));
         if (!tasksSnap.empty) {
           const tasks: any[] = [];
           tasksSnap.forEach((d) => { tasks.push({ id: d.id, ...d.data() }); });
           setCommitteeTasks(tasks);
         }
 
-        // جلب سجل الشراكات (للعلاقات العامة)
-        const partnersSnap = await getDocs(collection(db, 'public_partners_relations'));
         setPublicPartnersList(partnersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        // جلب المعرض الإعلامي (للإعلام)
-        const mediaSnap = await getDocs(collection(db, 'media_committee_gallery'));
         setMediaGallery(mediaSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        // جلب بنك النصوص والعبارات العلمية (للمحتوى العلمي ولجنة التصميم)
-        const scientificSnap = await getDocs(collection(db, 'scientific_committee_texts'));
         setScientificTextsList(scientificSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
       } catch (err) {
         console.error('Error fetching cloud data:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchCloudData();
+    return () => {
+      cancelled = true;
+    };
   }, [id, baseDetails]);
 
   const isAdmin = currentUserPhone === '0553731265';
@@ -767,9 +775,10 @@ export default function CommitteeDetailPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center" dir="rtl">
-        <p className="text-sm font-bold text-slate-500 animate-pulse">جاري التحقق من صلاحيات العضوية والخصوصية...</p>
-      </main>
+      <PageLoading
+        title="جاري تجهيز بوابتك"
+        hint={`تجهيز بيانات ${baseDetails.name}`}
+      />
     );
   }
 
