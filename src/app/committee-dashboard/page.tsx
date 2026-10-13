@@ -9,6 +9,9 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as XLSX from 'xlsx';
 import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
 import { notifyExistingUser } from '../lib/userAccounts';
+import { auth } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { emailToPhone } from '../lib/authIdentity';
 
 export default function CommitteeDashboard() {
   const router = useRouter();
@@ -160,43 +163,48 @@ useEffect(() => {
 }, [router]); 
 
   useEffect(() => {
-    const phone = localStorage.getItem('userPhone');
-    if (!phone) {
-      alert('الرجاء تسجيل الدخول أولاً.');
-      router.push('/login');
-      return;
-    }
-    setUserPhone(phone);
-    fetchLeaderData(phone);
-    fetchEscalatedReports();
-    fetchCommitteeTasks();
-    fetchAllUsers();
-    fetchQualityArchives();
-    fetchMediaGallery();
-    fetchEventExcuses();
-    fetchPublicPartners();
-    fetchCommitteeWhatsappLinks();
-    fetchHonorBoard();
-    fetchQualityUploadedFiles();
-
-    const unsubScientific = onSnapshot(
-      collection(db, 'scientific_committee_texts'),
-      (snap) => {
-        const texts = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-        setScientificTextsList(texts);
-      },
-      (err) => {
-        console.error('Error listening to scientific texts:', err);
+    let unsubScientific: (() => void) | undefined;
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        alert('الرجاء تسجيل الدخول أولاً.');
+        router.push('/login');
+        return;
       }
-    );
+      const phone = emailToPhone(user.email);
+      localStorage.setItem('userPhone', phone);
+      setUserPhone(phone);
+      fetchLeaderData(phone);
+      fetchEscalatedReports();
+      fetchCommitteeTasks();
+      fetchAllUsers();
+      fetchQualityArchives();
+      fetchMediaGallery();
+      fetchEventExcuses();
+      fetchPublicPartners();
+      fetchCommitteeWhatsappLinks();
+      fetchHonorBoard();
+      fetchQualityUploadedFiles();
 
-    const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
-    if (isHiddenLocally === 'true') {
-      setWarningHidden(true);
-    }
+      unsubScientific = onSnapshot(
+        collection(db, 'scientific_committee_texts'),
+        (snap) => {
+          const texts = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+          setScientificTextsList(texts);
+        },
+        (err) => {
+          console.error('Error listening to scientific texts:', err);
+        }
+      );
+
+      const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
+      if (isHiddenLocally === 'true') {
+        setWarningHidden(true);
+      }
+    });
 
     return () => {
-      unsubScientific();
+      unsubAuth();
+      if (unsubScientific) unsubScientific();
     };
   }, [router]);
 
@@ -329,13 +337,6 @@ useEffect(() => {
       const title = certTitle.trim();
       const name = certStudentName.trim();
       const issuer = userData?.fullName || 'لجنة الموارد البشرية';
-      let storedPassword = '';
-      if (phone) {
-        try {
-          const recipientSnap = await getDoc(doc(db, 'users', phone));
-          if (recipientSnap.exists()) storedPassword = recipientSnap.data()?.password || '';
-        } catch (er) { console.error(er); }
-      }
 
       const newCertObj = {
         fullName: name,
@@ -352,7 +353,7 @@ useEffect(() => {
         dateStr: new Date().toLocaleDateString('ar-SA'),
         issueDate: new Date().toISOString(),
         description: `صادرة من لجنة الموارد البشرية • ${issuer}`,
-        password: storedPassword,
+        password: '',
       };
 
       const certRef = await addDoc(collection(db, 'certificates'), newCertObj);

@@ -1,17 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { db } from '../lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { completeOrCreateUserAccount, isIncompleteUserAccount } from '../lib/userAccounts';
+import { loginWithPhonePassword, registerWithPhonePassword } from '../lib/sessionAuth';
 
 export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [isRegistering, setIsRegistering] = useState(false); // للتبديل بين تسجيل الدخول وإنشاء الحساب
-  const router = useRouter();
 
   if (!isOpen) return null;
 
@@ -24,50 +20,16 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
     }
 
     try {
-      const cleanPhone = phone.trim();
-
-      // 1. حماية صارمة خاصة بمدير النظام (عبدالعزيز) برقم الجوال وكلمة المرور السرية الحصرية
-      if (cleanPhone === '0553731265') {
-        if (password !== 'qwer8901as') {
-          alert('كلمة المرور غير صحيحة لحساب المشرف العام.');
-          return;
-        }
-        localStorage.setItem('userPhone', cleanPhone);
-        localStorage.setItem('userName', 'عبدالعزيز العنزي (المشرف العام)');
-        sessionStorage.setItem('adminToken', 'SECURE_ADMIN_KEY_NURSING_2026');
-        alert('أهلاً بك يا عبد العزيز (المشرف العام) 🚀');
-        onClose();
-        window.location.reload();
-        return;
+      const session = await loginWithPhonePassword(phone, password);
+      alert(`مرحباً بك يا ${session.fullName || 'صديقنا'}! تم تسجيل الدخول بنجاح.`);
+      onClose();
+      window.location.reload();
+    } catch (err: any) {
+      const message = String(err?.message || '');
+      if (message.includes('لم يكمل إنشاء الحساب')) {
+        setIsRegistering(true);
       }
-
-      // 2. التحقق من قاعدة بيانات المستخدمين في Firebase
-      const userDocRef = doc(db, 'users', cleanPhone);
-      const userSnap = await getDoc(userDocRef);
-
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        if (isIncompleteUserAccount(userData)) {
-          alert('هذا الرقم لم يكمل إنشاء الحساب بعد. استخدم "إنشاء حساب جديد" واختر كلمة المرور بنفسك.');
-          setIsRegistering(true);
-          return;
-        }
-        if (userData.password === password) {
-          sessionStorage.removeItem('adminToken'); // منع أي مستخدم عادي من أخذ صلاحية الأدمن
-          localStorage.setItem('userPhone', cleanPhone);
-          localStorage.setItem('userName', userData.fullName || 'مستخدم مسجل');
-          alert(`مرحباً بك يا ${userData.fullName || 'صديقنا'}! تم تسجيل الدخول بنجاح.`);
-          onClose();
-          window.location.reload();
-        } else {
-          alert('كلمة المرور غير صحيحة. يرجى التأكد والمحاولة مرة أخرى أو استخدام خيار "نسيت كلمة المرور".');
-        }
-      } else {
-        alert('رقم الجوال غير مسجل في النظام. يمكنك الضغط على "إنشاء حساب جديد" بالأسفل.');
-      }
-    } catch (err) {
-      console.error('Login error:', err);
-      alert('حدث خطأ أثناء تسجيل الدخول. تأكد من اتصال الإنترنت.');
+      alert(message || 'حدث خطأ أثناء تسجيل الدخول.');
     }
   };
 
@@ -85,33 +47,20 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
     }
 
     try {
-      const cleanPhone = phone.trim();
-      const result = await completeOrCreateUserAccount(db, {
-        phone: cleanPhone,
-        fullName: fullName.trim(),
+      const result = await registerWithPhonePassword({
+        phone,
         password,
+        fullName: fullName.trim(),
       });
-
-      if (result.status === 'exists') {
-        alert('رقم الجوال مسجل مسبقاً بكلمة مرور. قم بتسجيل الدخول مباشرة.');
-        setIsRegistering(false);
-        return;
-      }
-
-      sessionStorage.removeItem('adminToken');
-      localStorage.setItem('userPhone', cleanPhone);
-      localStorage.setItem('userName', fullName.trim());
-
       alert(
-        result.status === 'claimed'
+        result.claimed
           ? `مرحباً بك يا ${fullName.trim()}! تم إكمال حسابك وتعيين كلمة المرور بنجاح.`
           : `مرحباً بك يا ${fullName.trim()}! تم إنشاء حسابك وتسجيل دخولك بنجاح.`
       );
       onClose();
       window.location.reload();
-    } catch (err) {
-      console.error('Registration error:', err);
-      alert('حدث خطأ أثناء إنشاء الحساب. حاول مرة أخرى.');
+    } catch (err: any) {
+      alert(err?.message || 'حدث خطأ أثناء إنشاء الحساب. حاول مرة أخرى.');
     }
   };
 

@@ -3,9 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { db } from '../lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { completeOrCreateUserAccount, isIncompleteUserAccount } from '../lib/userAccounts';
+import { loginWithPhonePassword, registerWithPhonePassword } from '../lib/sessionAuth';
 
 export default function LoginPage() {
   const [phone, setPhone] = useState('');
@@ -13,17 +11,6 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const router = useRouter();
-
-  const finishLogin = (cleanPhone: string, name: string, isAdmin: boolean) => {
-    localStorage.setItem('userPhone', cleanPhone);
-    localStorage.setItem('userName', name);
-    if (isAdmin) {
-      sessionStorage.setItem('adminToken', 'SECURE_ADMIN_KEY_NURSING_2026');
-    } else {
-      sessionStorage.removeItem('adminToken');
-    }
-    router.push('/');
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,38 +20,14 @@ export default function LoginPage() {
     }
 
     try {
-      const cleanPhone = phone.trim();
-
-      if (cleanPhone === '0553731265') {
-        if (password !== 'qwer8901as') {
-          alert('كلمة المرور غير صحيحة لحساب المشرف العام.');
-          return;
-        }
-        finishLogin(cleanPhone, 'عبدالعزيز العنزي (المشرف العام)', true);
-        return;
+      await loginWithPhonePassword(phone, password);
+      router.push('/');
+    } catch (err: any) {
+      const message = String(err?.message || '');
+      if (message.includes('لم يكمل إنشاء الحساب')) {
+        setIsRegistering(true);
       }
-
-      const userDocRef = doc(db, 'users', cleanPhone);
-      const userSnap = await getDoc(userDocRef);
-
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        if (isIncompleteUserAccount(userData)) {
-          alert('هذا الرقم لم يكمل إنشاء الحساب بعد. استخدم إنشاء حساب جديد واختر كلمة المرور بنفسك.');
-          setIsRegistering(true);
-          return;
-        }
-        if (userData.password === password) {
-          finishLogin(cleanPhone, userData.fullName || 'مستخدم مسجل', false);
-        } else {
-          alert('كلمة المرور غير صحيحة. يرجى التأكد والمحاولة مرة أخرى.');
-        }
-      } else {
-        alert('رقم الجوال غير مسجل في النظام. يمكنك إنشاء حساب جديد من الأسفل.');
-      }
-    } catch (err) {
-      console.error('Login error:', err);
-      alert('حدث خطأ أثناء تسجيل الدخول. تأكد من اتصال الإنترنت.');
+      alert(message || 'حدث خطأ أثناء تسجيل الدخول.');
     }
   };
 
@@ -80,23 +43,14 @@ export default function LoginPage() {
     }
 
     try {
-      const cleanPhone = phone.trim();
-      const result = await completeOrCreateUserAccount(db, {
-        phone: cleanPhone,
-        fullName: fullName.trim(),
+      await registerWithPhonePassword({
+        phone,
         password,
+        fullName: fullName.trim(),
       });
-
-      if (result.status === 'exists') {
-        alert('رقم الجوال مسجل مسبقاً بكلمة مرور. قم بتسجيل الدخول مباشرة.');
-        setIsRegistering(false);
-        return;
-      }
-
-      finishLogin(cleanPhone, fullName.trim(), false);
-    } catch (err) {
-      console.error('Registration error:', err);
-      alert('حدث خطأ أثناء إنشاء الحساب. حاول مرة أخرى.');
+      router.push('/');
+    } catch (err: any) {
+      alert(err?.message || 'حدث خطأ أثناء إنشاء الحساب.');
     }
   };
 

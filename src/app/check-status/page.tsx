@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { loginWithPhonePassword } from '../lib/sessionAuth';
 
 export default function CheckStatusPage() {
   const [phone, setPhone] = useState('');
@@ -24,26 +25,11 @@ export default function CheckStatusPage() {
 
     try {
       const cleanPhone = phone.trim();
-      const cleanPass = password.trim();
 
-      // 1. التحقق من حساب المستخدم وكلمة المرور للخصوصية والأمان
+      await loginWithPhonePassword(cleanPhone, password);
       const userRef = doc(db, 'users', cleanPhone);
       const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        alert('رقم الجوال غير مسجل في النظام.');
-        setLoading(false);
-        setSearched(true);
-        return;
-      }
-
-      const userData = userSnap.data();
-      if (userData.password !== cleanPass) {
-        alert('كلمة المرور غير صحيحة.');
-        setLoading(false);
-        setSearched(true);
-        return;
-      }
+      const userData = userSnap.exists() ? userSnap.data() : {};
 
       // 2. البحث عن الطلب برقم الجوال أو الرقم الجامعي المرتبط بالحساب
       const appsRef = collection(db, 'applications');
@@ -74,9 +60,9 @@ export default function CheckStatusPage() {
       }
 
       setSearched(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error checking status:', err);
-      alert('حدث خطأ أثناء البحث. حاول مرة أخرى.');
+      alert(err?.message || 'حدث خطأ أثناء البحث. حاول مرة أخرى.');
     } finally {
       setLoading(false);
     }

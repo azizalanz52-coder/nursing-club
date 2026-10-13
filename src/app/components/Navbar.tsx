@@ -4,9 +4,12 @@ import { useState, useEffect } from "react";
 import Link from 'next/link';
 import Image from 'next/image';
 import LoginModal from './LoginModal';
-import { db } from '../lib/firebase';
-import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '../lib/firebase';
+import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { findCertificatesByLookup } from '../lib/certificatesLookup';
+import { emailToPhone, isAdminPhone, isPrivilegedRole } from '../lib/authIdentity';
+import { logoutSession } from '../lib/sessionAuth';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
@@ -37,18 +40,29 @@ export default function Navbar() {
 
   useEffect(() => {
     setMounted(true);
-    const name = localStorage.getItem('userName');
-    const phone = localStorage.getItem('userPhone');
-    const isAuthAdmin = sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026';
-    
-    if (name) setUserName(name);
-    if (phone) {
-      setUserPhone(phone);
-      updateUserPresence(phone);
-    }
-    setAdminAuth(isAuthAdmin);
+    sessionStorage.removeItem('adminToken');
 
-    // الاستماع لحالة فتح/إغلاق الانضمام من إعدادات الأدمن سحابياً
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        localStorage.removeItem('userPhone');
+        localStorage.removeItem('userName');
+        setUserPhone(null);
+        setUserName(null);
+        setUserRole(null);
+        setAssignedCommittee(null);
+        setAdminAuth(false);
+        return;
+      }
+
+      const phone = emailToPhone(user.email);
+      const storedName = localStorage.getItem('userName');
+      setUserPhone(phone);
+      if (storedName) setUserName(storedName);
+      localStorage.setItem('userPhone', phone);
+      setAdminAuth(isAdminPhone(phone));
+      updateUserPresence(phone);
+    });
+
     const settingsRef = doc(db, 'site_settings', 'general');
     const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -62,6 +76,7 @@ export default function Navbar() {
     document.body.style.paddingTop = '85px';
 
     return () => {
+      unsubAuth();
       unsubSettings();
       document.body.style.paddingTop = '0px';
     };
@@ -216,10 +231,8 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('userPhone');
-    localStorage.removeItem('userName');
-    sessionStorage.removeItem('adminToken');
+  const handleLogout = async () => {
+    await logoutSession();
     setUserName(null);
     setUserPhone(null);
     setUserRole(null);
@@ -230,7 +243,7 @@ export default function Navbar() {
 
   if (!mounted) return null;
 
-  const isAdmin = (userPhone === '0553731265') || adminAuth || (typeof window !== 'undefined' && sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026') || (userRole === 'System Admin') || (userRole === 'رئيس النادي') || (userRole === 'رئيسة النادي') || (userRole === 'نائب رئيس النادي') || (userRole === 'نائبة رئيس النادي');
+  const isAdmin = isAdminPhone(userPhone) || adminAuth || isPrivilegedRole(userRole);
   const isCommitteeLeader = userRole && (userRole.includes('رئيس لجنة') || userRole.includes('مشرف') || userRole.includes('General Supervisor'));
   const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || isAdmin;
 

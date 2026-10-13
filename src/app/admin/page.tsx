@@ -6,6 +6,10 @@ import { useRouter } from 'next/navigation';
 import { db, storage } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot } from 'firebase/firestore';
 import { isIncompleteUserAccount } from '../lib/userAccounts';
+import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
+import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
+import { auth } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -273,42 +277,45 @@ export default function AdminDashboard() {
   useEffect(() => {
     const checkAdminAuth = async () => {
       try {
-        const phone = localStorage.getItem('userPhone');
-        const adminAuth = sessionStorage.getItem('adminToken') === 'SECURE_ADMIN_KEY_NURSING_2026';
-        
-        if (!phone && !adminAuth) {
+        const firebaseUser = await new Promise<import('firebase/auth').User | null>((resolve) => {
+          const unsub = onAuthStateChanged(auth, (user) => {
+            unsub();
+            resolve(user);
+          });
+        });
+
+        if (!firebaseUser) {
           router.push('/login');
           return;
         }
 
-        if (phone === '0553731265' || adminAuth) {
+        const phone = emailToPhone(firebaseUser.email);
+        localStorage.setItem('userPhone', phone);
+        sessionStorage.removeItem('adminToken');
+
+        if (isAdminPhone(phone)) {
           setIsSystemAdminUser(true);
           setIsPresidentsRole(true);
           return;
         }
 
-        const userRef = doc(db, 'users', phone as string);
+        const userRef = doc(db, 'users', phone);
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
           const userData = userSnap.data();
           const userRole = userData.role || 'عضو أساسي';
 
-          if (userRole === 'رئيس النادي' || userRole === 'نائبة الرئيس') {
-            setIsPresidentsRole(true);
-            setIsSystemAdminUser(false);
-          } else if (phone === '0553731265' || userRole === 'System Admin') {
+          if (isAdminPhone(phone) || userRole === 'System Admin') {
             setIsSystemAdminUser(true);
             setIsPresidentsRole(true);
+          } else if (isLeadershipRole(userRole)) {
+            setIsPresidentsRole(true);
+            setIsSystemAdminUser(false);
           } else {
             setIsSystemAdminUser(false);
             setIsPresidentsRole(false);
-            if (
-              userRole !== 'رئيس النادي' && 
-              userRole !== 'نائبة الرئيس' && 
-              !userRole.includes('رئيس لجنة') && 
-              !userRole.includes('مشرف')
-            ) {
+            if (!userRole.includes('رئيس لجنة') && !userRole.includes('مشرف')) {
               router.push('/');
             }
           }
@@ -2206,8 +2213,12 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       return nameA.localeCompare(nameB, 'ar');
     });
 
+  const completeRegisteredUsers = usersList.filter(
+    (usr) => !isIncompleteUserAccount(usr) && !isAdminPhone(usr.phone)
+  );
+  const registeredAccountsCount = completeRegisteredUsers.length + 1;
   const filteredAndSortedUsers = sortUsersByName(
-    usersList.filter((usr) => !isIncompleteUserAccount(usr) && matchesUserSearch(usr))
+    completeRegisteredUsers.filter((usr) => matchesUserSearch(usr))
   );
   const incompleteUsers = sortUsersByName(
     usersList.filter((usr) => isIncompleteUserAccount(usr) && matchesUserSearch(usr))
@@ -2281,6 +2292,12 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           </div>
         </div>
 
+        {isPresidentsRole && !isSystemAdminUser && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 font-bold">
+            دخول قيادي: لوحة التشغيل كاملة (الطلبات، اللجان، النشرة، الشهادات، الجودة). تغيير الرتب والحسابات لمدير النظام فقط.
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           <button
             type="button"
@@ -2302,7 +2319,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
               }`}
             >
-              🔑 الحسابات والرتب والصلاحيات
+              🔑 الحسابات والرتب والصلاحيات ({registeredAccountsCount})
             </button>
           )}
 
@@ -3405,63 +3422,19 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         )}
 
         {activeTab === 'performance-radar' && (
-          <div className="bg-white rounded-3xl p-8 border border-indigo-200 shadow-sm space-y-6">
-            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
-              <div>
-                <h3 className="text-xl font-black text-slate-900">📊 رادار مراقبة أداء اللجان الشامل</h3>
-                <p className="text-xs text-slate-500">متابعة حية من قاعدة البيانات للأعضاء المقبولين، أداء اللجان، والجاهزية التشغيلية.</p>
-              </div>
-              <span className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs">
-                عدد اللجان النشطة: {committees.length}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {committees.map((comm) => {
-                const acceptedCommMembers = requests.filter(r => (r.acceptedCommittee === comm.name || matchesCommittee(r.acceptedCommittee, comm.name)) && r.status === 'مقبول').length;
-                const membersListCount = comm.members?.length || 0;
-                const totalActiveCount = Math.max(acceptedCommMembers, membersListCount);
-                const performanceScore = Math.min(100, totalActiveCount * 12 + 45);
-
-                return (
-                  <div key={comm.id} className="p-6 rounded-2xl border border-indigo-100 bg-indigo-50/20 shadow-sm flex flex-col justify-between space-y-4">
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <h4 className="font-black text-indigo-900 text-base">{comm.name}</h4>
-                        <span className="px-2.5 py-1 rounded-full bg-indigo-600 text-white font-mono text-[10px] font-bold">
-                          أداء {performanceScore}%
-                        </span>
-                      </div>
-
-                      <div className="space-y-1 text-xs text-slate-700 bg-white p-3 rounded-xl border border-indigo-100">
-                        <p><strong>👨‍✈️ قائد الطلاب:</strong> {comm.maleLeader || 'غير متوفر'}</p>
-                        <p><strong>👩‍✈️ قائدة الطالبات:</strong> {comm.femaleLeader || 'غير متوفر'}</p>
-                        <p><strong>👥 الأعضاء المقبولون:</strong> {totalActiveCount} أعضاء فاعلين</p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[10px] font-bold text-slate-500">
-                          <span>مؤشر الإنجاز والمهام</span>
-                          <span>{performanceScore}%</span>
-                        </div>
-                        <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${performanceScore > 75 ? 'bg-emerald-500' : performanceScore > 50 ? 'bg-indigo-600' : 'bg-amber-500'}`}
-                            style={{ width: `${performanceScore}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-indigo-100 flex justify-between items-center text-[11px]">
-                      <span className="text-slate-500">الحالة التشغيلية:</span>
-                      <span className="font-bold text-emerald-600">🟢 مستقر وتحت السيطرة</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <CommitteePerformanceRadar
+            committees={committees}
+            requests={requests}
+            mediaUploads={mediaUploads}
+            certificates={certificates}
+            partners={partners}
+            events={events}
+            scientificTexts={scientificTexts}
+            qualityEvaluationReports={qualityEvaluationReports}
+            qualityUploadedFiles={qualityUploadedFiles}
+            escalatedReports={escalatedReports}
+            matchesCommittee={matchesCommittee}
+          />
         )}
 
         {activeTab === 'historical-vault' && (
@@ -3671,8 +3644,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين، الأسماء، كلمات المرور، والرتب (مرتبة أبجدياً 🔤)</h3>
-                <p className="text-xs text-slate-500">الحسابات الحقيقية تظهر هنا. الأرقام بدون كلمة مرور احذفها من الصندوق الأصفر فوق.</p>
+                <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين والرتب</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  الحسابات المسجلة في الموقع: <strong className="text-[#630517]">{registeredAccountsCount}</strong>
+                  {userSearchQuery.trim() ? ` • المعروض الآن: ${filteredAndSortedUsers.length + 1}` : ''}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  المشرف العام ونائبة الرئيس يدخلون لوحة القيادة التشغيلية (طلبات، لجان، نشرة، شهادات). تغيير الرتب يبقى لمدير النظام فقط.
+                </p>
               </div>
               <input
                 type="text"
@@ -3742,33 +3721,24 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               <table className="w-full text-right text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                    <th className="pb-3 pr-2">اسم المستخدم وحالة الاتصال</th>
+                    <th className="pb-3 pr-2">#</th>
+                    <th className="pb-3">اسم المستخدم وحالة الاتصال</th>
                     <th className="pb-3">رقم الجوال (اسم الدخول)</th>
-                    <th className="pb-3">كلمة المرور</th>
+                    <th className="pb-3">الدخول</th>
                     <th className="pb-3">الرتبة والصلاحيات</th>
                     <th className="pb-3">اللجنة المعينة ( لرئيس اللجنة )</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   <tr className="hover:bg-slate-50 bg-rose-50/20">
-                    <td className="py-4 pr-2 font-black text-[#630517]">
+                    <td className="py-4 pr-2 font-black text-slate-400">1</td>
+                    <td className="py-4 font-black text-[#630517]">
                       عبدالعزيز سليمان العنزي (Admin)
                       <span className="block text-[10px] text-emerald-600 font-bold mt-0.5">🟢 متصل الآن</span>
                     </td>
                     <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
                     <td className="py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[#630517] font-mono font-bold bg-slate-100 px-2.5 py-1 rounded w-fit">
-                          {showPasswords['0553731265'] ? 'qwer8901as' : '••••••••'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => togglePasswordVisibility('0553731265')}
-                          className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
-                        >
-                          {showPasswords['0553731265'] ? '👁‍🗨️' : '👁'}
-                        </button>
-                      </div>
+                      <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded">محمية في نظام الدخول</span>
                     </td>
                     <td className="py-4">
                       <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-black text-[11px] inline-block" dir="ltr">
@@ -3784,8 +3754,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     const displayName = usr.fullName || matchedReq?.fullName || 'مستخدم مسجل';
 
                     return (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="py-4 pr-2 font-bold text-slate-900">
+                      <tr key={usr.phone || idx} className="hover:bg-slate-50">
+                        <td className="py-4 pr-2 font-black text-slate-400">{idx + 2}</td>
+                        <td className="py-4 font-bold text-slate-900">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span>{displayName}</span>
                             <button
@@ -3816,23 +3787,16 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                         </td>
                         <td className="py-4">
                           <div className="flex items-center gap-2">
-                            <span className="text-[#630517] font-mono font-bold bg-slate-100 px-2.5 py-1 rounded w-fit">
-                              {showPasswords[usr.phone] ? (usr.password || 'غير متوفرة') : '••••••••'}
+                            <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded">
+                              محمية في نظام الدخول
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => togglePasswordVisibility(usr.phone)}
-                              className="text-slate-500 hover:text-[#630517] p-1 transition-colors cursor-pointer"
-                            >
-                              {showPasswords[usr.phone] ? '👁️‍🗨️' : '👁'}
-                            </button>
                             <button
                               type="button"
                               onClick={() => openPasswordModal(usr.phone)}
                               className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-lg font-bold hover:bg-amber-100 cursor-pointer shadow-sm transition-all"
-                              title="تعديل كلمة المرور"
+                              title="تعيين كلمة مرور انتقالية"
                             >
-                              ✏ تعديل
+                              ✏ كلمة مرور انتقالية
                             </button>
                           </div>
                         </td>

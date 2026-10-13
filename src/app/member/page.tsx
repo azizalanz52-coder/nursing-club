@@ -121,7 +121,7 @@ export default function MemberSmartDashboard() {
     fetchLinkedData();
   }, []);
 
-  const isAdmin = currentUserPhone === '0553731265' || userRole === 'System Admin' || userRole === 'رئيس النادي' || userRole === 'رئيسة النادي' || userRole === 'نائب رئيس النادي' || userRole === 'نائبة رئيس النادي';
+  const isAdmin = currentUserPhone === '0553731265' || userRole === 'System Admin' || userRole === 'رئيس النادي' || userRole === 'رئيسة النادي' || userRole === 'نائب رئيس النادي' || userRole === 'نائبة رئيس النادي' || userRole === 'نائبة الرئيس' || userRole === 'General Supervisor';
   const isLeader = userRole.includes('رئيس لجنة') || userRole.includes('مشرف');
 
   return (

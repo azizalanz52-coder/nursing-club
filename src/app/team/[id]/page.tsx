@@ -615,13 +615,6 @@ export default function CommitteeDetailPage() {
       const title = certTitle.trim();
       const name = certStudentName.trim();
       const issuer = currentUserName || 'لجنة الموارد البشرية';
-      let storedPassword = '';
-      if (phone) {
-        try {
-          const recipientSnap = await getDoc(doc(db, 'users', phone));
-          if (recipientSnap.exists()) storedPassword = recipientSnap.data()?.password || '';
-        } catch (er) { console.error(er); }
-      }
 
       const newCertObj = {
         fullName: name,
@@ -638,7 +631,7 @@ export default function CommitteeDetailPage() {
         dateStr: new Date().toLocaleDateString('ar-SA'),
         issueDate: new Date().toISOString(),
         description: `صادرة من لجنة الموارد البشرية • ${issuer}`,
-        password: storedPassword,
+        password: '',
       };
 
       const certRef = await addDoc(collection(db, 'certificates'), newCertObj);

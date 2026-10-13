@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function authPhone() {
+      return request.auth.token.email.split('@')[0];
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.email == '0553731265@accounts.nursing-club.app';
+    }
+
+    function isStaff() {
+      return isAdmin() || (
+        signedIn() &&
+        exists(/databases/$(database)/documents/users/$(authPhone())) &&
+        get(/databases/$(database)/documents/users/$(authPhone())).data.role in [
+          'System Admin',
+          'General Supervisor',
+          'رئيس النادي',
+          'نائبة الرئيس'
+        ]
+      );
+    }
+
+    match /users/{phone} {
+      allow get: if true;
+      allow list: if signedIn();
+      allow create: if signedIn() && authPhone() == phone;
+      allow delete: if isAdmin();
+      allow update: if isAdmin()
+        || (signedIn() && authPhone() == phone
+            && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['role', 'assignedCommittee']))
+        || (signedIn()
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['latestNotification', 'lastActive', 'warningHidden', 'hasSeenCongrats', 'pendingCongratulation']));
+    }
+
+    match /applications/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if signedIn();
+    }
+
+    match /suggestions/{id} {
+      allow read: if signedIn();
+      allow create: if true;
+      allow update, delete: if signedIn();
+    }
+
+    match /case_study_submissions/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if signedIn();
+    }
+
+    match /site_settings/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /site_newsletters/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /site_events/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /site_banners/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /site_partners/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /site_passion_slides/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /site_discover_events/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /site_scientific_texts/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /student_achievements/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /certificates/{id} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+
+    match /site_certificates/{id} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+
+    match /{document=**} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+  }
+}
