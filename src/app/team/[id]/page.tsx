@@ -8,7 +8,9 @@ import { doc, getDoc, updateDoc, setDoc, collection, getDocs, addDoc, deleteDoc 
 import { storage } from '../../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import HrCertificatesRegistry from '../../components/HrCertificatesRegistry';
-import { notifyExistingUser } from '../../lib/userAccounts';
+import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
+import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
+import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 
 // دالة تحويل الملف إلى Base64 كخيار احتياطي ومضمون
 const convertFileToBase64 = (file: File): Promise<string> => {
@@ -184,6 +186,9 @@ export default function CommitteeDetailPage() {
   const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
   const [textBannerTitle, setTextBannerTitle] = useState('');
   const [textBannerContent, setTextBannerContent] = useState('');
+  const [textArchiveTitle, setTextArchiveTitle] = useState('');
+  const [textPdfFile, setTextPdfFile] = useState<File | null>(null);
+  const [isUploadingScientific, setIsUploadingScientific] = useState(false);
 
   // نافذة معاينة الميديا الكبيرة داخل الصفحة
   const [previewItem, setPreviewItem] = useState<any | null>(null);
@@ -533,45 +538,118 @@ export default function CommitteeDetailPage() {
   const handleAddScientificTextSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (id !== 'scientific') {
-      alert('إرسال النصوص متاح فقط للجنة المحتوى العلمي.');
+      alert('إرسال النصوص متاح فقط لقادة وأعضاء لجنة المحتوى العلمي.');
       return;
     }
-    if (!textBannerTitle.trim() || !textBannerContent.trim()) {
-      alert('يرجى تعبئة عنوان البانر والنص المطلوب.');
+    if (!textBannerTitle.trim()) {
+      alert('أدخل عنوان النص أولاً.');
       return;
     }
-    const newTextObj = {
-      title: textBannerTitle.trim(),
-      content: textBannerContent.trim(),
-      author: currentUserName || 'عضو المحتوى العلمي',
-      createdAt: new Date().toLocaleDateString('ar-SA')
-    };
+    if (!textArchiveTitle.trim()) {
+      alert('أدخل عنوان الأرشيف، مثال: نصوص فعالية الصحة النفسية.');
+      return;
+    }
+    if (!textBannerContent.trim() && !textPdfFile) {
+      alert('اكتب النص أو ارفع ملف PDF يحتوي النصوص.');
+      return;
+    }
+    if (textPdfFile) {
+      if (textPdfFile.type !== 'application/pdf' && !textPdfFile.name.toLowerCase().endsWith('.pdf')) {
+        alert('خانة الملف تقبل PDF فقط.');
+        return;
+      }
+      if (textPdfFile.size > 8 * 1024 * 1024) {
+        alert('حجم ملف PDF كبير جداً. الحد الأقصى 8 ميغابايت.');
+        return;
+      }
+    }
+
+    setIsUploadingScientific(true);
     try {
+      let pdfUrl = '';
+      if (textPdfFile) {
+        pdfUrl = await uploadFileToStorage(textPdfFile, 'scientific-texts');
+      }
+      const newTextObj = {
+        title: textBannerTitle.trim(),
+        archiveTitle: textArchiveTitle.trim(),
+        content: textBannerContent.trim(),
+        author: currentUserName || 'عضو المحتوى العلمي',
+        pdfUrl,
+        fileUrl: pdfUrl,
+        fileName: textPdfFile?.name || '',
+        status: 'pending',
+        archived: false,
+        source: 'scientific-committee',
+        createdAt: new Date().toLocaleDateString('ar-SA'),
+        createdAtMs: Date.now(),
+      };
       const docRef = await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
       setScientificTextsList([{ id: docRef.id, ...newTextObj }, ...scientificTextsList]);
+      try {
+        await notifyLeadership(db, `🔬 [نص جديد للتقييم]: "${newTextObj.title}" من ${newTextObj.author}. قيّموه من تبويب نصوص المحتوى العلمي.`);
+      } catch (notifyErr) {
+        console.error(notifyErr);
+      }
       setTextBannerTitle('');
       setTextBannerContent('');
-      alert('تم اعتماد ونشر النص وعرضه مباشرة للجنة التصميم وإرساله للوحة الإدارة بنجاح! 🔬✨');
-    } catch (err) {
+      setTextPdfFile(null);
+      alert('تم إرسال النص لتقييم الإدارة والرؤساء. بعد الاعتماد يصل للجنة التصميم.');
+    } catch (err: any) {
       console.error(err);
-      alert('حدث خطأ أثناء حفظ النص، يرجى المحاولة مرة أخرى.');
+      alert(err?.message || 'حدث خطأ أثناء حفظ النص، يرجى المحاولة مرة أخرى.');
+    } finally {
+      setIsUploadingScientific(false);
     }
   };
 
-  // حذف نص من بنك النصوص
-  const handleDeleteScientificText = async (textId: string) => {
+  const resolveArchiveTitle = (textId?: string, groupTitle?: string) => {
+    const item = scientificTextsList.find((t) => t.id === textId);
+    const current = String(item?.archiveTitle || groupTitle || textArchiveTitle || '').trim();
+    if (current) return current;
+    return window.prompt('اكتب عنوان الأرشيف، مثال: نصوص فعالية الصحة النفسية')?.trim() || '';
+  };
+
+  const handleArchiveScientificTexts = async (ids: string[], groupTitle?: string) => {
     if (id !== 'scientific') {
-      alert('حذف النصوص متاح فقط للجنة المحتوى العلمي.');
+      alert('الأرشفة متاحة فقط لقادة وأعضاء لجنة المحتوى العلمي.');
       return;
     }
-    if (!confirm('هل أنت متأكد من حذف هذا النص من البنك؟')) return;
+    const archiveTitle = resolveArchiveTitle(ids[0], groupTitle);
+    if (!archiveTitle) return;
     try {
-      await deleteDoc(doc(db, 'scientific_committee_texts', textId));
-      setScientificTextsList(scientificTextsList.filter(t => t.id !== textId));
-      alert('تم حذف النص بنجاح 🗑️');
+      await Promise.all(ids.map((textId) => updateDoc(doc(db, 'scientific_committee_texts', textId), {
+        archived: true,
+        archiveTitle,
+        archivedAt: Date.now(),
+      })));
+      setScientificTextsList((prev) => prev.map((t) => (
+        ids.includes(t.id) ? { ...t, archived: true, archiveTitle } : t
+      )));
+      alert(`تم أرشفة النصوص تحت عنوان: ${archiveTitle}`);
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء الحذف.');
+      alert('تعذر أرشفة النص. حاول مرة أخرى.');
+    }
+  };
+
+  const handleRestoreScientificTexts = async (ids: string[]) => {
+    if (id !== 'scientific') {
+      alert('إرجاع الأرشيف متاح فقط لقادة وأعضاء لجنة المحتوى العلمي.');
+      return;
+    }
+    try {
+      await Promise.all(ids.map((textId) => updateDoc(doc(db, 'scientific_committee_texts', textId), {
+        archived: false,
+        restoredAt: Date.now(),
+      })));
+      setScientificTextsList((prev) => prev.map((t) => (
+        ids.includes(t.id) ? { ...t, archived: false } : t
+      )));
+      alert('تم إرجاع النصوص إلى القائمة الحالية.');
+    } catch (err) {
+      console.error(err);
+      alert('تعذر إرجاع النص من الأرشيف.');
     }
   };
 
@@ -666,6 +744,7 @@ export default function CommitteeDetailPage() {
   const canAccessScientificTexts = isScientificCommittee || isDesignCommittee;
   const canAddScientificTexts = isScientificCommittee;
   const canIssueCertificates = id === 'hr' || normalizeArabic(committee?.name || '').includes('موارد');
+  const scientificArchiveOptions = existingArchiveTitles(scientificTextsList);
 
   if (!baseDetails) {
     return (
@@ -1120,18 +1199,37 @@ export default function CommitteeDetailPage() {
                 <h2 className="text-xl font-black text-slate-900">🔬 بنك صياغة النصوص الطبية والعبارات للبنرات والتصاميم</h2>
                 <p className="text-xs text-slate-500 mt-1">
                   {isScientificCommittee
-                    ? 'اكتب واعتمد النصوص التوعوية والعبارات الطبية ليصل إشعارها وتعرض مباشرة لأعضاء لجنة التصميم لتجهيز البنرات.'
-                    : 'استقبل واستعرض العبارات والنصوص الدقيقة المعتمدة من لجنة المحتوى العلمي لاستخدامها المباشر في التصاميم والبوسترات.'}
+                    ? 'ارفع النص أو PDF تحت عنوان فعالية واضح، وبعد انتهائها أرشفوها للرجوع لها لاحقاً.'
+                    : 'استقبل النصوص المعتمدة الحالية، ويمكنك فتح أرشيف الفعاليات السابقة.'}
                 </p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-xs">
-                إجمالي النصوص المعتمدة: {scientificTextsList.length}
+                الأرشيف: {scientificTextsList.filter((t) => t.archived).length}
               </span>
             </div>
 
             {/* نموذج إضافة نص جديد (يظهر حصرياً للجنة المحتوى العلمي والأدمن) */}
             {canAddScientificTexts && (
               <form onSubmit={handleAddScientificTextSubmit} className="grid grid-cols-1 gap-4 bg-emerald-50/40 p-6 rounded-2xl border border-emerald-200">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">عنوان الأرشيف / اسم الفعالية</label>
+                  <input
+                    type="text"
+                    list="scientific-archive-titles-team"
+                    placeholder="مثال: نصوص فعالية الصحة النفسية"
+                    value={textArchiveTitle}
+                    onChange={(e) => setTextArchiveTitle(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                    required
+                  />
+                  <datalist id="scientific-archive-titles-team">
+                    {scientificArchiveOptions.map((title) => (
+                      <option key={title} value={title} />
+                    ))}
+                  </datalist>
+                  <p className="text-[10px] text-slate-500">هذا العنوان هو اللي ترجعون له لاحقاً، مثل: نصوص فعالية الصحة النفسية.</p>
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">عنوان البانر أو التصميم المستهدف</label>
                   <input
@@ -1145,57 +1243,60 @@ export default function CommitteeDetailPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">النصوص والعبارات الدقيقة المعتمدة (ستظهر فوراً للجنة التصميم)</label>
+                  <label className="text-xs font-bold text-slate-700">النص المكتوب (اختياري إذا رفعت PDF)</label>
                   <textarea
                     rows={3}
-                    placeholder="اكتب النص العلمي أو العبارة الإبداعية هنا لتكون مرجعاً للبنرات والتصاميم..."
+                    placeholder="اكتب النص العلمي هنا، أو اتركه فارغاً إذا كان الملف يحتوي النصوص..."
                     value={textBannerContent}
                     onChange={(e) => setTextBannerContent(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-                    required
                   />
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">رفع ملف PDF فيه النصوص</label>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={(e) => setTextPdfFile(e.target.files?.[0] || null)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:ml-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white cursor-pointer"
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    {textPdfFile ? `الملف المختار: ${textPdfFile.name}` : 'يمكن رفع PDF فقط، بحد أقصى 8 ميغابايت.'}
+                  </p>
+                </div>
+
                 <div>
-                  <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700 cursor-pointer">
-                    + نشر واعتماد النص للجنة التصميم 📝✨
+                  <button
+                    type="submit"
+                    disabled={isUploadingScientific}
+                    className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-emerald-700 cursor-pointer disabled:opacity-60"
+                  >
+                    {isUploadingScientific ? 'جاري الإرسال...' : '+ إرسال النص لتقييم الإدارة والرؤساء'}
                   </button>
                 </div>
               </form>
             )}
 
-            {/* عرض بنك النصوص المعتمدة لكلا اللجنتين (المحتوى العلمي والتصميم) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-              {scientificTextsList.length === 0 ? (
-                <p className="col-span-2 text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد نصوص علمية معتمدة مرفوعة حالياً.</p>
-              ) : (
-                scientificTextsList.map((txt) => (
-                  <div key={txt.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold">جاهز للاستخدام في التصاميم ✓</span>
-                        <span className="text-[10px] text-slate-400">{txt.createdAt}</span>
-                      </div>
-                      <h5 className="font-black text-slate-900 text-sm">{txt.title}</h5>
-                      <p className="text-xs text-slate-700 bg-white p-3 rounded-xl border border-slate-100 leading-relaxed font-semibold">"{txt.content}"</p>
-                      {txt.author && <p className="text-[10px] text-slate-400">بواسطة: {txt.author}</p>}
-                    </div>
-
-                    {canAddScientificTexts && (
-                      <div className="flex justify-end pt-2">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteScientificText(txt.id)}
-                          className="px-3 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-lg hover:bg-red-100 transition-all cursor-pointer"
-                        >
-                          حذف ✕
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
+            <ScientificTextsShelf
+              texts={scientificTextsList}
+              canManage={canAddScientificTexts}
+              isDesignOnly={isDesignCommittee && !isScientificCommittee}
+              onArchive={(textId) => handleArchiveScientificTexts([textId])}
+              onRestore={(textId) => handleRestoreScientificTexts([textId])}
+              onArchiveGroup={(title) => {
+                const ids = scientificTextsList
+                  .filter((t) => !t.archived && scientificArchiveTitle(t) === title)
+                  .map((t) => t.id);
+                handleArchiveScientificTexts(ids, title);
+              }}
+              onRestoreGroup={(title) => {
+                const ids = scientificTextsList
+                  .filter((t) => t.archived && scientificArchiveTitle(t) === title)
+                  .map((t) => t.id);
+                handleRestoreScientificTexts(ids);
+              }}
+            />
           </div>
         )}
 

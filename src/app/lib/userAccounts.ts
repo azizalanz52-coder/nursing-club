@@ -1,4 +1,17 @@
-import { Firestore, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+
+function isLeadershipAccount(phone: string, role?: string) {
+  const value = String(role || '');
+  return (
+    phone === '0553731265' ||
+    value === 'System Admin' ||
+    value === 'General Supervisor' ||
+    value.includes('رئيس النادي') ||
+    value.includes('رئيسة النادي') ||
+    value.includes('نائب رئيس') ||
+    value.includes('نائبة الرئيس')
+  );
+}
 
 export function isIncompleteUserAccount(data?: { password?: string } | null) {
   return !String(data?.password || '').trim();
@@ -16,6 +29,30 @@ export async function notifyExistingUser(
   if (!snap.exists()) return false;
   await updateDoc(ref, fields);
   return true;
+}
+
+export async function notifyLeadership(db: Firestore, message: string) {
+  await notifyExistingUser(db, '0553731265', { latestNotification: message });
+  try {
+    const snap = await getDocs(collection(db, 'users'));
+    for (const item of snap.docs) {
+      if (isLeadershipAccount(item.id, item.data()?.role)) {
+        await notifyExistingUser(db, item.id, { latestNotification: message });
+      }
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+export async function notifyCommitteeByKeyword(db: Firestore, keyword: string, message: string) {
+  const snap = await getDocs(collection(db, 'users'));
+  for (const item of snap.docs) {
+    const assigned = String(item.data()?.assignedCommittee || item.data()?.committee || '');
+    if (assigned.includes(keyword)) {
+      await notifyExistingUser(db, item.id, { latestNotification: message });
+    }
+  }
 }
 
 export async function completeOrCreateUserAccount(

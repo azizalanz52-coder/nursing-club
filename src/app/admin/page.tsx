@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db, storage } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot } from 'firebase/firestore';
-import { isIncompleteUserAccount } from '../lib/userAccounts';
+import { isIncompleteUserAccount, notifyCommitteeByKeyword } from '../lib/userAccounts';
+import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
 import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { auth } from '../lib/firebase';
@@ -138,11 +139,19 @@ interface NewsletterItem {
 interface ScientificTextItem {
   id: string;
   title: string;
-  category: string;
+  category?: string;
   author: string;
-  content: string;
+  content?: string;
   fileUrl?: string;
+  pdfUrl?: string;
+  fileName?: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  source?: string;
   createdAt: string;
+  createdAtMs?: number;
+  archiveTitle?: string;
+  archived?: boolean;
+  collectionName?: 'scientific_committee_texts' | 'site_scientific_texts';
 }
 
 export default function AdminDashboard() {
@@ -202,6 +211,10 @@ export default function AdminDashboard() {
   const [sciAuthorInput, setSciAuthorInput] = useState<string>('');
   const [sciContentInput, setSciContentInput] = useState<string>('');
   const [sciFileInput, setSciFileInput] = useState<string>('');
+  const [sciFileName, setSciFileName] = useState<string>('');
+  const [sciCollectionName, setSciCollectionName] = useState<'scientific_committee_texts' | 'site_scientific_texts'>('scientific_committee_texts');
+  const [sciReviewFilter, setSciReviewFilter] = useState<'pending' | 'all' | 'archived'>('pending');
+  const [sciArchiveTitle, setSciArchiveTitle] = useState<string>('');
 
   const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'name' | 'confirm'>('none');
   const [modalMessage, setModalMessage] = useState<string>('');
@@ -338,6 +351,19 @@ export default function AdminDashboard() {
     fetchSiteSettings();
   }, [router]);
 
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, 'scientific_committee_texts'),
+      () => {
+        fetchScientificTexts();
+      },
+      (err) => {
+        console.error('Error listening to scientific texts:', err);
+      }
+    );
+    return () => unsub();
+  }, []);
+
   const getRealUserName = (phone: string, defaultName: string) => {
     if (!phone) return defaultName;
     const found = usersList.find(u => u.phone === phone);
@@ -424,45 +450,105 @@ export default function AdminDashboard() {
     }
   };
 
+  const mapScientificDoc = (
+    d: { id: string; data: () => Record<string, unknown> },
+    collectionName: 'scientific_committee_texts' | 'site_scientific_texts'
+  ): ScientificTextItem => {
+    const data = d.data();
+    const createdAtMs = typeof data.createdAtMs === 'number'
+      ? data.createdAtMs
+      : (typeof data.createdAt === 'number' ? data.createdAt : Date.parse(String(data.createdAt || '')) || 0);
+    return {
+      id: d.id,
+      title: String(data.title || ''),
+      category: String(data.category || 'نصوص اللجنة'),
+      author: String(data.author || 'لجنة المحتوى العلمي'),
+      content: String(data.content || ''),
+      fileUrl: String(data.fileUrl || ''),
+      pdfUrl: String(data.pdfUrl || ''),
+      fileName: String(data.fileName || ''),
+      status: (data.status as ScientificTextItem['status']) || (collectionName === 'site_scientific_texts' ? 'approved' : 'pending'),
+      source: String(data.source || collectionName),
+      createdAt: String(data.createdAt || ''),
+      createdAtMs,
+      archiveTitle: String(data.archiveTitle || ''),
+      archived: Boolean(data.archived),
+      collectionName,
+    };
+  };
+
   const fetchScientificTexts = async () => {
     try {
-      const snap = await getDocs(collection(db, 'site_scientific_texts'));
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as ScientificTextItem[];
-      setScientificTexts(list);
+      const [siteSnap, commSnap] = await Promise.all([
+        getDocs(collection(db, 'site_scientific_texts')),
+        getDocs(collection(db, 'scientific_committee_texts')),
+      ]);
+      const mapped = new Map<string, ScientificTextItem>();
+      siteSnap.docs.forEach((d) => {
+        mapped.set(`site_${d.id}`, mapScientificDoc(d, 'site_scientific_texts'));
+      });
+      commSnap.docs.forEach((d) => {
+        mapped.set(`comm_${d.id}`, mapScientificDoc(d, 'scientific_committee_texts'));
+      });
+      setScientificTexts(
+        Array.from(mapped.values()).sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0))
+      );
     } catch (e) {
       console.error(e);
     }
   };
 
+  const resetScientificForm = () => {
+    setEditingScientificId(null);
+    setSciTitleInput('');
+    setSciAuthorInput('');
+    setSciContentInput('');
+    setSciFileInput('');
+    setSciFileName('');
+    setSciCollectionName('scientific_committee_texts');
+    setSciArchiveTitle('');
+  };
+
   const handleSaveScientificText = async (e: FormEvent) => {
     e.preventDefault();
-    if (!sciTitleInput.trim() || !sciContentInput.trim()) return;
+    if (!sciTitleInput.trim()) return;
+    if (!sciContentInput.trim() && !sciFileInput) {
+      setModalMessage('اكتب النص أو ارفع ملف PDF.');
+      setModalType('success');
+      return;
+    }
 
     const sciId = editingScientificId ? editingScientificId : Date.now().toString();
+    const targetCollection = editingScientificId ? sciCollectionName : 'scientific_committee_texts';
+    const isPdf = sciFileName.toLowerCase().endsWith('.pdf') || sciFileInput.startsWith('data:application/pdf');
     const updatedSci: ScientificTextItem = {
       id: sciId,
       title: sciTitleInput.trim(),
       category: sciCategoryInput,
-      author: sciAuthorInput.trim() || 'لجنة المحتوى العلمي',
+      author: sciAuthorInput.trim() || 'إدارة النادي',
       content: sciContentInput.trim(),
       fileUrl: sciFileInput,
-      createdAt: new Date().toISOString()
+      pdfUrl: isPdf ? sciFileInput : '',
+      fileName: sciFileName,
+      status: 'approved',
+      source: 'admin',
+      createdAt: new Date().toISOString(),
+      createdAtMs: Date.now(),
+      archiveTitle: sciArchiveTitle.trim() || 'نصوص عامة',
+      archived: false,
+      collectionName: targetCollection,
     };
 
     try {
-      await setDoc(doc(db, 'site_scientific_texts', sciId), updatedSci);
+      await setDoc(doc(db, targetCollection, sciId), updatedSci);
       if (editingScientificId) {
-        setScientificTexts(scientificTexts.map(s => s.id === sciId ? updatedSci : s));
-        setModalMessage('تم تحديث وتعديل نص المحتوى العلمي بنجاح سحابياً! ✏️🔬');
+        setScientificTexts(scientificTexts.map(s => s.id === sciId && s.collectionName === targetCollection ? updatedSci : s));
+        setModalMessage('تم تحديث النص العلمي بنجاح.');
       } else {
         setScientificTexts([updatedSci, ...scientificTexts]);
-        setModalMessage('تم إضافة ونشر نص المحتوى العلمي بنجاح سحابياً للموقع! 🔬✨');
+        setModalMessage('تم حفظ النص واعتماده. يظهر الآن للجنة التصميم.');
       }
-      setEditingScientificId(null);
-      setSciTitleInput('');
-      setSciAuthorInput('');
-      setSciContentInput('');
-      setSciFileInput('');
+      resetScientificForm();
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -476,16 +562,78 @@ export default function AdminDashboard() {
     setSciTitleInput(item.title);
     setSciCategoryInput(item.category || 'أبحاث ومقالات علمية');
     setSciAuthorInput(item.author || '');
-    setSciContentInput(item.content);
-    setSciFileInput(item.fileUrl || '');
+    setSciContentInput(item.content || '');
+    setSciFileInput(item.pdfUrl || item.fileUrl || '');
+    setSciFileName(item.fileName || '');
+    setSciCollectionName(item.collectionName || 'scientific_committee_texts');
+    setSciArchiveTitle(item.archiveTitle || '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDeleteScientificText = (id: string) => {
+  const handleArchiveScientificText = (item: ScientificTextItem, archived: boolean) => {
+    const archiveTitle = item.archiveTitle || window.prompt('اكتب عنوان الأرشيف، مثال: نصوص فعالية الصحة النفسية')?.trim() || '';
+    if (archived && !archiveTitle) return;
+    triggerConfirmModal(
+      archived ? `أرشفة هذا النص تحت عنوان: ${archiveTitle}؟` : 'إرجاع هذا النص من الأرشيف إلى القائمة الحالية؟',
+      async () => {
+        try {
+          const col = item.collectionName || 'scientific_committee_texts';
+          await updateDoc(doc(db, col, item.id), {
+            archived,
+            archiveTitle: archiveTitle || item.archiveTitle || 'نصوص عامة',
+            ...(archived ? { archivedAt: Date.now() } : { restoredAt: Date.now() }),
+          });
+          setScientificTexts(scientificTexts.map((s) => (
+            s.id === item.id && s.collectionName === col
+              ? { ...s, archived, archiveTitle: archiveTitle || s.archiveTitle }
+              : s
+          )));
+          setModalMessage(archived ? 'تم أرشفة النص. يبقى محفوظاً للرجوع له لاحقاً.' : 'تم إرجاع النص من الأرشيف.');
+          setModalType('success');
+        } catch (err) {
+          console.error(err);
+          setModalMessage('تعذر تحديث الأرشيف.');
+          setModalType('success');
+        }
+      }
+    );
+  };
+
+  const handleReviewScientificText = (item: ScientificTextItem, status: 'approved' | 'rejected') => {
+    const label = status === 'approved' ? 'اعتماد هذا النص وتمريره للجنة التصميم؟' : 'رفض هذا النص وإعادته للجنة المحتوى العلمي؟';
+    triggerConfirmModal(label, async () => {
+      try {
+        const col = item.collectionName || 'scientific_committee_texts';
+        await updateDoc(doc(db, col, item.id), {
+          status,
+          reviewedAt: Date.now(),
+          reviewedBy: 'إدارة النادي والرؤساء',
+        });
+        setScientificTexts(scientificTexts.map((s) => (
+          s.id === item.id && s.collectionName === col ? { ...s, status } : s
+        )));
+        if (status === 'approved') {
+          await notifyCommitteeByKeyword(db, 'تصميم', `🔬 [نص معتمد من الإدارة]: "${item.title}" جاهز للاستخدام في التصاميم.`);
+        }
+        setModalMessage(status === 'approved' ? 'تم اعتماد النص وأُرسل للجنة التصميم.' : 'تم رفض النص. اللجنة تقدر تعدّله وتعيد رفعه.');
+        setModalType('success');
+      } catch (err) {
+        console.error(err);
+        setModalMessage('تعذر تحديث حالة النص.');
+        setModalType('success');
+      }
+    });
+  };
+
+  const handleDeleteScientificText = (item: ScientificTextItem) => {
     triggerConfirmModal('هل أنت متأكد من حذف هذا النص العلمي نهائياً من السحابة؟', async () => {
       try {
-        await deleteDoc(doc(db, 'site_scientific_texts', id));
-        setScientificTexts(scientificTexts.filter(s => s.id !== id));
+        const col = item.collectionName || 'scientific_committee_texts';
+        await deleteDoc(doc(db, col, item.id));
+        if (col !== 'site_scientific_texts') {
+          await deleteDoc(doc(db, 'site_scientific_texts', item.id)).catch(() => undefined);
+        }
+        setScientificTexts(scientificTexts.filter(s => !(s.id === item.id && s.collectionName === col)));
         setModalMessage('تم حذف النص العلمي بنجاح.');
         setModalType('success');
       } catch (err) {
@@ -2224,6 +2372,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     usersList.filter((usr) => isIncompleteUserAccount(usr) && matchesUserSearch(usr))
   );
   const incompleteAccountsCount = usersList.filter((usr) => isIncompleteUserAccount(usr)).length;
+  const pendingScientificCount = scientificTexts.filter((s) => s.status === 'pending' && !s.archived).length;
+  const archivedScientificCount = scientificTexts.filter((s) => s.archived).length;
+  const filteredScientificTexts = sciReviewFilter === 'pending'
+    ? scientificTexts.filter((s) => s.status === 'pending' && !s.archived)
+    : sciReviewFilter === 'archived'
+      ? scientificTexts.filter((s) => s.archived)
+      : scientificTexts.filter((s) => !s.archived);
+  const groupedScientificTexts = groupTextsByArchiveTitle(filteredScientificTexts);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
@@ -2330,7 +2486,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'scientific-texts' ? 'bg-teal-700 text-white shadow-md scale-105' : 'bg-teal-50 text-teal-900 border border-teal-200 hover:bg-teal-100'
             }`}
           >
-            🔬 نصوص المحتوى العلمي ({scientificTexts.length})
+            🔬 نصوص المحتوى العلمي ({pendingScientificCount > 0 ? `${pendingScientificCount} بانتظار` : scientificTexts.length})
           </button>
 
           <button
@@ -2428,27 +2584,187 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           ))}
         </div>
 
-        {/* تبويب نصوص المحتوى العلمي الجديد */}
+        {/* تبويب نصوص المحتوى العلمي: صندوق تقييم من اللجنة */}
         {activeTab === 'scientific-texts' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-teal-300 shadow-sm space-y-6">
               <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
                 <div>
-                  <h3 className="text-xl font-black text-teal-900">
-                    {editingScientificId ? '✏️ تعديل نص المحتوى العلمي' : '🔬 إضافة ونشر نص جديد للمحتوى العلمي'}
+                  <h3 className="text-xl font-black text-teal-900">صندوق تقييم نصوص لجنة المحتوى العلمي</h3>
+                  <p className="text-xs text-slate-500">
+                    قادة وأعضاء اللجنة يرفعون النص أو PDF تحت عنوان فعالية. بعد انتهائها يأرشفونها للرجوع لها لاحقاً، مثل نصوص فعالية الصحة النفسية.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setSciReviewFilter('pending')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black ${
+                      sciReviewFilter === 'pending' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-800 border border-amber-200'
+                    }`}
+                  >
+                    بانتظار التقييم ({pendingScientificCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSciReviewFilter('all')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black ${
+                      sciReviewFilter === 'all' ? 'bg-teal-700 text-white' : 'bg-teal-50 text-teal-800 border border-teal-200'
+                    }`}
+                  >
+                    الحالية ({scientificTexts.filter((s) => !s.archived).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSciReviewFilter('archived')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black ${
+                      sciReviewFilter === 'archived' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                    }`}
+                  >
+                    الأرشيف ({archivedScientificCount})
+                  </button>
+                </div>
+              </div>
+
+              {groupedScientificTexts.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <p className="text-sm font-bold">
+                    {sciReviewFilter === 'pending'
+                      ? 'لا توجد نصوص بانتظار التقييم حالياً.'
+                      : sciReviewFilter === 'archived'
+                        ? 'لا يوجد أرشيف بعد.'
+                        : 'لم تصل أي نصوص حالية من لجنة المحتوى العلمي.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {groupedScientificTexts.map(([archiveTitle, items]) => (
+                    <section key={archiveTitle} className="space-y-4">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <h4 className="text-sm font-black text-slate-900">{archiveTitle}</h4>
+                        <span className="text-[10px] font-bold text-slate-500">{items.length} نص</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {items.map((sci) => (
+                    <div key={`${sci.collectionName}-${sci.id}`} className="p-6 rounded-2xl border border-teal-200 bg-teal-50/20 shadow-sm flex flex-col justify-between space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-start gap-3">
+                          <div>
+                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold inline-block mb-1 ${
+                              sci.status === 'pending'
+                                ? 'bg-amber-200 text-amber-900'
+                                : sci.status === 'rejected'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {scientificStatusLabel(sci.status)}
+                            </span>
+                            <span className="text-[10px] bg-amber-50 text-[#630517] border border-amber-100 px-2.5 py-0.5 rounded-full font-bold inline-block mb-1 mr-1">
+                              {scientificArchiveTitle(sci)}
+                            </span>
+                            {sci.category ? (
+                              <span className="text-[10px] bg-teal-200 text-teal-900 px-2.5 py-0.5 rounded-full font-bold inline-block mb-1 mr-1">
+                                {sci.category}
+                              </span>
+                            ) : null}
+                            <h4 className="font-black text-slate-900 text-sm">{sci.title}</h4>
+                            <span className="text-[11px] text-slate-500 font-bold block mt-0.5">✍️ {sci.author || 'لجنة المحتوى العلمي'}</span>
+                          </div>
+                          {sci.fileUrl && !scientificPdfUrl(sci) ? (
+                            <img src={sci.fileUrl} alt={sci.title} className="w-14 h-14 rounded-2xl object-cover border-2 border-teal-400 shadow shrink-0" />
+                          ) : null}
+                        </div>
+                        {sci.content ? (
+                          <p className="text-slate-700 text-xs font-medium bg-white p-4 rounded-xl border border-teal-100 shadow-inner leading-relaxed whitespace-pre-line">
+                            {sci.content}
+                          </p>
+                        ) : null}
+                        {scientificPdfUrl(sci) ? (
+                          <a
+                            href={scientificPdfUrl(sci)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex text-xs font-bold text-teal-800 bg-white border border-teal-200 px-3 py-1.5 rounded-lg hover:bg-teal-50"
+                          >
+                            فتح ملف PDF {sci.fileName ? `(${sci.fileName})` : ''}
+                          </a>
+                        ) : null}
+                      </div>
+
+                      <div className="pt-2 border-t border-teal-200 flex justify-between items-center flex-wrap gap-2 text-[11px]">
+                        <span className="text-slate-400">{formatScientificDate(sci.createdAtMs || sci.createdAt)}</span>
+                        <div className="flex gap-2 flex-wrap">
+                          {sci.status === 'pending' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleReviewScientificText(sci, 'approved')}
+                                className="px-3 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 cursor-pointer"
+                              >
+                                اعتماد ✓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleReviewScientificText(sci, 'rejected')}
+                                className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold hover:bg-amber-200 cursor-pointer"
+                              >
+                                رفض
+                              </button>
+                            </>
+                          )}
+                          {sci.status === 'rejected' && (
+                            <button
+                              type="button"
+                              onClick={() => handleReviewScientificText(sci, 'approved')}
+                              className="px-3 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 cursor-pointer"
+                            >
+                              اعتماد بعد المراجعة ✓
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleArchiveScientificText(sci, !sci.archived)}
+                            className="px-3 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 cursor-pointer"
+                          >
+                            {sci.archived ? 'إرجاع من الأرشيف' : 'أرشفة'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditScientificTextClick(sci)}
+                            className="px-3 py-1 rounded-lg bg-teal-100 text-teal-900 font-bold hover:bg-teal-200 cursor-pointer"
+                          >
+                            تعديل ✏️
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteScientificText(sci)}
+                            className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
+                          >
+                            حذف ✕
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+              <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">
+                    {editingScientificId ? '✏️ تعديل نص' : 'ملاحظة من الإدارة (اختياري)'}
                   </h3>
-                  <p className="text-xs text-slate-500">أدخل عنوان المقال أو البحث العلمي، التصنيف، اسم الكاتب أو المصدر، والنص التفصيلي.</p>
+                  <p className="text-xs text-slate-500">الرفع الأساسي من قادة وأعضاء لجنة المحتوى العلمي. هذا النموذج إذا أردتم إضافة نص معتمد مباشرة.</p>
                 </div>
                 {editingScientificId && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setEditingScientificId(null);
-                      setSciTitleInput('');
-                      setSciAuthorInput('');
-                      setSciContentInput('');
-                      setSciFileInput('');
-                    }}
+                    onClick={resetScientificForm}
                     className="text-xs text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-xl hover:bg-red-100"
                   >
                     إلغاء التعديل ✕
@@ -2457,6 +2773,17 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               </div>
 
               <form onSubmit={handleSaveScientificText} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-teal-50/40 p-6 rounded-2xl border border-teal-200">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">عنوان الأرشيف / اسم الفعالية</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: نصوص فعالية الصحة النفسية"
+                    value={sciArchiveTitle}
+                    onChange={(e) => setSciArchiveTitle(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-teal-600"
+                  />
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">عنوان المقال أو النص العلمي</label>
                   <input
@@ -2487,7 +2814,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                   <label className="text-xs font-bold text-slate-700">اسم الكاتب / المراجِع العلمي (اختياري)</label>
                   <input
                     type="text"
-                    placeholder="مثال: إعداد لجنة المحتوى العلمي - إشراف أ.د. عبدالله"
+                    placeholder="مثال: إعداد لجنة المحتوى العلمي"
                     value={sciAuthorInput}
                     onChange={(e) => setSciAuthorInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-teal-600"
@@ -2495,29 +2822,31 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">صورة أو مرفق توضيحي (📁)</label>
+                  <label className="text-xs font-bold text-slate-700">رفع ملف PDF فيه النصوص</label>
                   <input
                     type="file"
-                    accept="image/*,.pdf"
+                    accept="application/pdf,.pdf,image/*"
                     onChange={async (e: ChangeEvent<HTMLInputElement>) => {
                       if (e.target.files && e.target.files[0]) {
-                        const base64 = await convertFileToBase64(e.target.files[0]);
+                        const file = e.target.files[0];
+                        const base64 = await convertFileToBase64(file);
                         setSciFileInput(base64);
+                        setSciFileName(file.name);
                       }
                     }}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-teal-600 file:text-white cursor-pointer"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:ml-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-teal-600 file:text-white cursor-pointer"
                   />
+                  {sciFileName ? <p className="text-[10px] text-slate-500">الملف: {sciFileName}</p> : null}
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">نص المحتوى العلمي التفصيلي</label>
+                  <label className="text-xs font-bold text-slate-700">نص المحتوى العلمي (اختياري إذا رفعت PDF)</label>
                   <textarea
                     rows={6}
-                    placeholder="اكتب المحتوى العلمي كاملاً والتفاصيل والملخصات..."
+                    placeholder="اكتب المحتوى هنا أو اتركه فارغاً إذا كان الملف يحتوي النصوص..."
                     value={sciContentInput}
                     onChange={(e) => setSciContentInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-teal-600 leading-relaxed font-sans"
-                    required
                   />
                 </div>
 
@@ -2526,63 +2855,10 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     type="submit"
                     className="bg-teal-700 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-teal-800 cursor-pointer"
                   >
-                    {editingScientificId ? '💾 حفظ التعديلات وتحديث النص العلمي سحابياً' : '+ نشر النص العلمي سحابياً للموقع 🚀'}
+                    {editingScientificId ? '💾 حفظ التعديلات' : '+ حفظ واعتماد النص مباشرة'}
                   </button>
                 </div>
               </form>
-            </div>
-
-            <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">سجل نصوص المحتوى العلمي المعتمدة ({scientificTexts.length})</h3>
-              {scientificTexts.length === 0 ? (
-                <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <p className="text-sm font-bold">لم تتم إضافة أي نص علمي حتى الآن.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {scientificTexts.map((sci) => (
-                    <div key={sci.id} className="p-6 rounded-2xl border border-teal-200 bg-teal-50/20 shadow-sm flex flex-col justify-between space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-start gap-3">
-                          <div>
-                            <span className="text-[10px] bg-teal-200 text-teal-900 px-2.5 py-0.5 rounded-full font-bold inline-block mb-1">
-                              {sci.category}
-                            </span>
-                            <h4 className="font-black text-slate-900 text-sm">{sci.title}</h4>
-                            <span className="text-[11px] text-slate-500 font-bold block mt-0.5">✍️ {sci.author || 'لجنة المحتوى العلمي'}</span>
-                          </div>
-                          {sci.fileUrl && (
-                            <img src={sci.fileUrl} alt={sci.title} className="w-14 h-14 rounded-2xl object-cover border-2 border-teal-400 shadow shrink-0" />
-                          )}
-                        </div>
-                        <p className="text-slate-700 text-xs font-medium bg-white p-4 rounded-xl border border-teal-100 shadow-inner leading-relaxed whitespace-pre-line">
-                          {sci.content}
-                        </p>
-                      </div>
-
-                      <div className="pt-2 border-t border-teal-200 flex justify-between items-center text-[11px]">
-                        <span className="text-slate-400">{new Date(sci.createdAt).toLocaleDateString('ar-SA')}</span>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleEditScientificTextClick(sci)}
-                            className="px-3 py-1 rounded-lg bg-teal-100 text-teal-900 font-bold hover:bg-teal-200 cursor-pointer"
-                          >
-                            تعديل ✏️
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteScientificText(sci.id)}
-                            className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
-                          >
-                            حذف ✕
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         )}
