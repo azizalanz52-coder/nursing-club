@@ -50,8 +50,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" className={`${readex.variable} ${readex.className} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-800">
+    <html lang="ar" className={`${readex.variable} ${readex.className} antialiased`}>
+      <body className="min-h-dvh flex flex-col bg-slate-50 text-slate-800">
         <AppShell>{children}</AppShell>
       </body>
     </html>
