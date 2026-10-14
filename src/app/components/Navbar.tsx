@@ -44,8 +44,14 @@ export default function Navbar() {
 
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        localStorage.removeItem('userPhone');
-        localStorage.removeItem('userName');
+        const storedPhone = localStorage.getItem('userPhone');
+        const storedName = localStorage.getItem('userName');
+        if (storedPhone) {
+          setUserPhone(storedPhone);
+          if (storedName) setUserName(storedName);
+          setAdminAuth(isAdminPhone(storedPhone));
+          return;
+        }
         setUserPhone(null);
         setUserName(null);
         setUserRole(null);
@@ -121,7 +127,7 @@ export default function Navbar() {
   const updateUserPresence = async (phone: string) => {
     try {
       const userRef = doc(db, 'users', phone);
-      await updateDoc(userRef, { lastActive: Date.now() });
+      await updateDoc(userRef, { lastActive: Date.now(), authMigrated: true });
     } catch (err) {
       console.error('Error updating presence:', err);
     }

@@ -13,8 +13,16 @@ function isLeadershipAccount(phone: string, role?: string) {
   );
 }
 
-export function isIncompleteUserAccount(data?: { password?: string } | null) {
-  return !String(data?.password || '').trim();
+export function isIncompleteUserAccount(data?: {
+  password?: string;
+  authMigrated?: boolean;
+  lastActive?: number | string;
+} | null) {
+  if (!data) return true;
+  if (data.authMigrated) return false;
+  if (String(data.password || '').trim()) return false;
+  if (data.lastActive) return false;
+  return true;
 }
 
 export async function notifyExistingUser(

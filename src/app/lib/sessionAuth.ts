@@ -95,6 +95,11 @@ export async function loginWithPhonePassword(phone: string, password: string) {
     await stripLegacyPassword(cleanPhone);
   }
   await persistSession(cleanPhone, profile?.fullName || (isAdminPhone(cleanPhone) ? 'عبدالعزيز العنزي (المشرف العام)' : 'مستخدم مسجل'));
+  try {
+    await setDoc(doc(db, 'users', cleanPhone), { authMigrated: true }, { merge: true });
+  } catch (err) {
+    console.error(err);
+  }
   return { phone: cleanPhone, fullName: profile?.fullName || '' };
 }
 

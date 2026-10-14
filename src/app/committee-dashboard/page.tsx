@@ -176,12 +176,12 @@ useEffect(() => {
   useEffect(() => {
     let unsubScientific: (() => void) | undefined;
     const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (!user) {
+      const phone = user ? emailToPhone(user.email) : (localStorage.getItem('userPhone') || '');
+      if (!phone) {
         alert('الرجاء تسجيل الدخول أولاً.');
         router.push('/login');
         return;
       }
-      const phone = emailToPhone(user.email);
       localStorage.setItem('userPhone', phone);
       setUserPhone(phone);
       fetchLeaderData(phone);

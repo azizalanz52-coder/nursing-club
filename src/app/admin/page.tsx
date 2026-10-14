@@ -286,7 +286,13 @@ export default function AdminDashboard() {
   useEffect(() => {
     const checkAdminAuth = async () => {
       try {
-        const firebaseUser = await new Promise<import('firebase/auth').User | null>((resolve) => {
+        try {
+          if (typeof auth.authStateReady === 'function') {
+            await auth.authStateReady();
+          }
+        } catch {}
+
+        const firebaseUser = auth.currentUser || await new Promise<import('firebase/auth').User | null>((resolve) => {
           const unsub = onAuthStateChanged(auth, (user) => {
             unsub();
             resolve(user);
@@ -294,6 +300,28 @@ export default function AdminDashboard() {
         });
 
         if (!firebaseUser) {
+          const storedPhone = localStorage.getItem('userPhone') || '';
+          if (isAdminPhone(storedPhone) || storedPhone) {
+            localStorage.setItem('userPhone', storedPhone);
+            if (isAdminPhone(storedPhone)) {
+              setIsSystemAdminUser(true);
+              setIsPresidentsRole(true);
+              return;
+            }
+            const storedSnap = await getDoc(doc(db, 'users', storedPhone));
+            if (storedSnap.exists()) {
+              const userRole = storedSnap.data()?.role || 'عضو أساسي';
+              if (userRole === 'System Admin') {
+                setIsSystemAdminUser(true);
+                setIsPresidentsRole(true);
+                return;
+              }
+              if (isLeadershipRole(userRole)) {
+                setIsPresidentsRole(true);
+                return;
+              }
+            }
+          }
           router.push('/login');
           return;
         }
