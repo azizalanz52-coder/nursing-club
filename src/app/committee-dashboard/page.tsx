@@ -9,6 +9,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as XLSX from 'xlsx';
 import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
 import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
+import { isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
 import { auth } from '../lib/firebase';
@@ -103,6 +104,9 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaCategory, setMediaCategory] = useState('تغطية فعالية');
   const [mediaBase64, setMediaBase64] = useState('/header-banner.png');
+  const [mediaUploadFile, setMediaUploadFile] = useState<File | null>(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [mediaUploadProgress, setMediaUploadProgress] = useState(0);
   const [mediaGallery, setMediaGallery] = useState<any[]>([]);
 
   const [textBannerTitle, setTextBannerTitle] = useState('');
@@ -701,39 +705,59 @@ useEffect(() => {
 
   const handleUploadMediaSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!mediaTitle.trim()) return;
-    const newObj = {
-      title: mediaTitle.trim(),
-      category: mediaCategory,
-      imageUrl: mediaBase64,
-      mediaUrl: mediaBase64,
-      files: [mediaBase64],
-      createdAt: new Date().toLocaleDateString('ar-SA'),
-      timestamp: Date.now(),
-      addedBy: userData?.fullName || 'لجنة الإعلام',
-      uploadedBy: userData?.fullName || 'لجنة الإعلام',
-      committee: 'لجنة الإعلام',
-      source: 'لوحة اللجنة'
-    };
+    if (!mediaTitle.trim() || !mediaUploadFile) {
+      alert('اكتب العنوان واختر صورة أو فيديو.');
+      return;
+    }
+    if (isOverUploadLimit(mediaUploadFile)) {
+      alert(uploadLimitMessage());
+      return;
+    }
+
+    setIsUploadingMedia(true);
+    setMediaUploadProgress(0);
     try {
+      const fileUrl = await uploadClubFile(mediaUploadFile, 'media_gallery', setMediaUploadProgress);
+      const isVideo = mediaUploadFile.type.startsWith('video');
+      const newObj = {
+        title: mediaTitle.trim(),
+        category: mediaCategory,
+        imageUrl: fileUrl,
+        mediaUrl: fileUrl,
+        files: [fileUrl],
+        mediaType: isVideo ? 'video' : 'image',
+        createdAt: new Date().toLocaleDateString('ar-SA'),
+        timestamp: Date.now(),
+        addedBy: userData?.fullName || 'لجنة الإعلام',
+        uploadedBy: userData?.fullName || 'لجنة الإعلام',
+        committee: 'لجنة الإعلام',
+        source: 'لوحة اللجنة'
+      };
       const docRef = await addDoc(collection(db, 'media_committee_gallery'), newObj);
       setMediaGallery([{ ...newObj, id: docRef.id }, ...mediaGallery]);
       setMediaTitle('');
       setMediaBase64('/header-banner.png');
+      setMediaUploadFile(null);
 
       for (const usr of allUsersList) {
         const cStr = usr.assignedCommittee || usr.committee || '';
         if (cStr.includes('التصميم') || cStr.includes('الاعلام') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
           try {
             await setDoc(doc(db, 'users', usr.id), {
-              latestNotification: `📸 [تحديث إعلامي جديد]: أضافت لجنة الإعلام مادة جديدة (${mediaTitle})`
+              latestNotification: `📸 [تحديث إعلامي جديد]: أضافت لجنة الإعلام مادة جديدة (${newObj.title})`
             }, { merge: true });
           } catch (er) { console.error(er); }
         }
       }
 
       alert('تم رفع ونشر المادة الإعلامية سحابياً لتصل للأدمن والرؤساء بنجاح! 📸🚀');
-    } catch (err) { console.error(err); }
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'تعذر رفع الملف. حاول مرة أخرى.');
+    } finally {
+      setIsUploadingMedia(false);
+      setMediaUploadProgress(0);
+    }
   };
 
   const handleDeleteMedia = async (id: string) => {
@@ -2460,23 +2484,36 @@ useEffect(() => {
               </div>
 
               <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-bold text-slate-700">اختر ملف الصورة أو الفيديو من جهازك</label>
+                <label className="text-xs font-bold text-slate-700">اختر ملف الصورة أو الفيديو (الحد 8 ميغابايت)</label>
                 <input
                   type="file"
                   accept="image/*,video/*"
-                  onChange={async (e: ChangeEvent<HTMLInputElement>) => {
-                    if (e.target.files && e.target.files[0]) {
-                      setMediaBase64(await convertFileToBase64(e.target.files[0]));
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (isOverUploadLimit(file)) {
+                      alert(uploadLimitMessage());
+                      e.target.value = '';
+                      setMediaUploadFile(null);
+                      return;
                     }
+                    setMediaUploadFile(file);
                   }}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-600 file:text-white cursor-pointer"
                   required
                 />
+                {mediaUploadFile ? (
+                  <p className="text-[11px] text-purple-800 font-bold">الملف الجاهز: {mediaUploadFile.name}</p>
+                ) : null}
               </div>
 
               <div className="sm:col-span-2 pt-2">
-                <button type="submit" className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer">
-                  + رفع ونشر المواد سحابياً (تصل للأدمن) 🎬
+                <button
+                  type="submit"
+                  disabled={isUploadingMedia}
+                  className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer disabled:opacity-60"
+                >
+                  {uploadingLabel(isUploadingMedia, mediaUploadProgress, '+ رفع ونشر المواد سحابياً (تصل للأدمن) 🎬')}
                 </button>
               </div>
             </form>

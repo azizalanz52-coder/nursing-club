@@ -12,6 +12,7 @@ import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import PageLoading from '../../components/PageLoading';
+import { isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
 
 // دالة تحويل الملف إلى Base64 كخيار احتياطي ومضمون
 const convertFileToBase64 = (file: File): Promise<string> => {
@@ -182,6 +183,7 @@ export default function CommitteeDetailPage() {
   const [mediaCategory, setMediaCategory] = useState('تغطيات مرئية وفيديوهات 🎥');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
+  const [mediaUploadProgress, setMediaUploadProgress] = useState(0);
 
   // خصائص لجنة المحتوى العلمي ولجنة التصميم (بنك النصوص والعبارات)
   const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
@@ -489,12 +491,16 @@ export default function CommitteeDetailPage() {
       alert('يرجى كتابة عنوان التغطية واختيار ملف الصورة أو الفيديو.');
       return;
     }
+    if (isOverUploadLimit(mediaFile)) {
+      alert(uploadLimitMessage());
+      return;
+    }
 
     try {
       setIsUploadingMedia(true);
+      setMediaUploadProgress(0);
 
-      // رفع الملف سحابياً للحصول على رابط مباشر غير محدود الحجم
-      const downloadUrl = await uploadFileToStorage(mediaFile, 'media_gallery');
+      const downloadUrl = await uploadClubFile(mediaFile, 'media_gallery', setMediaUploadProgress);
       const isVideo = mediaFile.type.startsWith('video');
 
       const newObj = {
@@ -519,13 +525,13 @@ export default function CommitteeDetailPage() {
 
       setMediaTitle('');
       setMediaFile(null);
-      setIsUploadingMedia(false);
-
       alert('تم رفع ونشر محتوى لجنة الإعلام سحابياً وتخزينه لجميع اللوحات بنجاح! 📸🚀');
     } catch (err: any) {
       console.error('Error uploading media:', err);
+      alert(err?.message || 'حدث خطأ أثناء رفع الملف، يرجى المحاولة مرة أخرى.');
+    } finally {
       setIsUploadingMedia(false);
-      alert('حدث خطأ أثناء رفع الملف، يرجى المحاولة مرة أخرى.');
+      setMediaUploadProgress(0);
     }
   };
 
@@ -1077,8 +1083,8 @@ export default function CommitteeDetailPage() {
           <div className="bg-white rounded-3xl p-8 sm:p-10 border border-purple-200 shadow-xl space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h2 className="text-xl font-black text-slate-900">📸 مركز رفع وتوثيق محتوى لجنة الإعلام (صور ومقاطع فيديو بدون قيود حجمية)</h2>
-                <p className="text-xs text-slate-500 mt-1">خاص برفع التغطيات المرئية والفيديوهات والصور الكبيرة وتخزينها سحابياً لعرضها في المنصة.</p>
+                <h2 className="text-xl font-black text-slate-900">📸 مركز رفع وتوثيق محتوى لجنة الإعلام</h2>
+                <p className="text-xs text-slate-500 mt-1">خاص برفع التغطيات المرئية والفيديوهات والصور، بحد 8 ميغابايت لكل ملف، وتخزينها سحابياً لعرضها في المنصة.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
                 إجمالي المواد: {mediaGallery.length}
@@ -1112,14 +1118,20 @@ export default function CommitteeDetailPage() {
               </div>
 
               <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-bold text-slate-700">اختر الملف (📁 دعم كامل للصور والفيديوهات عالية الدقة)</label>
+                <label className="text-xs font-bold text-slate-700">اختر الملف (الحد 8 ميغابايت لكل صورة أو فيديو)</label>
                 <input
                   type="file"
                   accept="image/*,video/*"
                   onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    if (e.target.files && e.target.files[0]) {
-                      setMediaFile(e.target.files[0]);
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (isOverUploadLimit(file)) {
+                      alert(uploadLimitMessage());
+                      e.target.value = '';
+                      setMediaFile(null);
+                      return;
                     }
+                    setMediaFile(file);
                   }}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white cursor-pointer"
                   required
@@ -1140,14 +1152,22 @@ export default function CommitteeDetailPage() {
                 </div>
               )}
 
-              <div className="sm:col-span-2 pt-2">
+              <div className="sm:col-span-2 pt-2 space-y-2">
                 <button
                   type="submit"
                   disabled={isUploadingMedia}
                   className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 disabled:bg-slate-400 cursor-pointer"
                 >
-                  {isUploadingMedia ? 'جاري الرفع السحابي... ⏳' : '+ رفع ونشر محتوى لجنة الإعلام سحابياً 🎬'}
+                  {uploadingLabel(isUploadingMedia, mediaUploadProgress, '+ رفع ونشر محتوى لجنة الإعلام سحابياً 🎬')}
                 </button>
+                {isUploadingMedia ? (
+                  <div className="h-2 rounded-full bg-purple-100 overflow-hidden" dir="ltr">
+                    <div
+                      className={`h-full bg-purple-600 ${mediaUploadProgress <= 0 ? 'w-1/3 animate-pulse' : 'transition-all duration-200'}`}
+                      style={mediaUploadProgress > 0 ? { width: `${mediaUploadProgress}%` } : undefined}
+                    />
+                  </div>
+                ) : null}
               </div>
             </form>
 

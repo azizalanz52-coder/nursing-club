@@ -3,15 +3,15 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { db, storage } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot } from 'firebase/firestore';
 import { isIncompleteUserAccount, notifyCommitteeByKeyword } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
+import { filterFilesWithinLimit, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 
@@ -260,12 +260,6 @@ export default function AdminDashboard() {
       if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleDateString('ar-SA');
     }
     return String(d);
-  };
-
-  const uploadFileToStorage = async (file: File, folderPath: string): Promise<string> => {
-    const storageRef = ref(storage, `${folderPath}/${Date.now()}_${file.name}`);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
   };
 
   const formatVaultDate = (vaultItem: any) => {
@@ -1228,7 +1222,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const [newDiscCategory, setNewDiscCategory] = useState<string>('أنشطة كبرى');
   const [newDiscDesc, setNewDiscDesc] = useState<string>('');
   const [newDiscImages, setNewDiscImages] = useState<string[]>([]);
+  const [newDiscFiles, setNewDiscFiles] = useState<File[]>([]);
   const [isUploadingDiscover, setIsUploadingDiscover] = useState<boolean>(false);
+  const [cloudUploadProgress, setCloudUploadProgress] = useState(0);
 
   const [mediaUploads, setMediaUploads] = useState<any[]>([]);
   const [mediaTitle, setMediaTitle] = useState<string>('');
@@ -1750,16 +1746,17 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     }
   };
 
-  const handleSelectMultipleImagesForNewEvent = async (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files);
-      const base64Images: string[] = [];
-      for (const file of filesArray) {
-        const base64 = await convertFileToBase64(file);
-        base64Images.push(base64);
-      }
-      setNewDiscImages((prev) => [...prev, ...base64Images]);
+  const handleSelectMultipleImagesForNewEvent = (e: ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const { accepted, rejected } = filterFilesWithinLimit(Array.from(e.target.files));
+    if (rejected.length > 0) {
+      setModalMessage(uploadLimitMessage());
+      setModalType('success');
     }
+    if (accepted.length > 0) {
+      setNewDiscFiles((prev) => [...prev, ...accepted]);
+    }
+    e.target.value = '';
   };
 
   const handleCreateNewDiscoverEvent = async (e: FormEvent) => {
@@ -1767,38 +1764,48 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     if (!newDiscTitle.trim() || isUploadingDiscover) return;
 
     setIsUploadingDiscover(true);
+    setCloudUploadProgress(0);
     const eventId = Date.now().toString();
-    const newEventObj: DiscoverEvent = {
-      id: eventId,
-      title: newDiscTitle.trim(),
-      category: newDiscCategory,
-      description: newDiscDesc || 'فعالية تابعة لنادي التمريض.',
-      images: newDiscImages.length > 0 ? newDiscImages : ['/logo.png']
-    };
 
     try {
+      const uploadedUrls = await uploadClubFiles(newDiscFiles, 'discover-events', setCloudUploadProgress);
+      const newEventObj: DiscoverEvent = {
+        id: eventId,
+        title: newDiscTitle.trim(),
+        category: newDiscCategory,
+        description: newDiscDesc || 'فعالية تابعة لنادي التمريض.',
+        images: uploadedUrls.length > 0 ? uploadedUrls : ['/logo.png']
+      };
       await setDoc(doc(db, 'site_discover_events', eventId), newEventObj);
       setDiscoverEvents([newEventObj, ...discoverEvents]);
       setSelectedEventId(eventId);
       setNewDiscTitle('');
       setNewDiscDesc('');
       setNewDiscImages([]);
+      setNewDiscFiles([]);
       setModalMessage('تم إنشاء الفعالية ونشر الصور سحابياً للجميع بنجاح! 🖼️🚀');
       setModalType('success');
-   } catch (err) {
-    console.error('Error saving event:', err);
-    setModalMessage('حدث خطأ أثناء رفع الفعالية بالسحابة.');
-    setModalType('error'); // يُفضّل اختيار 'error' بدلاً من 'success' في حالة الخطأ
-  } finally {
-    setIsUploadingDiscover(false);
-  }
-};
-
-  const handleSelectMediaFiles = async (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files);
-      setMediaFileObjects((prev) => [...prev, ...filesArray]);
+    } catch (err: any) {
+      console.error('Error saving event:', err);
+      setModalMessage(err?.message || 'حدث خطأ أثناء رفع الفعالية بالسحابة.');
+      setModalType('success');
+    } finally {
+      setIsUploadingDiscover(false);
+      setCloudUploadProgress(0);
     }
+  };
+
+  const handleSelectMediaFiles = (e: ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const { accepted, rejected } = filterFilesWithinLimit(Array.from(e.target.files));
+    if (rejected.length > 0) {
+      setModalMessage(uploadLimitMessage());
+      setModalType('success');
+    }
+    if (accepted.length > 0) {
+      setMediaFileObjects((prev) => [...prev, ...accepted]);
+    }
+    e.target.value = '';
   };
 
   const handleUploadMediaCommitteeContent = async (e: FormEvent) => {
@@ -1811,14 +1818,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
     try {
       setIsUploadingMedia(true);
-      const uploadedUrls: string[] = [];
-      let hasVideo = false;
-
-      for (const file of mediaFileObjects) {
-        const url = await uploadFileToStorage(file, 'media_gallery');
-        uploadedUrls.push(url);
-        if (file.type.startsWith('video')) hasVideo = true;
-      }
+      setCloudUploadProgress(0);
+      const uploadedUrls = await uploadClubFiles(mediaFileObjects, 'media_gallery', setCloudUploadProgress);
+      const hasVideo = mediaFileObjects.some((file) => file.type.startsWith('video'));
 
       const mediaObj = {
         title: mediaTitle.trim(),
@@ -1844,12 +1846,13 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       setMediaFileObjects([]);
       setModalMessage('تم رفع الصور والفيديوهات الخاصة بلجنة الإعلام، وهي مربوطة الآن بصفحة الأعضاء! 🎥📸');
       setModalType('success');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setModalMessage('حدث خطأ أثناء رفع محتوى لجنة الإعلام.');
+      setModalMessage(err?.message || 'حدث خطأ أثناء رفع محتوى لجنة الإعلام.');
       setModalType('success');
     } finally {
       setIsUploadingMedia(false);
+      setCloudUploadProgress(0);
     }
   };
 
@@ -1874,28 +1877,35 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   };
 
   const handleAddMultipleImagesToExistingEvent = async (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && selectedEventId) {
-      const filesArray = Array.from(e.target.files);
-      const base64Images: string[] = [];
-      for (const file of filesArray) {
-        const base64 = await convertFileToBase64(file);
-        base64Images.push(base64);
-      }
+    if (!e.target.files || !selectedEventId) return;
+    const { accepted, rejected } = filterFilesWithinLimit(Array.from(e.target.files));
+    e.target.value = '';
+    if (rejected.length > 0) {
+      setModalMessage(uploadLimitMessage());
+      setModalType('success');
+    }
+    if (accepted.length === 0) return;
 
-      const targetEvent = discoverEvents.find((ev) => ev.id === selectedEventId);
-      if (!targetEvent) return;
+    const targetEvent = discoverEvents.find((ev) => ev.id === selectedEventId);
+    if (!targetEvent) return;
 
-      const updatedImages = [...(targetEvent.images || []), ...base64Images];
+    try {
+      setIsUploadingDiscover(true);
+      setCloudUploadProgress(0);
+      const uploadedUrls = await uploadClubFiles(accepted, 'discover-events', setCloudUploadProgress);
+      const updatedImages = [...(targetEvent.images || []), ...uploadedUrls];
       const updatedEventObj = { ...targetEvent, images: updatedImages };
-
-      try {
-        await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
-        setDiscoverEvents(discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev)));
-        setModalMessage('تم رفع وإضافة الصور سحابياً بنجاح! 🚀');
-        setModalType('success');
-      } catch (err) {
-        console.error(err);
-      }
+      await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
+      setDiscoverEvents(discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev)));
+      setModalMessage('تم رفع وإضافة الصور سحابياً بنجاح! 🚀');
+      setModalType('success');
+    } catch (err: any) {
+      console.error(err);
+      setModalMessage(err?.message || 'تعذر رفع الملفات. حاول مرة أخرى.');
+      setModalType('success');
+    } finally {
+      setIsUploadingDiscover(false);
+      setCloudUploadProgress(0);
     }
   };
 
@@ -3305,7 +3315,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-3">
-                  <label className="text-xs font-bold text-slate-700">صورة أو ملف الشهادة (📁 بدون قيود حجمية)</label>
+                  <label className="text-xs font-bold text-slate-700">صورة أو ملف الشهادة (الحد 8 ميغابايت)</label>
                   <input
                     type="file"
                     accept="image/*,.pdf"
@@ -3481,7 +3491,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         </div>
 
         <div className="space-y-1.5 sm:col-span-2">
-          <label className="text-xs font-bold text-slate-700">صورة الإنجاز أو فريق العمل / التكريم (📁 بدون قيود حجمية)</label>
+          <label className="text-xs font-bold text-slate-700">صورة الإنجاز أو فريق العمل / التكريم (الحد 8 ميغابايت)</label>
           <input
             type="file"
             accept="image/*"
@@ -3586,7 +3596,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm space-y-6">
               <div className="border-b border-slate-100 pb-4">
-                <h3 className="text-xl font-black text-rose-900">🎥 رفع وتوثيق محتوى لجنة الإعلام (صور وفيديوهات بدون قيود حجمية)</h3>
+                <h3 className="text-xl font-black text-rose-900">🎥 رفع وتوثيق محتوى لجنة الإعلام</h3>
                 <p className="text-xs text-slate-500">مربوط مباشرة بصفحة أعضاء لجنة الإعلام: أي صورة أو فيديو يرفعها الأعضاء تصلك هنا تلقائياً، ورفوعات الأدمن تظهر لهم أيضاً.</p>
               </div>
 
@@ -3617,7 +3627,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر الملفات والفيديوهات (📁 بدون أي قيود على الحجم)</label>
+                  <label className="text-xs font-bold text-slate-700">اختر الملفات والفيديوهات (الحد 8 ميغابايت لكل ملف)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -3636,7 +3646,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     disabled={isUploadingMedia}
                     className="bg-rose-700 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-rose-800 disabled:bg-slate-400 cursor-pointer"
                   >
-                    {isUploadingMedia ? 'جاري الرفع السحابي... ⏳' : '+ رفع ونشر محتوى لجنة الإعلام سحابياً'}
+                    {uploadingLabel(isUploadingMedia, cloudUploadProgress, '+ رفع ونشر محتوى لجنة الإعلام سحابياً')}
                   </button>
                 </div>
               </form>
@@ -4171,7 +4181,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         {activeTab === 'discover' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة مع معرض صور وفيديوهات سحابي (بدون قيود حجمية)</h3>
+              <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة مع معرض صور وفيديوهات سحابي</h3>
+              <p className="text-xs text-slate-500">الحد الأقصى 8 ميغابايت لكل ملف. الملفات تُرفع سحابياً ولا تُحفظ داخل فايرستور.</p>
               <form onSubmit={handleCreateNewDiscoverEvent} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">عنوان الفعالية الجديدة</label>
@@ -4205,7 +4216,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر صور وفيديوهات المعرض (📁 بدون أي قيود على الحجم)</label>
+                  <label className="text-xs font-bold text-slate-700">اختر صور وفيديوهات المعرض (الحد 8 ميغابايت لكل ملف)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -4213,8 +4224,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     onChange={handleSelectMultipleImagesForNewEvent}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
-                  {newDiscImages.length > 0 && (
-                    <p className="text-xs font-bold text-emerald-600 mt-1">✅ تم اختيار وتجهيز عدد الملفات: {newDiscImages.length}</p>
+                  {newDiscFiles.length > 0 && (
+                    <p className="text-xs font-bold text-emerald-600 mt-1">✅ تم اختيار {newDiscFiles.length} ملف: {newDiscFiles.map((f) => f.name).join('، ')}</p>
                   )}
                 </div>
                 <div className="sm:col-span-2 pt-2">
@@ -4223,7 +4234,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     disabled={isUploadingDiscover}
                     className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 cursor-pointer disabled:opacity-50"
                   >
-                    {isUploadingDiscover ? '⏳ جاري الرفع سحابياً للجميع...' : '+ رفع ونشر الفعالية سحابياً للجميع 🚀'}
+                    {uploadingLabel(isUploadingDiscover, cloudUploadProgress, '+ رفع ونشر الفعالية سحابياً للجميع 🚀')}
                   </button>
                 </div>
               </form>
@@ -4265,6 +4276,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     onChange={handleAddMultipleImagesToExistingEvent}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
+                  <p className="text-[11px] text-slate-500 font-bold">الحد 8 ميغابايت لكل ملف.</p>
                 </div>
               )}
 
@@ -4304,7 +4316,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               <h3 className="text-xl font-black text-slate-900">إدارة صور وعبارات بطاقة "شغف، عطاء، واحترافية" (سحابي)</h3>
               <form onSubmit={handleAddPassionSlide} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر صورة أو فيديو الشريحة من جهازك (بدون قيود حجمية)</label>
+                  <label className="text-xs font-bold text-slate-700">اختر صورة أو فيديو الشريحة من جهازك (الحد 8 ميغابايت)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -4451,7 +4463,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر بوستر أو فيديو الفعالية (بدون قيود حجمية)</label>
+                  <label className="text-xs font-bold text-slate-600">اختر بوستر أو فيديو الفعالية (الحد 8 ميغابايت)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -4552,7 +4564,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر صورة أو فيديو البانر (بدون قيود حجمية)</label>
+                  <label className="text-xs font-bold text-slate-600">اختر صورة أو فيديو البانر (الحد 8 ميغابايت)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -4679,7 +4691,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-600">اختر شعار أو فيديو الشريك (📁 بدون قيود حجمية)</label>
+                  <label className="text-xs font-bold text-slate-600">اختر شعار أو فيديو الشريك (الحد 8 ميغابايت)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
