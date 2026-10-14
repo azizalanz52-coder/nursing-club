@@ -14,9 +14,17 @@ export function bindClubNoticeHandler(next: NoticeHandler | null) {
   handler = next;
 }
 
-export function inferNoticeKind(message: string): ClubNoticeKind {
+export function humanizeNotice(message: string) {
   const text = String(message || '');
-  if (/تعذر|خطأ|فشل|مرفوضة|غير صحيحة/.test(text)) return 'error';
+  if (/longer than|1048487|exceeds the maximum/i.test(text) || (/fileUrl|property/i.test(text) && /longer/i.test(text))) {
+    return 'ملف الشهادة كبير على الحفظ. صغّر الصورة ثم أعد المحاولة.';
+  }
+  return text;
+}
+
+export function inferNoticeKind(message: string): ClubNoticeKind {
+  const text = humanizeNotice(message);
+  if (/تعذر|خطأ|فشل|مرفوضة|غير صحيحة|كبير على الحفظ/.test(text)) return 'error';
   if (/لا يوجد|مكرر|مسبقا/.test(text)) return 'info';
   if (/تم |بنجاح|نجاح|مرحبا/.test(text)) return 'success';
   return 'info';
@@ -43,7 +51,7 @@ function pickActionTitle(text: string, failed: boolean) {
 }
 
 export function compactNotice(message: string, kind: ClubNoticeKind, customTitle?: string) {
-  const text = stripDecor(message);
+  const text = stripDecor(humanizeNotice(message));
 
   if (kind === 'success') {
     const welcome = text.match(/يا\s+([^!]+)/);
@@ -54,7 +62,11 @@ export function compactNotice(message: string, kind: ClubNoticeKind, customTitle
   }
 
   if (kind === 'error') {
-    return { title: customTitle || pickActionTitle(text, true), detail: '' };
+    if (customTitle) return { title: customTitle, detail: /[\u0600-\u06FF]/.test(text) ? text.slice(0, 52) : '' };
+    if (/[\u0600-\u06FF]/.test(text)) {
+      return { title: (text.split(/[.!؟]/)[0] || text).slice(0, 52), detail: '' };
+    }
+    return { title: pickActionTitle(text, true), detail: '' };
   }
 
   if (kind === 'confirm') {
@@ -75,9 +87,10 @@ export function compactNotice(message: string, kind: ClubNoticeKind, customTitle
 }
 
 export function clubNotice(message: string, kind?: ClubNoticeKind, title?: string): Promise<boolean> {
+  const text = humanizeNotice(String(message || ''));
   const req: ClubNoticeRequest = {
-    message: String(message || ''),
-    kind: kind || inferNoticeKind(String(message || '')),
+    message: text,
+    kind: kind || inferNoticeKind(text),
     title,
   };
   if (handler) return handler(req);

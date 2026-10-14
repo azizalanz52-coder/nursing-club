@@ -11,7 +11,7 @@ import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
 import HrCertificateBatches from './../components/HrCertificateBatches';
 import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
-import { isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { certMediaFields, isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
 import { auth } from '../lib/firebase';
@@ -321,30 +321,7 @@ useEffect(() => {
 
     setIsUploadingCert(true);
     try {
-      const fileExt = certUploadFile.name.includes('.')
-        ? certUploadFile.name.substring(certUploadFile.name.lastIndexOf('.'))
-        : '';
-      const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${fileExt}`;
-      const storageRef = ref(storage, `certificates/${safeFileName}`);
-
-      let fileUrl = '';
-      try {
-        const storagePromise = (async () => {
-          await uploadBytes(storageRef, certUploadFile);
-          return await getDownloadURL(storageRef);
-        })();
-        const timeoutPromise = new Promise<string>((_, reject) =>
-          setTimeout(() => reject(new Error('Storage Upload Timeout')), 8000)
-        );
-        fileUrl = await Promise.race([storagePromise, timeoutPromise]);
-      } catch (storageErr) {
-        console.warn('تعذر الرفع عبر Storage، التحويل الاحتياطي:', storageErr);
-        if (certUploadFile.size > 700 * 1024) {
-          throw new Error('تعذر الرفع السحابي والملف أكبر من 700 كيلوبايت. صغّر الملف ثم أعد المحاولة.');
-        }
-        fileUrl = await convertFileToBase64(certUploadFile);
-      }
-
+      const fileUrl = await uploadClubFile(certUploadFile, 'certificates');
       const phone = canonicalPhone(certStudentPhone) || certStudentPhone.trim();
       const universityId = normalizeUniversityId(certStudentUniversityId);
       const title = certTitle.trim();
@@ -359,8 +336,7 @@ useEffect(() => {
         title,
         certTitle: title,
         category: certCategory,
-        fileUrl,
-        image: fileUrl,
+        ...certMediaFields(fileUrl),
         issuedBy: issuer,
         createdAt: Date.now(),
         dateStr: new Date().toLocaleDateString('ar-SA'),

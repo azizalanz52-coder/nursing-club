@@ -13,7 +13,7 @@ import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import PageLoading from '../../components/PageLoading';
-import { isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
+import { certMediaFields, isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
 import { canonicalPhone, normalizeUniversityId } from '../../lib/certificatesLookup';
 import { clubConfirm, inferNoticeKind } from '../../lib/clubNotice';
 import { ClubNoticeDialog } from '../../components/ClubNotice';
@@ -705,7 +705,7 @@ export default function CommitteeDetailPage() {
 
     setIsUploadingCert(true);
     try {
-      const fileUrl = await uploadFileToStorage(certUploadFile, 'certificates');
+      const fileUrl = await uploadClubFile(certUploadFile, 'certificates');
       const phone = canonicalPhone(certStudentPhone) || certStudentPhone.trim();
       const universityId = normalizeUniversityId(certStudentUniversityId);
       const title = certTitle.trim();
@@ -720,8 +720,7 @@ export default function CommitteeDetailPage() {
         title,
         certTitle: title,
         category: certCategory,
-        fileUrl,
-        image: fileUrl,
+        ...certMediaFields(fileUrl),
         issuedBy: issuer,
         createdAt: Date.now(),
         dateStr: new Date().toLocaleDateString('ar-SA'),

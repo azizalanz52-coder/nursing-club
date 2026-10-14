@@ -7,7 +7,7 @@ import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot } from 'firebase/firestore';
 import { isIncompleteUserAccount, notifyCommitteeByKeyword } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
-import { filterFilesWithinLimit, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { certMediaFields, filterFilesWithinLimit, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { clubConfirm, inferNoticeKind } from '../lib/clubNotice';
 import { ClubNoticeDialog } from '../components/ClubNotice';
 import HrCertificateBatches from '../components/HrCertificateBatches';
@@ -777,6 +777,7 @@ export default function AdminDashboard() {
     if (!phone && !universityId) return;
 
     const certId = editingCertId ? editingCertId : Date.now().toString();
+    const media = certMediaFields(certImageInput);
     const updatedCert: CertificateItem = {
       id: certId,
       recipientName: certRecipientInput.trim(),
@@ -785,7 +786,7 @@ export default function AdminDashboard() {
       password: certPasswordInput.trim() || '',
       certTitle: certTitleInput.trim(),
       category: certCategoryInput,
-      image: certImageInput,
+      image: media.image || media.fileUrl,
       description: certDescInput.trim() || 'شهادة معتمدة من نادي كلية التمريض بجامعة حفر الباطن.',
       issueDate: new Date().toISOString()
     };
@@ -3389,9 +3390,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     type="file"
                     accept="image/*,.pdf"
                     onChange={async (e: ChangeEvent<HTMLInputElement>) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const base64 = await convertFileToBase64(e.target.files[0]);
-                        setCertImageInput(base64);
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const url = await uploadClubFile(file, 'certificates');
+                        setCertImageInput(url);
+                      } catch (err) {
+                        setModalMessage(err instanceof Error ? err.message : 'تعذر رفع ملف الشهادة.');
+                        setModalType('success');
                       }
                     }}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-sky-600 file:text-white cursor-pointer"

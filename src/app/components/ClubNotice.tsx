@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   bindClubNoticeHandler,
   compactNotice,
+  humanizeNotice,
   inferNoticeKind,
   type ClubNoticeKind,
   type ClubNoticeRequest,
@@ -108,7 +109,7 @@ export default function ClubNoticeHost() {
 
     bindClubNoticeHandler(enqueue);
     window.alert = (message?: any) => {
-      const text = String(message ?? '');
+      const text = humanizeNotice(String(message ?? ''));
       void enqueue({ message: text, kind: inferNoticeKind(text) });
     };
 

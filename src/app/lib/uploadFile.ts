@@ -3,7 +3,7 @@ import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { auth, storage } from './firebase';
 
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const FIRESTORE_SAFE_BYTES = 600 * 1024;
+const FIRESTORE_SAFE_BYTES = 450 * 1024;
 const STORAGE_WAIT_MS = 12_000;
 
 export function isOverUploadLimit(file: File) {
@@ -180,7 +180,7 @@ export async function uploadClubFile(
   try {
     return await uploadToStorage(file, folderPath, onProgress);
   } catch (error) {
-    if (file.type.startsWith('image/')) {
+    if (file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name)) {
       onProgress?.(55);
       const dataUrl = await compressImageToDataUrl(file);
       onProgress?.(100);
@@ -189,10 +189,21 @@ export async function uploadClubFile(
 
     const mapped = storageErrorMessage(error);
     if (mapped.includes('STORAGE_TIMEOUT') || String(error).includes('STORAGE_TIMEOUT')) {
-      throw new Error('تعذر رفع الفيديو لأن سحابة الملفات لا تستجيب حالياً. ارفع صورة، أو فعّل Firebase Storage ثم أعد المحاولة.');
+      throw new Error(
+        file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+          ? 'تعذر رفع ملف PDF لأن سحابة الملفات لا تستجيب. ارفع صورة الشهادة ثم أعد المحاولة.'
+          : 'تعذر رفع الملف لأن سحابة الملفات لا تستجيب حالياً. ارفع صورة أصغر، أو فعّل Firebase Storage ثم أعد المحاولة.'
+      );
     }
     throw new Error(mapped);
   }
+}
+
+export function certMediaFields(fileUrl: string) {
+  if (fileUrl.startsWith('data:')) {
+    return { fileUrl, image: '' };
+  }
+  return { fileUrl, image: fileUrl };
 }
 
 export async function uploadClubFiles(
