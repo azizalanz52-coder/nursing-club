@@ -8,11 +8,13 @@ import { doc, getDoc, updateDoc, setDoc, collection, getDocs, addDoc, deleteDoc 
 import { storage } from '../../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import HrCertificatesRegistry from '../../components/HrCertificatesRegistry';
+import HrCertificateBatches from '../../components/HrCertificateBatches';
 import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import PageLoading from '../../components/PageLoading';
 import { isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
+import { canonicalPhone, normalizeUniversityId } from '../../lib/certificatesLookup';
 import { clubConfirm, inferNoticeKind } from '../../lib/clubNotice';
 import { ClubNoticeDialog } from '../../components/ClubNotice';
 
@@ -704,8 +706,8 @@ export default function CommitteeDetailPage() {
     setIsUploadingCert(true);
     try {
       const fileUrl = await uploadFileToStorage(certUploadFile, 'certificates');
-      const phone = certStudentPhone.trim();
-      const universityId = certStudentUniversityId.trim();
+      const phone = canonicalPhone(certStudentPhone) || certStudentPhone.trim();
+      const universityId = normalizeUniversityId(certStudentUniversityId);
       const title = certTitle.trim();
       const name = certStudentName.trim();
       const issuer = currentUserName || 'لجنة الموارد البشرية';
@@ -903,7 +905,20 @@ export default function CommitteeDetailPage() {
               </span>
             </div>
 
-            <form onSubmit={handleUploadCertificateSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-sky-50/40 p-6 rounded-2xl border border-sky-200">
+            <HrCertificateBatches
+              certificates={issuedHrCertificates}
+              actorName={currentUserName || 'لجنة الموارد البشرية'}
+              formAnchorId="hr-cert-form"
+              onIssue={(person, certTitle) => {
+                setCertStudentName(person.fullName);
+                setCertStudentPhone(person.phone);
+                setCertStudentUniversityId(person.universityId);
+                setCertTitle(certTitle);
+                setCertCategory('شهادة مشاركة فعالية');
+              }}
+            />
+
+            <form id="hr-cert-form" onSubmit={handleUploadCertificateSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-sky-50/40 p-6 rounded-2xl border border-sky-200">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">اسم المستفيد الثلاثي</label>
                 <input

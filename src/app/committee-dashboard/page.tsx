@@ -8,7 +8,9 @@ import { collection, getDocs, doc, updateDoc, getDoc, addDoc, deleteDoc, setDoc,
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as XLSX from 'xlsx';
 import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
+import HrCertificateBatches from './../components/HrCertificateBatches';
 import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
+import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
@@ -343,8 +345,8 @@ useEffect(() => {
         fileUrl = await convertFileToBase64(certUploadFile);
       }
 
-      const phone = certStudentPhone.trim();
-      const universityId = certStudentUniversityId.trim();
+      const phone = canonicalPhone(certStudentPhone) || certStudentPhone.trim();
+      const universityId = normalizeUniversityId(certStudentUniversityId);
       const title = certTitle.trim();
       const name = certStudentName.trim();
       const issuer = userData?.fullName || 'لجنة الموارد البشرية';
@@ -2304,7 +2306,20 @@ useEffect(() => {
               </span>
             </div>
 
-            <form onSubmit={handleUploadCertificateSubmit} className="bg-sky-50/40 p-6 rounded-2xl border border-sky-200 space-y-4">
+            <HrCertificateBatches
+              certificates={issuedHrCertificates}
+              actorName={userData?.fullName || 'لجنة الموارد البشرية'}
+              formAnchorId="hr-cert-form"
+              onIssue={(person, certTitle) => {
+                setCertStudentName(person.fullName);
+                setCertStudentPhone(person.phone);
+                setCertStudentUniversityId(person.universityId);
+                setCertTitle(certTitle);
+                setCertCategory('شهادة مشاركة فعالية');
+              }}
+            />
+
+            <form id="hr-cert-form" onSubmit={handleUploadCertificateSubmit} className="bg-sky-50/40 p-6 rounded-2xl border border-sky-200 space-y-4">
               <h4 className="font-extrabold text-sm text-[#630517]">بيانات المستفيد وملف الشهادة</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-1">

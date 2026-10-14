@@ -10,8 +10,10 @@ import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle,
 import { filterFilesWithinLimit, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { clubConfirm, inferNoticeKind } from '../lib/clubNotice';
 import { ClubNoticeDialog } from '../components/ClubNotice';
+import HrCertificateBatches from '../components/HrCertificateBatches';
 import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
+import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import * as XLSX from 'xlsx';
@@ -106,6 +108,7 @@ interface CertificateItem {
   id: string;
   recipientName: string;
   phone: string;
+  universityId?: string;
   password?: string;
   certTitle: string;
   category: string;
@@ -184,6 +187,7 @@ export default function AdminDashboard() {
   const [editingCertId, setEditingCertId] = useState<string | null>(null);
   const [certRecipientInput, setCertRecipientInput] = useState<string>('');
   const [certPhoneInput, setCertPhoneInput] = useState<string>('');
+  const [certUniversityIdInput, setCertUniversityIdInput] = useState<string>('');
   const [certPasswordInput, setCertPasswordInput] = useState<string>('');
   const [certTitleInput, setCertTitleInput] = useState<string>('');
   const [certCategoryInput, setCertCategoryInput] = useState<string>('شهادة شكر وتقدير');
@@ -767,14 +771,18 @@ export default function AdminDashboard() {
 
   const handleSaveCertificate = async (e: FormEvent) => {
     e.preventDefault();
-    if (!certRecipientInput.trim() || !certTitleInput.trim() || !certPhoneInput.trim()) return;
+    if (!certRecipientInput.trim() || !certTitleInput.trim()) return;
+    const phone = canonicalPhone(certPhoneInput) || certPhoneInput.trim();
+    const universityId = normalizeUniversityId(certUniversityIdInput);
+    if (!phone && !universityId) return;
 
     const certId = editingCertId ? editingCertId : Date.now().toString();
     const updatedCert: CertificateItem = {
       id: certId,
       recipientName: certRecipientInput.trim(),
-      phone: certPhoneInput.trim(),
-      password: certPasswordInput.trim() || '123456',
+      phone,
+      universityId,
+      password: certPasswordInput.trim() || '',
       certTitle: certTitleInput.trim(),
       category: certCategoryInput,
       image: certImageInput,
@@ -794,6 +802,7 @@ export default function AdminDashboard() {
       setEditingCertId(null);
       setCertRecipientInput('');
       setCertPhoneInput('');
+      setCertUniversityIdInput('');
       setCertPasswordInput('');
       setCertTitleInput('');
       setCertDescInput('');
@@ -810,6 +819,7 @@ export default function AdminDashboard() {
     setEditingCertId(cert.id);
     setCertRecipientInput(cert.recipientName);
     setCertPhoneInput(cert.phone || '');
+    setCertUniversityIdInput(cert.universityId || '');
     setCertPasswordInput(cert.password || '');
     setCertTitleInput(cert.certTitle);
     setCertCategoryInput(cert.category || 'شهادة شكر وتقدير');
@@ -3267,6 +3277,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                       setEditingCertId(null);
                       setCertRecipientInput('');
                       setCertPhoneInput('');
+                      setCertUniversityIdInput('');
                       setCertPasswordInput('');
                       setCertTitleInput('');
                       setCertDescInput('');
@@ -3279,7 +3290,25 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 )}
               </div>
 
-              <form onSubmit={handleSaveCertificate} className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-sky-50/40 p-6 rounded-2xl border border-sky-200">
+              <HrCertificateBatches
+                certificates={certificates.map((cert) => ({
+                  phone: cert.phone,
+                  universityId: cert.universityId,
+                  title: cert.certTitle,
+                  certTitle: cert.certTitle,
+                }))}
+                actorName="لوحة الأدمن"
+                formAnchorId="admin-cert-form"
+                onIssue={(person, certTitle) => {
+                  setCertRecipientInput(person.fullName);
+                  setCertPhoneInput(person.phone);
+                  setCertUniversityIdInput(person.universityId);
+                  setCertTitleInput(certTitle);
+                  setCertCategoryInput('شهادة مشاركة فعالية');
+                }}
+              />
+
+              <form id="admin-cert-form" onSubmit={handleSaveCertificate} className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-sky-50/40 p-6 rounded-2xl border border-sky-200">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">اسم المستفيد أو المكرم</label>
                   <input
@@ -3301,7 +3330,18 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     onChange={(e) => setCertPhoneInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-sky-600 font-mono"
                     dir="ltr"
-                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">الرقم الجامعي (إن وجد)</label>
+                  <input
+                    type="text"
+                    placeholder="الرقم الجامعي"
+                    value={certUniversityIdInput}
+                    onChange={(e) => setCertUniversityIdInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-sky-600 font-mono"
+                    dir="ltr"
                   />
                 </div>
 
@@ -3314,7 +3354,6 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     onChange={(e) => setCertPasswordInput(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-none focus:border-sky-600 font-mono"
                     dir="ltr"
-                    required
                   />
                 </div>
 

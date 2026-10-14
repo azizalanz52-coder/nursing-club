@@ -16,7 +16,8 @@ export function bindClubNoticeHandler(next: NoticeHandler | null) {
 
 export function inferNoticeKind(message: string): ClubNoticeKind {
   const text = String(message || '');
-  if (/تعذر|خطأ|فشل|مرفوضة|غير صحيحة|غير موجود/.test(text)) return 'error';
+  if (/تعذر|خطأ|فشل|مرفوضة|غير صحيحة/.test(text)) return 'error';
+  if (/لا يوجد|مكرر|مسبقا/.test(text)) return 'info';
   if (/تم |بنجاح|نجاح|مرحبا/.test(text)) return 'success';
   return 'info';
 }
@@ -68,8 +69,9 @@ export function compactNotice(message: string, kind: ClubNoticeKind, customTitle
     return { title: customTitle || 'تأكيد', detail };
   }
 
-  const detail = (customTitle ? text : text.split(/[.!]/)[0] || text).slice(0, 42);
-  return { title: customTitle || 'تنبيه', detail };
+  const short = (text.split(/[.!]/)[0] || text).slice(0, 48);
+  if (customTitle && customTitle !== short) return { title: customTitle, detail: short };
+  return { title: customTitle || short || 'تنبيه', detail: '' };
 }
 
 export function clubNotice(message: string, kind?: ClubNoticeKind, title?: string): Promise<boolean> {

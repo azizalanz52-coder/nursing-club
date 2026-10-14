@@ -17,11 +17,35 @@ export function phoneVariants(value: string) {
   return Array.from(new Set(variants.filter(Boolean)));
 }
 
+export function canonicalPhone(value: string) {
+  const digits = normalizeLookupValue(value).replace(/\D/g, '');
+  let core = digits;
+  if (core.startsWith('966')) core = core.slice(3);
+  if (core.startsWith('0')) core = core.slice(1);
+  return core ? `0${core}` : '';
+}
+
+export function normalizeUniversityId(value: unknown) {
+  let raw = String(value ?? '').trim();
+  if (!raw) return '';
+  if (/e\+/i.test(raw)) {
+    const num = Number(raw);
+    if (Number.isFinite(num)) raw = String(Math.round(num));
+  }
+  if (/^\d+\.0+$/.test(raw)) raw = raw.replace(/\.0+$/, '');
+  return raw.replace(/\s+/g, '');
+}
+
+export function universityIdVariants(value: string) {
+  const id = normalizeUniversityId(value);
+  const raw = normalizeLookupValue(value);
+  return Array.from(new Set([id, raw].filter(Boolean)));
+}
+
 export async function findCertificatesByLookup(db: Firestore, lookup: string) {
   const value = normalizeLookupValue(lookup);
   if (!value) return [] as any[];
 
-  const variants = phoneVariants(value);
   const mapped = new Map<string, any>();
 
   const collect = async (field: 'phone' | 'universityId', values: string[]) => {
@@ -34,15 +58,17 @@ export async function findCertificatesByLookup(db: Firestore, lookup: string) {
     }
   };
 
-  await collect('phone', variants);
-  await collect('universityId', [value]);
+  await collect('phone', phoneVariants(value));
+  await collect('universityId', universityIdVariants(value));
 
   try {
-    const appSnap = await getDocs(query(collection(db, 'applications'), where('universityId', '==', value)));
-    for (const appDoc of appSnap.docs) {
-      const app = appDoc.data();
-      const appPhone = String(app.phone || '').trim();
-      if (appPhone) await collect('phone', phoneVariants(appPhone));
+    for (const id of universityIdVariants(value)) {
+      const appSnap = await getDocs(query(collection(db, 'applications'), where('universityId', '==', id)));
+      for (const appDoc of appSnap.docs) {
+        const app = appDoc.data();
+        const appPhone = String(app.phone || '').trim();
+        if (appPhone) await collect('phone', phoneVariants(appPhone));
+      }
     }
   } catch (err) {
     console.error(err);
