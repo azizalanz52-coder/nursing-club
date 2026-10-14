@@ -16,7 +16,7 @@ import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import PageLoading from '../../components/PageLoading';
 import { certMediaFields, isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
 import { canonicalPhone, normalizeUniversityId } from '../../lib/certificatesLookup';
-import { findUserDoc, isAcceptedStatus, sameMemberPhone } from '../../lib/memberAcceptance';
+import { canAccessCommittee, findUserDoc, isAcceptedStatus, sameMemberName, sameMemberPhone } from '../../lib/memberAcceptance';
 import { clubConfirm, inferNoticeKind } from '../../lib/clubNotice';
 import { ClubNoticeDialog } from '../../components/ClubNotice';
 
@@ -280,17 +280,22 @@ export default function CommitteeDetailPage() {
         }
 
         let userAuthorized = trimmedPhone === '0553731265';
-        const normUserPhone = canonicalPhone(trimmedPhone);
+        const uData = userDoc?.data || null;
+        if (await canAccessCommittee(db, trimmedPhone, String(id), uData)) {
+          userAuthorized = true;
+        }
 
-        if (userDoc) {
-          const uData = userDoc.data;
-          const assigned = String(uData.assignedCommittee || uData.committee || '');
-          const roleStr = String(uData.role || '');
+        if (!userAuthorized) {
+          const assigned = String(uData?.assignedCommittee || uData?.committee || '');
+          const roleStr = String(uData?.role || '');
           if (matchesThisCommittee(assigned, roleStr)) userAuthorized = true;
         }
 
-        if (!userAuthorized && normUserPhone !== '') {
-          const foundInDirect = mergedMembers.some((m: any) => m.phone && sameMemberPhone(m.phone, trimmedPhone));
+        if (!userAuthorized) {
+          const fullName = String(uData?.fullName || name || '');
+          const foundInDirect = mergedMembers.some((m: any) =>
+            sameMemberPhone(m.phone, trimmedPhone) || sameMemberName(m.name || m.fullName, fullName)
+          );
           if (foundInDirect) userAuthorized = true;
         }
 

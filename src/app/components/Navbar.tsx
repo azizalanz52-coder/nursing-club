@@ -261,7 +261,7 @@ export default function Navbar() {
   if (!mounted) return null;
 
   const isAdmin = isAdminPhone(userPhone) || adminAuth || isPrivilegedRole(userRole);
-  const isCommitteeLeader = userRole && (userRole.includes('رئيس لجنة') || userRole.includes('مشرف') || userRole.includes('General Supervisor'));
+  const isCommitteeLeader = userRole && (userRole.includes('رئيس لجنة') || userRole.includes('قائد') || userRole.includes('مشرف') || userRole.includes('General Supervisor'));
   const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || isAdmin;
 
   const showLeaderAlertInNavbar = (isCommitteeLeader || isQualityOperationsRoom || isAdmin) && leaderAlertMsg && showLeaderAlertBar;

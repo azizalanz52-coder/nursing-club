@@ -1,6 +1,16 @@
 import { Firestore, collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { canonicalPhone, normalizeUniversityId, phoneVariants, universityIdVariants } from './certificatesLookup';
 
+export const COMMITTEE_NAMES: Record<string, string> = {
+  design: 'لجنة التصميم',
+  media: 'لجنة الإعلام',
+  'events-org': 'لجنة تنظيم الفعاليات',
+  hr: 'لجنة الموارد البشرية',
+  pr: 'لجنة العلاقات العامة',
+  scientific: 'لجنة المحتوى العلمي',
+  quality: 'لجنة الجودة والتطوير',
+};
+
 export type MemberAcceptance = {
   fullName: string;
   universityId: string;
@@ -26,14 +36,36 @@ export function isRejectedStatus(status?: string | null) {
 
 export function committeeIdFromName(name: string) {
   const value = String(name || '');
-  if (value.includes('تصميم')) return 'design';
-  if (value.includes('إعلام') || value.includes('الاعلام') || value.includes('الإعلام')) return 'media';
-  if (value.includes('فعاليات') || value.includes('تنظيم')) return 'events-org';
-  if (value.includes('الموارد') || value.includes('بشري')) return 'hr';
-  if (value.includes('العلاقات')) return 'pr';
-  if (value.includes('العلمي') || value.includes('علمي')) return 'scientific';
-  if (value.includes('الجودة') || value.includes('جودة')) return 'quality';
+  if (value === 'design' || value.includes('تصميم')) return 'design';
+  if (value === 'media' || value.includes('إعلام') || value.includes('الاعلام') || value.includes('الإعلام') || value.includes('اعلام')) return 'media';
+  if (value === 'events-org' || value.includes('فعاليات') || value.includes('تنظيم')) return 'events-org';
+  if (value === 'hr' || value.includes('الموارد') || value.includes('بشري')) return 'hr';
+  if (value === 'pr' || value.includes('العلاقات')) return 'pr';
+  if (value === 'scientific' || value.includes('العلمي') || value.includes('علمي')) return 'scientific';
+  if (value === 'quality' || value.includes('الجودة') || value.includes('جودة')) return 'quality';
   return '';
+}
+
+export function committeeNameFromId(id: string) {
+  return COMMITTEE_NAMES[id] || '';
+}
+
+function normalizePersonName(name: string) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[إأآا]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[\u064B-\u065F]/g, '')
+    .replace(/\s+/g, '');
+}
+
+export function sameMemberName(a?: string | null, b?: string | null) {
+  const left = normalizePersonName(String(a || ''));
+  const right = normalizePersonName(String(b || ''));
+  if (!left || !right || left.length < 4 || right.length < 4) return false;
+  return left === right || left.includes(right) || right.includes(left);
 }
 
 function rankApp(app: Record<string, unknown>) {
@@ -81,6 +113,8 @@ export async function resolveMemberAcceptance(
   const univSet = new Set(universityId ? universityIdVariants(universityId) : []);
   const apps: Record<string, unknown>[] = [];
 
+  const userName = String(userData?.fullName || '');
+
   try {
     const snap = await getDocs(collection(db, 'applications'));
     snap.forEach((row) => {
@@ -88,7 +122,8 @@ export async function resolveMemberAcceptance(
       const phoneMatch = sameMemberPhone(String(data.phone || ''), lookupPhone);
       const appUniv = normalizeUniversityId(String(data.universityId || ''));
       const univMatch = Boolean(appUniv && univSet.has(appUniv));
-      if (phoneMatch || univMatch) {
+      const nameMatch = sameMemberName(String(data.fullName || data.name || ''), userName);
+      if (phoneMatch || univMatch || nameMatch) {
         apps.push({ id: row.id, ...data });
       }
     });
@@ -100,7 +135,8 @@ export async function resolveMemberAcceptance(
   const best = apps[0] || null;
   const assigned = String(userData?.assignedCommittee || userData?.committee || '').trim();
   const appCommittee = String(best?.acceptedCommittee || best?.committee || '').trim();
-  const committee = assigned || appCommittee;
+  const fromRole = committeeNameFromId(committeeIdFromName(String(userData?.role || '')));
+  const committee = assigned || appCommittee || fromRole;
   const appStatus = String(best?.status || '');
 
   let status: MemberAcceptance['status'] = 'معلق';
@@ -117,4 +153,59 @@ export async function resolveMemberAcceptance(
     acceptedCommittee: committee,
     whatsappLink: String(best?.whatsappLink || userData?.whatsappLink || ''),
   };
+}
+
+function memberListedInCommittee(data: Record<string, unknown>, phone: string, fullName: string) {
+  const members = Array.isArray(data.members) ? data.members : [];
+  if (members.some((member: any) => sameMemberPhone(member?.phone, phone) || sameMemberName(member?.name || member?.fullName, fullName))) {
+    return true;
+  }
+  return sameMemberName(String(data.maleLeader || ''), fullName) || sameMemberName(String(data.femaleLeader || ''), fullName);
+}
+
+export async function resolvePortalCommitteeId(
+  db: Firestore,
+  phone: string,
+  userData?: Record<string, unknown> | null
+) {
+  const acceptance = await resolveMemberAcceptance(db, phone, userData);
+  const fromAcceptance = committeeIdFromName(acceptance?.acceptedCommittee || '');
+  if (fromAcceptance) return fromAcceptance;
+
+  const fromRole = committeeIdFromName(String(userData?.role || ''));
+  if (fromRole) return fromRole;
+
+  try {
+    const snap = await getDocs(collection(db, 'committees'));
+    const fullName = String(userData?.fullName || '');
+    for (const row of snap.docs) {
+      if (memberListedInCommittee(row.data(), phone, fullName)) return row.id;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+
+  return '';
+}
+
+export async function canAccessCommittee(
+  db: Firestore,
+  phone: string,
+  committeeId: string,
+  userData?: Record<string, unknown> | null
+) {
+  if (!committeeId) return false;
+  const resolved = await resolvePortalCommitteeId(db, phone, userData);
+  if (resolved === committeeId) return true;
+
+  try {
+    const snap = await getDoc(doc(db, 'committees', committeeId));
+    if (snap.exists() && memberListedInCommittee(snap.data(), phone, String(userData?.fullName || ''))) {
+      return true;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+
+  return false;
 }

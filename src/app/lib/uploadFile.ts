@@ -151,7 +151,7 @@ async function compressImageToDataUrl(file: File, maxBytes = FIRESTORE_SAFE_BYTE
 }
 
 async function uploadToStorage(file: File, folderPath: string, onProgress?: (percent: number) => void) {
-  await waitForAuthUser();
+  await waitForAuthUser(1500);
   const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`;
   const storageRef = ref(storage, `${folderPath}/${safeFileName}`);
   onProgress?.(20);

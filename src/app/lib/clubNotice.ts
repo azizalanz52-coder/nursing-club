@@ -20,7 +20,7 @@ export function humanizeNotice(message: string) {
     return 'ملف الشهادة كبير على الحفظ. صغّر الصورة ثم أعد المحاولة.';
   }
   if (/insufficient permissions|permission-denied|permission_denied/i.test(text)) {
-    return 'تعذر حفظ الشهادة. سجّل الدخول مرة أخرى ثم أعد الرفع.';
+    return 'سجّل الدخول مرة أخرى ثم احفظ الشهادة';
   }
   return text;
 }

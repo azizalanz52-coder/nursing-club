@@ -1,7 +1,10 @@
 import { Firestore, collection, getDocs, query, where } from 'firebase/firestore';
 
 export function normalizeLookupValue(value: string) {
-  return String(value || '').trim();
+  return String(value || '')
+    .trim()
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 1632))
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 1776));
 }
 
 export function phoneVariants(value: string) {

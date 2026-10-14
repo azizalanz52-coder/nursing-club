@@ -11,7 +11,7 @@ import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
 import HrCertificateBatches from './../components/HrCertificateBatches';
 import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
-import { findUserDoc, stampMemberAcceptance } from '../lib/memberAcceptance';
+import { committeeNameFromId, findUserDoc, resolvePortalCommitteeId, stampMemberAcceptance } from '../lib/memberAcceptance';
 import { certMediaFields, isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
@@ -496,8 +496,8 @@ useEffect(() => {
         return;
       }
 
-      const assigned = uData.assignedCommittee || uData.committee || '';
-      const roleStr = uData.role || '';
+      const assigned = String(uData.assignedCommittee || uData.committee || '');
+      const roleStr = String(uData.role || '');
 
       if (roleStr.includes('رئيس') || roleStr.includes('مشرف') || roleStr.includes('قائد')) {
         setIsCommitteeLeader(true);
@@ -505,7 +505,8 @@ useEffect(() => {
         setIsCommitteeLeader(false);
       }
 
-      let resolvedComm = assigned || 'لجنة تنظيم الفعاليات';
+      const resolvedId = assigned ? '' : await resolvePortalCommitteeId(db, phone, uData);
+      let resolvedComm = assigned || committeeNameFromId(resolvedId) || 'لجنة تنظيم الفعاليات';
       if (roleStr.includes('جودة') || assigned.includes('جودة') || assigned.includes('الجودة')) {
         setIsQualityTeam(true);
         setIsCommitteeLeader(true);
@@ -958,7 +959,7 @@ useEffect(() => {
   };
 
   const currentActiveComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
-  const userAssignedComm = userData?.assignedCommittee || userData?.committee || '';
+  const userAssignedComm = userData?.assignedCommittee || userData?.committee || selectedManagedCommittee || '';
   const isHrTeam =
     matchesTargetCommittee(userAssignedComm, 'لجنة الموارد البشرية') ||
     isSameCommittee(userAssignedComm, 'لجنة الموارد البشرية') ||

@@ -5,22 +5,8 @@ import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { ClubNoticeDialog } from '../components/ClubNotice';
-import { committeeIdFromName, findUserDoc, resolveMemberAcceptance } from '../lib/memberAcceptance';
+import { canAccessCommittee, findUserDoc, resolvePortalCommitteeId } from '../lib/memberAcceptance';
 
-// دالة ذكية لتطبيع النصوص العربية وتوحيد الهمزات والمسافات
-const normalizeArabic = (str: string) => {
-  if (!str) return '';
-  return str
-    .trim()
-    .toLowerCase()
-    .replace(/[إأآا]/g, 'ا')
-    .replace(/ة/g, 'ه')
-    .replace(/ى/g, 'ي')
-    .replace(/[\u064B-\u065F]/g, '') // إزالة التشكيل
-    .replace(/\s+/g, '');
-};
-
-// دالة ذكية لتطبيع رقم الجوال لضمان مطابقة دقيقة 100%
 const normalizePhone = (phone: string) => {
   if (!phone) return '';
   let cleaned = String(phone).replace(/\D/g, '');
@@ -47,28 +33,6 @@ const initialCommittees = [
   { id: 'scientific', name: 'المحتوى العلمي', description: 'المحاضرات، والدعم الأكاديمي.', icon: '🔬', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي' },
   { id: 'quality', name: 'الجودة والتطوير', description: 'تقييم الأداء، قياس رضا الأعضاء، وتحسين العمل.', icon: '📊', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري' },
 ];
-
-// دالة مطابقة ذكية وشاملة للجان تتغلب على اختلاف الهمزات والتسميات
-const isCommitteeMatch = (acceptedComm: string, comm: { id: string, name: string }) => {
-  const normAcc = normalizeArabic(acceptedComm);
-  const normName = normalizeArabic(comm.name);
-  const normId = normalizeArabic(comm.id);
-
-  if (comm.id === 'media' && (normAcc.includes('اعلام') || normAcc.includes('إعلام'))) return true;
-  if (comm.id === 'pr' && normAcc.includes('علاقات')) return true;
-  if (comm.id === 'design' && normAcc.includes('تصميم')) return true;
-  if (comm.id === 'quality' && (normAcc.includes('جوده') || normAcc.includes('تطوير'))) return true;
-  if (comm.id === 'scientific' && normAcc.includes('علمي')) return true;
-  if (comm.id === 'hr' && (normAcc.includes('موارد') || normAcc.includes('بشري'))) return true;
-  if (comm.id === 'events-org' && (normAcc.includes('تنظيم') || normAcc.includes('فعاليات'))) return true;
-
-  return (
-    normAcc.includes(normName) || 
-    normName.includes(normAcc) || 
-    normAcc.includes(normId) || 
-    normId.includes(normAcc)
-  );
-};
 
 export default function TeamPage() {
   const [committees, setCommittees] = useState(initialCommittees);
@@ -123,18 +87,7 @@ export default function TeamPage() {
 
     try {
       const userDoc = await findUserDoc(db, phone);
-      const acceptance = await resolveMemberAcceptance(db, phone, userDoc?.data || null);
-      let targetCommitteeId = acceptance?.status === 'مقبول'
-        ? committeeIdFromName(acceptance.acceptedCommittee)
-        : '';
-      if (!targetCommitteeId && acceptance?.status === 'مقبول' && acceptance.acceptedCommittee) {
-        for (const comm of initialCommittees) {
-          if (isCommitteeMatch(acceptance.acceptedCommittee, comm)) {
-            targetCommitteeId = comm.id;
-            break;
-          }
-        }
-      }
+      const targetCommitteeId = await resolvePortalCommitteeId(db, phone, userDoc?.data || null);
 
       if (targetCommitteeId) {
         window.location.href = `/team/${targetCommitteeId}`;
@@ -169,15 +122,7 @@ export default function TeamPage() {
 
     try {
       const userDoc = await findUserDoc(db, phone);
-      const acceptance = await resolveMemberAcceptance(db, phone, userDoc?.data || null);
-      const acceptedId = acceptance?.status === 'مقبول'
-        ? committeeIdFromName(acceptance.acceptedCommittee)
-        : '';
-      const matchesThis = Boolean(
-        acceptance?.status === 'مقبول' &&
-        acceptance.acceptedCommittee &&
-        (acceptedId === committee.id || isCommitteeMatch(acceptance.acceptedCommittee, committee))
-      );
+      const matchesThis = await canAccessCommittee(db, phone, committee.id, userDoc?.data || null);
 
       if (matchesThis) {
         window.location.href = `/team/${committee.id}`;
