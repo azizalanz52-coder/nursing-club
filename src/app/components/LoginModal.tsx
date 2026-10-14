@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { loginWithPhonePassword, registerWithPhonePassword } from '../lib/sessionAuth';
+import { clubNotice } from '../lib/clubNotice';
 
 export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [phone, setPhone] = useState('');
@@ -15,13 +16,13 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone || !password) {
-      alert('الرجاء إدخال رقم الجوال وكلمة المرور.');
+      await clubNotice('الرجاء إدخال رقم الجوال وكلمة المرور.', 'info');
       return;
     }
 
     try {
       const session = await loginWithPhonePassword(phone, password);
-      alert(`مرحباً بك يا ${session.fullName || 'صديقنا'}! تم تسجيل الدخول بنجاح.`);
+      await clubNotice(`مرحباً بك يا ${session.fullName || 'صديقنا'}! تم تسجيل الدخول بنجاح.`, 'success');
       onClose();
       window.location.reload();
     } catch (err: any) {
@@ -29,7 +30,7 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
       if (message.includes('لم يكمل إنشاء الحساب')) {
         setIsRegistering(true);
       }
-      alert(message || 'حدث خطأ أثناء تسجيل الدخول.');
+      await clubNotice(message || 'حدث خطأ أثناء تسجيل الدخول.', 'error');
     }
   };
 
@@ -37,12 +38,12 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone || !password || !fullName.trim()) {
-      alert('الرجاء تعبئة جميع الحقول (الاسم، الجوال، وكلمة المرور).');
+      await clubNotice('الرجاء تعبئة جميع الحقول (الاسم، الجوال، وكلمة المرور).', 'info');
       return;
     }
 
     if (password.length < 6) {
-      alert('يجب أن تكون كلمة المرور 6 أحرف أو أرقام على الأقل.');
+      await clubNotice('يجب أن تكون كلمة المرور 6 أحرف أو أرقام على الأقل.', 'info');
       return;
     }
 
@@ -52,15 +53,16 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
         password,
         fullName: fullName.trim(),
       });
-      alert(
+      await clubNotice(
         result.claimed
           ? `مرحباً بك يا ${fullName.trim()}! تم إكمال حسابك وتعيين كلمة المرور بنجاح.`
-          : `مرحباً بك يا ${fullName.trim()}! تم إنشاء حسابك وتسجيل دخولك بنجاح.`
+          : `مرحباً بك يا ${fullName.trim()}! تم إنشاء حسابك وتسجيل دخولك بنجاح.`,
+        'success'
       );
       onClose();
       window.location.reload();
     } catch (err: any) {
-      alert(err?.message || 'حدث خطأ أثناء إنشاء الحساب. حاول مرة أخرى.');
+      await clubNotice(err?.message || 'حدث خطأ أثناء إنشاء الحساب. حاول مرة أخرى.', 'error');
     }
   };
 

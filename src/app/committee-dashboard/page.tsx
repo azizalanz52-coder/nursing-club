@@ -16,6 +16,7 @@ import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { emailToPhone } from '../lib/authIdentity';
 import PageLoading from '../components/PageLoading';
+import { clubConfirm } from '../lib/clubNotice';
 
 export default function CommitteeDashboard() {
   const router = useRouter();
@@ -39,7 +40,7 @@ const fetchQualityUploadedFiles = async () => {
 
 // 3. دالة حذف ملف خارجي مرفوع
 const handleDeleteQualityUploadedFile = async (fileId: string) => {
-  if (!confirm('هل أنت متأكد من حذف هذا الملف المرفوع نهائياً؟')) return;
+  if (!(await clubConfirm('هل أنت متأكد من حذف هذا الملف المرفوع نهائياً؟'))) return;
   try {
     await deleteDoc(doc(db, 'quality_uploaded_files', fileId));
     setQualityUploadedFiles(prev => prev.filter(f => f.id !== fileId));
@@ -284,7 +285,7 @@ useEffect(() => {
   };
 
   const handleDeleteHrCertificate = async (id: string) => {
-    if (!confirm('حذف هذه الشهادة نهائياً من حساب المستفيد ومن سجل النادي؟')) return;
+    if (!(await clubConfirm('حذف هذه الشهادة نهائياً من حساب المستفيد ومن سجل النادي؟'))) return;
     try {
       await Promise.all([
         deleteDoc(doc(db, 'certificates', id)).catch(() => undefined),
@@ -460,7 +461,7 @@ useEffect(() => {
     }
   };
   const handleDeleteHonorMember = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا العضو من لوحة الشرف؟')) {
+    if (await clubConfirm('هل أنت متأكد من حذف هذا العضو من لوحة الشرف؟')) {
       try {
         await deleteDoc(doc(db, 'committee_honor_board', id));
         setHonorBoardList(honorBoardList.filter(item => item.id !== id));
@@ -657,7 +658,7 @@ useEffect(() => {
   };
 
   const handleDeletePartner = async (partnerId: string) => {
-    if (confirm('هل أنت متأكد من حذف هذه الشركة أو المحل من السجل؟')) {
+    if (await clubConfirm('هل أنت متأكد من حذف هذه الشركة أو المحل من السجل؟')) {
       try {
         await deleteDoc(doc(db, 'public_partners_relations', partnerId));
         setPublicPartnersList(publicPartnersList.filter(p => p.id !== partnerId));
@@ -761,7 +762,7 @@ useEffect(() => {
   };
 
   const handleDeleteMedia = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذه المادة؟')) {
+    if (await clubConfirm('هل أنت متأكد من حذف هذه المادة؟')) {
       await deleteDoc(doc(db, 'media_committee_gallery', id));
       setMediaGallery(mediaGallery.filter(m => m.id !== id));
     }
@@ -1044,7 +1045,7 @@ useEffect(() => {
   };
 
   const handleRemoveAcceptedMember = async (memberId: string, memberPhone?: string) => {
-    if (!confirm('هل أنت متأكد من إزالة هذا العضو من اللجنة؟ سيتم تحريره وإتاحة قبوله مجدداً.')) return;
+    if (!(await clubConfirm('هل أنت متأكد من إزالة هذا العضو من اللجنة؟ سيتم تحريره وإتاحة قبوله مجدداً.'))) return;
     try {
       const docRef = doc(db, 'applications', memberId);
       await updateDoc(docRef, {
@@ -1073,7 +1074,7 @@ useEffect(() => {
   };
 
   const handleReject = async (id: string) => {
-    if (confirm('هل أنت متأكد من رفض الطلب؟')) {
+    if (await clubConfirm('هل أنت متأكد من رفض الطلب؟')) {
       try {
         const docRef = doc(db, 'applications', id);
         await updateDoc(docRef, { status: 'مرفوض' });
@@ -1216,7 +1217,7 @@ useEffect(() => {
   };
 
   const handleDeleteTaskGroup = async (taskId: string) => {
-    if (confirm('هل أنت متأكد من حذف قائمة المهام هذه نهائياً؟')) {
+    if (await clubConfirm('هل أنت متأكد من حذف قائمة المهام هذه نهائياً؟')) {
       try {
         await deleteDoc(doc(db, 'committee_tasks', taskId));
         setCommitteeTasks(committeeTasks.filter(t => t.id !== taskId));
@@ -1344,7 +1345,7 @@ useEffect(() => {
   };
 
   const handleDeleteReport = async (reportId: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا البلاغ التجريبي؟')) {
+    if (await clubConfirm('هل أنت متأكد من حذف هذا البلاغ التجريبي؟')) {
       try {
         await deleteDoc(doc(db, 'escalated_reports', reportId));
         setEscalatedReports(escalatedReports.filter(r => r.id !== reportId));
@@ -1382,7 +1383,7 @@ useEffect(() => {
       alert('الرجاء إدخال عنوان تقرير التقييم أولاً.');
       return;
     }
-    if (!confirm('هل أنت متأكد من اعتماد تقييم اللجان ورفعه إلى أرشيف الأدمن؟ هذا التقرير منفصل عن ملفات الوورد والإكسل.')) return;
+    if (!(await clubConfirm('هل أنت متأكد من اعتماد تقييم اللجان ورفعه إلى أرشيف الأدمن؟ هذا التقرير منفصل عن ملفات الوورد والإكسل.'))) return;
 
     try {
       const featuredMembers = allCommitteesList.map((comm) => ({
@@ -1594,7 +1595,7 @@ useEffect(() => {
   };
 
   const handleDeleteQualityArchive = async (archiveId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا التقرير من الأرشيف نهائياً؟')) return;
+    if (!(await clubConfirm('هل أنت متأكد من حذف هذا التقرير من الأرشيف نهائياً؟'))) return;
     try {
       await deleteDoc(doc(db, 'quality_reports_archive', archiveId));
       setQualityArchives(qualityArchives.filter(a => a.id !== archiveId));

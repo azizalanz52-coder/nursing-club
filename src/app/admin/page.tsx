@@ -8,6 +8,8 @@ import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc,
 import { isIncompleteUserAccount, notifyCommitteeByKeyword } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
 import { filterFilesWithinLimit, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { clubConfirm, inferNoticeKind } from '../lib/clubNotice';
+import { ClubNoticeDialog } from '../components/ClubNotice';
 import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { auth } from '../lib/firebase';
@@ -802,7 +804,7 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteCaseSubmission = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه المشاركة وإزالتها نهائياً من لوحة الصدارة؟')) return;
+    if (!(await clubConfirm('هل أنت متأكد من حذف هذه المشاركة وإزالتها نهائياً من لوحة الصدارة؟'))) return;
     
     try {
       await deleteDoc(doc(db, 'case_study_submissions', id));
@@ -1383,7 +1385,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const handleDeleteIncompleteAccounts = async () => {
     const stubs = usersList.filter((u) => isIncompleteUserAccount(u) && u.phone !== '0553731265');
     if (stubs.length === 0) return;
-    if (!window.confirm(`سيتم حذف ${stubs.length} حساب غير مكتمل (بدون كلمة مرور). الشهادات وطلبات الانضمام تبقى، والطالب يقدر ينشئ حسابه بنفسه. هل أنت متأكد؟`)) return;
+    if (!(await clubConfirm(`سيتم حذف ${stubs.length} حساب غير مكتمل (بدون كلمة مرور). الشهادات وطلبات الانضمام تبقى، والطالب يقدر ينشئ حسابه بنفسه. هل أنت متأكد؟`))) return;
 
     setIsCleaningIncompleteUsers(true);
     try {
@@ -5366,51 +5368,23 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       )}
 
       {modalType === 'success' && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full text-center space-y-4 shadow-2xl border border-slate-100">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 text-2xl font-black mx-auto flex items-center justify-center">
-              ✓
-            </div>
-            <p className="text-sm font-black text-slate-800 whitespace-pre-line">{modalMessage}</p>
-            <button
-              type="button"
-              onClick={() => setModalType('none')}
-              className="px-6 py-2.5 bg-[#630517] text-[#F5D061] rounded-xl font-bold text-xs hover:brightness-110 cursor-pointer shadow"
-            >
-              حسناً، فهمت
-            </button>
-          </div>
-        </div>
+        <ClubNoticeDialog
+          kind={inferNoticeKind(modalMessage)}
+          message={modalMessage}
+          onClose={() => setModalType('none')}
+        />
       )}
 
       {modalType === 'confirm' && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl border border-slate-100 text-center">
-            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 text-2xl font-black mx-auto flex items-center justify-center">
-              ⚠️
-            </div>
-            <p className="text-sm font-bold text-slate-800 leading-relaxed">{modalMessage}</p>
-            <div className="flex justify-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setModalType('none')}
-                className="px-5 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs hover:bg-slate-200 cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirmActionCallback) confirmActionCallback();
-                  setModalType('none');
-                }}
-                className="px-5 py-2 rounded-xl bg-red-600 text-white font-black text-xs shadow hover:bg-red-700 cursor-pointer"
-              >
-                نعم، تأكيد التنفيذ
-              </button>
-            </div>
-          </div>
-        </div>
+        <ClubNoticeDialog
+          kind="confirm"
+          message={modalMessage}
+          onClose={() => setModalType('none')}
+          onConfirm={() => {
+            if (confirmActionCallback) confirmActionCallback();
+            setModalType('none');
+          }}
+        />
       )}
 
     </main>

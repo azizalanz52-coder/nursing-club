@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import OpeningSplash from './components/OpeningSplash';
+import ClubNoticeHost from './components/ClubNotice';
 
 const SPLASH_KEY = 'nurs_splash_seen';
 
@@ -26,14 +27,15 @@ export default function AppShell({
     return () => clearTimeout(timer);
   }, []);
 
-  if (showSplash) {
-    return <OpeningSplash />;
-  }
-
   return (
     <>
-      <Navbar />
-      {children}
+      {showSplash ? <OpeningSplash /> : (
+        <>
+          <Navbar />
+          {children}
+        </>
+      )}
+      <ClubNoticeHost />
     </>
   );
 }

@@ -13,6 +13,8 @@ import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scienti
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import PageLoading from '../../components/PageLoading';
 import { isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
+import { clubConfirm, inferNoticeKind } from '../../lib/clubNotice';
+import { ClubNoticeDialog } from '../../components/ClubNotice';
 
 // دالة تحويل الملف إلى Base64 كخيار احتياطي ومضمون
 const convertFileToBase64 = (file: File): Promise<string> => {
@@ -537,7 +539,7 @@ export default function CommitteeDetailPage() {
 
   // حذف عنصر ميديا من الأرشيف
   const handleDeleteMediaItem = async (itemId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه المادة الإعلامية نهائياً؟')) return;
+    if (!(await clubConfirm('هل أنت متأكد من حذف هذه المادة الإعلامية نهائياً؟'))) return;
     try {
       await deleteDoc(doc(db, 'media_committee_gallery', itemId));
       setMediaGallery(mediaGallery.filter(item => item.id !== itemId));
@@ -668,7 +670,7 @@ export default function CommitteeDetailPage() {
   };
 
   const handleDeleteHrCertificate = async (certId: string) => {
-    if (!confirm('حذف هذه الشهادة نهائياً من حساب المستفيد ومن سجل النادي؟')) return;
+    if (!(await clubConfirm('حذف هذه الشهادة نهائياً من حساب المستفيد ومن سجل النادي؟'))) return;
     try {
       await Promise.all([
         deleteDoc(doc(db, 'certificates', certId)).catch(() => undefined),
@@ -1488,24 +1490,11 @@ export default function CommitteeDetailPage() {
       )}
 
       {showSuccessModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061]">
-            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
-              ✨
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-black text-slate-900">تم بنجاح</h3>
-              <p className="text-xs text-slate-600 font-medium leading-relaxed">{modalMessage}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowSuccessModal(false)}
-              className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer transition-all"
-            >
-              حسنًا 🚀
-            </button>
-          </div>
-        </div>
+        <ClubNoticeDialog
+          kind={inferNoticeKind(modalMessage)}
+          message={modalMessage}
+          onClose={() => setShowSuccessModal(false)}
+        />
       )}
     </main>
   );

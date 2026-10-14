@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { ClubNoticeDialog } from '../components/ClubNotice';
 
 // دالة ذكية لتطبيع النصوص العربية وتوحيد الهمزات والمسافات
 const normalizeArabic = (str: string) => {
@@ -296,24 +297,12 @@ export default function TeamPage() {
       </div>
 
       {showAlertModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#630517]/20">
-            <div className="w-16 h-16 bg-red-100 text-red-700 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold">
-              🔒
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-black text-slate-900">منطقة مؤمنة للأعضاء</h3>
-              <p className="text-xs text-slate-600 font-medium leading-relaxed">{alertMessage}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowAlertModal(false)}
-              className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer transition-all"
-            >
-              حسنًا، فهمت ➔
-            </button>
-          </div>
-        </div>
+        <ClubNoticeDialog
+          kind="info"
+          title="منطقة مؤمنة للأعضاء"
+          message={alertMessage}
+          onClose={() => setShowAlertModal(false)}
+        />
       )}
     </main>
   );
