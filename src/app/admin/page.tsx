@@ -11,6 +11,7 @@ import { certMediaFields, filterFilesWithinLimit, uploadClubFile, uploadClubFile
 import { clubConfirm, inferNoticeKind } from '../lib/clubNotice';
 import { ClubNoticeDialog } from '../components/ClubNotice';
 import HrCertificateBatches from '../components/HrCertificateBatches';
+import { printQualityEventReport, QUALITY_EVENT_REPORTS, computedSuccessIndex, recommendationLabel, type QualityEventReport } from '../lib/qualityEventReport';
 import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
@@ -173,6 +174,7 @@ export default function AdminDashboard() {
   const [historicalVaultReports, setHistoricalVaultReports] = useState<any[]>([]);
   const [qualityEvaluationReports, setQualityEvaluationReports] = useState<any[]>([]);
   const [qualityUploadedFiles, setQualityUploadedFiles] = useState<any[]>([]);
+  const [qualityEventReports, setQualityEventReports] = useState<QualityEventReport[]>([]);
 
   const [caseSubmissions, setCaseSubmissions] = useState<any[]>([]);
 
@@ -953,6 +955,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     try {
       const evalSnap = await getDocs(collection(db, 'quality_reports_archive'));
       const fileSnap = await getDocs(collection(db, 'quality_uploaded_files'));
+      const eventSnap = await getDocs(collection(db, QUALITY_EVENT_REPORTS));
 
       const evaluations = evalSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
@@ -967,9 +970,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         .map(d => ({ id: d.id, ...d.data(), reportType: 'uploaded_file' }))
         .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
 
+      const eventReports = eventSnap.docs
+        .map((item) => ({ id: item.id, ...item.data() } as QualityEventReport))
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
       setQualityEvaluationReports(evaluations);
       setQualityUploadedFiles(files);
-      setHistoricalVaultReports([...evaluations, ...files]);
+      setQualityEventReports(eventReports);
+      setHistoricalVaultReports([...evaluations, ...files, ...eventReports]);
     } catch (e) {
       console.error(e);
     }
@@ -1197,9 +1205,12 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             font-weight: 700;
             margin-bottom: 25px;
           }
+          @page { size: A4 portrait; margin: 12mm; }
           @media print {
             .no-print { display: none !important; }
-            body { padding: 15px; }
+            html, body { overflow: visible !important; height: auto !important; padding: 0; }
+            .header, .featured-box, .box-green, .box-red, tr { break-inside: avoid; page-break-inside: avoid; }
+            thead { display: table-header-group; }
           }
         </style>
       </head>
@@ -2597,7 +2608,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'historical-vault' ? 'bg-amber-700 text-white shadow-md scale-105' : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
             }`}
           >
-            📦 أرشيف التقارير التاريخية ({qualityEvaluationReports.length + qualityUploadedFiles.length})
+            📦 أرشيف التقارير التاريخية ({qualityEvaluationReports.length + qualityUploadedFiles.length + qualityEventReports.length})
           </button>
 
           <button
@@ -3914,6 +3925,69 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                             حذف
                           </button>
                         </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 border border-[#630517]/20 shadow-sm space-y-6">
+              <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">التقرير الشامل للفعالية</h3>
+                  <p className="text-xs text-slate-500">تقارير الفعاليات من لجنة الجودة والتطوير.</p>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-bold text-xs">
+                  {qualityEventReports.length} تقرير
+                </span>
+              </div>
+              {qualityEventReports.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <p className="text-sm font-bold">لا توجد تقارير شاملة حتى الآن.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {qualityEventReports.map((report) => (
+                    <div key={report.id} className="p-6 rounded-2xl border border-[#630517]/20 bg-[#630517]/5 space-y-3">
+                      <div className="flex justify-between items-center flex-wrap gap-2">
+                        <span className="font-black text-[#630517] text-sm">{report.eventTitle}</span>
+                        <span className="text-[10px] bg-[#F5D061] text-[#630517] font-mono px-2 py-0.5 rounded font-bold">
+                          {computedSuccessIndex(report)}% نجاح
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 font-semibold">
+                        {report.organizer || 'نادي كلية التمريض'} • {report.eventDate || 'بدون تاريخ'}
+                      </p>
+                      <p className="text-xs font-bold text-slate-800">التوصية: {recommendationLabel(report.recommendation)}</p>
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-[#630517]/10">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            try {
+                              printQualityEventReport(report);
+                            } catch (err) {
+                              alert(err instanceof Error ? err.message : 'تعذر فتح التقرير.');
+                            }
+                          }}
+                          className="px-3.5 py-1.5 bg-[#630517] text-[#F5D061] rounded-xl font-black text-xs cursor-pointer"
+                        >
+                          فتح / طباعة
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            triggerConfirmModal('حذف التقرير الشامل لهذه الفعالية؟', async () => {
+                              await deleteDoc(doc(db, QUALITY_EVENT_REPORTS, report.id));
+                              setQualityEventReports((prev) => prev.filter((item) => item.id !== report.id));
+                              setModalMessage('تم حذف التقرير الشامل.');
+                              setModalType('success');
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-red-100 text-red-700 rounded-xl font-bold text-xs cursor-pointer"
+                        >
+                          حذف
+                        </button>
                       </div>
                     </div>
                   ))}

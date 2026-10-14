@@ -14,6 +14,7 @@ import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup
 import { certMediaFields, isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
+import QualityEventReportForm from '../components/QualityEventReport';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { emailToPhone } from '../lib/authIdentity';
@@ -1436,7 +1437,10 @@ useEffect(() => {
           
           @media print {
             .no-print-bar { display: none !important; }
-            body { padding: 0; }
+            html, body { padding: 0; overflow: visible !important; height: auto !important; }
+            .top-box, .green-box, .red-box, .header, tr { break-inside: avoid; page-break-inside: avoid; }
+            thead { display: table-header-group; }
+            table { break-inside: auto; }
           }
         </style>
       </head>
@@ -1521,7 +1525,12 @@ useEffect(() => {
           .section-box { background: #f8fafc; border-right: 5px solid #630517; padding: 20px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; color: #334155; }
           .print-btn { background: #630517; color: white; padding: 14px 28px; border: none; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; display: block; margin: 0 auto 30px auto; box-shadow: 0 4px 12px rgba(99,5,23,0.3); }
           .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
-          @media print { .no-print { display: none !important; } }
+          @page { size: A4 portrait; margin: 12mm; }
+          @media print {
+            .no-print { display: none !important; }
+            html, body { overflow: visible !important; height: auto !important; padding: 0; }
+            .header, .section-box { break-inside: avoid; page-break-inside: avoid; }
+          }
         </style>
       </head>
       <body>
@@ -1612,6 +1621,12 @@ useEffect(() => {
           .badge-ok { color: #047857; font-weight: bold; }
           .badge-warn { color: #b45309; font-weight: bold; }
           .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+          @page { size: A4 portrait; margin: 12mm; }
+          @media print {
+            html, body { overflow: visible !important; height: auto !important; padding: 0; }
+            .header, .executive-box, tr { break-inside: avoid; page-break-inside: avoid; }
+            thead { display: table-header-group; }
+          }
         </style>
       </head>
       <body>
@@ -1968,6 +1983,15 @@ useEffect(() => {
               </div>
             </div>
           </div>
+        )}
+
+        {isQualityTeam && (
+          <QualityEventReportForm
+            actorName={userData?.fullName || 'لجنة الجودة والتطوير'}
+            onSaved={(title) => {
+              notifyAdminOffice(`📋 [التقرير الشامل للفعالية]: تم رفع (${title}).`).catch((er) => console.error(er));
+            }}
+          />
         )}
 
         {isCommitteeLeader && !isQualityTeam && (

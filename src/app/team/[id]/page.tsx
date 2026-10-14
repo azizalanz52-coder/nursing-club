@@ -9,6 +9,7 @@ import { storage } from '../../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import HrCertificatesRegistry from '../../components/HrCertificatesRegistry';
 import HrCertificateBatches from '../../components/HrCertificateBatches';
+import QualityEventReportForm from '../../components/QualityEventReport';
 import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
@@ -761,6 +762,7 @@ export default function CommitteeDetailPage() {
   const canAccessScientificTexts = isScientificCommittee || isDesignCommittee;
   const canAddScientificTexts = isScientificCommittee;
   const canIssueCertificates = id === 'hr' || normalizeArabic(committee?.name || '').includes('موارد');
+  const canWriteQualityEventReport = id === 'quality' || normalizeArabic(committee?.name || '').includes('جوده') || normalizeArabic(committee?.name || '').includes('تطوير');
   const scientificArchiveOptions = existingArchiveTitles(scientificTextsList);
 
   if (!baseDetails) {
@@ -891,6 +893,10 @@ export default function CommitteeDetailPage() {
             </div>
           </div>
         </div>
+
+        {canWriteQualityEventReport && (
+          <QualityEventReportForm actorName={currentUserName || 'لجنة الجودة والتطوير'} />
+        )}
 
         {canIssueCertificates && (
           <div className="bg-white rounded-3xl p-8 sm:p-10 border border-sky-200 shadow-xl space-y-6">
