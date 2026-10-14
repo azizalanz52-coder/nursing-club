@@ -10,7 +10,7 @@ import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { findCertificatesByLookup } from '../lib/certificatesLookup';
 import { emailToPhone, isAdminPhone, isPrivilegedRole } from '../lib/authIdentity';
 import { logoutSession } from '../lib/sessionAuth';
-import { findUserDoc, resolveMemberAcceptance } from '../lib/memberAcceptance';
+import { findMemberContext, resolveMemberAcceptance } from '../lib/memberAcceptance';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
@@ -44,9 +44,10 @@ export default function Navbar() {
     sessionStorage.removeItem('adminToken');
 
     const unsubAuth = onAuthStateChanged(auth, (user) => {
+      const storedPhone = localStorage.getItem('userPhone') || '';
+      const storedName = localStorage.getItem('userName') || '';
+
       if (!user) {
-        const storedPhone = localStorage.getItem('userPhone');
-        const storedName = localStorage.getItem('userName');
         if (storedPhone) {
           setUserPhone(storedPhone);
           if (storedName) setUserName(storedName);
@@ -61,12 +62,12 @@ export default function Navbar() {
         return;
       }
 
-      const phone = emailToPhone(user.email);
-      const storedName = localStorage.getItem('userName');
+      const authPhone = emailToPhone(user.email);
+      const phone = storedPhone || authPhone;
       setUserPhone(phone);
       if (storedName) setUserName(storedName);
-      localStorage.setItem('userPhone', phone);
-      setAdminAuth(isAdminPhone(phone));
+      if (!storedPhone && authPhone) localStorage.setItem('userPhone', authPhone);
+      setAdminAuth(isAdminPhone(phone) || isAdminPhone(authPhone));
       updateUserPresence(phone);
     });
 
@@ -96,7 +97,13 @@ export default function Navbar() {
     let unsubscribe = () => {};
 
     const attach = async () => {
-      const userDoc = await findUserDoc(db, userPhone);
+      const storedName = localStorage.getItem('userName') || '';
+      const context = await findMemberContext(db, userPhone, storedName);
+      const userDoc = context.data ? { id: context.id, data: context.data } : null;
+      if (!cancelled && context.phone && context.phone !== userPhone) {
+        localStorage.setItem('userPhone', context.phone);
+        setUserPhone(context.phone);
+      }
       if (cancelled) return;
 
       const applyUser = (data: Record<string, unknown>) => {

@@ -74,6 +74,46 @@ function rankApp(app: Record<string, unknown>) {
   return 2;
 }
 
+export function mergeIdentity(
+  userData?: Record<string, unknown> | null,
+  storedName?: string | null
+) {
+  const name = String(storedName || '').trim();
+  if (!userData && !name) return null;
+  return {
+    ...(userData || {}),
+    fullName: String(userData?.fullName || name || ''),
+  } as Record<string, unknown>;
+}
+
+export async function findMemberContext(db: Firestore, phone: string, storedName?: string | null) {
+  let found = await findUserDoc(db, phone);
+  const name = String(storedName || found?.data?.fullName || '').trim();
+
+  if (!found && name) {
+    try {
+      const snap = await getDocs(collection(db, 'applications'));
+      for (const row of snap.docs) {
+        const data = row.data();
+        if (!sameMemberName(String(data.fullName || data.name || ''), name)) continue;
+        const appPhone = String(data.phone || '');
+        if (appPhone) found = await findUserDoc(db, appPhone);
+        if (found) break;
+        found = { id: appPhone || phone, data: { ...data, fullName: data.fullName || name } };
+        break;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  return {
+    id: found?.id || phone,
+    phone: found?.id || phone,
+    data: mergeIdentity(found?.data || null, name),
+  };
+}
+
 export async function findUserDoc(db: Firestore, phone: string) {
   const variants = phoneVariants(phone);
   const canonical = canonicalPhone(phone) || String(phone || '').trim();

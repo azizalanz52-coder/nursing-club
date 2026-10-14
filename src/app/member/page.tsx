@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { committeeIdFromName, findUserDoc, resolveMemberAcceptance } from '../lib/memberAcceptance';
+import { committeeIdFromName, findMemberContext, resolveMemberAcceptance, resolvePortalCommitteeId } from '../lib/memberAcceptance';
 
 interface CommitteeData {
   id: string;
@@ -51,8 +51,8 @@ export default function MemberSmartDashboard() {
         let finalName = name;
 
         if (phone) {
-          const userDoc = await findUserDoc(db, phone);
-          const uData = userDoc?.data || null;
+          const context = await findMemberContext(db, phone, name);
+          const uData = context.data;
           if (uData) {
             if (uData.fullName) finalName = String(uData.fullName);
             if (uData.role) activeRole = String(uData.role);
@@ -61,10 +61,14 @@ export default function MemberSmartDashboard() {
           }
 
           if (!activeComm) {
-            const acceptance = await resolveMemberAcceptance(db, phone, uData);
+            const acceptance = await resolveMemberAcceptance(db, context.phone, uData);
             if (acceptance?.status === 'مقبول') {
               activeComm = acceptance.acceptedCommittee || '';
             }
+          }
+          if (!activeComm) {
+            const portalId = await resolvePortalCommitteeId(db, context.phone, uData);
+            if (portalId) activeComm = committeesMeta[portalId]?.name || portalId;
           }
         }
 

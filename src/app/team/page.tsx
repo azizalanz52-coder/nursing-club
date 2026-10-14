@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { ClubNoticeDialog } from '../components/ClubNotice';
-import { canAccessCommittee, findUserDoc, resolvePortalCommitteeId } from '../lib/memberAcceptance';
+import { canAccessCommittee, findMemberContext, resolvePortalCommitteeId } from '../lib/memberAcceptance';
 
 const normalizePhone = (phone: string) => {
   if (!phone) return '';
@@ -86,8 +86,9 @@ export default function TeamPage() {
     }
 
     try {
-      const userDoc = await findUserDoc(db, phone);
-      const targetCommitteeId = await resolvePortalCommitteeId(db, phone, userDoc?.data || null);
+      const storedName = localStorage.getItem('userName') || '';
+      const context = await findMemberContext(db, phone, storedName);
+      const targetCommitteeId = await resolvePortalCommitteeId(db, context.phone, context.data);
 
       if (targetCommitteeId) {
         window.location.href = `/team/${targetCommitteeId}`;
@@ -121,8 +122,9 @@ export default function TeamPage() {
     }
 
     try {
-      const userDoc = await findUserDoc(db, phone);
-      const matchesThis = await canAccessCommittee(db, phone, committee.id, userDoc?.data || null);
+      const storedName = localStorage.getItem('userName') || '';
+      const context = await findMemberContext(db, phone, storedName);
+      const matchesThis = await canAccessCommittee(db, context.phone, committee.id, context.data);
 
       if (matchesThis) {
         window.location.href = `/team/${committee.id}`;

@@ -23,7 +23,9 @@ function getClubAuth() {
       persistence: [indexedDBLocalPersistence, browserLocalPersistence],
     });
   } catch {
-    return getAuth(app);
+    const existing = getAuth(app);
+    existing.setPersistence(browserLocalPersistence).catch(() => undefined);
+    return existing;
   }
 }
 

@@ -11,7 +11,7 @@ import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
 import HrCertificateBatches from './../components/HrCertificateBatches';
 import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
-import { committeeNameFromId, findUserDoc, resolvePortalCommitteeId, stampMemberAcceptance } from '../lib/memberAcceptance';
+import { committeeIdFromName, committeeNameFromId, findMemberContext, findUserDoc, resolvePortalCommitteeId, sameMemberName, stampMemberAcceptance } from '../lib/memberAcceptance';
 import { certMediaFields, isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
@@ -473,14 +473,14 @@ useEffect(() => {
 
   const fetchLeaderData = async (phone: string) => {
     try {
-      const userDoc = await findUserDoc(db, phone);
+      const storedName = localStorage.getItem('userName') || '';
+      const context = await findMemberContext(db, phone, storedName);
+      const uData = context.data;
 
-      if (!userDoc) {
+      if (!uData) {
         router.push('/login');
         return;
       }
-
-      const uData = userDoc.data;
       setUserData(uData);
       
       if (uData.warningHidden) {
@@ -498,14 +498,28 @@ useEffect(() => {
 
       const assigned = String(uData.assignedCommittee || uData.committee || '');
       const roleStr = String(uData.role || '');
+      const resolvedId = await resolvePortalCommitteeId(db, context.phone || phone, uData);
+      const leaderCommId = committeeIdFromName(assigned) || resolvedId;
+      let isListedLeader = false;
+      if (leaderCommId) {
+        try {
+          const leaderSnap = await getDoc(doc(db, 'committees', leaderCommId));
+          if (leaderSnap.exists()) {
+            const leaderData = leaderSnap.data();
+            const fullName = String(uData.fullName || storedName);
+            isListedLeader = sameMemberName(String(leaderData.maleLeader || ''), fullName) || sameMemberName(String(leaderData.femaleLeader || ''), fullName);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
 
-      if (roleStr.includes('رئيس') || roleStr.includes('مشرف') || roleStr.includes('قائد')) {
+      if (roleStr.includes('رئيس') || roleStr.includes('مشرف') || roleStr.includes('قائد') || isListedLeader) {
         setIsCommitteeLeader(true);
       } else {
         setIsCommitteeLeader(false);
       }
 
-      const resolvedId = assigned ? '' : await resolvePortalCommitteeId(db, phone, uData);
       let resolvedComm = assigned || committeeNameFromId(resolvedId) || 'لجنة تنظيم الفعاليات';
       if (roleStr.includes('جودة') || assigned.includes('جودة') || assigned.includes('الجودة')) {
         setIsQualityTeam(true);
