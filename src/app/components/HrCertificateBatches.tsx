@@ -5,7 +5,7 @@ import { addDoc, collection, deleteDoc, doc, onSnapshot, updateDoc } from 'fireb
 import { db } from '../lib/firebase';
 import { clubConfirm, clubNotice } from '../lib/clubNotice';
 import {
-  filterNewRecipients,
+  mergeRecipients,
   parseEligibleExcel,
   personHasCertificate,
   sameEventTitle,
@@ -56,42 +56,38 @@ export default function HrCertificateBatches({
     setIsImporting(true);
     try {
       const buffer = await excelFile.arrayBuffer();
-      const incoming = parseEligibleExcel(buffer);
+      const { people: incoming, skippedDuplicates, namedRows } = parseEligibleExcel(buffer);
       if (incoming.length === 0) {
-        alert('ما لقينا أسماء صالحة في الملف. تأكد من عمود الاسم مع الجوال أو الرقم الجامعي.');
+        await clubNotice('ما لقينا أسماء صالحة في الملف.', 'info');
         return;
       }
 
       const title = eventTitle.trim();
       const existingBatch = batches.find((batch) => sameEventTitle(batch.eventTitle, title));
       const alreadyListed = existingBatch?.recipients || [];
-      const uniqueIncoming = filterNewRecipients(incoming, alreadyListed);
-      const skipped = incoming.length - uniqueIncoming.length;
+      const { recipients, added } = mergeRecipients(alreadyListed, incoming);
 
-      if (uniqueIncoming.length === 0) {
-        await clubNotice('لا يوجد اسم جديد.', 'info');
+      if (added.length === 0 && existingBatch) {
+        await updateDoc(doc(db, 'hr_certificate_batches', existingBatch.id), { recipients });
+        await clubNotice(`الملف فيه ${namedRows} اسم`, 'info', 'لا يوجد اسم جديد');
         return;
       }
 
       if (existingBatch) {
-        await updateDoc(doc(db, 'hr_certificate_batches', existingBatch.id), {
-          recipients: [...alreadyListed, ...uniqueIncoming],
-        });
+        await updateDoc(doc(db, 'hr_certificate_batches', existingBatch.id), { recipients });
         setOpenId(existingBatch.id);
       } else {
         const docRef = await addDoc(collection(db, 'hr_certificate_batches'), {
           eventTitle: title,
           createdAt: Date.now(),
           createdBy: actorName || 'لجنة الموارد البشرية',
-          recipients: uniqueIncoming,
+          recipients,
         });
         setOpenId(docRef.id);
       }
       setExcelFile(null);
-      await clubNotice(
-        skipped > 0 ? `أُضيف ${uniqueIncoming.length} وتخطّي ${skipped} مكرر.` : `أُضيف ${uniqueIncoming.length} مستحق.`,
-        skipped > 0 ? 'info' : 'success'
-      );
+      const skippedNote = skippedDuplicates.length ? `مكرر بالرقم: ${skippedDuplicates.slice(0, 4).join('، ')}` : `الملف فيه ${namedRows} اسم`;
+      await clubNotice(skippedNote, 'info', `القائمة ${recipients.length}`);
     } catch (err) {
       console.error(err);
       await clubNotice('تعذر قراءة الملف.', 'error');
