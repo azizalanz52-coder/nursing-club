@@ -10,6 +10,7 @@ import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { findCertificatesByLookup } from '../lib/certificatesLookup';
 import { emailToPhone, isAdminPhone, isPrivilegedRole } from '../lib/authIdentity';
 import { logoutSession } from '../lib/sessionAuth';
+import { findUserDoc, resolveMemberAcceptance } from '../lib/memberAcceptance';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
@@ -91,37 +92,47 @@ export default function Navbar() {
   useEffect(() => {
     if (!userPhone) return;
 
-    const userRef = doc(db, 'users', userPhone);
-    const unsubscribe = onSnapshot(userRef, (userSnap) => {
-      if (userSnap.exists()) {
-        const data = userSnap.data();
-        const currentRole = data.role || 'عضو أساسي';
+    let cancelled = false;
+    let unsubscribe = () => {};
+
+    const attach = async () => {
+      const userDoc = await findUserDoc(db, userPhone);
+      if (cancelled) return;
+
+      const applyUser = (data: Record<string, unknown>) => {
+        const currentRole = String(data.role || 'عضو أساسي');
         setUserRole(currentRole);
-
-        if (data.assignedCommittee) {
-          setAssignedCommittee(data.assignedCommittee);
-        }
-
-        // تحديث الاسم فوراً في الحالة والـ localStorage سحابياً عند أي تعديل من الأدمن
+        if (data.assignedCommittee) setAssignedCommittee(String(data.assignedCommittee));
         if (data.fullName) {
-          setUserName(data.fullName);
-          localStorage.setItem('userName', data.fullName);
+          setUserName(String(data.fullName));
+          localStorage.setItem('userName', String(data.fullName));
         }
+        const notifText = String(data.latestNotification || '');
+        if (notifText.includes('إنذار') || notifText.includes('تنبيه') || notifText.includes('تصعيد') || notifText.includes('الإحالة')) {
+          setLeaderAlertMsg(notifText);
+          setShowLeaderAlertBar(true);
+        }
+      };
 
-        // رصد التنبيهات القيادية أو الإنذارات الخاصة بالقادة فقط
-        if (data.latestNotification) {
-          const notifText = data.latestNotification;
-          if (notifText.includes('إنذار') || notifText.includes('تنبيه') || notifText.includes('تصعيد') || notifText.includes('الإحالة')) {
-            setLeaderAlertMsg(notifText);
-            setShowLeaderAlertBar(true);
-          }
-        }
+      if (userDoc) applyUser(userDoc.data);
+      const acceptance = await resolveMemberAcceptance(db, userPhone, userDoc?.data || null);
+      if (!cancelled && acceptance?.acceptedCommittee) {
+        setAssignedCommittee(acceptance.acceptedCommittee);
       }
-    }, (err) => {
-      console.error('Error listening to user changes:', err);
-    });
 
-    return () => unsubscribe();
+      const userRef = doc(db, 'users', userDoc?.id || userPhone);
+      unsubscribe = onSnapshot(userRef, (userSnap) => {
+        if (userSnap.exists()) applyUser(userSnap.data());
+      }, (err) => {
+        console.error('Error listening to user changes:', err);
+      });
+    };
+
+    attach();
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [userPhone]);
 
   const updateUserPresence = async (phone: string) => {

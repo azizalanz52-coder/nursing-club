@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import { committeeIdFromName, findUserDoc, resolveMemberAcceptance } from '../lib/memberAcceptance';
 
 interface CommitteeData {
   id: string;
@@ -50,23 +51,20 @@ export default function MemberSmartDashboard() {
         let finalName = name;
 
         if (phone) {
-          const userSnap = await getDoc(doc(db, 'users', phone));
-          if (userSnap.exists()) {
-            const uData = userSnap.data();
-            if (uData.fullName) finalName = uData.fullName;
-            if (uData.role) activeRole = uData.role;
-            if (uData.assignedCommittee) activeComm = uData.assignedCommittee;
-            if (uData.latestNotification) notification = uData.latestNotification;
+          const userDoc = await findUserDoc(db, phone);
+          const uData = userDoc?.data || null;
+          if (uData) {
+            if (uData.fullName) finalName = String(uData.fullName);
+            if (uData.role) activeRole = String(uData.role);
+            if (uData.assignedCommittee) activeComm = String(uData.assignedCommittee);
+            if (uData.latestNotification) notification = String(uData.latestNotification);
           }
 
           if (!activeComm) {
-            const appsSnap = await getDocs(collection(db, 'applications'));
-            appsSnap.forEach(d => {
-              const appData = d.data();
-              if (appData.phone === phone && appData.status === 'مقبول') {
-                activeComm = appData.acceptedCommittee || '';
-              }
-            });
+            const acceptance = await resolveMemberAcceptance(db, phone, uData);
+            if (acceptance?.status === 'مقبول') {
+              activeComm = acceptance.acceptedCommittee || '';
+            }
           }
         }
 
@@ -75,12 +73,23 @@ export default function MemberSmartDashboard() {
         setAssignedCommittee(activeComm);
         setUserNotification(notification);
 
-        let targetKey = 'design';
-        for (const key of Object.keys(committeesMeta)) {
-          if (activeComm.includes(committeesMeta[key].name) || activeComm.includes(key)) {
-            targetKey = key;
-            break;
+        if (!activeComm) {
+          setUserCommitteeData(null);
+          return;
+        }
+
+        let targetKey = committeeIdFromName(activeComm);
+        if (!targetKey) {
+          for (const key of Object.keys(committeesMeta)) {
+            if (activeComm.includes(committeesMeta[key].name) || activeComm.includes(key)) {
+              targetKey = key;
+              break;
+            }
           }
+        }
+        if (!targetKey) {
+          setUserCommitteeData(null);
+          return;
         }
 
         const commDocRef = doc(db, 'committees', targetKey);

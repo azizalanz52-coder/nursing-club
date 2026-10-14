@@ -19,12 +19,15 @@ export function humanizeNotice(message: string) {
   if (/longer than|1048487|exceeds the maximum/i.test(text) || (/fileUrl|property/i.test(text) && /longer/i.test(text))) {
     return 'ملف الشهادة كبير على الحفظ. صغّر الصورة ثم أعد المحاولة.';
   }
+  if (/insufficient permissions|permission-denied|permission_denied/i.test(text)) {
+    return 'تعذر حفظ الشهادة. سجّل الدخول مرة أخرى ثم أعد الرفع.';
+  }
   return text;
 }
 
 export function inferNoticeKind(message: string): ClubNoticeKind {
   const text = humanizeNotice(message);
-  if (/تعذر|خطأ|فشل|مرفوضة|غير صحيحة|كبير على الحفظ/.test(text)) return 'error';
+  if (/تعذر|خطأ|فشل|مرفوضة|غير صحيحة|كبير على الحفظ|صلاحية/.test(text)) return 'error';
   if (/لا يوجد|مكرر|مسبقا/.test(text)) return 'info';
   if (/تم |بنجاح|نجاح|مرحبا/.test(text)) return 'success';
   return 'info';

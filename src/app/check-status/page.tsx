@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { loginWithPhonePassword } from '../lib/sessionAuth';
+import { findUserDoc, resolveMemberAcceptance } from '../lib/memberAcceptance';
 
 export default function CheckStatusPage() {
   const [phone, setPhone] = useState('');
@@ -24,38 +24,17 @@ export default function CheckStatusPage() {
     setResult(null);
 
     try {
-      const cleanPhone = phone.trim();
+      const session = await loginWithPhonePassword(phone, password);
+      const userDoc = await findUserDoc(db, session.phone);
+      const acceptance = await resolveMemberAcceptance(db, session.phone, userDoc?.data || null);
 
-      await loginWithPhonePassword(cleanPhone, password);
-      const userRef = doc(db, 'users', cleanPhone);
-      const userSnap = await getDoc(userRef);
-      const userData = userSnap.exists() ? userSnap.data() : {};
-
-      // 2. البحث عن الطلب برقم الجوال أو الرقم الجامعي المرتبط بالحساب
-      const appsRef = collection(db, 'applications');
-      const q = query(appsRef, where('phone', '==', cleanPhone));
-      let querySnapshot = await getDocs(q);
-
-      let docData: any = null;
-
-      if (!querySnapshot.empty) {
-        docData = querySnapshot.docs[0].data();
-      } else if (userData.universityId) {
-        const qUniv = query(appsRef, where('universityId', '==', userData.universityId));
-        const univSnap = await getDocs(qUniv);
-        if (!univSnap.empty) {
-          docData = univSnap.docs[0].data();
-        }
-      }
-
-      if (docData) {
-        setResult(docData);
+      if (acceptance) {
+        setResult(acceptance);
       } else {
-        // إذا كان له حساب لكنه لم يقدم طلب انضمام بعد
         setResult({
-          fullName: userData.fullName,
-          universityId: userData.universityId,
-          status: 'معلق'
+          fullName: session.fullName,
+          universityId: '',
+          status: 'معلق',
         });
       }
 

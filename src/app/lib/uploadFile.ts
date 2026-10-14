@@ -66,17 +66,19 @@ function safeExtension(file: File) {
   return fromType[file.type] || '';
 }
 
-function waitForAuthUser(timeoutMs = 2500) {
+function waitForAuthUser(timeoutMs = 4000) {
   if (auth.currentUser) return Promise.resolve(auth.currentUser);
   return new Promise<typeof auth.currentUser>((resolve) => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      unsub();
-      resolve(user);
-    });
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       unsub();
       resolve(auth.currentUser);
     }, timeoutMs);
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) return;
+      clearTimeout(timer);
+      unsub();
+      resolve(user);
+    });
   });
 }
 

@@ -16,6 +16,7 @@ import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import PageLoading from '../../components/PageLoading';
 import { certMediaFields, isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
 import { canonicalPhone, normalizeUniversityId } from '../../lib/certificatesLookup';
+import { findUserDoc, isAcceptedStatus, sameMemberPhone } from '../../lib/memberAcceptance';
 import { clubConfirm, inferNoticeKind } from '../../lib/clubNotice';
 import { ClubNoticeDialog } from '../../components/ClubNotice';
 
@@ -257,9 +258,9 @@ export default function CommitteeDetailPage() {
 
     const fetchCloudData = async () => {
       try {
-        const [docSnap, userSnap] = await Promise.all([
+        const [docSnap, userDoc] = await Promise.all([
           getDoc(doc(db, 'committees', id)),
-          getDoc(doc(db, 'users', trimmedPhone)),
+          findUserDoc(db, trimmedPhone),
         ]);
 
         let mergedMembers = baseDetails.members || [];
@@ -279,17 +280,17 @@ export default function CommitteeDetailPage() {
         }
 
         let userAuthorized = trimmedPhone === '0553731265';
-        const normUserPhone = normalizePhone(trimmedPhone);
+        const normUserPhone = canonicalPhone(trimmedPhone);
 
-        if (userSnap.exists()) {
-          const uData = userSnap.data();
+        if (userDoc) {
+          const uData = userDoc.data;
           const assigned = String(uData.assignedCommittee || uData.committee || '');
           const roleStr = String(uData.role || '');
           if (matchesThisCommittee(assigned, roleStr)) userAuthorized = true;
         }
 
         if (!userAuthorized && normUserPhone !== '') {
-          const foundInDirect = mergedMembers.some((m: any) => m.phone && normalizePhone(m.phone) === normUserPhone);
+          const foundInDirect = mergedMembers.some((m: any) => m.phone && sameMemberPhone(m.phone, trimmedPhone));
           if (foundInDirect) userAuthorized = true;
         }
 
@@ -328,7 +329,7 @@ export default function CommitteeDetailPage() {
             const data = d.data();
             const acceptedComm = data.acceptedCommittee || data.committee || data.assignedCommittee || '';
             const statusStr = String(data.status || '');
-            const isAccepted = normalizeArabic(statusStr).includes('مقبول') || statusStr === 'مقبول';
+            const isAccepted = isAcceptedStatus(statusStr) || Boolean(String(acceptedComm || '').trim());
             if (isAccepted && matchesThisCommittee(acceptedComm)) {
               acceptedFromApps.push({
                 name: data.fullName || data.name || '',
@@ -337,8 +338,7 @@ export default function CommitteeDetailPage() {
                 status: 'نشط ✓',
                 universityId: data.universityId || ''
               });
-              const appPhoneNorm = normalizePhone(data.phone);
-              if (normUserPhone !== '' && appPhoneNorm !== '' && appPhoneNorm === normUserPhone) {
+              if (sameMemberPhone(data.phone, trimmedPhone)) {
                 userAuthorized = true;
               }
             }

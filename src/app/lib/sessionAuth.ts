@@ -8,6 +8,7 @@ import {
 import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { isAdminPhone, normalizePhone, phoneToEmail } from './authIdentity';
+import { findUserDoc } from './memberAcceptance';
 
 function authErrorMessage(err: any) {
   const code = String(err?.code || '');
@@ -66,9 +67,9 @@ export async function loginWithPhonePassword(phone: string, password: string) {
       await bootstrapAdmin(cleanPhone, password);
       await signInWithEmailAndPassword(auth, email, password);
     } else {
-      const userSnap = await getDoc(doc(db, 'users', cleanPhone));
-      const legacyPassword = String(userSnap.data()?.password || '');
-      if (!userSnap.exists()) {
+      const foundLegacy = await findUserDoc(db, cleanPhone);
+      const legacyPassword = String(foundLegacy?.data?.password || '');
+      if (!foundLegacy) {
         throw new Error('رقم الجوال غير مسجل في النظام. يمكنك إنشاء حساب جديد.');
       }
       if (!legacyPassword) {
@@ -85,22 +86,23 @@ export async function loginWithPhonePassword(phone: string, password: string) {
         }
         throw new Error(authErrorMessage(createErr));
       }
-      await stripLegacyPassword(cleanPhone);
+      await stripLegacyPassword(foundLegacy.id);
     }
   }
 
-  const profileSnap = await getDoc(doc(db, 'users', cleanPhone));
-  const profile = profileSnap.data();
+  const found = await findUserDoc(db, cleanPhone);
+  const profileId = found?.id || cleanPhone;
+  const profile = found?.data;
   if (profile?.password) {
-    await stripLegacyPassword(cleanPhone);
+    await stripLegacyPassword(profileId);
   }
-  await persistSession(cleanPhone, profile?.fullName || (isAdminPhone(cleanPhone) ? 'عبدالعزيز العنزي (المشرف العام)' : 'مستخدم مسجل'));
+  await persistSession(profileId, String(profile?.fullName || (isAdminPhone(cleanPhone) ? 'عبدالعزيز العنزي (المشرف العام)' : 'مستخدم مسجل')));
   try {
-    await setDoc(doc(db, 'users', cleanPhone), { authMigrated: true }, { merge: true });
+    await setDoc(doc(db, 'users', profileId), { authMigrated: true }, { merge: true });
   } catch (err) {
     console.error(err);
   }
-  return { phone: cleanPhone, fullName: profile?.fullName || '' };
+  return { phone: profileId, fullName: String(profile?.fullName || '') };
 }
 
 export async function registerWithPhonePassword(payload: {

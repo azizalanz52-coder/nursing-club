@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Image from "next/image";
 import Link from "next/link";
 import { db } from './../lib/firebase';
-import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { findUserDoc, resolveMemberAcceptance, sameMemberPhone } from '../lib/memberAcceptance';
 
 interface BannerItem {
   id: string;
@@ -93,13 +94,13 @@ export default function Hero() {
       const checkUserData = async () => {
         try {
           if (userPhone) {
-            const userDocRef = doc(db, 'users', userPhone);
-            const userSnap = await getDoc(userDocRef);
-            if (userSnap.exists()) {
-              const uData = userSnap.data();
+            const found = await findUserDoc(db, userPhone);
+            const userDocRef = doc(db, 'users', found?.id || userPhone);
+            const uData = found?.data;
+            if (uData) {
               if (uData.pendingCongratulation) {
-                setMyNewRole(uData.role || 'عضو أساسي');
-                setMyPermissions(uData.assignedPermissions || 'الصلاحيات العامة للنادي.');
+                setMyNewRole(String(uData.role || 'عضو أساسي'));
+                setMyPermissions(String(uData.assignedPermissions || 'الصلاحيات العامة للنادي.'));
                 setShowRoleCongratModal(true);
                 await updateDoc(userDocRef, { pendingCongratulation: false });
               }
@@ -108,10 +109,11 @@ export default function Hero() {
                 return;
               }
 
-              if (uData.status === 'مقبول') {
+              const acceptance = await resolveMemberAcceptance(db, userPhone, uData);
+              if (acceptance?.status === 'مقبول') {
                 setAcceptedData({
-                  committee: uData.assignedCommittee || uData.firstChoice || 'اللجنة',
-                  whatsapp: uData.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
+                  committee: acceptance.acceptedCommittee || String(uData.firstChoice || 'اللجنة'),
+                  whatsapp: acceptance.whatsappLink || String(uData.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP')
                 });
                 setShowModal(true);
                 return;
@@ -119,15 +121,12 @@ export default function Hero() {
             }
           }
 
-          if (hasSeenLocal !== 'true') {
+          if (hasSeenLocal !== 'true' && userPhone) {
             const querySnapshot = await getDocs(collection(db, 'applications'));
             querySnapshot.forEach((docSnap) => {
               const data = docSnap.data();
-              if (
-                (userPhone && data.phone === userPhone) ||
-                (userName && data.fullName === userName)
-              ) {
-                if (data.status === 'مقبول') {
+              if (sameMemberPhone(data.phone, userPhone) || (userName && data.fullName === userName)) {
+                if (String(data.status || '').includes('مقبول')) {
                   setAcceptedData({
                     committee: data.acceptedCommittee || data.firstChoice || 'اللجنة',
                     whatsapp: data.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'

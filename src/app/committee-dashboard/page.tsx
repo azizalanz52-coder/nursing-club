@@ -11,6 +11,7 @@ import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
 import HrCertificateBatches from './../components/HrCertificateBatches';
 import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
+import { findUserDoc, stampMemberAcceptance } from '../lib/memberAcceptance';
 import { certMediaFields, isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
@@ -472,15 +473,14 @@ useEffect(() => {
 
   const fetchLeaderData = async (phone: string) => {
     try {
-      const userRef = doc(db, 'users', phone);
-      const userSnap = await getDoc(userRef);
+      const userDoc = await findUserDoc(db, phone);
 
-      if (!userSnap.exists()) {
+      if (!userDoc) {
         router.push('/login');
         return;
       }
 
-      const uData = userSnap.data();
+      const uData = userDoc.data;
       setUserData(uData);
       
       if (uData.warningHidden) {
@@ -1005,12 +1005,12 @@ useEffect(() => {
 
       if (targetReq?.phone) {
         try {
-          const userDocRef = doc(db, 'users', targetReq.phone);
-          await setDoc(userDocRef, {
+          await stampMemberAcceptance(db, targetReq.phone, {
             latestNotification: `🎉 مبارك القبول النهائي في (${currentActiveComm})! رابط قروب الواتساب: ${activeWhatsapp}`,
             assignedCommittee: currentActiveComm,
-            committee: currentActiveComm
-          }, { merge: true });
+            committee: currentActiveComm,
+            whatsappLink: activeWhatsapp,
+          });
         } catch (e) { console.error(e); }
       }
 
@@ -1035,12 +1035,11 @@ useEffect(() => {
 
       if (memberPhone) {
         try {
-          const userRef = doc(db, 'users', memberPhone);
-          await setDoc(userRef, {
+          await stampMemberAcceptance(db, memberPhone, {
             assignedCommittee: '',
             committee: '',
             latestNotification: `⚠️ تم تعديل حالتك الإدارية وإلغاء قبولك السابق في اللجنة. يمكنك متابعة حالة طلبك.`
-          }, { merge: true });
+          });
         } catch (e) { console.error(e); }
       }
 

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { ClubNoticeDialog } from '../components/ClubNotice';
+import { committeeIdFromName, findUserDoc, resolveMemberAcceptance } from '../lib/memberAcceptance';
 
 // دالة ذكية لتطبيع النصوص العربية وتوحيد الهمزات والمسافات
 const normalizeArabic = (str: string) => {
@@ -121,25 +122,18 @@ export default function TeamPage() {
     }
 
     try {
-      const appsSnap = await getDocs(collection(db, 'applications'));
-      let targetCommitteeId = '';
-
-      if (!appsSnap.empty) {
-        appsSnap.forEach((d) => {
-          const data = d.data();
-          const dataPhone = data.phone ? String(data.phone).trim() : '';
-          const statusStr = String(data.status || '');
-          const isAccepted = normalizeArabic(statusStr).includes('مقبول') || statusStr === 'مقبول';
-
-          if (normalizePhone(dataPhone) === normUserPhone && isAccepted) {
-            const acceptedComm = data.acceptedCommittee || data.committee || data.assignedCommittee || '';
-            for (const comm of initialCommittees) {
-              if (isCommitteeMatch(acceptedComm, comm)) {
-                targetCommitteeId = comm.id;
-              }
-            }
+      const userDoc = await findUserDoc(db, phone);
+      const acceptance = await resolveMemberAcceptance(db, phone, userDoc?.data || null);
+      let targetCommitteeId = acceptance?.status === 'مقبول'
+        ? committeeIdFromName(acceptance.acceptedCommittee)
+        : '';
+      if (!targetCommitteeId && acceptance?.status === 'مقبول' && acceptance.acceptedCommittee) {
+        for (const comm of initialCommittees) {
+          if (isCommitteeMatch(acceptance.acceptedCommittee, comm)) {
+            targetCommitteeId = comm.id;
+            break;
           }
-        });
+        }
       }
 
       if (targetCommitteeId) {
@@ -174,26 +168,18 @@ export default function TeamPage() {
     }
 
     try {
-      const appsSnap = await getDocs(collection(db, 'applications'));
-      let isAuthorized = false;
+      const userDoc = await findUserDoc(db, phone);
+      const acceptance = await resolveMemberAcceptance(db, phone, userDoc?.data || null);
+      const acceptedId = acceptance?.status === 'مقبول'
+        ? committeeIdFromName(acceptance.acceptedCommittee)
+        : '';
+      const matchesThis = Boolean(
+        acceptance?.status === 'مقبول' &&
+        acceptance.acceptedCommittee &&
+        (acceptedId === committee.id || isCommitteeMatch(acceptance.acceptedCommittee, committee))
+      );
 
-      if (!appsSnap.empty) {
-        appsSnap.forEach((d) => {
-          const data = d.data();
-          const dataPhone = data.phone ? String(data.phone).trim() : '';
-          const acceptedComm = data.acceptedCommittee || data.committee || data.assignedCommittee || '';
-          const statusStr = String(data.status || '');
-          const isAccepted = normalizeArabic(statusStr).includes('مقبول') || statusStr === 'مقبول';
-
-          const matchesComm = isCommitteeMatch(acceptedComm, committee);
-
-          if (normalizePhone(dataPhone) === normUserPhone && isAccepted && matchesComm) {
-            isAuthorized = true;
-          }
-        });
-      }
-
-      if (isAuthorized) {
+      if (matchesThis) {
         window.location.href = `/team/${committee.id}`;
       } else {
         setAlertMessage(`عذراً، هذه البوابة مخصصة لأعضاء (${committee.name}) المقبولين رسمياً فقط.`);

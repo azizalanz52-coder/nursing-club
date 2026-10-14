@@ -15,6 +15,7 @@ import { printQualityEventReport, QUALITY_EVENT_REPORTS, computedSuccessIndex, r
 import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
+import { stampMemberAcceptance } from '../lib/memberAcceptance';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import * as XLSX from 'xlsx';
@@ -2178,9 +2179,11 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
       if (targetRequest.phone) {
         try {
-          const userDocRef = doc(db, 'users', targetRequest.phone);
-          await updateDoc(userDocRef, {
-            latestNotification: `🎉 مبارك القبول النهائي في (${acceptedCommittee})!`
+          await stampMemberAcceptance(db, targetRequest.phone, {
+            assignedCommittee: acceptedCommittee,
+            committee: acceptedCommittee,
+            latestNotification: `🎉 مبارك القبول النهائي في (${acceptedCommittee})!`,
+            whatsappLink: whatsappLink,
           });
         } catch (e) { console.error(e); }
       }
