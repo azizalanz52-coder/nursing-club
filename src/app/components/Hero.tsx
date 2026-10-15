@@ -20,7 +20,6 @@ interface BannerItem {
 
 export default function Hero() {
   const [banners, setBanners] = useState<BannerItem[]>([DEFAULT_WELCOME_BANNER]);
-
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
@@ -73,114 +72,95 @@ export default function Hero() {
 
   const currentBanner = banners[currentIndex] || banners[0];
   const isPink = currentBanner.theme === 'pink-october';
-  const cinematic = currentBanner.cinematic === true;
   const heroCtaHref = currentBanner.buttonLink || (isPink ? '/case-study' : '/discover');
   const heroCtaLabel = currentBanner.buttonText || (isPink ? 'ابدئي التحدي الوردي' : 'اكتشف النادي');
 
   return (
     <section 
-      className={`relative min-h-[92vh] flex items-center justify-center overflow-hidden px-4 sm:px-6 lg:px-8 text-white pb-16 ${
-        cinematic ? 'pt-28' : 'pt-36 pb-20'
-      } ${
+      className={`relative min-h-[92vh] flex items-center justify-center overflow-hidden px-4 sm:px-6 lg:px-8 text-white pt-36 pb-20 ${
         isPink
           ? 'bg-gradient-to-br from-[#4a0326] via-[#9d174d] to-[#be185d]'
-          : 'bg-gradient-to-br from-[#3b020b] via-[#630517] to-[#4a030f]'
+          : 'bg-[radial-gradient(ellipse_at_50%_0%,rgba(245,208,97,0.18),transparent_42%),linear-gradient(165deg,#2a050c_0%,#630517_48%,#1a0208_100%)]'
       }`}
       dir="rtl"
     >
-      <div className="absolute inset-0 opacity-10 bg-[url('/grid.svg')] bg-center pointer-events-none mix-blend-overlay" />
-      <div
-        className={`absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] rounded-full blur-[160px] pointer-events-none ${
-          isPink ? 'bg-pink-300/25' : 'bg-[#F5D061]/10'
-        }`}
-      />
-      {isPink && (
-        <div className="absolute bottom-10 right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-      )}
+      <div className={`absolute top-1/4 left-1/2 -translate-x-1/2 w-[34rem] h-[34rem] rounded-full blur-[140px] pointer-events-none ${
+        isPink ? 'bg-pink-300/25' : 'bg-[#F5D061]/22'
+      }`} />
+      <div className="absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-[#F5D061]/10 blur-[100px] pointer-events-none" />
 
-      <div className={`relative z-10 mx-auto text-center flex flex-col items-center justify-center ${cinematic ? 'max-w-6xl space-y-6' : 'max-w-5xl space-y-8'}`}>
-        
-        {!cinematic && (
-          <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/10 backdrop-blur-xl text-xs sm:text-sm font-bold tracking-wider uppercase shadow-sm border ${
-            isPink ? 'border-white/40 text-pink-100' : 'border-[#F5D061]/30 text-[#F5D061]'
-          }`}>
-            <span>{isPink ? '🎀' : '✨'} {currentBanner.tag}</span>
-          </div>
-        )}
+      <div className="relative z-10 max-w-5xl mx-auto text-center flex flex-col items-center justify-center space-y-7">
+        <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full backdrop-blur-xl text-xs sm:text-sm font-bold shadow-sm border ${
+          isPink
+            ? 'bg-white/10 border-white/40 text-pink-100'
+            : 'bg-[#F5D061]/10 border-[#F5D061]/40 text-[#F5D061]'
+        }`}>
+          <span>{isPink ? '🎀' : '✨'} {currentBanner.tag}</span>
+        </div>
 
-        {!cinematic && (
-          <div className="space-y-3">
-            <h1 className="text-4xl sm:text-7xl font-black text-white drop-shadow-md transition-all duration-700">
-              {currentBanner.title}
-            </h1>
-          </div>
-        )}
+        <h1 className="text-4xl sm:text-6xl font-black text-white drop-shadow-md">
+          {currentBanner.title}
+        </h1>
 
-        <div
-          className={`relative w-full mx-auto overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.45)] group transition-all duration-500 ${
-            cinematic
-              ? 'max-w-6xl rounded-[1.25rem] sm:rounded-[2rem] border border-white/15'
-              : `max-w-4xl rounded-[1.5rem] sm:rounded-[2.5rem] border-2 ${isPink ? 'border-pink-200/40 hover:border-pink-100/80' : 'border-[#F5D061]/30 hover:border-[#F5D061]/70'}`
-          }`}
-        >
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60 pointer-events-none z-10" />
-
-          {currentBanner.image?.startsWith('data:video') || currentBanner.image?.includes('.mp4') ? (
-            <video 
-              src={currentBanner.image} 
-              autoPlay 
-              loop 
-              muted 
-              playsInline
-              className={`w-full h-auto block object-cover mx-auto ${cinematic ? 'max-h-[82vh]' : 'max-h-[75vh]'}`}
-            />
-          ) : (
-            <img
-              src={currentBanner.image || '/header-banner.png'} 
-              alt={currentBanner.title || "بانر نادي التمريض"}
-              className={`w-full h-auto block object-cover mx-auto transition-transform duration-700 group-hover:scale-[1.015] ${cinematic ? 'max-h-[82vh]' : 'max-h-[75vh]'}`}
-            />
-          )}
-
-          {cinematic && (
-            <div className="absolute bottom-4 right-4 left-4 z-20 flex flex-wrap items-end justify-between gap-3 text-right" dir="rtl">
-              <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/35 backdrop-blur-md text-[11px] font-black tracking-wide ${
-                isPink ? 'text-pink-100 border border-white/20' : 'text-[#F5D061] border border-[#F5D061]/30'
-              }`}>
-                {isPink ? '🎀' : '✨'} {currentBanner.tag}
-              </span>
+        <div className="relative w-full max-w-4xl mx-auto">
+          <div className={`absolute -inset-3 rounded-[2.2rem] blur-2xl pointer-events-none ${
+            isPink ? 'bg-pink-400/20' : 'bg-[#F5D061]/25'
+          }`} />
+          <div
+            className={`relative overflow-hidden rounded-[1.5rem] sm:rounded-[2.2rem] p-[2px] shadow-[0_24px_60px_rgba(0,0,0,0.35)] ${
+              isPink
+                ? 'bg-gradient-to-br from-pink-200 via-white/30 to-[#9d174d]'
+                : 'bg-gradient-to-br from-[#F5D061] via-[#FFF3C4] to-[#C9A227]'
+            }`}
+          >
+            <div className="overflow-hidden rounded-[1.4rem] sm:rounded-[2.05rem] bg-[#1a0208]">
+              {currentBanner.image?.startsWith('data:video') || currentBanner.image?.includes('.mp4') ? (
+                <video 
+                  src={currentBanner.image} 
+                  autoPlay 
+                  loop 
+                  muted 
+                  playsInline
+                  className="w-full h-auto block object-cover max-h-[75vh] mx-auto"
+                />
+              ) : (
+                <img
+                  src={currentBanner.image || '/header-banner.png'} 
+                  alt={currentBanner.title || "بانر نادي التمريض"}
+                  className="w-full h-auto block object-cover max-h-[75vh] mx-auto"
+                />
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {currentBanner.description ? (
-          <p className={`max-w-2xl mx-auto text-base sm:text-lg leading-relaxed text-center font-medium px-6 py-4 backdrop-blur-md rounded-2xl border shadow-inner ${
+          <p className={`max-w-2xl mx-auto text-base sm:text-lg leading-relaxed text-center font-medium px-6 py-4 backdrop-blur-md rounded-2xl border ${
             isPink
               ? 'text-pink-50 bg-white/10 border-white/15'
-              : 'text-amber-50/90 bg-white/5 border-white/10'
+              : 'text-[#FFF6D6] bg-[#F5D061]/8 border-[#F5D061]/25'
           }`}>
             {currentBanner.description}
           </p>
         ) : null}
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-5 w-full sm:w-auto pt-1">
-          <Link
-            href={heroCtaHref}
-            className={`w-full sm:w-auto px-10 py-3.5 rounded-2xl font-black hover:brightness-110 active:scale-95 transition-all duration-300 shadow-lg text-base text-center border ${
-              isPink
-                ? 'bg-white text-[#9d174d] border-white/40'
-                : 'bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#3b020b] border-white/30'
-            }`}
-          >
-            {heroCtaLabel}
-          </Link>
-        </div>
+        <Link
+          href={heroCtaHref}
+          className={`w-full sm:w-auto px-10 py-3.5 rounded-2xl font-black hover:brightness-110 active:scale-95 transition-all duration-300 text-base text-center ${
+            isPink
+              ? 'bg-white text-[#9d174d]'
+              : 'bg-gradient-to-l from-[#F5D061] via-[#F0C75A] to-[#E2B739] text-[#3b020b] shadow-[0_10px_28px_rgba(245,208,97,0.28)]'
+          }`}
+        >
+          {heroCtaLabel}
+        </Link>
 
         {banners.length > 1 && (
-          <div className="flex items-center justify-center gap-2.5 pt-2 bg-black/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/10">
+          <div className="flex items-center justify-center gap-2.5 pt-1 bg-black/20 backdrop-blur-md px-5 py-2 rounded-full border border-[#F5D061]/20">
             {banners.map((b, idx) => (
               <button
                 key={b.id}
+                type="button"
                 onClick={() => setCurrentIndex(idx)}
                 className={`h-2.5 rounded-full transition-all duration-500 cursor-pointer ${
                   currentIndex === idx
@@ -192,7 +172,6 @@ export default function Hero() {
             ))}
           </div>
         )}
-
       </div>
     </section>
   );
