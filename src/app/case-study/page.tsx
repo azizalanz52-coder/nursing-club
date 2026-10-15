@@ -21,85 +21,84 @@ interface LeaderboardItem {
   totalScore: number;
 }
 
-// بنك الحالات الإكلينيكية الخاص بأسبوع الصحة النفسية (Mental Health Nursing Cases)
 const masterCasePool: Omit<CaseQuestion, 'id'>[] = [
   {
     difficulty: 'Easy',
-    title: 'Case 1: Major Depressive Disorder & Suicide Safety Assessment',
-    scenario: 'A 28-year-old admitted patient with Major Depressive Disorder states: "I feel like a burden to everyone, and things would be better if I just went to sleep forever." What is the immediate priority nursing action?',
+    title: 'Case 1: Breast Cancer Warning Signs & Early Detection',
+    scenario: 'A 34-year-old woman attends a Pink October booth and says she noticed a painless, hard lump in the upper outer quadrant of her left breast two weeks ago. She has no family history of cancer and feels well. What is the priority nursing action?',
     options: [
-      'Encourage the patient to join a group therapy session immediately to distract their thoughts',
-      'Ask the patient directly: "Are you thinking about suicide or harming yourself right now?" and initiate 1-to-1 observation',
-      'Reassure the patient that everything will get better soon and leave them alone to rest',
-      'Document the statement and re-evaluate the patient during the next shift round'
+      'Reassure her that painless lumps in young women are almost always benign and need no follow-up',
+      'Advise urgent clinical breast assessment and referral for diagnostic imaging rather than waiting for the lump to disappear',
+      'Teach her to squeeze the lump daily to see if it reduces in size',
+      'Start her on antibiotics for presumed mastitis without examination'
     ],
-    correctIndexString: 'Ask the patient directly: "Are you thinking about suicide or harming yourself right now?" and initiate 1-to-1 observation',
-    explanation: 'Directly assessing for suicidal ideation and intent is the gold standard in psychiatric nursing safety. Immediate continuous suicide precautions (1-to-1 observation) are mandatory to protect patient life.'
+    correctIndexString: 'Advise urgent clinical breast assessment and referral for diagnostic imaging rather than waiting for the lump to disappear',
+    explanation: 'A new, painless, hard breast lump is a classic warning sign. Nurses must never delay assessment. Early referral for clinical exam and imaging (ultrasound/mammography as indicated) is the evidence-based first step in Pink October screening.'
   } as any,
   {
     difficulty: 'Easy',
-    title: 'Case 2: Acute Panic Attack & Hyperventilation Crisis',
-    scenario: 'A nursing student presents to the student clinic experiencing a severe panic attack with hyperventilation, chest tightness, rapid heart rate, and an overwhelming feeling of impending doom. What is the priority nursing intervention?',
+    title: 'Case 2: Breast Self-Awareness Health Teaching',
+    scenario: 'During a student awareness campaign, a participant asks when and how she should check her breasts. She has regular menstrual cycles. What is the most accurate nursing teaching?',
     options: [
-      'Instruct the student to sit down, speak in short, calm sentences, and guide them to practice slow, deep diaphragmatic breathing',
-      'Leave the student alone in a quiet dark room so they can calm down without pressure',
-      'Administer high-flow oxygen via non-rebreather mask immediately',
-      'Provide detailed health teaching regarding the pathophysiology of panic disorders'
+      'Examine the breasts only once a year on her birthday',
+      'Become familiar with how her breasts normally look and feel, and report any new change promptly; the best time is a few days after menstruation ends',
+      'Perform vigorous daily squeezing of breast tissue to detect cancer earlier',
+      'Breast awareness is unnecessary before the age of 50'
     ],
-    correctIndexString: 'Instruct the student to sit down, speak in short, calm sentences, and guide them to practice slow, deep diaphragmatic breathing',
-    explanation: 'During an acute panic attack, the nurse must remain calm, minimize environmental stimuli, use clear, simple sentences, and guide slow breathing to reduce hyperventilation and acute respiratory alkalosis.'
+    correctIndexString: 'Become familiar with how her breasts normally look and feel, and report any new change promptly; the best time is a few days after menstruation ends',
+    explanation: 'Modern guidance emphasizes breast awareness, not aggressive daily self-exam. Knowing baseline appearance and reporting new changes (lump, skin dimpling, nipple discharge, inversion) is key. After menses, hormonal swelling is lowest, so changes are easier to notice.'
   } as any,
   {
     difficulty: 'Moderate',
-    title: 'Case 3: Acute Bipolar Mania & Environmental Management',
-    scenario: 'A patient with Bipolar I Disorder in an acute manic phase is hyperactive, pacing continuously, talking rapidly with grandiosity, and refusing to sit for meals. Which nursing strategy is most effective for maintaining adequate nutrition and safety?',
+    title: 'Case 3: Post-Mastectomy Lymphedema Precautions',
+    scenario: 'A woman is 48 hours after left modified radical mastectomy with axillary lymph node dissection. The nurse prepares discharge teaching. Which instruction is essential to reduce lymphedema risk?',
     options: [
-      'Force the patient to sit quietly at the dining table until they finish a full 3-course meal',
-      'Provide high-calorie, high-protein finger foods and drinks that the patient can eat while moving',
-      'Restrict all physical movement by applying soft wrist restraints until calm',
-      'Hold all nutritional intake until the patient’s mood stabilizes with mood stabilizers'
+      'Measure blood pressure and perform venipuncture on the left (operative) arm because it is closer to the wound',
+      'Avoid blood pressure cuffs, injections, and tight jewelry on the affected arm; elevate the arm and start gentle range-of-motion as prescribed',
+      'Keep the affected arm in a dependent position at all times to improve drainage',
+      'Apply ice packs tightly around the axilla for 24 hours to prevent swelling'
     ],
-    correctIndexString: 'Provide high-calorie, high-protein finger foods and drinks that the patient can eat while moving',
-    explanation: 'Manic patients have extreme energy expenditure and short attention spans. High-calorie, portable "finger foods" (e.g., sandwiches, smoothies, protein bars) ensure adequate nutritional intake without conflict.'
+    correctIndexString: 'Avoid blood pressure cuffs, injections, and tight jewelry on the affected arm; elevate the arm and start gentle range-of-motion as prescribed',
+    explanation: 'After axillary dissection, the affected arm is at high risk of lymphedema. Nursing care protects that arm from constriction and trauma, elevates it, and encourages prescribed early mobility without strain.'
   } as any,
   {
     difficulty: 'Moderate',
-    title: 'Case 4: Schizophrenia & Command Hallucinations',
-    scenario: 'A patient diagnosed with Schizophrenia looks terrified, stares at the corner of the unit, and whispers: "The voices are telling me to jump out of the window." What is the therapeutic response by the nurse?',
+    title: 'Case 4: Chemotherapy Neutropenia & Infection Prevention',
+    scenario: 'A patient receiving doxorubicin-based chemotherapy for breast cancer has an absolute neutrophil count of 800/mm³ and a temperature of 38.4°C. What is the priority nursing action?',
     options: [
-      'Argue with the patient and state: "There are no voices here, you are imagining things."',
-      'Acknowledge the fear, validate feelings without reinforcing the hallucination: "I know the voices feel real to you, but you are safe here, and I do not hear them."',
-      'Validate the hallucination by asking: "What do the voices look like and what else do they say?"',
-      'Ignore the statement and immediately escort the patient to the television room'
+      'Encourage large gatherings of visitors to improve her mood',
+      'Treat this as a potential oncologic emergency: isolate from infection sources, notify the physician, obtain cultures as ordered, and prepare for prompt antibiotics',
+      'Give an antipyretic only and discharge her because low-grade fever is expected',
+      'Start high-dose iron supplements to raise the neutrophil count'
     ],
-    correctIndexString: 'Acknowledge the fear, validate feelings without reinforcing the hallucination: "I know the voices feel real to you, but you are safe here, and I do not hear them."',
-    explanation: 'Command hallucinations present a critical safety risk. The nurse must validate the patient’s feelings (fear/distress) while presenting reality clearly without arguing or agreeing with the hallucination.'
+    correctIndexString: 'Treat this as a potential oncologic emergency: isolate from infection sources, notify the physician, obtain cultures as ordered, and prepare for prompt antibiotics',
+    explanation: 'Neutropenic fever in a chemotherapy patient is an emergency. Rapid assessment, protective isolation, cultures, and timely antibiotics reduce sepsis risk. Social crowding is contraindicated.'
   } as any,
   {
     difficulty: 'Hard',
-    title: 'Case 5: Severe Alcohol Withdrawal & Delirium Tremens (DTs)',
-    scenario: 'On day 3 of hospitalization, a patient with a history of chronic severe alcohol use disorder develops coarse hand tremors, severe agitation, diaphoresis, visual hallucinations, blood pressure 180/110 mmHg, and heart rate 130 bpm. What is the priority medication category prescribed under CIWA protocol?',
+    title: 'Case 5: Tamoxifen Education & Thromboembolic Warning',
+    scenario: 'A premenopausal woman with estrogen-receptor-positive breast cancer is started on tamoxifen. She calls the clinic reporting sudden left-calf pain, swelling, and mild shortness of breath. What is the critical nursing response?',
     options: [
-      'Administer IV Benzodiazepines (e.g., Lorazepam or Diazepam) titrated according to CIWA score',
-      'Administer IV Antihypertensives to lower blood pressure and delay psychiatric treatment',
-      'Administer high-dose antipsychotics (e.g., Haloperidol) as first-line monotherapy',
-      'Administer oral antidepressant SSRIs to manage agitation'
+      'Tell her to walk more because tamoxifen-related leg pain is always musculoskeletal',
+      'Advise her to double the next tamoxifen dose to reduce inflammation',
+      'Recognize possible deep-vein thrombosis/pulmonary embolism: instruct her to seek emergency care immediately and hold tamoxifen until evaluated',
+      'Apply a heating pad and schedule a routine follow-up in two weeks'
     ],
-    correctIndexString: 'Administer IV Benzodiazepines (e.g., Lorazepam or Diazepam) titrated according to CIWA score',
-    explanation: 'Delirium Tremens (DTs) is a medical emergency with high mortality. Benzodiazepines are the cornerstone treatment to enhance GABA activity, prevent alcohol withdrawal seizures, and control autonomic hyperarousal.'
+    correctIndexString: 'Recognize possible deep-vein thrombosis/pulmonary embolism: instruct her to seek emergency care immediately and hold tamoxifen until evaluated',
+    explanation: 'Tamoxifen increases venous thromboembolism risk. Sudden unilateral calf pain plus dyspnea requires emergency evaluation for DVT/PE. The nurse must not delay care or continue the drug until a physician assesses her.'
   } as any,
   {
     difficulty: 'Hard',
-    title: 'Case 6: Lithium Toxicity & Psychopharmacology Monitoring',
-    scenario: 'A patient receiving Lithium Carbonate for Bipolar Disorder presents with severe nausea, persistent vomiting, coarse hand tremors, blurred vision, ataxia, and confusion. Laboratory results reveal a serum lithium level of 2.2 mEq/L. What is the critical nursing action?',
+    title: 'Case 6: Psychosocial Support After Breast Cancer Diagnosis',
+    scenario: 'A newly diagnosed patient refuses to look at her surgical site, says "I am no longer a woman," and withdraws from her family. Which nursing approach is most therapeutic?',
     options: [
-      'Continue the morning lithium dose as scheduled and reassess in 24 hours',
-      'Withhold the lithium dose immediately, notify the physician, and prepare for hydration and toxicity protocols',
-      'Increase oral fluid restriction to prevent hyponatremia',
-      'Administer an extra dose of lithium to stabilize mood swings'
+      'Tell her she should feel lucky because many women die from delayed diagnosis',
+      'Force her to view the incision immediately to speed acceptance',
+      'Sit with her, acknowledge grief and body-image loss, assess for depression, and offer counseling/support-group referral without rushing her',
+      'Leave her alone for several days so she can adjust without nursing presence'
     ],
-    correctIndexString: 'Withhold the lithium dose immediately, notify the physician, and prepare for hydration and toxicity protocols',
-    explanation: 'Therapeutic Lithium level is 0.6 - 1.2 mEq/L. Levels above 2.0 mEq/L cause severe toxicity manifested by coarse tremors, ataxia, vomiting, and confusion. Lithium must be withheld immediately and medical intervention initiated.'
+    correctIndexString: 'Sit with her, acknowledge grief and body-image loss, assess for depression, and offer counseling/support-group referral without rushing her',
+    explanation: 'Body-image disturbance and grief are expected after mastectomy. Therapeutic nursing presence, validation, suicide/depression screening, and referral to psycho-oncology or support groups are evidence-based. Forcing confrontation or minimizing feelings harms trust.'
   } as any
 ];
 
@@ -316,27 +315,23 @@ export default function CaseStudyPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 pb-20 relative" dir="ltr">
+    <main className="min-h-screen bg-gradient-to-b from-pink-50 to-slate-50 text-slate-900 pb-20 relative" dir="ltr">
       
-      {/* هيدر التحدي اليومي بهوية اليوم العالمي للصحة النفسية */}
-      <div className="bg-gradient-to-r from-[#064e3b] via-[#047857] to-[#0d9488] text-white py-12 px-4 sm:px-6 shadow-xl border-b-4 border-[#F5D061]">
+      <div className="bg-gradient-to-r from-[#9d174d] via-[#be185d] to-[#f472b6] text-white py-12 px-4 sm:px-6 shadow-xl border-b-4 border-pink-200">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
           <div className="space-y-3 text-center sm:text-left">
-            <div className="inline-flex items-center gap-2 bg-[#F5D061] text-[#064e3b] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
-              <span>💚 🧠 World Mental Health Day Special</span>
+            <div className="inline-flex items-center gap-2 bg-white text-[#9d174d] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
+              <span>🎀 Pink October • Breast Cancer Awareness</span>
             </div>
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
-              Psychiatric & Mental Health Nursing Challenge
+              Breast Cancer Nursing Challenge
             </h1>
-            
-            {/* فقرة الوقت المنسقة */}
-            <div className="bg-emerald-950/40 border border-emerald-400/30 px-4 py-2 rounded-2xl text-xs sm:text-sm text-emerald-100 font-medium inline-block" dir="rtl">
+            <div className="bg-pink-950/30 border border-white/25 px-4 py-2 rounded-2xl text-xs sm:text-sm text-pink-50 font-medium inline-block" dir="rtl">
               ⏱️ <span>يتجدد التحدي اليومي بعد: </span>
-              <strong className="text-[#F5D061] font-black px-1">{timeLeft || 'جاري التحديث...'}</strong>
+              <strong className="text-white font-black px-1">{timeLeft || 'جاري التحديث...'}</strong>
             </div>
-
             <div>
-              <Link href="/" className="text-xs text-[#F5D061] hover:underline font-bold inline-block pt-1">
+              <Link href="/" className="text-xs text-pink-100 hover:underline font-bold inline-block pt-1">
                 ← Back to Home | العودة للرئيسية
               </Link>
             </div>
@@ -345,7 +340,7 @@ export default function CaseStudyPage() {
           <button
             type="button"
             onClick={() => setShowLeaderboardModal(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-[#F5D061] to-[#E2B739] text-[#064e3b] px-6 py-3.5 rounded-2xl font-black text-xs shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border border-white/30"
+            className="flex items-center gap-2 bg-white text-[#9d174d] px-6 py-3.5 rounded-2xl font-black text-xs shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border border-pink-100"
           >
             <span className="text-lg">🏆</span>
             <span>لوحة الصدارة</span>
@@ -358,8 +353,8 @@ export default function CaseStudyPage() {
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-slate-200 text-right" dir="rtl">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-              <h3 className="text-xl font-black text-[#047857] flex items-center gap-2">
-                <span>🏆</span> لوحة صدارة أسبوع الصحة النفسية
+              <h3 className="text-xl font-black text-[#9d174d] flex items-center gap-2">
+                <span>🏆</span> لوحة صدارة أسبوع سرطان الثدي
               </h3>
               <button
                 type="button"
@@ -375,18 +370,18 @@ export default function CaseStudyPage() {
                 <p className="text-center text-xs text-slate-400 py-8 font-medium">لا توجد سجلات صدارة حتى الآن، كن أول المشاركين!</p>
               ) : (
                 leaderboard.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-emerald-50/50 border border-emerald-100 text-xs font-bold">
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-pink-50/70 border border-pink-100 text-xs font-bold">
                     <div className="flex items-center gap-3">
                       <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black ${
                         idx === 0 ? 'bg-amber-400 text-slate-900 shadow-sm' :
                         idx === 1 ? 'bg-slate-300 text-slate-800' :
-                        idx === 2 ? 'bg-amber-700 text-white' : 'bg-emerald-200 text-emerald-800'
+                        idx === 2 ? 'bg-amber-700 text-white' : 'bg-pink-200 text-pink-900'
                       }`}>
                         {idx + 1}
                       </span>
                       <span className="text-slate-800">{item.studentName}</span>
                     </div>
-                    <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-mono font-bold">
+                    <span className="bg-[#be185d] text-white px-3 py-1 rounded-full text-xs font-mono font-bold">
                       ⭐ {item.totalScore} نقطة
                     </span>
                   </div>
@@ -397,7 +392,7 @@ export default function CaseStudyPage() {
             <button
               type="button"
               onClick={() => setShowLeaderboardModal(false)}
-              className="w-full py-3 rounded-2xl bg-[#047857] text-[#F5D061] font-black text-xs shadow-md cursor-pointer hover:brightness-110"
+              className="w-full py-3 rounded-2xl bg-[#9d174d] text-white font-black text-xs shadow-md cursor-pointer hover:brightness-110"
             >
               إغلاق
             </button>
@@ -408,7 +403,7 @@ export default function CaseStudyPage() {
       {/* قائمة الأسماء والحالات الإكلينيكية */}
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8" dir="ltr">
         {activeCases.map((item) => (
-          <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-emerald-100 shadow-sm space-y-6 relative overflow-hidden">
+          <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-pink-100 shadow-sm space-y-6 relative overflow-hidden">
             
             {/* يظهر البونص فقط للسؤال الوحيد الذي وقع عليه الاختيار اليوم */}
             {item.bonusPoints && item.bonusPoints > 0 ? (
@@ -424,8 +419,8 @@ export default function CaseStudyPage() {
             ) : null}
 
             <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
-              <span className="font-black text-[#047857] text-base flex items-center gap-2">
-                <span>🧠</span> {item.title}
+              <span className="font-black text-[#9d174d] text-base flex items-center gap-2">
+                <span>🎀</span> {item.title}
               </span>
               <span className={`text-xs font-bold px-3 py-1 rounded-full ${
                 item.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-800' : 
@@ -435,7 +430,7 @@ export default function CaseStudyPage() {
               </span>
             </div>
 
-            <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-100/80 text-sm font-medium leading-relaxed text-slate-800">
+            <div className="bg-pink-50/70 p-4 rounded-2xl border border-pink-100 text-sm font-medium leading-relaxed text-slate-800">
               {item.scenario}
             </div>
 
@@ -446,12 +441,12 @@ export default function CaseStudyPage() {
                   const isSelected = selectedAnswers[item.id] === optIdx;
                   const isCorrect = optIdx === item.correctIndex;
 
-                  let btnStyle = 'bg-white border-slate-200 hover:bg-emerald-50/30 text-slate-800';
+                  let btnStyle = 'bg-white border-slate-200 hover:bg-pink-50 text-slate-800';
                   if (showResults) {
-                    if (isCorrect) btnStyle = 'bg-emerald-600 text-white border-emerald-700 font-bold';
-                    else if (isSelected && !isCorrect) btnStyle = 'bg-rose-600 text-white border-rose-700 font-bold';
+                    if (isCorrect) btnStyle = 'bg-pink-600 text-white border-pink-700 font-bold';
+                    else if (isSelected && !isCorrect) btnStyle = 'bg-rose-700 text-white border-rose-800 font-bold';
                   } else if (isSelected) {
-                    btnStyle = 'bg-[#047857] text-white border-[#047857] font-bold shadow-md';
+                    btnStyle = 'bg-[#9d174d] text-white border-[#9d174d] font-bold shadow-md';
                   }
 
                   return (
@@ -473,8 +468,8 @@ export default function CaseStudyPage() {
             </div>
 
             {showResults && (
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 space-y-1">
-                <strong className="text-[#047857]">💡 Mental Health Clinical Rationale:</strong>
+              <div className="p-4 rounded-2xl bg-pink-50 border border-pink-200 text-xs text-pink-950 space-y-1">
+                <strong className="text-[#9d174d]">💡 Breast Cancer Clinical Rationale:</strong>
                 <p className="leading-relaxed">{item.explanation}</p>
               </div>
             )}
@@ -482,28 +477,28 @@ export default function CaseStudyPage() {
         ))}
 
         {!showResults ? (
-          <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm space-y-4 text-center">
-            <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 text-xs text-slate-700 font-medium">
-              🔒 Connected Profile: <strong className="text-[#047857]">{studentName || 'مستخدم مسجل'}</strong> (Phone: <span dir="ltr">{studentPhone || '---'}</span>)
-              <p className="text-[10px] text-slate-400 mt-1">Your response will be recorded for Mental Health Week Clinical Leaderboard.</p>
+          <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-pink-100 shadow-sm space-y-4 text-center">
+            <div className="p-4 bg-pink-50/70 rounded-2xl border border-pink-100 text-xs text-slate-700 font-medium">
+              🔒 Connected Profile: <strong className="text-[#9d174d]">{studentName || 'مستخدم مسجل'}</strong> (Phone: <span dir="ltr">{studentPhone || '---'}</span>)
+              <p className="text-[10px] text-slate-400 mt-1">Your response will be recorded for Pink October Breast Cancer Leaderboard.</p>
             </div>
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-gradient-to-r from-[#064e3b] to-[#047857] text-[#F5D061] py-4 rounded-2xl font-black text-sm shadow-xl hover:brightness-110 active:scale-98 transition-all cursor-pointer border border-white/20"
+              className="w-full bg-gradient-to-r from-[#9d174d] to-[#f472b6] text-white py-4 rounded-2xl font-black text-sm shadow-xl hover:brightness-110 active:scale-98 transition-all cursor-pointer border border-white/20"
             >
-              {submitting ? 'Submitting...' : 'Submit Answers & Save Mental Health Score 🧠🎯'}
+              {submitting ? 'Submitting...' : 'Submit Answers & Save Pink October Score 🎀'}
             </button>
           </form>
         ) : (
-          <div className="bg-emerald-50 border-2 border-emerald-300 p-6 rounded-3xl space-y-3 text-center">
-            <h3 className="text-xl font-black text-emerald-900">Your Score: {calculateScore()} / {getMaxPossibleScore()} Points! 🎉</h3>
-            <p className="text-xs text-emerald-800 font-medium">
-              شكراً لمشاركتك في أسبوع التوعية بالصحة النفسية. تم تسجيل إجابتك وتحديث نقاطك بنجاح.
+          <div className="bg-pink-50 border-2 border-pink-300 p-6 rounded-3xl space-y-3 text-center">
+            <h3 className="text-xl font-black text-pink-900">Your Score: {calculateScore()} / {getMaxPossibleScore()} Points! 🎉</h3>
+            <p className="text-xs text-pink-800 font-medium">
+              شكراً لمشاركتك في أسبوع التوعية بسرطان الثدي. تم تسجيل إجابتك وتحديث نقاطك بنجاح.
             </p>
-            <div className="bg-white/80 p-3 rounded-2xl border border-emerald-200 text-xs text-slate-700 font-bold" dir="rtl">
+            <div className="bg-white/80 p-3 rounded-2xl border border-pink-200 text-xs text-slate-700 font-bold" dir="rtl">
               ⏱️ <span>التحدي اليومي القادم متاح بعد: </span>
-              <span className="text-[#047857] font-black">{timeLeft}</span>
+              <span className="text-[#9d174d] font-black">{timeLeft}</span>
             </div>
           </div>
         )}

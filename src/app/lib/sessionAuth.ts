@@ -5,10 +5,12 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteField, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { isAdminPhone, normalizePhone, phoneToEmail } from './authIdentity';
+import { canonicalPhone, phoneVariants } from './certificatesLookup';
 import { findUserDoc } from './memberAcceptance';
+import { findUserDocsByPhone, isIncompleteUserAccount } from './userAccounts';
 
 function authErrorMessage(err: any) {
   const code = String(err?.code || '');
@@ -25,6 +27,25 @@ function authErrorMessage(err: any) {
     return 'تفعيل الدخول بالبريد غير مفتوح في Firebase. افتح Authentication ثم Email/Password.';
   }
   return err?.message || 'تعذر إتمام العملية. حاول مرة أخرى.';
+}
+
+function phoneAuthCandidates(phone: string) {
+  const raw = normalizePhone(phone);
+  const canonical = canonicalPhone(raw);
+  return Array.from(new Set([raw, canonical, ...phoneVariants(raw)].filter(Boolean)));
+}
+
+function isAuthMiss(err: any) {
+  const code = String(err?.code || '');
+  return (
+    code.includes('invalid-credential') ||
+    code.includes('wrong-password') ||
+    code.includes('user-not-found')
+  );
+}
+
+function isEmailTaken(err: any) {
+  return String(err?.code || '').includes('email-already-in-use');
 }
 
 async function persistSession(phone: string, fullName?: string) {
@@ -56,53 +77,97 @@ async function bootstrapAdmin(phone: string, password: string) {
   }
 }
 
+async function signInAuthWithVariants(phone: string, password: string) {
+  let lastErr: any = null;
+  for (const candidate of phoneAuthCandidates(phone)) {
+    try {
+      await signInWithEmailAndPassword(auth, phoneToEmail(candidate), password);
+      return candidate;
+    } catch (err: any) {
+      lastErr = err;
+      if (!isAuthMiss(err) && !isEmailTaken(err)) throw err;
+    }
+  }
+  throw lastErr || new Error('تعذر تسجيل الدخول.');
+}
+
+async function createAuthWithVariants(phone: string, password: string) {
+  let lastErr: any = null;
+  for (const candidate of phoneAuthCandidates(phone)) {
+    try {
+      await createUserWithEmailAndPassword(auth, phoneToEmail(candidate), password);
+      return candidate;
+    } catch (err: any) {
+      lastErr = err;
+      if (!isEmailTaken(err) && !isAuthMiss(err)) throw err;
+    }
+  }
+  throw lastErr || new Error('تعذر إنشاء الحساب.');
+}
+
+async function finishLogin(profileId: string, profile?: Record<string, any> | null) {
+  const fullName = String(
+    profile?.fullName || (isAdminPhone(profileId) ? 'عبدالعزيز العنزي (المشرف العام)' : 'مستخدم مسجل')
+  );
+  await persistSession(profileId, fullName);
+  const signedIn = Boolean(auth.currentUser);
+  try {
+    await setDoc(
+      doc(db, 'users', profileId),
+      signedIn
+        ? { authMigrated: true, lastActive: Date.now() }
+        : { lastActive: Date.now() },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error(err);
+  }
+  if (signedIn && profile?.password) {
+    await stripLegacyPassword(profileId);
+  }
+  return { phone: profileId, fullName };
+}
+
 export async function loginWithPhonePassword(phone: string, password: string) {
   const cleanPhone = normalizePhone(phone);
-  const email = phoneToEmail(cleanPhone);
 
   try {
-    await signInWithEmailAndPassword(auth, email, password);
+    await signInAuthWithVariants(cleanPhone, password);
   } catch (err: any) {
     if (isAdminPhone(cleanPhone)) {
       await bootstrapAdmin(cleanPhone, password);
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, phoneToEmail(cleanPhone), password);
     } else {
+      const phoneDocs = await findUserDocsByPhone(db, cleanPhone);
       const foundLegacy = await findUserDoc(db, cleanPhone);
-      const legacyPassword = String(foundLegacy?.data?.password || '');
-      if (!foundLegacy) {
+      if (!foundLegacy && phoneDocs.length === 0) {
         throw new Error('رقم الجوال غير مسجل في النظام. يمكنك إنشاء حساب جديد.');
       }
-      if (!legacyPassword) {
+
+      const passwordDoc = phoneDocs.find((item) => String(item.data?.password || '') === password);
+      if (passwordDoc) {
+        try {
+          await createAuthWithVariants(passwordDoc.id, password);
+        } catch (createErr: any) {
+          if (!isEmailTaken(createErr) && !isAuthMiss(createErr)) {
+            throw new Error(authErrorMessage(createErr));
+          }
+        }
+        return finishLogin(passwordDoc.id, passwordDoc.data);
+      }
+
+      const profile = foundLegacy || phoneDocs[0];
+      if (profile && isIncompleteUserAccount(profile.data)) {
         throw new Error('هذا الرقم لم يكمل إنشاء الحساب بعد. استخدم إنشاء حساب جديد.');
       }
-      if (legacyPassword !== password) {
-        throw new Error('كلمة المرور غير صحيحة.');
-      }
-      try {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } catch (createErr: any) {
-        if (String(createErr?.code || '').includes('email-already-in-use')) {
-          throw new Error('كلمة المرور غير صحيحة.');
-        }
-        throw new Error(authErrorMessage(createErr));
-      }
-      await stripLegacyPassword(foundLegacy.id);
+
+      throw new Error('كلمة المرور غير صحيحة.');
     }
   }
 
   const found = await findUserDoc(db, cleanPhone);
-  const profileId = found?.id || cleanPhone;
-  const profile = found?.data;
-  if (profile?.password) {
-    await stripLegacyPassword(profileId);
-  }
-  await persistSession(profileId, String(profile?.fullName || (isAdminPhone(cleanPhone) ? 'عبدالعزيز العنزي (المشرف العام)' : 'مستخدم مسجل')));
-  try {
-    await setDoc(doc(db, 'users', profileId), { authMigrated: true }, { merge: true });
-  } catch (err) {
-    console.error(err);
-  }
-  return { phone: profileId, fullName: String(profile?.fullName || '') };
+  const profileId = found?.id || canonicalPhone(cleanPhone) || cleanPhone;
+  return finishLogin(profileId, found?.data);
 }
 
 export async function registerWithPhonePassword(payload: {
@@ -113,7 +178,6 @@ export async function registerWithPhonePassword(payload: {
   const cleanPhone = normalizePhone(payload.phone);
   const fullName = payload.fullName.trim();
   const password = payload.password;
-  const email = phoneToEmail(cleanPhone);
 
   if (isAdminPhone(cleanPhone)) {
     throw new Error('هذا الرقم محجوز لإدارة النادي. استخدم تسجيل الدخول.');
@@ -122,37 +186,51 @@ export async function registerWithPhonePassword(payload: {
     throw new Error('يجب أن تكون كلمة المرور 6 أحرف أو أرقام على الأقل.');
   }
 
-  const existingSnap = await getDoc(doc(db, 'users', cleanPhone));
-  const existing = existingSnap.data();
-  if (existing?.password) {
-    throw new Error('رقم الجوال مسجل مسبقاً بكلمة مرور. قم بتسجيل الدخول مباشرة.');
+  const existingFound = await findUserDoc(db, cleanPhone);
+  const existing = existingFound?.data;
+  const profileId = existingFound?.id || canonicalPhone(cleanPhone) || cleanPhone;
+
+  if (existing && !isIncompleteUserAccount(existing) && existing.password && existing.password !== password) {
+    throw new Error('رقم الجوال مسجل مسبقاً. إذا نسيتِ كلمة المرور اطلبي إعادة تعيينها من الإدارة.');
+  }
+  if (existing && !isIncompleteUserAccount(existing) && !existing.password) {
+    throw new Error('رقم الجوال مسجل مسبقاً. سجّلي الدخول، وإذا نسيتِ كلمة المرور اطلبي إعادة تعيينها من الإدارة.');
   }
 
   try {
-    await createUserWithEmailAndPassword(auth, email, password);
+    await createAuthWithVariants(profileId, password);
   } catch (err: any) {
-    if (String(err?.code || '').includes('email-already-in-use')) {
-      throw new Error('رقم الجوال مسجل مسبقاً. قم بتسجيل الدخول مباشرة.');
+    if (isEmailTaken(err)) {
+      try {
+        await signInAuthWithVariants(profileId, password);
+      } catch {
+        if (existing?.password && existing.password === password) {
+          return finishLogin(profileId, { ...existing, fullName });
+        }
+        throw new Error('رقم الجوال مسجل مسبقاً. سجّلي الدخول أو اطلبي من الإدارة إعادة تعيين كلمة المرور.');
+      }
+    } else {
+      throw new Error(authErrorMessage(err));
     }
-    throw new Error(authErrorMessage(err));
   }
 
   await setDoc(
-    doc(db, 'users', cleanPhone),
+    doc(db, 'users', profileId),
     {
       ...(existing || {}),
       fullName,
-      phone: cleanPhone,
+      phone: profileId,
       role: existing?.role || 'عضو أساسي',
       createdAt: existing?.createdAt || new Date().toISOString(),
-      authMigrated: true,
-      password: deleteField(),
+      authMigrated: Boolean(auth.currentUser),
+      lastActive: Date.now(),
+      password: auth.currentUser ? deleteField() : password,
     },
     { merge: true }
   );
 
-  await persistSession(cleanPhone, fullName);
-  return { phone: cleanPhone, fullName, claimed: existingSnap.exists() };
+  await persistSession(profileId, fullName);
+  return { phone: profileId, fullName, claimed: Boolean(existingFound) };
 }
 
 export async function logoutSession() {

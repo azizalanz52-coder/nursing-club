@@ -1,11 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Image from "next/image";
 import Link from "next/link";
 import { db } from './../lib/firebase';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { findUserDoc, resolveMemberAcceptance, sameMemberPhone } from '../lib/memberAcceptance';
+import { collection, getDocs } from 'firebase/firestore';
 
 interface BannerItem {
   id: string;
@@ -15,6 +13,8 @@ interface BannerItem {
   image: string;
   buttonText: string;
   buttonLink: string;
+  theme?: 'club' | 'pink-october';
+  cinematic?: boolean;
 }
 
 export default function Hero() {
@@ -30,23 +30,9 @@ export default function Hero() {
     },
   ]);
 
-  const [acceptedData, setAcceptedData] = useState<{ committee: string; whatsapp: string } | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [currentUserPhone, setCurrentUserPhone] = useState<string | null>(null);
-
-  // --- States خاصة بتهنئة الترقية والصلاحيات القيادية ---
-  const [showRoleCongratModal, setShowRoleCongratModal] = useState(false);
-  const [myNewRole, setMyNewRole] = useState('');
-  const [myPermissions, setMyPermissions] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    // التحقق الفوري محلياً هل سبق إغلاق النافذة لعدم تكرارها نهائياً
-    const hasSeenLocal = localStorage.getItem('hasSeenAcceptanceModal');
-    if (hasSeenLocal === 'true') {
-      setShowModal(false);
-    }
-
     const savedBanners = localStorage.getItem('UHB_BANNERS');
     if (savedBanners) {
       try {
@@ -69,10 +55,12 @@ export default function Hero() {
                 id: d.id,
                 tag: dat.tag || 'مناسبة خاصة',
                 title: dat.title || 'نادي التمريض',
-                description: dat.description || 'مجتمع طلابي متميز بجامعة حفر الباطن.',
+                description: dat.description || '',
                 image: dat.image || '/header-banner.png',
-                buttonText: dat.buttonText || 'اكتشف النادي',
-                buttonLink: dat.buttonLink || '/discover'
+                buttonText: dat.buttonText || (dat.theme === 'pink-october' ? 'ابدئي التحدي الوردي' : 'اكتشف النادي'),
+                buttonLink: dat.buttonLink || (dat.theme === 'pink-october' ? '/case-study' : '/discover'),
+                theme: dat.theme === 'pink-october' ? 'pink-october' : 'club',
+                cinematic: Boolean(dat.cinematic),
               });
             });
             if (cloudList.length > 0) {
@@ -85,80 +73,7 @@ export default function Hero() {
       };
       fetchCloudBanners();
     }
-
-    const userPhone = localStorage.getItem('userPhone');
-    const userName = localStorage.getItem('userName');
-    if (userPhone) setCurrentUserPhone(userPhone);
-
-    if (userPhone || userName) {
-      const checkUserData = async () => {
-        try {
-          if (userPhone) {
-            const found = await findUserDoc(db, userPhone);
-            const userDocRef = doc(db, 'users', found?.id || userPhone);
-            const uData = found?.data;
-            if (uData) {
-              if (uData.pendingCongratulation) {
-                setMyNewRole(String(uData.role || 'عضو أساسي'));
-                setMyPermissions(String(uData.assignedPermissions || 'الصلاحيات العامة للنادي.'));
-                setShowRoleCongratModal(true);
-                await updateDoc(userDocRef, { pendingCongratulation: false });
-              }
-
-              if (uData.hasSeenCongrats === true || hasSeenLocal === 'true') {
-                return;
-              }
-
-              const acceptance = await resolveMemberAcceptance(db, userPhone, uData);
-              if (acceptance?.status === 'مقبول') {
-                setAcceptedData({
-                  committee: acceptance.acceptedCommittee || String(uData.firstChoice || 'اللجنة'),
-                  whatsapp: acceptance.whatsappLink || String(uData.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP')
-                });
-                setShowModal(true);
-                return;
-              }
-            }
-          }
-
-          if (hasSeenLocal !== 'true' && userPhone) {
-            const querySnapshot = await getDocs(collection(db, 'applications'));
-            querySnapshot.forEach((docSnap) => {
-              const data = docSnap.data();
-              if (sameMemberPhone(data.phone, userPhone) || (userName && data.fullName === userName)) {
-                if (String(data.status || '').includes('مقبول')) {
-                  setAcceptedData({
-                    committee: data.acceptedCommittee || data.firstChoice || 'اللجنة',
-                    whatsapp: data.whatsappLink || 'https://chat.whatsapp.com/JQGv9ut56D2LJ2i2mIdxLP'
-                  });
-                  setShowModal(true);
-                }
-              }
-            });
-          }
-
-        } catch (err) {
-          console.error('Error checking user acceptance or role update:', err);
-        }
-      };
-
-      checkUserData();
-    }
   }, []);
-
-  const handleCloseAcceptanceModal = async () => {
-    setShowModal(false);
-    localStorage.setItem('hasSeenAcceptanceModal', 'true');
-
-    const phone = currentUserPhone || localStorage.getItem('userPhone');
-    if (!phone) return;
-    try {
-      const userDocRef = doc(db, 'users', phone);
-      await updateDoc(userDocRef, { hasSeenCongrats: true });
-    } catch (err) {
-      console.error('Error updating hasSeenCongrats in cloud:', err);
-    }
-  };
 
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -169,30 +84,58 @@ export default function Hero() {
   }, [banners.length]);
 
   const currentBanner = banners[currentIndex] || banners[0];
+  const isPink = currentBanner.theme === 'pink-october';
+  const cinematic = currentBanner.cinematic === true;
+  const heroCtaHref = currentBanner.buttonLink || (isPink ? '/case-study' : '/discover');
+  const heroCtaLabel = currentBanner.buttonText || (isPink ? 'ابدئي التحدي الوردي' : 'اكتشف النادي');
 
   return (
     <section 
-      className="relative min-h-[92vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#3b020b] via-[#630517] to-[#4a030f] px-4 sm:px-6 lg:px-8 text-white pt-36 pb-20"
+      className={`relative min-h-[92vh] flex items-center justify-center overflow-hidden px-4 sm:px-6 lg:px-8 text-white pb-16 ${
+        cinematic ? 'pt-28' : 'pt-36 pb-20'
+      } ${
+        isPink
+          ? 'bg-gradient-to-br from-[#4a0326] via-[#9d174d] to-[#be185d]'
+          : 'bg-gradient-to-br from-[#3b020b] via-[#630517] to-[#4a030f]'
+      }`}
       dir="rtl"
     >
       <div className="absolute inset-0 opacity-10 bg-[url('/grid.svg')] bg-center pointer-events-none mix-blend-overlay" />
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-[#F5D061]/10 rounded-full blur-[160px] pointer-events-none" />
+      <div
+        className={`absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] rounded-full blur-[160px] pointer-events-none ${
+          isPink ? 'bg-pink-300/25' : 'bg-[#F5D061]/10'
+        }`}
+      />
+      {isPink && (
+        <div className="absolute bottom-10 right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+      )}
 
-      <div className="relative z-10 max-w-5xl mx-auto text-center flex flex-col items-center justify-center space-y-8">
+      <div className={`relative z-10 mx-auto text-center flex flex-col items-center justify-center ${cinematic ? 'max-w-6xl space-y-6' : 'max-w-5xl space-y-8'}`}>
         
-        <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/10 backdrop-blur-xl border border-[#F5D061]/30 text-[#F5D061] text-xs sm:text-sm font-bold tracking-wider uppercase shadow-sm">
-          <span>✨ {currentBanner.tag}</span>
-        </div>
+        {!cinematic && (
+          <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/10 backdrop-blur-xl text-xs sm:text-sm font-bold tracking-wider uppercase shadow-sm border ${
+            isPink ? 'border-white/40 text-pink-100' : 'border-[#F5D061]/30 text-[#F5D061]'
+          }`}>
+            <span>{isPink ? '🎀' : '✨'} {currentBanner.tag}</span>
+          </div>
+        )}
 
-        <div className="space-y-3">
-          <h1 className="text-4xl sm:text-7xl font-black text-white drop-shadow-md transition-all duration-700">
-            {currentBanner.title}
-          </h1>
-        </div>
+        {!cinematic && (
+          <div className="space-y-3">
+            <h1 className="text-4xl sm:text-7xl font-black text-white drop-shadow-md transition-all duration-700">
+              {currentBanner.title}
+            </h1>
+          </div>
+        )}
 
-        {/* حاوية متكيفة تلقائياً بدون إطار أسود/أحمر وبدون اقتطاع لأي مقاس صورة */}
-        <div className="relative w-full max-w-4xl mx-auto rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl border-2 border-[#F5D061]/30 group transition-all duration-500 hover:border-[#F5D061]/70">
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-40 transition-opacity pointer-events-none z-10" />
+        <div
+          className={`relative w-full mx-auto overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.45)] group transition-all duration-500 ${
+            cinematic
+              ? 'max-w-6xl rounded-[1.25rem] sm:rounded-[2rem] border border-white/15'
+              : `max-w-4xl rounded-[1.5rem] sm:rounded-[2.5rem] border-2 ${isPink ? 'border-pink-200/40 hover:border-pink-100/80' : 'border-[#F5D061]/30 hover:border-[#F5D061]/70'}`
+          }`}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60 pointer-events-none z-10" />
 
           {currentBanner.image?.startsWith('data:video') || currentBanner.image?.includes('.mp4') ? (
             <video 
@@ -201,38 +144,60 @@ export default function Hero() {
               loop 
               muted 
               playsInline
-              className="w-full h-auto block object-cover max-h-[75vh] mx-auto" 
+              className={`w-full h-auto block object-cover mx-auto ${cinematic ? 'max-h-[82vh]' : 'max-h-[75vh]'}`}
             />
           ) : (
             <img
               src={currentBanner.image || '/header-banner.png'} 
               alt={currentBanner.title || "بانر نادي التمريض"}
-              className="w-full h-auto block object-cover max-h-[75vh] mx-auto transition-transform duration-700 group-hover:scale-[1.01]"
+              className={`w-full h-auto block object-cover mx-auto transition-transform duration-700 group-hover:scale-[1.015] ${cinematic ? 'max-h-[82vh]' : 'max-h-[75vh]'}`}
             />
+          )}
+
+          {cinematic && (
+            <div className="absolute bottom-4 right-4 left-4 z-20 flex flex-wrap items-end justify-between gap-3 text-right" dir="rtl">
+              <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/35 backdrop-blur-md text-[11px] font-black tracking-wide ${
+                isPink ? 'text-pink-100 border border-white/20' : 'text-[#F5D061] border border-[#F5D061]/30'
+              }`}>
+                {isPink ? '🎀' : '✨'} {currentBanner.tag}
+              </span>
+            </div>
           )}
         </div>
 
-        <p className="max-w-2xl mx-auto text-base sm:text-lg text-amber-50/90 leading-relaxed text-center font-medium px-6 py-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-inner">
-          {currentBanner.description}
-        </p>
+        {currentBanner.description ? (
+          <p className={`max-w-2xl mx-auto text-base sm:text-lg leading-relaxed text-center font-medium px-6 py-4 backdrop-blur-md rounded-2xl border shadow-inner ${
+            isPink
+              ? 'text-pink-50 bg-white/10 border-white/15'
+              : 'text-amber-50/90 bg-white/5 border-white/10'
+          }`}>
+            {currentBanner.description}
+          </p>
+        ) : null}
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-5 w-full sm:w-auto pt-2">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-5 w-full sm:w-auto pt-1">
           <Link
-            href={currentBanner.buttonLink || '/discover'}
-            className="w-full sm:w-auto bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#3b020b] px-10 py-3.5 rounded-2xl font-black hover:brightness-110 active:scale-95 transition-all duration-300 shadow-lg text-base text-center border border-white/30"
+            href={heroCtaHref}
+            className={`w-full sm:w-auto px-10 py-3.5 rounded-2xl font-black hover:brightness-110 active:scale-95 transition-all duration-300 shadow-lg text-base text-center border ${
+              isPink
+                ? 'bg-white text-[#9d174d] border-white/40'
+                : 'bg-gradient-to-r from-[#F5D061] via-[#E2B739] to-[#C99C21] text-[#3b020b] border-white/30'
+            }`}
           >
-            {currentBanner.buttonText || 'اكتشف النادي'}
+            {heroCtaLabel}
           </Link>
         </div>
 
         {banners.length > 1 && (
-          <div className="flex items-center justify-center gap-2.5 pt-4 bg-black/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/10">
+          <div className="flex items-center justify-center gap-2.5 pt-2 bg-black/20 backdrop-blur-md px-5 py-2 rounded-full border border-white/10">
             {banners.map((b, idx) => (
               <button
                 key={b.id}
                 onClick={() => setCurrentIndex(idx)}
                 className={`h-2.5 rounded-full transition-all duration-500 cursor-pointer ${
-                  currentIndex === idx ? 'w-8 bg-[#F5D061]' : 'w-2.5 bg-white/40 hover:bg-white/80'
+                  currentIndex === idx
+                    ? isPink ? 'w-8 bg-white' : 'w-8 bg-[#F5D061]'
+                    : 'w-2.5 bg-white/40 hover:bg-white/80'
                 }`}
                 title={b.tag}
               />
@@ -241,81 +206,6 @@ export default function Hero() {
         )}
 
       </div>
-
-      {/* --- نافذة تهنئة الترقية القيادية والصلاحيات --- */}
-      {showRoleCongratModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-300" dir="rtl">
-          <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 text-center border-4 border-[#F5D061] animate-in zoom-in-95 duration-300 text-slate-900">
-            <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-lg font-black">
-              🎉
-            </div>
-            
-            <div className="space-y-2">
-              <h2 className="text-2xl font-black text-slate-900">مبارك لك الثقة القيادية!</h2>
-              <p className="text-xs text-slate-500">تم ترقيتك رسمياً في نادي كلية التمريض - جامعة حفر الباطن</p>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
-              <span className="text-xs text-slate-400 font-bold block">رتبتك القيادية الجديدة:</span>
-              <span className="text-lg font-black text-[#630517] bg-[#F5D061]/20 px-4 py-1.5 rounded-xl inline-block" dir="ltr">
-                {myNewRole}
-              </span>
-            </div>
-
-            <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200 text-right space-y-1">
-              <h4 className="text-xs font-black text-amber-900">📜 صلاحياتك ومهامك القيادية المعتمدة:</h4>
-              <p className="text-xs text-slate-700 leading-relaxed">{myPermissions}</p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowRoleCongratModal(false)}
-              className="w-full py-3.5 bg-[#630517] text-[#F5D061] rounded-2xl font-black text-sm shadow-lg hover:brightness-110 transition-all cursor-pointer"
-            >
-              بدء مهام العمل القيادي 🚀
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* نافذة التهنئة بالقبول */}
-      {showModal && acceptedData && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-300" dir="rtl">
-          <div className="bg-gradient-to-br from-[#F5D061] via-[#dfb64d] to-[#630517] rounded-[32px] p-8 max-w-md w-full shadow-2xl text-center space-y-6 border-2 border-[#F5D061] relative text-slate-900">
-            
-            <div className="w-20 h-20 bg-[#630517] text-[#F5D061] rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl border-4 border-white/20">
-              🎉
-            </div>
-
-            <div className="space-y-2">
-              <h3 className="text-2xl font-black text-rose-950">مبروك تم قبولك!</h3>
-              <p className="text-xs font-bold text-slate-800 leading-relaxed">
-                يسعدنا انضمامك إلى <span className="text-[#630517] font-black underline">{acceptedData.committee}</span> في نادي التمريض 🌟
-              </p>
-            </div>
-
-            <div className="pt-2">
-              <a
-                href={acceptedData.whatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 px-6 rounded-2xl shadow-xl transition-all text-xs"
-              >
-                <span>💬</span>
-                <span>الانضمام إلى قروب اللجنة عبر واتساب</span>
-              </a>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleCloseAcceptanceModal}
-              className="text-xs font-extrabold text-rose-950 hover:text-rose-900 underline cursor-pointer pt-1 block mx-auto"
-            >
-              إغلاق النافذة ✕
-            </button>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

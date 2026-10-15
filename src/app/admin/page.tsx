@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot } from 'firebase/firestore';
-import { isIncompleteUserAccount, notifyCommitteeByKeyword } from '../lib/userAccounts';
+import { isIncompleteUserAccount, notifyCommitteeByKeyword, setUserPasswordOnPhone } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
-import { certMediaFields, filterFilesWithinLimit, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { certMediaFields, filterFilesWithinLimit, isOverUploadLimit, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { clubConfirm, inferNoticeKind } from '../lib/clubNotice';
 import { ClubNoticeDialog } from '../components/ClubNotice';
 import HrCertificateBatches from '../components/HrCertificateBatches';
@@ -52,6 +52,9 @@ interface BannerItem {
   image: string;
   buttonText: string;
   buttonLink: string;
+  description?: string;
+  theme?: 'club' | 'pink-october';
+  cinematic?: boolean;
 }
 
 interface PartnerItem {
@@ -60,6 +63,8 @@ interface PartnerItem {
   category: string;
   logo: string;
   websiteUrl?: string;
+  offerType?: string;
+  offerCode?: string;
 }
 
 interface SuggestionItem {
@@ -1298,7 +1303,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [bannerTag, setBannerTag] = useState<string>('');
   const [bannerTitle, setBannerTitle] = useState<string>('');
-  const [bannerImage, setBannerImage] = useState<string>('/header-banner.png');
+  const [bannerDescription, setBannerDescription] = useState<string>('');
+  const [bannerTheme, setBannerTheme] = useState<'club' | 'pink-october'>('pink-october');
+  const [bannerCinematic, setBannerCinematic] = useState(true);
+  const [bannerButtonText, setBannerButtonText] = useState<string>('');
+  const [bannerButtonLink, setBannerButtonLink] = useState<string>('');
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const [bannerUploadProgress, setBannerUploadProgress] = useState(0);
 
   const [partners, setPartners] = useState<PartnerItem[]>([]);
   const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
@@ -1306,6 +1318,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const [partnerCategory, setPartnerCategory] = useState<string>('شريك إستراتيجي');
   const [partnerLogo, setPartnerLogo] = useState<string>('/logo.png');
   const [partnerWebsiteUrl, setPartnerWebsiteUrl] = useState<string>('');
+  const [partnerOfferType, setPartnerOfferType] = useState<string>('');
+  const [partnerOfferCode, setPartnerOfferCode] = useState<string>('');
 
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [requests, setRequests] = useState<Record<string, any>[]>([]);
@@ -1513,10 +1527,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     if (!modalInputVal.trim()) return;
 
     try {
-      const userRef = doc(db, 'users', activeUserPhoneForAction);
-      await updateDoc(userRef, { password: modalInputVal.trim() });
+      await setUserPasswordOnPhone(db, activeUserPhoneForAction, modalInputVal.trim());
       setUsersList(usersList.map(u => u.phone === activeUserPhoneForAction ? { ...u, password: modalInputVal.trim() } : u));
-      setModalMessage('تم تحديث كلمة المرور بنجاح سحابياً! 🔒');
+      setModalMessage('تم تحديث كلمة المرور. تقدر تدخل فيها مباشرة من تسجيل الدخول.');
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -2057,27 +2070,59 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
   const handleAddBanner = async (e: FormEvent) => {
     e.preventDefault();
-    if (!bannerTitle.trim()) return;
-    const bannerId = Date.now().toString();
-    const newBanner: BannerItem = {
-      id: bannerId,
-      tag: bannerTag || 'مناسبة خاصة',
-      title: bannerTitle,
-      image: bannerImage,
-      buttonText: 'اكتشف النادي',
-      buttonLink: '/discover'
-    };
+    if (!bannerTitle.trim()) {
+      setModalMessage('أدخل عنوان البانر أولاً.');
+      setModalType('success');
+      return;
+    }
+    if (!bannerFile) {
+      setModalMessage('اختر صورة أو فيديو البانر أولاً.');
+      setModalType('success');
+      return;
+    }
+    if (isOverUploadLimit(bannerFile)) {
+      setModalMessage(uploadLimitMessage());
+      setModalType('success');
+      return;
+    }
 
+    setBannerUploading(true);
+    setBannerUploadProgress(0);
     try {
+      const image = await uploadClubFile(bannerFile, 'banners', setBannerUploadProgress);
+      const bannerId = Date.now().toString();
+      const isPink = bannerTheme === 'pink-october';
+      const newBanner: BannerItem = {
+        id: bannerId,
+        tag: bannerTag.trim() || (isPink ? 'Pink October' : 'مناسبة خاصة'),
+        title: bannerTitle.trim(),
+        image,
+        description: bannerDescription.trim(),
+        theme: bannerTheme,
+        cinematic: bannerCinematic,
+        buttonText: bannerButtonText.trim() || (isPink ? 'ابدئي التحدي الوردي' : 'اكتشف النادي'),
+        buttonLink: bannerButtonLink.trim() || (isPink ? '/case-study' : '/discover'),
+      };
+
       await setDoc(doc(db, 'site_banners', bannerId), newBanner);
       setBanners([newBanner, ...banners]);
       setBannerTag('');
       setBannerTitle('');
-      setBannerImage('/header-banner.png');
-      setModalMessage('تم إضافة وتفعيل البانر بنجاح سحابياً! 🖼️');
+      setBannerDescription('');
+      setBannerTheme('pink-october');
+      setBannerCinematic(true);
+      setBannerButtonText('');
+      setBannerButtonLink('');
+      setBannerFile(null);
+      setModalMessage('تم إضافة وتفعيل البانر بنجاح.');
       setModalType('success');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setModalMessage(err?.message || 'تعذر حفظ البانر. صغّر الملف ثم أعد المحاولة.');
+      setModalType('success');
+    } finally {
+      setBannerUploading(false);
+      setBannerUploadProgress(0);
     }
   };
 
@@ -2103,7 +2148,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       name: partnerName.trim(),
       category: partnerCategory,
       logo: partnerLogo,
-      websiteUrl: partnerWebsiteUrl.trim()
+      websiteUrl: partnerWebsiteUrl.trim(),
+      offerType: partnerOfferType.trim(),
+      offerCode: partnerOfferCode.trim().toUpperCase(),
     };
 
     try {
@@ -2120,6 +2167,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       setPartnerCategory('شريك إستراتيجي');
       setPartnerLogo('/logo.png');
       setPartnerWebsiteUrl('');
+      setPartnerOfferType('');
+      setPartnerOfferCode('');
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -2134,6 +2183,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     setPartnerCategory(p.category || 'شريك إستراتيجي');
     setPartnerLogo(p.logo || '/logo.png');
     setPartnerWebsiteUrl(p.websiteUrl || '');
+    setPartnerOfferType(p.offerType || '');
+    setPartnerOfferCode(p.offerCode || '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -2524,7 +2575,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             type="button"
             onClick={() => setActiveTab('case-study')}
             className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
-              activeTab === 'case-study' ? 'bg-emerald-700 text-white shadow-md scale-105' : 'bg-emerald-50 text-emerald-900 border border-emerald-200 hover:bg-emerald-100'
+              activeTab === 'case-study' ? 'bg-[#9d174d] text-white shadow-md scale-105' : 'bg-pink-50 text-pink-900 border border-pink-200 hover:bg-pink-100'
             }`}
           >
             🩺 دراسة الحالة ({caseSubmissions.length})
@@ -3171,13 +3222,13 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         )}
 
         {activeTab === 'case-study' && (
-          <div className="bg-white rounded-3xl p-8 border border-emerald-300 shadow-sm space-y-6">
+          <div className="bg-white rounded-3xl p-8 border border-pink-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-emerald-900">🩺 دراسة الحالة والطلاب المتفاعلون (Case Study Submissions)</h3>
-                <p className="text-xs text-slate-500">متابعة أسماء الطلاب المتفاعلين (تُجلب تلقائياً من الحسابات)، درجاتهم أو نقاطهم، وأرقام جوالاتهم.</p>
+                <h3 className="text-xl font-black text-pink-900">🎀 دراسة الحالة — أسبوع سرطان الثدي</h3>
+                <p className="text-xs text-slate-500">متابعة المشاركين في تحدي Pink October، درجاتهم، وأرقام جوالاتهم.</p>
               </div>
-              <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
+              <span className="px-3 py-1 rounded-full bg-pink-100 text-pink-800 font-bold text-xs">
                 إجمالي المشاركات: {caseSubmissions.length}
               </span>
             </div>
@@ -3217,7 +3268,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                             📞 {userPhone || 'غير متوفر'}
                           </td>
                           <td className="py-4">
-                            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs font-mono">
+                            <span className="px-3 py-1 rounded-full bg-pink-100 text-pink-800 font-bold text-xs font-mono">
                               ⭐ {sub.score || 0} نقطة
                             </span>
                           </td>
@@ -4690,14 +4741,17 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         {activeTab === 'banners' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">إضافة بانر رئيسي جديد (سحابي)</h3>
+              <div className="space-y-1">
+                <h3 className="text-xl font-black text-slate-900">إضافة بانر رئيسي جديد (سحابي)</h3>
+                <p className="text-xs text-slate-500 font-medium">ارفع تصميمك، واختر الهوية حتى الواجهة تستقبله بانبهار بدل إطار النادي الاعتيادي.</p>
+              </div>
               
               <form onSubmit={handleAddBanner} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600">نص الشارة العلوية</label>
                   <input
                     type="text"
-                    placeholder="مثال: مناسبة خاصة"
+                    placeholder="مثال: Pink October"
                     value={bannerTag}
                     onChange={(e) => setBannerTag(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
@@ -4708,10 +4762,87 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                   <label className="text-xs font-bold text-slate-600">عنوان البانر الرئيسي</label>
                   <input
                     type="text"
-                    placeholder="مثال: نادي التمريض"
+                    placeholder="مثال: أسبوع سرطان الثدي"
                     value={bannerTitle}
                     onChange={(e) => setBannerTitle(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-600">هوية العرض في الصفحة الرئيسية</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setBannerTheme('pink-october')}
+                      className={`rounded-2xl border-2 p-4 text-right transition-all cursor-pointer ${
+                        bannerTheme === 'pink-october'
+                          ? 'border-pink-500 bg-pink-50 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-pink-200'
+                      }`}
+                    >
+                      <p className="text-sm font-black text-pink-800">🎀 أسبوع سرطان الثدي</p>
+                      <p className="text-[11px] text-pink-700/80 mt-1 leading-relaxed">خلفية وردية، الزر يفتح دراسة الحالة، والتصميم يأخذ الواجهة.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBannerTheme('club')}
+                      className={`rounded-2xl border-2 p-4 text-right transition-all cursor-pointer ${
+                        bannerTheme === 'club'
+                          ? 'border-[#630517] bg-rose-50 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-rose-200'
+                      }`}
+                    >
+                      <p className="text-sm font-black text-[#630517]">نادي التمريض</p>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">الهوية البورغندي والذهبي الاعتيادية للترحيب العام.</p>
+                    </button>
+                  </div>
+                </div>
+
+                <label className="sm:col-span-2 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={bannerCinematic}
+                    onChange={(e) => setBannerCinematic(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-[#9d174d]"
+                  />
+                  <span>
+                    <span className="block text-xs font-black text-slate-800">عرض بانورامي يملأ الشاشة</span>
+                    <span className="block text-[11px] text-slate-500 mt-0.5 leading-relaxed">موصى به لتصاميمك الجاهزة: الصورة هي البطلة، بدون عنوان ضخم فوقها يكرر النص.</span>
+                  </span>
+                </label>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-600">نص تحت البانر (اختياري)</label>
+                  <textarea
+                    rows={2}
+                    placeholder="مثال: الكشف المبكر ينقذ الأرواح — انضمي لتحدي دراسة الحالة الوردي"
+                    value={bannerDescription}
+                    onChange={(e) => setBannerDescription(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517] resize-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600">نص الزر (اختياري)</label>
+                  <input
+                    type="text"
+                    placeholder={bannerTheme === 'pink-october' ? 'ابدئي التحدي الوردي' : 'اكتشف النادي'}
+                    value={bannerButtonText}
+                    onChange={(e) => setBannerButtonText(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600">رابط الزر (اختياري)</label>
+                  <input
+                    type="text"
+                    placeholder={bannerTheme === 'pink-october' ? '/case-study' : '/discover'}
+                    value={bannerButtonLink}
+                    onChange={(e) => setBannerButtonLink(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                    dir="ltr"
                   />
                 </div>
 
@@ -4720,11 +4851,16 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                   <input
                     type="file"
                     accept="image/*,video/*"
-                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const fileUrl = await convertFileToBase64(e.target.files[0]);
-                        setBannerImage(fileUrl);
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                      const file = e.target.files?.[0] || null;
+                      if (file && isOverUploadLimit(file)) {
+                        setBannerFile(null);
+                        setModalMessage(uploadLimitMessage());
+                        setModalType('success');
+                        e.target.value = '';
+                        return;
                       }
+                      setBannerFile(file);
                     }}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
@@ -4733,9 +4869,10 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 <div className="sm:col-span-2">
                   <button
                     type="submit"
-                    className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 transition-all cursor-pointer"
+                    disabled={bannerUploading}
+                    className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-bold text-xs shadow hover:brightness-110 transition-all cursor-pointer disabled:opacity-50"
                   >
-                    + إضافة وتفعيل البانر سحابياً
+                    {uploadingLabel(bannerUploading, bannerUploadProgress, '+ إضافة وتفعيل البانر سحابياً')}
                   </button>
                 </div>
               </form>
@@ -4749,6 +4886,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     <tr className="border-b border-slate-200 text-slate-400 font-bold">
                       <th className="pb-3 pr-2">الشارة</th>
                       <th className="pb-3">العنوان</th>
+                      <th className="pb-3">الهوية</th>
                       <th className="pb-3 text-left pl-2">الإجراء</th>
                     </tr>
                   </thead>
@@ -4757,6 +4895,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                       <tr key={ban.id} className="hover:bg-slate-50">
                         <td className="py-4 pr-2 font-bold text-[#630517]">{ban.tag}</td>
                         <td className="py-4 text-slate-900 font-extrabold">{ban.title}</td>
+                        <td className="py-4">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                            ban.theme === 'pink-october' ? 'bg-pink-100 text-pink-800' : 'bg-rose-50 text-[#630517]'
+                          }`}>
+                            {ban.theme === 'pink-october' ? 'وردي' : 'النادي'}
+                            {ban.cinematic !== false ? ' · بانوراما' : ''}
+                          </span>
+                        </td>
                         <td className="py-4 text-left pl-2">
                           <button
                             type="button"
@@ -4794,6 +4940,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                       setPartnerCategory('شريك إستراتيجي');
                       setPartnerLogo('/logo.png');
                       setPartnerWebsiteUrl('');
+                      setPartnerOfferType('');
+                      setPartnerOfferCode('');
                     }}
                     className="text-xs text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-xl hover:bg-red-100"
                   >
@@ -4828,6 +4976,29 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     <option value="راعي برونزي">راعي برونزي 🥉</option>
                     <option value="جهة داعمة">جهة داعمة 💎</option>
                   </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600">نوع الخصم أو العرض</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: خصم 20% لطلاب النادي"
+                    value={partnerOfferType}
+                    onChange={(e) => setPartnerOfferType(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600">كود الخصم (اختياري)</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: NURS20"
+                    value={partnerOfferCode}
+                    onChange={(e) => setPartnerOfferCode(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 font-mono focus:outline-none focus:border-[#630517]"
+                    dir="ltr"
+                  />
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
@@ -4886,6 +5057,13 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                           <span className="text-[10px] text-[#630517] font-bold bg-[#630517]/10 px-2 py-0.5 rounded-md mt-1 inline-block">{p.category}</span>
                         </div>
                       </div>
+
+                      {(p.offerType || p.offerCode) && (
+                        <div className="text-[10px] space-y-1 bg-white rounded-xl p-2 border border-[#630517]/10">
+                          {p.offerType && <p className="font-bold text-[#630517]">{p.offerType}</p>}
+                          {p.offerCode && <p className="font-mono text-slate-700" dir="ltr">كود: {p.offerCode}</p>}
+                        </div>
+                      )}
 
                       {p.websiteUrl && (
                         <a 

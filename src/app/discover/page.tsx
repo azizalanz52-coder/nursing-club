@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
@@ -48,8 +48,8 @@ const DEFAULT_DISCOVER_EVENTS = [
 ];
 
 const DEFAULT_PARTNERS = [
-  { id: '1', name: 'وبل', category: 'شريك إستراتيجي', logo: '/wabal.png', websiteUrl: '' },
-  { id: '2', name: 'كوفي غاء', category: 'شريك إستراتيجي', logo: '/ghaa.png', websiteUrl: '' }
+  { id: '1', name: 'وبل', category: 'شريك إستراتيجي', logo: '/wabal.png', websiteUrl: '', offerType: '', offerCode: '' },
+  { id: '2', name: 'كوفي غاء', category: 'شريك إستراتيجي', logo: '/ghaa.png', websiteUrl: '', offerType: '', offerCode: '' }
 ];
 
 interface StudentAchievement {
@@ -68,6 +68,46 @@ interface PartnerItem {
   category: string;
   logo: string;
   websiteUrl?: string;
+  offerType?: string;
+  offerCode?: string;
+}
+
+function Reveal({
+  children,
+  className = '',
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setShown(true);
+        io.disconnect();
+      },
+      { threshold: 0.14, rootMargin: '0px 0px -48px 0px' }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={`discover-reveal ${shown ? 'is-in' : ''} ${className}`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
 }
 
 export default function DiscoverPage() {
@@ -77,6 +117,7 @@ export default function DiscoverPage() {
   const [partners, setPartners] = useState<PartnerItem[]>(DEFAULT_PARTNERS);
   const [studentAchievements, setStudentAchievements] = useState<StudentAchievement[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+  const [copiedCode, setCopiedCode] = useState('');
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -123,7 +164,6 @@ export default function DiscoverPage() {
 
   const activeSlide = passionSlides[currentSlide] || passionSlides[0];
 
-  // دالة تحديد الأولوية الهرمية للرعاة
   const getCategoryPriority = (category: string = '') => {
     const cat = category.trim();
     if (cat.includes('إستراتيجي') || cat.includes('استراتيجي') || cat.includes('ماسي')) return 1;
@@ -141,97 +181,131 @@ export default function DiscoverPage() {
   const silverPartners = sortedPartners.filter((p) => getCategoryPriority(p.category) === 3);
   const bronzeAndOthers = sortedPartners.filter((p) => getCategoryPriority(p.category) >= 4);
 
-  const renderPartnerCard = (partner: PartnerItem) => {
+  const copyOfferCode = async (code: string, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      window.setTimeout(() => setCopiedCode(''), 1600);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const renderPartnerCard = (partner: PartnerItem, delay = 0) => {
     const isGoldOrStrategic = partner.category?.includes('ذهبي') || partner.category?.includes('إستراتيجي') || partner.category?.includes('استراتيجي') || partner.category?.includes('ماسي');
     const isSilver = partner.category?.includes('فضي');
     const isBronze = partner.category?.includes('برونزي');
+    const offerType = String(partner.offerType || '').trim();
+    const offerCode = String(partner.offerCode || '').trim();
 
-    const badgeColorClass = isGoldOrStrategic 
-      ? 'text-amber-700 font-black' 
-      : isSilver 
-      ? 'text-slate-600 font-extrabold' 
-      : isBronze 
-      ? 'text-amber-900 font-bold' 
+    const badgeColorClass = isGoldOrStrategic
+      ? 'text-amber-700 font-black'
+      : isSilver
+      ? 'text-slate-600 font-extrabold'
+      : isBronze
+      ? 'text-amber-900 font-bold'
       : 'text-[#630517] font-bold';
 
     const partnerContent = (
-      <div 
-        className={`p-6 rounded-3xl bg-slate-50 border shadow-md flex flex-col items-center justify-center w-60 h-52 hover:border-[#630517] hover:scale-105 transition-all overflow-hidden space-y-3 group cursor-pointer ${
-          isGoldOrStrategic ? 'border-amber-300 bg-gradient-to-b from-amber-50/50 to-slate-50 shadow-lg' : 'border-slate-200'
+      <div
+        className={`relative p-6 rounded-[1.75rem] border shadow-md flex flex-col items-center justify-between w-64 min-h-64 overflow-hidden space-y-3 group cursor-pointer ${
+          isGoldOrStrategic
+            ? 'discover-shine border-amber-300 bg-gradient-to-b from-amber-50 to-white shadow-amber-200/70'
+            : 'bg-white border-slate-200'
         }`}
       >
-        <div className="w-28 h-28 bg-white rounded-2xl p-2.5 shadow-inner flex items-center justify-center overflow-hidden border border-slate-100">
-          <img 
-            src={partner.logo && partner.logo.trim() !== '' ? partner.logo : '/logo.png'} 
-            alt={partner.name} 
+        <div className="w-24 h-24 bg-white rounded-2xl p-2.5 shadow-inner flex items-center justify-center overflow-hidden border border-slate-100">
+          <img
+            src={partner.logo && partner.logo.trim() !== '' ? partner.logo : '/logo.png'}
+            alt={partner.name}
             className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
             onError={(e) => {
               (e.target as HTMLImageElement).src = '/logo.png';
             }}
           />
         </div>
-        <div>
-          <h4 className="font-extrabold text-slate-900 text-sm truncate max-w-[180px]">{partner.name}</h4>
+        <div className="space-y-1">
+          <h4 className="font-extrabold text-slate-900 text-sm truncate max-w-[200px]">{partner.name}</h4>
           <span className={`text-xs ${badgeColorClass}`}>{partner.category || 'شريك إستراتيجي'}</span>
         </div>
+        {(offerType || offerCode) && (
+          <div className="w-full space-y-1.5 pt-1 border-t border-slate-100">
+            {offerType && (
+              <p className="text-[11px] font-black text-[#630517] bg-[#630517]/10 rounded-xl px-2.5 py-1.5">
+                {offerType}
+              </p>
+            )}
+            {offerCode && (
+              <button
+                type="button"
+                onClick={(event) => copyOfferCode(offerCode, event)}
+                className="w-full text-[11px] font-mono font-black tracking-wide bg-slate-900 text-[#F5D061] rounded-xl px-2.5 py-1.5 cursor-pointer hover:brightness-110"
+                dir="ltr"
+                title="نسخ الكود"
+              >
+                {copiedCode === offerCode ? 'تم النسخ' : offerCode}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
 
-    return partner.websiteUrl ? (
-      <a
-        key={partner.id || partner.name}
-        href={partner.websiteUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block transition-transform"
-        title={`زيارة صفحة أو موقع ${partner.name}`}
-      >
-        {partnerContent}
-      </a>
-    ) : (
-      <div key={partner.id || partner.name}>
-        {partnerContent}
-      </div>
+    return (
+      <Reveal key={partner.id || partner.name} delay={delay}>
+        {partner.websiteUrl ? (
+          <a
+            href={partner.websiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block"
+            title={`زيارة صفحة أو موقع ${partner.name}`}
+          >
+            {partnerContent}
+          </a>
+        ) : (
+          <div>{partnerContent}</div>
+        )}
+      </Reveal>
     );
   };
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
-      
-      <div className="py-14 bg-white border-b border-slate-200 text-center px-4 shadow-sm">
-        <span className="inline-block px-4 py-1.5 rounded-full bg-[#630517]/10 border border-[#630517]/20 text-[#630517] text-xs font-extrabold tracking-widest uppercase mb-3">
-          استكشف عالمنا
-        </span>
-        <h1 className="text-4xl sm:text-5xl font-black text-slate-900">عن نادي التمريض</h1>
-        <p className="text-slate-600 text-sm sm:text-base mt-2">تعرف على رؤيتنا، أنشطتنا، وشركاء النجاح</p>
+      <div className="py-14 bg-white border-b border-slate-200 text-center px-4 shadow-sm overflow-hidden">
+        <Reveal>
+          <span className="inline-block px-4 py-1.5 rounded-full bg-[#630517]/10 border border-[#630517]/20 text-[#630517] text-xs font-extrabold tracking-widest uppercase mb-3">
+            استكشف عالمنا
+          </span>
+          <h1 className="text-4xl sm:text-5xl font-black text-slate-900">عن نادي التمريض</h1>
+          <p className="text-slate-600 text-sm sm:text-base mt-2">تعرف على رؤيتنا، أنشطتنا، وشركاء النجاح</p>
+        </Reveal>
       </div>
 
-      <section className="py-12 bg-[#630517] text-white border-b border-[#F5D061]/20 shadow-md">
+      <section className="py-12 bg-[#630517] text-white border-b border-[#F5D061]/20 shadow-md overflow-hidden">
         <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          <div className="space-y-2">
-            <h3 className="text-4xl sm:text-5xl font-black text-[#F5D061]">200+</h3>
-            <p className="text-amber-50/90 text-sm sm:text-base font-bold">عضو </p>
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-4xl sm:text-5xl font-black text-[#F5D061]">15+</h3>
-            <p className="text-amber-50/90 text-sm sm:text-base font-bold">فعالية سنوية</p>
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-4xl sm:text-5xl font-black text-[#F5D061]">«بصمة»</h3>
-            <p className="text-amber-50/90 text-sm sm:text-base font-bold">نبض يلامس القلوب أو عطاء بلا حدود</p>
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-4xl sm:text-5xl font-black text-[#F5D061]">2+</h3>
-            <p className="text-amber-50/90 text-sm sm:text-base font-bold">سنوات من العطاء</p>
-          </div>
+          {[
+            { value: '200+', label: 'عضو' },
+            { value: '15+', label: 'فعالية سنوية' },
+            { value: '«بصمة»', label: 'نبض يلامس القلوب أو عطاء بلا حدود' },
+            { value: '2+', label: 'سنوات من العطاء' },
+          ].map((stat, index) => (
+            <Reveal key={stat.label} delay={index * 90}>
+              <div className="space-y-2">
+                <h3 className="text-4xl sm:text-5xl font-black text-[#F5D061]">{stat.value}</h3>
+                <p className="text-amber-50/90 text-sm sm:text-base font-bold">{stat.label}</p>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </section>
 
       {studentAchievements.length > 0 && (
-        <section className="py-20 bg-gradient-to-b from-amber-50/60 via-white to-slate-50 border-b border-amber-200/50">
+        <section className="py-20 bg-gradient-to-b from-amber-50/60 via-white to-slate-50 border-b border-amber-200/50 overflow-hidden">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-            
-            <div className="text-center max-w-2xl mx-auto space-y-3">
+            <Reveal className="text-center max-w-2xl mx-auto space-y-3">
               <span className="inline-block px-4 py-1.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-extrabold tracking-widest uppercase shadow-sm">
                 🏆 نبض التميز والفخر
               </span>
@@ -241,159 +315,157 @@ export default function DiscoverPage() {
               <p className="text-slate-600 text-sm sm:text-base font-medium">
                 نحتفي بنخبة من طلاب وطالبات كلية التمريض بجامعة حفر الباطن الحاصلين على جوائز ومراكز متقدمة تشرف الكلية والنادي.
               </p>
-            </div>
+            </Reveal>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {studentAchievements.map((ach) => {
-                const namesList = ach.studentNames && ach.studentNames.length > 0 
-                  ? ach.studentNames 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {studentAchievements.map((ach, index) => {
+                const namesList = ach.studentNames && ach.studentNames.length > 0
+                  ? ach.studentNames
                   : (ach.studentName ? ach.studentName.split(/[,،\n]+/).map(n => n.trim()).filter(Boolean) : []);
 
                 return (
-                  <div 
-                    key={ach.id} 
-                    className="bg-white rounded-3xl p-6 sm:p-8 border border-amber-200 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col justify-between space-y-6 group relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-400 via-[#630517] to-amber-500" />
-
-                    <div className="space-y-5">
-                      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-right">
-                        <div className="relative shrink-0">
-                          <img 
-                            src={ach.image || '/logo.png'} 
-                            alt="صورة الإنجاز" 
-                            className="w-20 h-20 rounded-2xl object-cover border-2 border-amber-400 shadow-md group-hover:scale-105 transition-transform" 
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/logo.png';
-                            }}
-                          />
-                          <div className="absolute -bottom-2 -right-2 bg-amber-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-md">
-                            ⭐
-                          </div>
-                        </div>
-
-                        <div className="space-y-2 w-full">
-                          <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-black border border-amber-200">
-                            {ach.awardName}
-                          </span>
-                          
-                          <div className="space-y-1.5 pt-1">
-                            {namesList.length > 0 ? (
-                              namesList.map((name, idx) => (
-                                <p key={idx} className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5 justify-center sm:justify-start">
-                                  <span className="text-amber-600 text-xs">👤</span>
-                                  <span>{name}</span>
-                                </p>
-                              ))
-                            ) : (
-                              <p className="font-extrabold text-slate-900 text-sm">فريق إنجاز كلية التمريض</p>
-                            )}
-                          </div>
-                        </div>
+                  <Reveal key={ach.id} delay={index * 80}>
+                    <article className="bg-white rounded-[1.75rem] overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500 flex flex-col h-full group">
+                      <div className="relative h-56 sm:h-72 overflow-hidden bg-slate-100">
+                        <img
+                          src={ach.image || '/logo.png'}
+                          alt={ach.awardName}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/logo.png';
+                          }}
+                        />
                       </div>
 
-                      <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-100 shadow-inner">
-                        <p className="text-slate-700 text-xs sm:text-sm font-medium leading-relaxed text-center sm:text-right">
-                          "{ach.description}"
+                      <div className="p-5 sm:p-6 flex flex-col gap-3.5 flex-1">
+                        <h3 className="text-slate-900 font-black text-lg leading-snug">
+                          {ach.awardName}
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {namesList.length > 0 ? (
+                            namesList.map((name, idx) => (
+                              <span
+                                key={`${ach.id}-name-${idx}`}
+                                className="px-3 py-1.5 rounded-full bg-amber-50 text-amber-950 text-xs font-bold border border-amber-100"
+                              >
+                                {name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-800 text-xs font-bold">
+                              فريق كلية التمريض
+                            </span>
+                          )}
+                        </div>
+
+                        {ach.description ? (
+                          <p className="text-slate-600 text-sm leading-relaxed">
+                            {ach.description}
+                          </p>
+                        ) : null}
+
+                        <p className="mt-auto pt-1 text-[11px] text-slate-400 font-bold">
+                          كلية التمريض — جامعة حفر الباطن
                         </p>
                       </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-[11px] text-slate-400 font-bold">
-                      <span>كلية التمريض - جامعة حفر الباطن</span>
-                      <span>{ach.createdAt ? new Date(ach.createdAt).toLocaleDateString('ar-SA') : ''}</span>
-                    </div>
-                  </div>
+                    </article>
+                  </Reveal>
                 );
               })}
             </div>
-
           </div>
         </section>
       )}
 
-      <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          
           <div className="space-y-6 text-right">
-            <span className="inline-block px-4 py-1.5 rounded-full bg-[#630517]/10 border border-[#630517]/20 text-[#630517] text-xs font-extrabold tracking-widest uppercase">
-              من نحن
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight">
-              نبذة عن نادي التمريض ورؤيتنا المستقبلية
-            </h2>
-            <p className="text-slate-600 leading-relaxed text-base font-medium">
-              نُعد المظلة الرسمية لطلاب وطالبات تخصص التمريض في جامعة حفر الباطن. نسعى لخلق بيئة محفزة تجمع بين التميز الأكاديمي، المهارات القيادية، والممارسات الإنسانية الراقية لخدمة المجتمع الجامعي والمحلي.
-            </p>
+            <Reveal>
+              <span className="inline-block px-4 py-1.5 rounded-full bg-[#630517]/10 border border-[#630517]/20 text-[#630517] text-xs font-extrabold tracking-widest uppercase">
+                من نحن
+              </span>
+            </Reveal>
+            <Reveal delay={80}>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight">
+                نبذة عن نادي التمريض ورؤيتنا المستقبلية
+              </h2>
+            </Reveal>
+            <Reveal delay={160}>
+              <p className="text-slate-600 leading-relaxed text-base font-medium">
+                نُعد المظلة الرسمية لطلاب وطالبات تخصص التمريض في جامعة حفر الباطن. نسعى لخلق بيئة محفزة تجمع بين التميز الأكاديمي، المهارات القيادية، والممارسات الإنسانية الراقية لخدمة المجتمع الجامعي والمحلي.
+              </p>
+            </Reveal>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                <h4 className="font-bold text-[#630517] text-lg mb-2">رؤيتنا</h4>
-                <p className="text-sm text-slate-600 leading-relaxed">الريادة والتميز في إعداد كوادر تمريضية قيادية ومؤثرة مجتمعياً واهتماماً بالمهنة.</p>
-              </div>
-              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                <h4 className="font-bold text-[#630517] text-lg mb-2">رسالتنا</h4>
-                <p className="text-sm text-slate-600 leading-relaxed">تمكين الأعضاء وتنمية مهاراتهم عبر برامج وفعاليات نوعية وثقافية متقدمة.</p>
-              </div>
+              <Reveal delay={220}>
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm h-full">
+                  <h4 className="font-bold text-[#630517] text-lg mb-2">رؤيتنا</h4>
+                  <p className="text-sm text-slate-600 leading-relaxed">الريادة والتميز في إعداد كوادر تمريضية قيادية ومؤثرة مجتمعياً واهتماماً بالمهنة.</p>
+                </div>
+              </Reveal>
+              <Reveal delay={300}>
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm h-full">
+                  <h4 className="font-bold text-[#630517] text-lg mb-2">رسالتنا</h4>
+                  <p className="text-sm text-slate-600 leading-relaxed">تمكين الأعضاء وتنمية مهاراتهم عبر برامج وفعاليات نوعية وثقافية متقدمة.</p>
+                </div>
+              </Reveal>
             </div>
           </div>
 
-          <div className="relative">
-            <div className="absolute inset-0 bg-[#630517]/10 rounded-3xl blur-2xl transform rotate-3" />
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200 min-h-[400px] flex flex-col justify-between text-white p-8 sm:p-10 bg-slate-950">
-              
-              <div className="absolute inset-0 z-0">
-                <img
-                  src={activeSlide.image && activeSlide.image.trim() !== '' ? activeSlide.image : '/header-banner.png'}
-                  alt="شغف وعطاء"
-                  className="w-full h-full object-cover opacity-80 scale-105 transition-all duration-1000"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/header-banner.png';
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-950/40" />
-              </div>
-
-              <div className="relative z-10 flex justify-between items-center">
-                <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl p-2 flex items-center justify-center shadow-lg border border-white/20 overflow-hidden">
-                  <img src="/logo.png" alt="شعار النادي" className="w-full h-full object-contain" />
+          <Reveal delay={120}>
+            <div className="relative">
+              <div className="absolute inset-0 bg-[#630517]/10 rounded-3xl blur-2xl transform rotate-3" />
+              <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200 min-h-[400px] flex flex-col justify-between text-white p-8 sm:p-10 bg-slate-950">
+                <div className="absolute inset-0 z-0">
+                  <img
+                    src={activeSlide.image && activeSlide.image.trim() !== '' ? activeSlide.image : '/header-banner.png'}
+                    alt="شغف وعطاء"
+                    className="w-full h-full object-cover opacity-80 scale-105 transition-all duration-1000"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/header-banner.png';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-950/40" />
                 </div>
-                <span className="text-xs px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#F5D061] font-bold border border-white/10">
-                  شغف، عطاء، وااحترافية
-                </span>
-              </div>
 
-              <div className="relative z-10 space-y-3 text-center my-6">
-                <h3 className="text-2xl sm:text-3xl font-black text-white drop-shadow-md">نادي التمريض</h3>
-                <p className="text-amber-50 text-sm sm:text-base leading-relaxed font-semibold transition-opacity duration-700 drop-shadow">
-                  {activeSlide.quote}
-                </p>
-              </div>
-
-              <div className="relative z-10 space-y-3">
-                <div className="flex justify-center gap-2">
-                  {passionSlides.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setCurrentSlide(idx)}
-                      className={`h-2 rounded-full transition-all cursor-pointer ${currentSlide === idx ? 'w-8 bg-[#F5D061]' : 'w-2 bg-white/40'}`}
-                    />
-                  ))}
+                <div className="relative z-10 flex justify-between items-center">
+                  <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl p-2 flex items-center justify-center shadow-lg border border-white/20 overflow-hidden">
+                    <img src="/logo.png" alt="شعار النادي" className="w-full h-full object-contain" />
+                  </div>
+                  <span className="text-xs px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#F5D061] font-bold border border-white/10">
+                    شغف، عطاء، واحترافية
+                  </span>
                 </div>
-                <div className="text-center pt-2 text-xs text-[#F5D061] font-black tracking-wider uppercase border-t border-white/10">
-                  جامعة حفر الباطن • كلية التمريض
+
+                <div className="relative z-10 space-y-3 text-center my-6">
+                  <h3 className="text-2xl sm:text-3xl font-black text-white drop-shadow-md">نادي التمريض</h3>
+                  <p className="text-amber-50 text-sm sm:text-base leading-relaxed font-semibold transition-opacity duration-700 drop-shadow">
+                    {activeSlide.quote}
+                  </p>
+                </div>
+
+                <div className="relative z-10 space-y-3">
+                  <div className="flex justify-center gap-2">
+                    {passionSlides.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentSlide(idx)}
+                        className={`h-2 rounded-full transition-all cursor-pointer ${currentSlide === idx ? 'w-8 bg-[#F5D061]' : 'w-2 bg-white/40'}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="text-center pt-2 text-xs text-[#F5D061] font-black tracking-wider uppercase border-t border-white/10">
+                    جامعة حفر الباطن • كلية التمريض
+                  </div>
                 </div>
               </div>
-
             </div>
-          </div>
-
+          </Reveal>
         </div>
       </section>
 
-      <section className="py-20 bg-slate-100/70 border-t border-slate-200">
+      <section className="py-20 bg-slate-100/70 border-t border-slate-200 overflow-hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
+          <Reveal className="text-center max-w-2xl mx-auto mb-16 space-y-4">
             <span className="inline-block px-4 py-1.5 rounded-full bg-[#630517]/10 border border-[#630517]/20 text-[#630517] text-xs font-extrabold tracking-widest uppercase">
               معرض الأنشطة
             </span>
@@ -401,50 +473,49 @@ export default function DiscoverPage() {
               لقطات من فعالياتنا وبرامجنا
             </h2>
             <p className="text-slate-600 text-sm">اضغط على أي فعالية لاستعراض معرض الصور الكامل المرفوع سحابياً</p>
-          </div>
+          </Reveal>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {discoverEvents.map((event) => {
+            {discoverEvents.map((event, index) => {
               const coverImage = (event.images && event.images.length > 0 && event.images[0]) ? event.images[0] : '/header-banner.png';
               return (
-                <div
-                  key={event.id}
-                  onClick={() => setSelectedEvent(event)}
-                  className="group relative h-80 rounded-3xl overflow-hidden border border-slate-200 bg-slate-950 shadow-md transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer"
-                >
-                  <div className="absolute inset-0">
-                    <img
-                      src={coverImage}
-                      alt={event.title}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-cover opacity-85 group-hover:scale-110 transition-transform duration-700"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/header-banner.png';
-                      }}
-                    />
+                <Reveal key={event.id} delay={index * 90}>
+                  <div
+                    onClick={() => setSelectedEvent(event)}
+                    className="group relative h-80 rounded-3xl overflow-hidden border border-slate-200 bg-slate-950 shadow-md transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] cursor-pointer"
+                  >
+                    <div className="absolute inset-0">
+                      <img
+                        src={coverImage}
+                        alt={event.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover opacity-85 group-hover:scale-110 transition-transform duration-700"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/header-banner.png';
+                        }}
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent z-10" />
+
+                    <div className="absolute bottom-0 right-0 left-0 p-6 z-20 space-y-2 text-right">
+                      <span className="inline-block px-3 py-1 rounded-full bg-[#F5D061] text-[#630517] font-bold text-xs shadow">
+                        {event.category || 'فعالية'} • {event.images?.length || 0} صور
+                      </span>
+                      <h4 className="text-xl font-black text-white leading-tight drop-shadow-md">{event.title}</h4>
+                      <p className="text-xs text-amber-50/90 font-medium line-clamp-1 drop-shadow">{event.description}</p>
+                    </div>
                   </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent z-10" />
-                  
-                  <div className="absolute bottom-0 right-0 left-0 p-6 z-20 space-y-2 text-right">
-                    <span className="inline-block px-3 py-1 rounded-full bg-[#F5D061] text-[#630517] font-bold text-xs shadow">
-                      {event.category || 'فعالية'} • {event.images?.length || 0} صور
-                    </span>
-                    <h4 className="text-xl font-black text-white leading-tight drop-shadow-md">{event.title}</h4>
-                    <p className="text-xs text-amber-50/90 font-medium line-clamp-1 drop-shadow">{event.description}</p>
-                  </div>
-                </div>
+                </Reveal>
               );
             })}
           </div>
-
         </div>
       </section>
 
       {selectedEvent && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
-            
             <div className="bg-[#630517] text-white p-6 flex justify-between items-center border-b border-[#F5D061]/20">
               <div>
                 <span className="text-xs text-[#F5D061] font-bold">{selectedEvent.category}</span>
@@ -465,7 +536,6 @@ export default function DiscoverPage() {
 
               <div>
                 <h4 className="font-extrabold text-slate-900 text-lg mb-4">معرض الصور ({selectedEvent.images?.length || 0} صورة)</h4>
-                
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {selectedEvent.images?.map((img: string, idx: number) => (
                     <div key={idx} className="h-48 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative group bg-slate-100">
@@ -496,67 +566,67 @@ export default function DiscoverPage() {
                 إغلاق المعرض
               </button>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* قسم شركاء النجاح والرعاة (مرتب هرمياً: الأعلى فوق والأسفل تحت) */}
-      <section className="py-16 border-t border-slate-200 bg-white">
+      <section className="py-16 border-t border-slate-200 bg-white overflow-hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-12">
-          <div className="space-y-3">
+          <Reveal className="space-y-3">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
               شركاء النجاح والرعاة
             </h2>
             <p className="text-slate-600 text-sm font-medium">
               نعتز بشراكاتنا الدائمة لدعم فعاليات وأنشطة نادي التمريض
             </p>
-          </div>
+          </Reveal>
 
           <div className="space-y-12">
-            {/* المستوى الأول: الشركاء الاستراتيجيون والرعاة الذهبيون (قمة الهرم) */}
             {goldAndStrategic.length > 0 && (
               <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-black shadow-sm">
-                  <span>👑</span>
-                  <span>الرعاة الذهبيون والشركاء الاستراتيجيون</span>
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
-                  {goldAndStrategic.map((partner) => renderPartnerCard(partner))}
+                <Reveal>
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-black shadow-sm">
+                    <span>👑</span>
+                    <span>الرعاة الذهبيون والشركاء الاستراتيجيون</span>
+                  </div>
+                </Reveal>
+                <div className="flex flex-wrap items-stretch justify-center gap-6 sm:gap-8">
+                  {goldAndStrategic.map((partner, index) => renderPartnerCard(partner, index * 90))}
                 </div>
               </div>
             )}
 
-            {/* المستوى الثاني: الرعاة الفضيون (وسط الهرم) */}
             {silverPartners.length > 0 && (
               <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 border border-slate-300 text-slate-800 text-xs font-black shadow-sm">
-                  <span>🥈</span>
-                  <span>الرعاة الفضيون</span>
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
-                  {silverPartners.map((partner) => renderPartnerCard(partner))}
+                <Reveal>
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 border border-slate-300 text-slate-800 text-xs font-black shadow-sm">
+                    <span>🥈</span>
+                    <span>الرعاة الفضيون</span>
+                  </div>
+                </Reveal>
+                <div className="flex flex-wrap items-stretch justify-center gap-6 sm:gap-8">
+                  {silverPartners.map((partner, index) => renderPartnerCard(partner, index * 90))}
                 </div>
               </div>
             )}
 
-            {/* المستوى الثالث: الرعاة البرونزيون وباقي الشركاء (قاعدة الهرم) */}
             {bronzeAndOthers.length > 0 && (
               <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-900/10 border border-amber-900/20 text-amber-950 text-xs font-black shadow-sm">
-                  <span>🥉</span>
-                  <span>الرعاة البرونزيون والشركاء</span>
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
-                  {bronzeAndOthers.map((partner) => renderPartnerCard(partner))}
+                <Reveal>
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-900/10 border border-amber-900/20 text-amber-950 text-xs font-black shadow-sm">
+                    <span>🥉</span>
+                    <span>الرعاة البرونزيون والشركاء</span>
+                  </div>
+                </Reveal>
+                <div className="flex flex-wrap items-stretch justify-center gap-6 sm:gap-8">
+                  {bronzeAndOthers.map((partner, index) => renderPartnerCard(partner, index * 90))}
                 </div>
               </div>
             )}
 
-            {/* احتياطي في حال وجود شركاء فئاتهم مخصصة أو غير مصنفة */}
             {goldAndStrategic.length === 0 && silverPartners.length === 0 && bronzeAndOthers.length === 0 && (
-              <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
-                {sortedPartners.map((partner) => renderPartnerCard(partner))}
+              <div className="flex flex-wrap items-stretch justify-center gap-6 sm:gap-8">
+                {sortedPartners.map((partner, index) => renderPartnerCard(partner, index * 90))}
               </div>
             )}
           </div>
@@ -571,7 +641,6 @@ export default function DiscoverPage() {
           العودة للرئيسية
         </Link>
       </div>
-
     </main>
   );
 }

@@ -55,3 +55,57 @@ html[lang="ar"] :is(h1, h2, h3, h4) {
 html[lang="ar"] :is(header, footer) :is(a, button, span, p) {
   letter-spacing: 0;
 }
+
+@keyframes discover-shine {
+  0% { transform: translateX(-130%) skewX(-18deg); }
+  100% { transform: translateX(220%) skewX(-18deg); }
+}
+
+@keyframes discover-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.discover-reveal {
+  opacity: 0;
+  transform: translateY(32px) scale(0.97);
+  filter: blur(8px);
+  transition:
+    opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.75s ease;
+}
+
+.discover-reveal.is-in {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+.discover-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(245, 208, 97, 0.28), transparent);
+  animation: discover-shine 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.discover-float {
+  animation: discover-float 4.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-reveal,
+  .discover-reveal.is-in {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+
+  .discover-shine::after,
+  .discover-float {
+    animation: none;
+  }
+}

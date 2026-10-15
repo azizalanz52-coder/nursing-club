@@ -1,4 +1,5 @@
 import { Firestore, collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import { canonicalPhone, phoneVariants } from './certificatesLookup';
 
 function isLeadershipAccount(phone: string, role?: string) {
   const value = String(role || '');
@@ -61,6 +62,40 @@ export async function notifyCommitteeByKeyword(db: Firestore, keyword: string, m
       await notifyExistingUser(db, item.id, { latestNotification: message });
     }
   }
+}
+
+export async function findUserDocsByPhone(db: Firestore, phone: string) {
+  const clean = String(phone || '').trim();
+  const ids = Array.from(new Set([clean, canonicalPhone(clean), ...phoneVariants(clean)].filter(Boolean)));
+  const docs: { id: string; data: Record<string, any> }[] = [];
+  for (const id of ids) {
+    const snap = await getDoc(doc(db, 'users', id));
+    if (snap.exists()) docs.push({ id: snap.id, data: snap.data() });
+  }
+  return docs;
+}
+
+export async function setUserPasswordOnPhone(db: Firestore, phone: string, password: string) {
+  const clean = String(phone || '').trim();
+  const ids = Array.from(new Set([clean, canonicalPhone(clean), ...phoneVariants(clean)].filter(Boolean)));
+  let updated = 0;
+  const payload = {
+    password,
+    phone: canonicalPhone(clean) || clean,
+    passwordResetAt: new Date().toISOString(),
+  };
+  for (const id of ids) {
+    const ref = doc(db, 'users', id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) continue;
+    await updateDoc(ref, payload);
+    updated += 1;
+  }
+  if (updated === 0 && clean) {
+    await setDoc(doc(db, 'users', canonicalPhone(clean) || clean), payload, { merge: true });
+    updated = 1;
+  }
+  return updated;
 }
 
 export async function completeOrCreateUserAccount(
