@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from "next/link";
 import { db } from './../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { DEFAULT_WELCOME_BANNER } from '../lib/welcomeBanner';
 
 interface BannerItem {
   id: string;
@@ -18,61 +19,48 @@ interface BannerItem {
 }
 
 export default function Hero() {
-  const [banners, setBanners] = useState<BannerItem[]>([
-    {
-      id: 'main',
-      tag: 'مرحباً بكم في نادي التمريض',
-      title: 'نادي التمريض',
-      description: 'مجتمع طلابي يهدف إلى تطوير المعرفة، وبناء المهارات القيادية، وصناعة أثر في مجال التمريض بجامعة حفر الباطن.',
-      image: '/header-banner.png',
-      buttonText: 'اكتشف النادي',
-      buttonLink: '/discover',
-    },
-  ]);
+  const [banners, setBanners] = useState<BannerItem[]>([DEFAULT_WELCOME_BANNER]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    const savedBanners = localStorage.getItem('UHB_BANNERS');
-    if (savedBanners) {
-      try {
-        const parsed = JSON.parse(savedBanners);
-        if (parsed && parsed.length > 0) {
-          setBanners(parsed);
+    localStorage.removeItem('UHB_BANNERS');
+    const unsub = onSnapshot(
+      collection(db, 'site_banners'),
+      (bannersSnap) => {
+        if (bannersSnap.empty) {
+          setBanners([DEFAULT_WELCOME_BANNER]);
+          setCurrentIndex(0);
+          return;
         }
-      } catch (e) {
-        console.error(e);
+        const cloudList: BannerItem[] = [];
+        bannersSnap.forEach((d) => {
+          const dat = d.data();
+          cloudList.push({
+            id: d.id,
+            tag: dat.tag || 'مناسبة خاصة',
+            title: dat.title || 'نادي التمريض',
+            description: dat.description || '',
+            image: dat.image || '/header-banner.png',
+            buttonText: dat.buttonText || 'اكتشف النادي',
+            buttonLink: dat.buttonLink || '/discover',
+            theme: dat.theme === 'pink-october' ? 'pink-october' : 'club',
+            cinematic: Boolean(dat.cinematic),
+          });
+        });
+        cloudList.sort((a, b) => {
+          if (a.id === 'welcome-default') return -1;
+          if (b.id === 'welcome-default') return 1;
+          return Number(b.id) - Number(a.id);
+        });
+        setBanners(cloudList);
+        setCurrentIndex(0);
+      },
+      (err) => {
+        console.error('Error fetching cloud banners:', err);
       }
-    } else {
-      const fetchCloudBanners = async () => {
-        try {
-          const bannersSnap = await getDocs(collection(db, 'site_banners'));
-          if (!bannersSnap.empty) {
-            const cloudList: BannerItem[] = [];
-            bannersSnap.forEach((d) => {
-              const dat = d.data();
-              cloudList.push({
-                id: d.id,
-                tag: dat.tag || 'مناسبة خاصة',
-                title: dat.title || 'نادي التمريض',
-                description: dat.description || '',
-                image: dat.image || '/header-banner.png',
-                buttonText: dat.buttonText || (dat.theme === 'pink-october' ? 'ابدئي التحدي الوردي' : 'اكتشف النادي'),
-                buttonLink: dat.buttonLink || (dat.theme === 'pink-october' ? '/case-study' : '/discover'),
-                theme: dat.theme === 'pink-october' ? 'pink-october' : 'club',
-                cinematic: Boolean(dat.cinematic),
-              });
-            });
-            if (cloudList.length > 0) {
-              setBanners([...cloudList, ...banners]);
-            }
-          }
-        } catch (err) {
-          console.error('Error fetching cloud banners:', err);
-        }
-      };
-      fetchCloudBanners();
-    }
+    );
+    return () => unsub();
   }, []);
 
   useEffect(() => {

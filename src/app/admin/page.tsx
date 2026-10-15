@@ -8,6 +8,7 @@ import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc,
 import { isIncompleteUserAccount, notifyCommitteeByKeyword, setUserPasswordOnPhone } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
 import { certMediaFields, filterFilesWithinLimit, isOverUploadLimit, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { DEFAULT_WELCOME_BANNER, WELCOME_BANNER_ID } from '../lib/welcomeBanner';
 import { clubConfirm, inferNoticeKind } from '../lib/clubNotice';
 import { ClubNoticeDialog } from '../components/ClubNotice';
 import HrCertificateBatches from '../components/HrCertificateBatches';
@@ -1304,13 +1305,15 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const [bannerTag, setBannerTag] = useState<string>('');
   const [bannerTitle, setBannerTitle] = useState<string>('');
   const [bannerDescription, setBannerDescription] = useState<string>('');
-  const [bannerTheme, setBannerTheme] = useState<'club' | 'pink-october'>('pink-october');
-  const [bannerCinematic, setBannerCinematic] = useState(true);
+  const [bannerTheme, setBannerTheme] = useState<'club' | 'pink-october'>('club');
+  const [bannerCinematic, setBannerCinematic] = useState(false);
   const [bannerButtonText, setBannerButtonText] = useState<string>('');
   const [bannerButtonLink, setBannerButtonLink] = useState<string>('');
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [bannerUploadProgress, setBannerUploadProgress] = useState(0);
+  const [welcomeReplacing, setWelcomeReplacing] = useState(false);
+  const [welcomeReplaceProgress, setWelcomeReplaceProgress] = useState(0);
 
   const [partners, setPartners] = useState<PartnerItem[]>([]);
   const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
@@ -1367,12 +1370,20 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           setEvents(eventsList);
         }
 
-        const bannersSnap = await getDocs(collection(db, 'site_banners'));
-        if (!bannersSnap.empty) {
-          const bannersList: BannerItem[] = [];
-          bannersSnap.forEach((d) => { bannersList.push({ id: d.id, ...d.data() } as BannerItem); });
-          setBanners(bannersList);
+        const welcomeRef = doc(db, 'site_banners', WELCOME_BANNER_ID);
+        const welcomeSnap = await getDoc(welcomeRef);
+        if (!welcomeSnap.exists()) {
+          await setDoc(welcomeRef, DEFAULT_WELCOME_BANNER);
         }
+        const bannersSnap = await getDocs(collection(db, 'site_banners'));
+        const bannersList: BannerItem[] = [];
+        bannersSnap.forEach((d) => { bannersList.push({ id: d.id, ...d.data() } as BannerItem); });
+        bannersList.sort((a, b) => {
+          if (a.id === WELCOME_BANNER_ID) return -1;
+          if (b.id === WELCOME_BANNER_ID) return 1;
+          return Number(b.id) - Number(a.id);
+        });
+        setBanners(bannersList);
 
         const partnersSnap = await getDocs(collection(db, 'site_partners'));
         if (!partnersSnap.empty) {
@@ -2068,6 +2079,30 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     });
   };
 
+  const handleReplaceBannerImage = async (bannerId: string, file: File) => {
+    if (isOverUploadLimit(file)) {
+      setModalMessage(uploadLimitMessage());
+      setModalType('success');
+      return;
+    }
+    setWelcomeReplacing(true);
+    setWelcomeReplaceProgress(0);
+    try {
+      const image = await uploadClubFile(file, 'banners', setWelcomeReplaceProgress);
+      await setDoc(doc(db, 'site_banners', bannerId), { image }, { merge: true });
+      setBanners(banners.map((b) => (b.id === bannerId ? { ...b, image } : b)));
+      setModalMessage('تم تغيير صورة البنر. حدّث الرئيسية لتشوفها.');
+      setModalType('success');
+    } catch (err: any) {
+      console.error(err);
+      setModalMessage(err?.message || 'تعذر استبدال البنر. صغّر الملف ثم أعد المحاولة.');
+      setModalType('success');
+    } finally {
+      setWelcomeReplacing(false);
+      setWelcomeReplaceProgress(0);
+    }
+  };
+
   const handleAddBanner = async (e: FormEvent) => {
     e.preventDefault();
     if (!bannerTitle.trim()) {
@@ -2109,8 +2144,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       setBannerTag('');
       setBannerTitle('');
       setBannerDescription('');
-      setBannerTheme('pink-october');
-      setBannerCinematic(true);
+      setBannerTheme('club');
+      setBannerCinematic(false);
       setBannerButtonText('');
       setBannerButtonLink('');
       setBannerFile(null);
@@ -2676,12 +2711,12 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           </button>
 
           {[
+            { id: 'banners', label: '🖼️ بنر الترحيب' },
             { id: 'requests', label: '📥 طلبات الانضمام والأكسل' },
             { id: 'suggestions', label: '💡 آراء ومقترحات الطلاب' },
             { id: 'discover', label: '🖼️ معرض "اكتشف النادي"' },
             { id: 'passion', label: '✨ بطاقة "شغف وعطاء"' },
             { id: 'events', label: '📅 الفعاليات والبوسترات' },
-            { id: 'banners', label: '🖼️ البانرات الرئيسية' },
             { id: 'partners', label: '🤝 شركاء النجاح والرعاة' },
             { id: 'team', label: '👥 القادة والأعضاء' },
           ].map((tab) => (
@@ -4740,10 +4775,66 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
         {activeTab === 'banners' && (
           <div className="space-y-8">
+            <div className="bg-white rounded-3xl p-8 border-2 border-[#630517]/20 shadow-sm space-y-5">
+              <div className="space-y-1">
+                <h3 className="text-xl font-black text-slate-900">بنرات الصفحة الترحيبية</h3>
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  أول بطاقة هي بنر NURSS الترحيبي اللي كان ثابتاً في الكود. غيّر صورته من هنا، وPink October بنر منفصل تقدر تحذفه أو تخليه معهم.
+                </p>
+              </div>
+              {banners.length === 0 ? (
+                <p className="text-xs text-slate-400 font-bold">ما فيه بنر مرفوع بعد، الرئيسية تعرض شعار NURSS الافتراضي إلى أن ترفع واحد.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {banners.map((ban) => (
+                    <div key={ban.id} className="rounded-2xl border border-slate-200 p-4 space-y-3 bg-slate-50/70">
+                      <img
+                        src={ban.image || '/header-banner.png'}
+                        alt={ban.title}
+                        className="w-full h-36 object-contain rounded-xl bg-white border border-slate-100"
+                      />
+                      <p className="text-sm font-black text-slate-900">{ban.title}</p>
+                      <p className="text-[11px] text-slate-500 font-bold">
+                        {ban.id === WELCOME_BANNER_ID ? 'البنر الترحيبي الافتراضي (NURSS)' : ban.tag}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="px-3 py-1.5 rounded-lg bg-[#630517] text-[#F5D061] font-bold text-[11px] cursor-pointer">
+                          تغيير الصورة
+                          <input
+                            type="file"
+                            accept="image/*,video/*"
+                            className="hidden"
+                            disabled={welcomeReplacing}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = '';
+                              if (file) handleReplaceBannerImage(ban.id, file);
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBanner(ban.id)}
+                          className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold text-[11px] hover:bg-red-100 cursor-pointer"
+                        >
+                          حذف
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {welcomeReplacing ? (
+                <p className="text-xs font-bold text-[#630517]">{uploadingLabel(true, welcomeReplaceProgress, 'جاري تغيير الصورة')}</p>
+              ) : null}
+            </div>
+
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <div className="space-y-1">
-                <h3 className="text-xl font-black text-slate-900">إضافة بانر رئيسي جديد (سحابي)</h3>
-                <p className="text-xs text-slate-500 font-medium">ارفع تصميمك، واختر الهوية حتى الواجهة تستقبله بانبهار بدل إطار النادي الاعتيادي.</p>
+                <h3 className="text-xl font-black text-slate-900">إضافة بنر إضافي (اختياري)</h3>
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  إذا تبي أكثر من بنر في الرئيسية يتبدلون تلقائياً، أضفهم من هنا.
+                </p>
               </div>
               
               <form onSubmit={handleAddBanner} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
