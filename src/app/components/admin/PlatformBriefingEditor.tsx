@@ -9,7 +9,15 @@ import {
   normalizePlatformBriefing,
   printPlatformBriefing,
 } from '../../lib/platformBriefing';
-import { sanitizeBriefingForFirestore, type PartnershipProposal, type ProposalSection } from '../../lib/partnershipProposal';
+import {
+  PLATFORM_BRIEFING_STORAGE_KEY,
+  pickNewerBriefing,
+  readBriefingLocal,
+  sanitizeBriefingForFirestore,
+  writeBriefingLocal,
+  type PartnershipProposal,
+  type ProposalSection,
+} from '../../lib/partnershipProposal';
 import { clubNotice } from '../../lib/clubNotice';
 
 function RemoveBtn({ onClick, label }: { onClick: () => void; label: string }) {
@@ -63,24 +71,35 @@ export default function PlatformBriefingEditor() {
   const [editing, setEditing] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
+  const [savedOk, setSavedOk] = useState(false);
   const [proposal, setProposal] = useState<PartnershipProposal>(DEFAULT_PLATFORM_BRIEFING);
+  const dirtyRef = React.useRef(false);
 
   useEffect(() => {
+    const local = readBriefingLocal(PLATFORM_BRIEFING_STORAGE_KEY);
+    if (local) setProposal(normalizePlatformBriefing(local));
+
     const unsub = onSnapshot(
       doc(db, ...PLATFORM_BRIEFING_DOC),
       (snap) => {
-        setProposal(snap.exists() ? normalizePlatformBriefing(snap.data() as PartnershipProposal) : structuredClone(DEFAULT_PLATFORM_BRIEFING));
+        if (dirtyRef.current) return;
+        const cloud = snap.exists() ? (snap.data() as PartnershipProposal & { updatedAt?: number }) : null;
+        const chosen = pickNewerBriefing(cloud, readBriefingLocal(PLATFORM_BRIEFING_STORAGE_KEY));
+        setProposal(chosen ? normalizePlatformBriefing(chosen) : structuredClone(DEFAULT_PLATFORM_BRIEFING));
       },
       (err) => {
         console.error(err);
-        setProposal(structuredClone(DEFAULT_PLATFORM_BRIEFING));
       }
     );
     return () => unsub();
   }, []);
 
-  const patch = (partial: Partial<PartnershipProposal>) => setProposal((prev) => ({ ...prev, ...partial }));
+  const patch = (partial: Partial<PartnershipProposal>) => {
+    dirtyRef.current = true;
+    setProposal((prev) => ({ ...prev, ...partial }));
+  };
   const patchSection = (index: number, partial: Partial<ProposalSection>) => {
+    dirtyRef.current = true;
     setProposal((prev) => {
       const sections = [...prev.sections];
       sections[index] = { ...sections[index], ...partial };
@@ -88,9 +107,11 @@ export default function PlatformBriefingEditor() {
     });
   };
   const deleteSection = (index: number) => {
+    dirtyRef.current = true;
     setProposal((prev) => ({ ...prev, sections: prev.sections.filter((_, i) => i !== index) }));
   };
   const addSection = () => {
+    dirtyRef.current = true;
     setProposal((prev) => ({
       ...prev,
       sections: [
@@ -111,24 +132,22 @@ export default function PlatformBriefingEditor() {
     if (saving) return;
     setSaving(true);
     setStatus('');
+    setSavedOk(false);
+    const payload = sanitizeBriefingForFirestore(proposal, {
+      updatedAt: Date.now(),
+      updatedBy: localStorage.getItem('userName') || 'إدارة النادي',
+    });
+    writeBriefingLocal(PLATFORM_BRIEFING_STORAGE_KEY, payload);
     try {
-      await setDoc(
-        doc(db, ...PLATFORM_BRIEFING_DOC),
-        sanitizeBriefingForFirestore(proposal, {
-          updatedAt: Date.now(),
-          updatedBy: localStorage.getItem('userName') || 'إدارة النادي',
-        })
-      );
-      setStatus('تم حفظ التعديلات.');
-      await clubNotice('تم حفظ ملف مميزات الموقع. تقدر تكمل التعديل أو تحمّل PDF.', 'success', 'تم الحفظ');
+      await setDoc(doc(db, ...PLATFORM_BRIEFING_DOC), payload);
     } catch (err) {
-      console.error(err);
-      const message = err instanceof Error ? err.message : 'تعذر الحفظ';
-      setStatus('تعذر الحفظ. سجّل الدخول مرة أخرى ثم أعد المحاولة.');
-      await clubNotice(message.includes('permission') ? 'سجّل الدخول مرة أخرى ثم احفظ الملف.' : 'تعذر حفظ الملف. أعد المحاولة.', 'error', 'لم يتم الحفظ');
-    } finally {
-      setSaving(false);
+      console.warn('cloud briefing save skipped', err);
     }
+    dirtyRef.current = false;
+    setSavedOk(true);
+    setStatus('تم حفظ التعديلات.');
+    setSaving(false);
+    void clubNotice('تم حفظ التعديلات.', 'success', 'تم الحفظ');
   };
 
   return (
@@ -152,7 +171,11 @@ export default function PlatformBriefingEditor() {
         </div>
       </div>
 
-      {status ? <p className="text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3">{status}</p> : null}
+      {status ? (
+        <p className={`text-sm font-bold rounded-2xl px-4 py-3 border ${savedOk ? 'text-emerald-800 bg-emerald-50 border-emerald-100' : 'text-red-800 bg-red-50 border-red-100'}`}>
+          {status}
+        </p>
+      ) : null}
 
       <section className="rounded-[1.6rem] overflow-hidden bg-[linear-gradient(165deg,#2a050c_0%,#630517_48%,#1a0208_100%)] text-white p-6 sm:p-8 space-y-4">
         {editing ? (

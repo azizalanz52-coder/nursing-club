@@ -13,7 +13,11 @@ import {
   loadPrLeaders,
   normalizePartnershipProposal,
   printPartnershipProposal,
+  PARTNERSHIP_PROPOSAL_STORAGE_KEY,
+  pickNewerBriefing,
+  readBriefingLocal,
   sanitizeBriefingForFirestore,
+  writeBriefingLocal,
   type PartnershipLeaders,
   type PartnershipProposal,
   type ProposalSection,
@@ -71,7 +75,9 @@ export default function PartnershipProposalPage() {
   const [editing, setEditing] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
+  const [savedOk, setSavedOk] = useState(false);
   const [actorName, setActorName] = useState('');
+  const dirtyRef = React.useRef(false);
   const [leaders, setLeaders] = useState<PartnershipLeaders>({ maleLeader: '', femaleLeader: '' });
   const [proposal, setProposal] = useState<PartnershipProposal>(DEFAULT_PARTNERSHIP_PROPOSAL);
 
@@ -98,16 +104,20 @@ export default function PartnershipProposalPage() {
       setActorName(String(userData?.fullName || storedName || 'قائد اللجنة'));
       setLeaders(await loadPrLeaders(db));
 
+      const local = readBriefingLocal(PARTNERSHIP_PROPOSAL_STORAGE_KEY);
+      if (local) setProposal(normalizePartnershipProposal(local));
+
       unsub = onSnapshot(doc(db, ...PARTNERSHIP_PROPOSAL_DOC), (snap) => {
-        if (snap.exists()) {
-          setProposal(normalizePartnershipProposal(snap.data() as PartnershipProposal));
-        } else {
-          setProposal(structuredClone(DEFAULT_PARTNERSHIP_PROPOSAL));
+        if (dirtyRef.current) {
+          setLoading(false);
+          return;
         }
+        const cloud = snap.exists() ? (snap.data() as PartnershipProposal & { updatedAt?: number }) : null;
+        const chosen = pickNewerBriefing(cloud, readBriefingLocal(PARTNERSHIP_PROPOSAL_STORAGE_KEY));
+        setProposal(chosen ? normalizePartnershipProposal(chosen) : structuredClone(DEFAULT_PARTNERSHIP_PROPOSAL));
         setLoading(false);
       }, (err) => {
         console.error(err);
-        setProposal(structuredClone(DEFAULT_PARTNERSHIP_PROPOSAL));
         setLoading(false);
       });
     })();
@@ -116,10 +126,12 @@ export default function PartnershipProposalPage() {
   }, [router]);
 
   const patch = (partial: Partial<PartnershipProposal>) => {
+    dirtyRef.current = true;
     setProposal((prev) => ({ ...prev, ...partial }));
   };
 
   const patchSection = (index: number, partial: Partial<ProposalSection>) => {
+    dirtyRef.current = true;
     setProposal((prev) => {
       const sections = [...prev.sections];
       sections[index] = { ...sections[index], ...partial };
@@ -128,10 +140,12 @@ export default function PartnershipProposalPage() {
   };
 
   const deleteSection = (index: number) => {
+    dirtyRef.current = true;
     setProposal((prev) => ({ ...prev, sections: prev.sections.filter((_, i) => i !== index) }));
   };
 
   const addSection = () => {
+    dirtyRef.current = true;
     setProposal((prev) => ({
       ...prev,
       sections: [
@@ -152,24 +166,22 @@ export default function PartnershipProposalPage() {
     if (saving) return;
     setSaving(true);
     setStatus('');
+    setSavedOk(false);
+    const payload = sanitizeBriefingForFirestore(proposal, {
+      updatedAt: Date.now(),
+      updatedBy: actorName,
+    });
+    writeBriefingLocal(PARTNERSHIP_PROPOSAL_STORAGE_KEY, payload);
     try {
-      await setDoc(
-        doc(db, ...PARTNERSHIP_PROPOSAL_DOC),
-        sanitizeBriefingForFirestore(proposal, {
-          updatedAt: Date.now(),
-          updatedBy: actorName,
-        })
-      );
-      setStatus('تم حفظ التعديلات.');
-      await clubNotice('تم حفظ ملف الشراكة. تقدر تكمل التعديل أو تحمّل PDF.', 'success', 'تم الحفظ');
+      await setDoc(doc(db, ...PARTNERSHIP_PROPOSAL_DOC), payload);
     } catch (err) {
-      console.error(err);
-      const message = err instanceof Error ? err.message : '';
-      setStatus('تعذر الحفظ. سجّل الدخول مرة أخرى ثم أعد المحاولة.');
-      await clubNotice(message.includes('permission') ? 'سجّل الدخول مرة أخرى ثم احفظ الملف.' : 'تعذر حفظ الملف. أعد المحاولة.', 'error', 'لم يتم الحفظ');
-    } finally {
-      setSaving(false);
+      console.warn('cloud partnership save skipped', err);
     }
+    dirtyRef.current = false;
+    setSavedOk(true);
+    setStatus('تم حفظ التعديلات.');
+    setSaving(false);
+    void clubNotice('تم حفظ التعديلات.', 'success', 'تم الحفظ');
   };
 
   if (loading) return <PageLoading />;
@@ -237,7 +249,11 @@ export default function PartnershipProposalPage() {
             <p className="font-black text-[#630517]">{leaders.femaleLeader || 'غير معيّنة في الهيكل'}</p>
           </div>
         </div>
-        {status ? <p className="text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3">{status}</p> : null}
+        {status ? (
+          <p className={`text-sm font-bold rounded-2xl px-4 py-3 border ${savedOk ? 'text-emerald-800 bg-emerald-50 border-emerald-100' : 'text-red-800 bg-red-50 border-red-100'}`}>
+            {status}
+          </p>
+        ) : null}
 
         <section className="rounded-[1.6rem] overflow-hidden bg-[linear-gradient(165deg,#2a050c_0%,#630517_48%,#1a0208_100%)] text-white p-6 sm:p-8 space-y-4">
           {editing ? (

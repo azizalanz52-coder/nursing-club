@@ -226,24 +226,38 @@ export function normalizePartnershipProposal(raw?: Partial<PartnershipProposal> 
   };
 }
 
+export const PLATFORM_BRIEFING_STORAGE_KEY = 'UHB_PLATFORM_BRIEFING';
+export const PARTNERSHIP_PROPOSAL_STORAGE_KEY = 'UHB_PARTNERSHIP_PROPOSAL';
+
 export function sanitizeBriefingForFirestore(
   proposal: PartnershipProposal,
   extra: Record<string, unknown> = {}
 ) {
-  const strip = (value: unknown): unknown => {
-    if (value === undefined) return undefined;
-    if (Array.isArray(value)) return value.map(strip);
-    if (value && typeof value === 'object') {
-      const out: Record<string, unknown> = {};
-      for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-        if (nested === undefined) continue;
-        out[key] = strip(nested);
-      }
-      return out;
-    }
-    return value;
-  };
-  return strip({ ...proposal, ...extra }) as Record<string, unknown>;
+  return JSON.parse(JSON.stringify({ ...proposal, ...extra })) as Record<string, unknown>;
+}
+
+export function readBriefingLocal(key: string): (PartnershipProposal & { updatedAt?: number }) | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as PartnershipProposal & { updatedAt?: number };
+  } catch {
+    return null;
+  }
+}
+
+export function writeBriefingLocal(key: string, payload: Record<string, unknown>) {
+  localStorage.setItem(key, JSON.stringify(payload));
+}
+
+export function pickNewerBriefing(
+  cloud: (PartnershipProposal & { updatedAt?: number }) | null,
+  local: (PartnershipProposal & { updatedAt?: number }) | null
+) {
+  const cloudAt = Number(cloud?.updatedAt || 0);
+  const localAt = Number(local?.updatedAt || 0);
+  if (local && localAt >= cloudAt) return local;
+  return cloud;
 }
 
 export async function loadPrLeaders(db: Firestore): Promise<PartnershipLeaders> {
