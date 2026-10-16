@@ -127,6 +127,14 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /admin_documents/{id} {
+      allow read, write: if true;
+    }
+
+    match /pr_documents/{id} {
+      allow read, write: if true;
+    }
+
     match /{document=**} {
       allow read: if true;
       allow write: if signedIn();

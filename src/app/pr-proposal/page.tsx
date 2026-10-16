@@ -13,10 +13,12 @@ import {
   loadPrLeaders,
   normalizePartnershipProposal,
   printPartnershipProposal,
+  sanitizeBriefingForFirestore,
   type PartnershipLeaders,
   type PartnershipProposal,
   type ProposalSection,
 } from '../lib/partnershipProposal';
+import { clubNotice } from '../lib/clubNotice';
 import PageLoading from '../components/PageLoading';
 
 function Field({
@@ -25,12 +27,14 @@ function Field({
   onChange,
   multiline,
   label,
+  onRemove,
 }: {
   editing: boolean;
   value: string;
   onChange: (next: string) => void;
   multiline?: boolean;
   label?: string;
+  onRemove?: () => void;
 }) {
   if (!editing) {
     if (!value) return null;
@@ -43,7 +47,14 @@ function Field({
   const shared = 'w-full rounded-xl border border-[#F5D061]/50 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-[#630517]';
   return (
     <label className="block space-y-1">
-      {label ? <span className="text-[10px] font-bold text-[#630517]">{label}</span> : null}
+      <span className="flex items-center justify-between gap-2">
+        {label ? <span className="text-[10px] font-bold text-[#630517]">{label}</span> : <span />}
+        {onRemove ? (
+          <button type="button" onClick={onRemove} className="text-[10px] font-black text-[#630517] bg-[#F5D061]/20 border border-[#F5D061]/50 px-2.5 py-1 rounded-lg">
+            حذف {label || 'النص'}
+          </button>
+        ) : null}
+      </span>
       {multiline ? (
         <textarea className={`${shared} min-h-[88px]`} value={value} onChange={(e) => onChange(e.target.value)} />
       ) : (
@@ -57,7 +68,7 @@ export default function PartnershipProposalPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [actorName, setActorName] = useState('');
@@ -116,24 +127,46 @@ export default function PartnershipProposalPage() {
     });
   };
 
+  const deleteSection = (index: number) => {
+    setProposal((prev) => ({ ...prev, sections: prev.sections.filter((_, i) => i !== index) }));
+  };
+
+  const addSection = () => {
+    setProposal((prev) => ({
+      ...prev,
+      sections: [
+        ...prev.sections,
+        {
+          id: `s-${Date.now()}`,
+          kicker: `تبويب ${String(prev.sections.length + 1).padStart(2, '0')}`,
+          title: 'قسم جديد',
+          intro: '',
+          paragraphs: [''],
+          cards: [],
+        },
+      ],
+    }));
+  };
+
   const save = async () => {
+    if (saving) return;
     setSaving(true);
     setStatus('');
     try {
       await setDoc(
         doc(db, ...PARTNERSHIP_PROPOSAL_DOC),
-        {
-          ...proposal,
+        sanitizeBriefingForFirestore(proposal, {
           updatedAt: Date.now(),
           updatedBy: actorName,
-        },
-        { merge: true }
+        })
       );
-      setEditing(false);
-      setStatus('تم حفظ النصوص. الملف محدّث لقائد وقائدة اللجنة.');
+      setStatus('تم حفظ التعديلات.');
+      await clubNotice('تم حفظ ملف الشراكة. تقدر تكمل التعديل أو تحمّل PDF.', 'success', 'تم الحفظ');
     } catch (err) {
       console.error(err);
-      setStatus('تعذر الحفظ. تأكد من تسجيل الدخول ثم أعد المحاولة.');
+      const message = err instanceof Error ? err.message : '';
+      setStatus('تعذر الحفظ. سجّل الدخول مرة أخرى ثم أعد المحاولة.');
+      await clubNotice(message.includes('permission') ? 'سجّل الدخول مرة أخرى ثم احفظ الملف.' : 'تعذر حفظ الملف. أعد المحاولة.', 'error', 'لم يتم الحفظ');
     } finally {
       setSaving(false);
     }
@@ -173,7 +206,7 @@ export default function PartnershipProposalPage() {
             </button>
             <button
               type="button"
-              disabled={!editing || saving}
+              disabled={saving}
               onClick={save}
               className="px-4 py-2 rounded-xl bg-[#F5D061] text-[#3b020b] text-xs font-black disabled:opacity-40"
             >
@@ -251,17 +284,27 @@ export default function PartnershipProposalPage() {
               <li key={section.id} className="flex gap-2 items-center">
                 <span className="w-7 h-7 rounded-lg bg-[#630517] text-[#F5D061] flex items-center justify-center text-xs">{index + 1}</span>
                 {editing ? (
-                  <input
-                    className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                    value={section.title}
-                    onChange={(e) => patchSection(index, { title: e.target.value })}
-                  />
+                  <>
+                    <input
+                      className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                      value={section.title}
+                      onChange={(e) => patchSection(index, { title: e.target.value })}
+                    />
+                    <button type="button" onClick={() => deleteSection(index)} className="text-[10px] font-black text-[#630517] bg-[#F5D061]/20 border border-[#F5D061]/50 px-2.5 py-1 rounded-lg">
+                      حذف القسم
+                    </button>
+                  </>
                 ) : (
                   <span>{section.title}</span>
                 )}
               </li>
             ))}
           </ol>
+          {editing ? (
+            <button type="button" onClick={addSection} className="mt-2 px-4 py-2 rounded-xl bg-[#630517] text-[#F5D061] text-xs font-black">
+              + إضافة قسم جديد
+            </button>
+          ) : null}
         </section>
 
         {proposal.sections.map((section, index) => (
@@ -281,8 +324,38 @@ export default function PartnershipProposalPage() {
               )}
             </h2>
             {(editing || section.intro) && (
-              <Field editing={editing} value={section.intro || ''} onChange={(intro) => patchSection(index, { intro })} multiline label={editing ? 'نص القسم' : undefined} />
+              <Field editing={editing} value={section.intro || ''} onChange={(intro) => patchSection(index, { intro })} multiline label={editing ? 'نص القسم' : undefined} onRemove={editing ? () => patchSection(index, { intro: '' }) : undefined} />
             )}
+            {(section.paragraphs || []).map((paragraph, paragraphIndex) => (
+              (editing || paragraph) ? (
+                <Field
+                  key={`${section.id}-p-${paragraphIndex}`}
+                  editing={editing}
+                  value={paragraph}
+                  onChange={(next) => {
+                    const paragraphs = [...(section.paragraphs || [])];
+                    paragraphs[paragraphIndex] = next;
+                    patchSection(index, { paragraphs });
+                  }}
+                  multiline
+                  label={editing ? `فقرة ${paragraphIndex + 1}` : undefined}
+                  onRemove={editing ? () => patchSection(index, { paragraphs: (section.paragraphs || []).filter((_, i) => i !== paragraphIndex) }) : undefined}
+                />
+              ) : null
+            ))}
+            {editing ? (
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => patchSection(index, { paragraphs: [...(section.paragraphs || []), ''] })} className="px-3 py-2 rounded-xl border border-[#F5D061] text-[#630517] text-[11px] font-black">
+                  + إضافة فقرة
+                </button>
+                <button type="button" onClick={() => patchSection(index, { cards: [...(section.cards || []), { title: 'عنوان جديد', body: '' }] })} className="px-3 py-2 rounded-xl border border-[#F5D061] text-[#630517] text-[11px] font-black">
+                  + إضافة بطاقة
+                </button>
+                <button type="button" onClick={() => deleteSection(index)} className="px-3 py-2 rounded-xl border border-[#F5D061] text-[#630517] text-[11px] font-black">
+                  حذف هذا القسم
+                </button>
+              </div>
+            ) : null}
             {(editing || section.callout) && (
               <div className="bg-[#fff6d6] border-r-4 border-[#F5D061] rounded-2xl p-4">
                 <Field editing={editing} value={section.callout || ''} onChange={(callout) => patchSection(index, { callout })} multiline label={editing ? 'إبراز' : undefined} />
@@ -294,6 +367,11 @@ export default function PartnershipProposalPage() {
                   <article key={`${section.id}-card-${cardIndex}`} className="rounded-2xl border border-slate-200 p-4 space-y-2">
                     {editing ? (
                       <>
+                        <div className="flex justify-end">
+                          <button type="button" onClick={() => patchSection(index, { cards: (section.cards || []).filter((_, i) => i !== cardIndex) })} className="text-[10px] font-black text-[#630517] bg-[#F5D061]/20 border border-[#F5D061]/50 px-2.5 py-1 rounded-lg">
+                            حذف البطاقة
+                          </button>
+                        </div>
                         <Field editing value={card.title} onChange={(title) => {
                           const cards = [...(section.cards || [])];
                           cards[cardIndex] = { ...cards[cardIndex], title };

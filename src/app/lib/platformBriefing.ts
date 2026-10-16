@@ -253,6 +253,7 @@ export function normalizePlatformBriefing(raw?: Partial<PartnershipProposal> | n
       kicker: withClubColors(section.kicker || ''),
       title: withClubColors(section.title || ''),
       intro: withClubColors(section.intro || ''),
+      paragraphs: Array.isArray(section.paragraphs) ? section.paragraphs.map(withClubColors) : [],
       callout: withClubColors(section.callout || ''),
       outro: withClubColors(section.outro || ''),
       cards: Array.isArray(section.cards)

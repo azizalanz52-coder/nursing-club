@@ -11,6 +11,7 @@ export type ProposalSection = {
   kicker: string;
   title: string;
   intro?: string;
+  paragraphs?: string[];
   callout?: string;
   cards?: ProposalCard[];
   tableHeaders?: string[];
@@ -209,15 +210,40 @@ export function normalizePartnershipProposal(raw?: Partial<PartnershipProposal> 
   return {
     ...base,
     ...raw,
-    sections: sections.map((section, index) => ({
-      ...base.sections[index % base.sections.length],
-      ...section,
+    sections: sections.map((section) => ({
+      id: section.id || `s-${Date.now()}`,
+      kicker: section.kicker || '',
+      title: section.title || '',
+      intro: section.intro || '',
+      callout: section.callout || '',
+      outro: section.outro || '',
+      paragraphs: Array.isArray(section.paragraphs) ? section.paragraphs : [],
       cards: Array.isArray(section.cards) ? section.cards : [],
       tableHeaders: Array.isArray(section.tableHeaders) ? section.tableHeaders : undefined,
       tableRows: Array.isArray(section.tableRows) ? section.tableRows : undefined,
       steps: Array.isArray(section.steps) ? section.steps : undefined,
     })),
   };
+}
+
+export function sanitizeBriefingForFirestore(
+  proposal: PartnershipProposal,
+  extra: Record<string, unknown> = {}
+) {
+  const strip = (value: unknown): unknown => {
+    if (value === undefined) return undefined;
+    if (Array.isArray(value)) return value.map(strip);
+    if (value && typeof value === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+        if (nested === undefined) continue;
+        out[key] = strip(nested);
+      }
+      return out;
+    }
+    return value;
+  };
+  return strip({ ...proposal, ...extra }) as Record<string, unknown>;
 }
 
 export async function loadPrLeaders(db: Firestore): Promise<PartnershipLeaders> {
@@ -293,6 +319,7 @@ export function printClubBriefing(
         <p class="kicker">${esc(section.kicker)}</p>
         <h2>${esc(section.title)}</h2>
         ${section.intro ? `<p>${esc(section.intro)}</p>` : ''}
+        ${(section.paragraphs || []).filter(Boolean).map((paragraph) => `<p>${esc(paragraph)}</p>`).join('')}
         ${section.callout ? `<div class="callout">${esc(section.callout)}</div>` : ''}
         ${cards ? `<div class="grid">${cards}</div>` : ''}
         ${steps ? `<div class="flow">${steps}</div>` : ''}

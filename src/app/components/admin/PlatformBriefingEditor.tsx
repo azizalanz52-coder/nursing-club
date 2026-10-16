@@ -9,7 +9,8 @@ import {
   normalizePlatformBriefing,
   printPlatformBriefing,
 } from '../../lib/platformBriefing';
-import type { PartnershipProposal, ProposalSection } from '../../lib/partnershipProposal';
+import { sanitizeBriefingForFirestore, type PartnershipProposal, type ProposalSection } from '../../lib/partnershipProposal';
+import { clubNotice } from '../../lib/clubNotice';
 
 function RemoveBtn({ onClick, label }: { onClick: () => void; label: string }) {
   return (
@@ -59,7 +60,7 @@ function Field({
 }
 
 export default function PlatformBriefingEditor() {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [proposal, setProposal] = useState<PartnershipProposal>(DEFAULT_PLATFORM_BRIEFING);
@@ -99,6 +100,7 @@ export default function PlatformBriefingEditor() {
           kicker: `تبويب ${String(prev.sections.length + 1).padStart(2, '0')}`,
           title: 'قسم جديد',
           intro: '',
+          paragraphs: [''],
           cards: [],
         },
       ],
@@ -106,19 +108,24 @@ export default function PlatformBriefingEditor() {
   };
 
   const save = async () => {
+    if (saving) return;
     setSaving(true);
     setStatus('');
     try {
-      await setDoc(doc(db, ...PLATFORM_BRIEFING_DOC), {
-        ...proposal,
-        updatedAt: Date.now(),
-        updatedBy: localStorage.getItem('userName') || 'إدارة النادي',
-      });
-      setEditing(false);
-      setStatus('تم حفظ ملف مميزات الموقع. يمكن تحميله PDF لاجتماع الجامعة.');
+      await setDoc(
+        doc(db, ...PLATFORM_BRIEFING_DOC),
+        sanitizeBriefingForFirestore(proposal, {
+          updatedAt: Date.now(),
+          updatedBy: localStorage.getItem('userName') || 'إدارة النادي',
+        })
+      );
+      setStatus('تم حفظ التعديلات.');
+      await clubNotice('تم حفظ ملف مميزات الموقع. تقدر تكمل التعديل أو تحمّل PDF.', 'success', 'تم الحفظ');
     } catch (err) {
       console.error(err);
-      setStatus('تعذر الحفظ. تأكد من تسجيل الدخول ثم أعد المحاولة.');
+      const message = err instanceof Error ? err.message : 'تعذر الحفظ';
+      setStatus('تعذر الحفظ. سجّل الدخول مرة أخرى ثم أعد المحاولة.');
+      await clubNotice(message.includes('permission') ? 'سجّل الدخول مرة أخرى ثم احفظ الملف.' : 'تعذر حفظ الملف. أعد المحاولة.', 'error', 'لم يتم الحفظ');
     } finally {
       setSaving(false);
     }
@@ -136,7 +143,7 @@ export default function PlatformBriefingEditor() {
           <button type="button" onClick={() => setEditing((v) => !v)} className="px-4 py-2 rounded-xl bg-white/10 border border-[#F5D061]/40 text-[#F5D061] text-xs font-black">
             {editing ? 'إلغاء التعديل' : 'تعديل النصوص'}
           </button>
-          <button type="button" disabled={!editing || saving} onClick={save} className="px-4 py-2 rounded-xl bg-[#F5D061] text-[#3b020b] text-xs font-black disabled:opacity-40">
+          <button type="button" disabled={saving} onClick={save} className="px-4 py-2 rounded-xl bg-[#F5D061] text-[#3b020b] text-xs font-black disabled:opacity-40">
             {saving ? 'جارٍ الحفظ...' : 'حفظ التعديلات'}
           </button>
           <button type="button" onClick={() => printPlatformBriefing(proposal)} className="px-4 py-2 rounded-xl bg-white text-[#630517] text-xs font-black">
@@ -238,6 +245,32 @@ export default function PlatformBriefingEditor() {
               onRemove={editing ? () => patchSection(index, { intro: '' }) : undefined}
             />
           )}
+          {(section.paragraphs || []).map((paragraph, paragraphIndex) => (
+            (editing || paragraph) ? (
+              <Field
+                key={`${section.id}-p-${paragraphIndex}`}
+                editing={editing}
+                value={paragraph}
+                onChange={(next) => {
+                  const paragraphs = [...(section.paragraphs || [])];
+                  paragraphs[paragraphIndex] = next;
+                  patchSection(index, { paragraphs });
+                }}
+                multiline
+                label={editing ? `فقرة ${paragraphIndex + 1}` : undefined}
+                onRemove={editing ? () => patchSection(index, { paragraphs: (section.paragraphs || []).filter((_, i) => i !== paragraphIndex) }) : undefined}
+              />
+            ) : null
+          ))}
+          {editing ? (
+            <button
+              type="button"
+              onClick={() => patchSection(index, { paragraphs: [...(section.paragraphs || []), ''] })}
+              className="px-3 py-2 rounded-xl border border-[#F5D061] text-[#630517] text-[11px] font-black"
+            >
+              + إضافة فقرة
+            </button>
+          ) : null}
           {(editing || section.callout) && (
             <div className="bg-[#fff6d6] border-r-4 border-[#F5D061] rounded-2xl p-4">
               <Field
