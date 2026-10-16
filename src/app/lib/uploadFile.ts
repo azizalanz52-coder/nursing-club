@@ -1,10 +1,9 @@
 import { onAuthStateChanged } from 'firebase/auth';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { auth, storage } from './firebase';
 
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const FIRESTORE_SAFE_BYTES = 450 * 1024;
-const STORAGE_WAIT_MS = 12_000;
 
 export function isOverUploadLimit(file: File) {
   return file.size > MAX_UPLOAD_BYTES;
@@ -150,26 +149,53 @@ async function compressImageToDataUrl(file: File, maxBytes = FIRESTORE_SAFE_BYTE
   }
 }
 
+function uploadTimeoutMs(file: File) {
+  const megaBytes = Math.max(1, file.size / (1024 * 1024));
+  return Math.min(180_000, Math.round(25_000 + megaBytes * 15_000));
+}
+
 async function uploadToStorage(file: File, folderPath: string, onProgress?: (percent: number) => void) {
-  await waitForAuthUser(1500);
+  await waitForAuthUser(4000);
   const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`;
   const storageRef = ref(storage, `${folderPath}/${safeFileName}`);
-  onProgress?.(20);
+  onProgress?.(15);
 
-  const url = await withTimeout(
-    (async () => {
-      await uploadBytes(storageRef, file, {
-        contentType: file.type || 'application/octet-stream',
-      });
-      onProgress?.(85);
-      return await getDownloadURL(storageRef);
-    })(),
-    STORAGE_WAIT_MS,
-    'STORAGE_TIMEOUT'
-  );
+  const task = uploadBytesResumable(storageRef, file, {
+    contentType: file.type || 'application/octet-stream',
+  });
 
-  onProgress?.(100);
-  return url;
+  try {
+    const url = await withTimeout(
+      new Promise<string>((resolve, reject) => {
+        task.on(
+          'state_changed',
+          (snap) => {
+            const ratio = snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0;
+            onProgress?.(Math.min(90, Math.round(15 + ratio * 75)));
+          },
+          reject,
+          async () => {
+            try {
+              resolve(await getDownloadURL(task.snapshot.ref));
+            } catch (error) {
+              reject(error);
+            }
+          }
+        );
+      }),
+      uploadTimeoutMs(file),
+      'STORAGE_TIMEOUT'
+    );
+    onProgress?.(100);
+    return url;
+  } catch (error) {
+    try {
+      task.cancel();
+    } catch {
+      // ignore cancel errors
+    }
+    throw error;
+  }
 }
 
 export async function uploadClubFile(
@@ -190,11 +216,17 @@ export async function uploadClubFile(
     }
 
     const mapped = storageErrorMessage(error);
-    if (mapped.includes('STORAGE_TIMEOUT') || String(error).includes('STORAGE_TIMEOUT')) {
+    const timedOut = mapped.includes('STORAGE_TIMEOUT') || String(error).includes('STORAGE_TIMEOUT');
+    const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(file.name);
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+
+    if (timedOut) {
       throw new Error(
-        file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
-          ? 'تعذر رفع ملف PDF لأن سحابة الملفات لا تستجيب. ارفع صورة الشهادة ثم أعد المحاولة.'
-          : 'تعذر رفع الملف لأن سحابة الملفات لا تستجيب حالياً. ارفع صورة أصغر، أو فعّل Firebase Storage ثم أعد المحاولة.'
+        isPdf
+          ? 'تعذر رفع ملف PDF لأن الرفع أخذ وقتاً أطول من المتوقع. أعد المحاولة على شبكة أقوى.'
+          : isVideo
+            ? 'تعذر رفع المقطع لأن الرفع على الجوال أخذ وقتاً أطول من المتوقع. أعد المحاولة على واي فاي، والمقطع حتى 8 ميغابايت مسموح.'
+            : 'تعذر رفع الملف لأن الرفع أخذ وقتاً أطول من المتوقع. أعد المحاولة على شبكة أقوى.'
       );
     }
     throw new Error(mapped);
