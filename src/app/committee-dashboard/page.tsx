@@ -2188,6 +2188,18 @@ useEffect(() => {
           )}
         </div>
 
+        {(currentActiveComm === 'لجنة العلاقات العامة' || currentActiveComm === 'لجنة العلاقات') && isCommitteeLeader && (
+          <Link
+            href="/pr-proposal"
+            className="block bg-gradient-to-l from-[#2a050c] via-[#630517] to-[#4a030f] rounded-3xl p-6 sm:p-8 border border-[#F5D061]/40 shadow-sm text-white"
+          >
+            <p className="text-[11px] font-bold text-[#F5D061] mb-1">خاص بقائد وقائدة لجنة العلاقات العامة</p>
+            <h3 className="text-xl font-black">ملف مقترح الشراكة والرعاية</h3>
+            <p className="text-sm text-white/80 mt-2">عدّلوا نصوص الملف ثم حمّلوه PDF لإرساله للرعاة، بدون الرجوع لتعديل البرمجة.</p>
+            <span className="inline-block mt-4 px-4 py-2 rounded-xl bg-[#F5D061] text-[#3b020b] text-xs font-black">فتح الملف وتعديل النصوص ➔</span>
+          </Link>
+        )}
+
         {(currentActiveComm === 'لجنة العلاقات العامة' || currentActiveComm === 'لجنة العلاقات') && (
           <div className="bg-white rounded-3xl p-8 border border-sky-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">

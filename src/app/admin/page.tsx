@@ -14,6 +14,7 @@ import { ClubNoticeDialog } from '../components/ClubNotice';
 import HrCertificateBatches from '../components/HrCertificateBatches';
 import { printQualityEventReport, QUALITY_EVENT_REPORTS, computedSuccessIndex, recommendationLabel, type QualityEventReport } from '../lib/qualityEventReport';
 import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
+import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { stampMemberAcceptance } from '../lib/memberAcceptance';
@@ -172,7 +173,7 @@ export default function AdminDashboard() {
   
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter' | 'scientific-texts'>('case-study');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter' | 'scientific-texts' | 'platform-briefing'>('case-study');
 
   const [isRegistrationClosed, setIsRegistrationClosed] = useState<boolean>(false);
 
@@ -2608,6 +2609,18 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         <div className="flex flex-wrap gap-3 border-b border-slate-200 pb-4">
           <button
             type="button"
+            onClick={() => setActiveTab('platform-briefing')}
+            className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+              activeTab === 'platform-briefing'
+                ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105'
+                : 'bg-[#fff6d6] text-[#630517] border border-[#F5D061]/60 hover:bg-[#F5D061]/30'
+            }`}
+          >
+            📘 ملف مميزات الموقع
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('case-study')}
             className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
               activeTab === 'case-study' ? 'bg-[#9d174d] text-white shadow-md scale-105' : 'bg-pink-50 text-pink-900 border border-pink-200 hover:bg-pink-100'
@@ -2734,6 +2747,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             </button>
           ))}
         </div>
+
+        {activeTab === 'platform-briefing' && <PlatformBriefingEditor />}
 
         {/* تبويب نصوص المحتوى العلمي: صندوق تقييم من اللجنة */}
         {activeTab === 'scientific-texts' && (
