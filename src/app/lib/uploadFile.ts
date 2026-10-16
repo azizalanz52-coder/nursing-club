@@ -1,5 +1,5 @@
 import { onAuthStateChanged } from 'firebase/auth';
-import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
+import { getDownloadURL, ref, uploadBytes, uploadBytesResumable } from 'firebase/storage';
 import { auth, storage } from './firebase';
 
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
@@ -65,12 +65,13 @@ function safeExtension(file: File) {
   return fromType[file.type] || '';
 }
 
-function waitForAuthUser(timeoutMs = 4000) {
+function waitForAuthUser(timeoutMs = 15000) {
   if (auth.currentUser) return Promise.resolve(auth.currentUser);
-  return new Promise<typeof auth.currentUser>((resolve) => {
+  return new Promise<NonNullable<typeof auth.currentUser>>((resolve, reject) => {
     const timer = setTimeout(() => {
       unsub();
-      resolve(auth.currentUser);
+      if (auth.currentUser) resolve(auth.currentUser);
+      else reject(new Error('سجّل الدخول ثم أعد رفع الملف.'));
     }, timeoutMs);
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) return;
@@ -78,22 +79,6 @@ function waitForAuthUser(timeoutMs = 4000) {
       unsub();
       resolve(user);
     });
-  });
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      }
-    );
   });
 }
 
@@ -149,45 +134,67 @@ async function compressImageToDataUrl(file: File, maxBytes = FIRESTORE_SAFE_BYTE
   }
 }
 
-function uploadTimeoutMs(file: File) {
-  const megaBytes = Math.max(1, file.size / (1024 * 1024));
-  return Math.min(180_000, Math.round(25_000 + megaBytes * 15_000));
+function isVideoFile(file: File) {
+  return file.type.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(file.name);
 }
 
-async function uploadToStorage(file: File, folderPath: string, onProgress?: (percent: number) => void) {
-  await waitForAuthUser(4000);
-  const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`;
-  const storageRef = ref(storage, `${folderPath}/${safeFileName}`);
-  onProgress?.(15);
+function isRetryableUploadError(error: unknown) {
+  const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: string }).code) : '';
+  const message = error instanceof Error ? error.message : String(error || '');
+  if (code.includes('unauthorized') || message.includes('unauthorized')) return false;
+  if (code.includes('unauthenticated') || message.includes('unauthenticated')) return false;
+  if (code.includes('quota') || code.includes('invalid-checksum')) return false;
+  return true;
+}
 
-  const task = uploadBytesResumable(storageRef, file, {
-    contentType: file.type || 'application/octet-stream',
-  });
+function startProgressTicker(file: File, onProgress?: (percent: number) => void) {
+  const megaBytes = Math.max(0.4, file.size / (1024 * 1024));
+  const expectedMs = Math.max(3500, megaBytes * 2200);
+  const started = Date.now();
+  onProgress?.(18);
+  const tick = setInterval(() => {
+    const ratio = Math.min(0.88, (Date.now() - started) / expectedMs);
+    onProgress?.(Math.round(18 + ratio * 70));
+  }, 180);
+  return () => clearInterval(tick);
+}
 
+const fileMetadata = (file: File) => ({
+  contentType: file.type || 'application/octet-stream',
+  cacheControl: 'public,max-age=86400',
+});
+
+async function uploadDirect(file: File, storageRef: ReturnType<typeof ref>, onProgress?: (percent: number) => void) {
+  const stop = startProgressTicker(file, onProgress);
   try {
-    const url = await withTimeout(
-      new Promise<string>((resolve, reject) => {
-        task.on(
-          'state_changed',
-          (snap) => {
-            const ratio = snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0;
-            onProgress?.(Math.min(90, Math.round(15 + ratio * 75)));
-          },
-          reject,
-          async () => {
-            try {
-              resolve(await getDownloadURL(task.snapshot.ref));
-            } catch (error) {
-              reject(error);
-            }
+    const result = await uploadBytes(storageRef, file, fileMetadata(file));
+    onProgress?.(92);
+    return await getDownloadURL(result.ref);
+  } finally {
+    stop();
+  }
+}
+
+async function uploadResumable(file: File, storageRef: ReturnType<typeof ref>, onProgress?: (percent: number) => void) {
+  const task = uploadBytesResumable(storageRef, file, fileMetadata(file));
+  try {
+    return await new Promise<string>((resolve, reject) => {
+      task.on(
+        'state_changed',
+        (snap) => {
+          const ratio = snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0;
+          onProgress?.(Math.min(90, Math.round(15 + ratio * 75)));
+        },
+        reject,
+        async () => {
+          try {
+            resolve(await getDownloadURL(task.snapshot.ref));
+          } catch (error) {
+            reject(error);
           }
-        );
-      }),
-      uploadTimeoutMs(file),
-      'STORAGE_TIMEOUT'
-    );
-    onProgress?.(100);
-    return url;
+        }
+      );
+    });
   } catch (error) {
     try {
       task.cancel();
@@ -195,6 +202,26 @@ async function uploadToStorage(file: File, folderPath: string, onProgress?: (per
       // ignore cancel errors
     }
     throw error;
+  }
+}
+
+async function uploadToStorage(file: File, folderPath: string, onProgress?: (percent: number) => void) {
+  const user = await waitForAuthUser(12000);
+  await user.getIdToken();
+
+  const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`;
+  const storageRef = ref(storage, `${folderPath}/${safeFileName}`);
+  onProgress?.(12);
+
+  try {
+    const url = await uploadDirect(file, storageRef, onProgress);
+    onProgress?.(100);
+    return url;
+  } catch (error) {
+    if (!isRetryableUploadError(error)) throw error;
+    const url = await uploadResumable(file, storageRef, onProgress);
+    onProgress?.(100);
+    return url;
   }
 }
 
@@ -217,16 +244,16 @@ export async function uploadClubFile(
 
     const mapped = storageErrorMessage(error);
     const timedOut = mapped.includes('STORAGE_TIMEOUT') || String(error).includes('STORAGE_TIMEOUT');
-    const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(file.name);
+    const isVideo = isVideoFile(file);
     const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
 
     if (timedOut) {
       throw new Error(
         isPdf
-          ? 'تعذر رفع ملف PDF لأن الرفع أخذ وقتاً أطول من المتوقع. أعد المحاولة على شبكة أقوى.'
+          ? 'تعذر رفع ملف PDF لأن الاتصال توقف أثناء الرفع. أبقِ الصفحة مفتوحة وأعد المحاولة على واي فاي.'
           : isVideo
-            ? 'تعذر رفع المقطع لأن الرفع على الجوال أخذ وقتاً أطول من المتوقع. أعد المحاولة على واي فاي، والمقطع حتى 8 ميغابايت مسموح.'
-            : 'تعذر رفع الملف لأن الرفع أخذ وقتاً أطول من المتوقع. أعد المحاولة على شبكة أقوى.'
+            ? 'تعذر إكمال رفع المقطع لأن الاتصال توقف. أبقِ الصفحة مفتوحة حتى تظهر نسبة الرفع 100٪، ويفضّل الواي فاي.'
+            : 'تعذر رفع الملف لأن الاتصال توقف أثناء الرفع. أعد المحاولة على شبكة أقوى.'
       );
     }
     throw new Error(mapped);

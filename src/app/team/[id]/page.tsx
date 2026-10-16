@@ -19,6 +19,16 @@ import { canonicalPhone, normalizeUniversityId } from '../../lib/certificatesLoo
 import { canAccessCommittee, findMemberContext, isAcceptedStatus, sameMemberName, sameMemberPhone } from '../../lib/memberAcceptance';
 import { clubConfirm, inferNoticeKind } from '../../lib/clubNotice';
 import { ClubNoticeDialog } from '../../components/ClubNotice';
+import {
+  MEDIA_CATEGORIES,
+  MEDIA_STORAGE_FOLDER,
+  buildMediaRecord,
+  deleteMediaRecord,
+  isMediaVideo,
+  mediaFileUrls,
+  mediaOriginLabel,
+  subscribeMediaGallery,
+} from '../../lib/mediaGallery';
 
 // دالة تحويل الملف إلى Base64 كخيار احتياطي ومضمون
 const convertFileToBase64 = (file: File): Promise<string> => {
@@ -186,7 +196,7 @@ export default function CommitteeDetailPage() {
   // خصائص لجنة الإعلام (رفع الصور ومقاطع الفيديو)
   const [mediaGallery, setMediaGallery] = useState<any[]>([]);
   const [mediaTitle, setMediaTitle] = useState('');
-  const [mediaCategory, setMediaCategory] = useState('تغطيات مرئية وفيديوهات 🎥');
+  const [mediaCategory, setMediaCategory] = useState<string>(MEDIA_CATEGORIES[0]);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
   const [mediaUploadProgress, setMediaUploadProgress] = useState(0);
@@ -311,7 +321,6 @@ export default function CommitteeDetailPage() {
           eventsSnap,
           tasksSnap,
           partnersSnap,
-          mediaSnap,
           scientificSnap,
           hrSnap,
           siteSnap,
@@ -320,7 +329,6 @@ export default function CommitteeDetailPage() {
           getDocs(collection(db, 'site_events')),
           getDocs(collection(db, 'committee_tasks')),
           getDocs(collection(db, 'public_partners_relations')),
-          getDocs(collection(db, 'media_committee_gallery')),
           getDocs(collection(db, 'scientific_committee_texts')),
           needsHr ? getDocs(collection(db, 'certificates')) : Promise.resolve(emptySnap),
           needsHr ? getDocs(collection(db, 'site_certificates')) : Promise.resolve(emptySnap),
@@ -380,7 +388,6 @@ export default function CommitteeDetailPage() {
         }
 
         setPublicPartnersList(partnersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setMediaGallery(mediaSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setScientificTextsList(scientificSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
         console.error('Error fetching cloud data:', err);
@@ -394,6 +401,10 @@ export default function CommitteeDetailPage() {
       cancelled = true;
     };
   }, [id, baseDetails]);
+
+  useEffect(() => {
+    return subscribeMediaGallery(db, setMediaGallery);
+  }, []);
 
   const isAdmin = currentUserPhone === '0553731265';
 
@@ -510,32 +521,22 @@ export default function CommitteeDetailPage() {
       setIsUploadingMedia(true);
       setMediaUploadProgress(0);
 
-      const downloadUrl = await uploadClubFile(mediaFile, 'media_gallery', setMediaUploadProgress);
-      const isVideo = mediaFile.type.startsWith('video');
-
-      const newObj = {
-        title: mediaTitle.trim(),
+      const downloadUrl = await uploadClubFile(mediaFile, MEDIA_STORAGE_FOLDER, setMediaUploadProgress);
+      const newObj = buildMediaRecord({
+        title: mediaTitle,
         category: mediaCategory,
-        mediaUrl: downloadUrl,
-        imageUrl: downloadUrl, // للتوافق مع جميع اللوحات
-        files: [downloadUrl],
-        mediaType: isVideo ? 'video' : 'image',
-        createdAt: new Date().toLocaleDateString('ar-SA'),
-        timestamp: Date.now(),
+        urls: [downloadUrl],
+        isVideo: mediaFile.type.startsWith('video'),
         addedBy: currentUserName || 'عضو الإعلام',
-        uploadedBy: currentUserName || 'عضو الإعلام',
+        source: 'بوابة أعضاء لجنة الإعلام',
         uploaderRole: 'عضو لجنة',
-        committee: 'لجنة الإعلام',
-        source: 'صفحة الأعضاء',
-        status: 'معتمد'
-      };
+      });
 
-      const docRef = await addDoc(collection(db, 'media_committee_gallery'), newObj);
-      setMediaGallery([{ id: docRef.id, ...newObj }, ...mediaGallery]);
+      await addDoc(collection(db, 'media_committee_gallery'), newObj);
 
       setMediaTitle('');
       setMediaFile(null);
-      alert('تم رفع ونشر محتوى لجنة الإعلام سحابياً وتخزينه لجميع اللوحات بنجاح! 📸🚀');
+      alert('تم الرفع في الأرشيف المشترك. يظهر الآن لقادة الإعلام وفي تبويب قسم الإعلام بالأدمن.');
     } catch (err: any) {
       console.error('Error uploading media:', err);
       alert(err?.message || 'حدث خطأ أثناء رفع الملف، يرجى المحاولة مرة أخرى.');
@@ -549,8 +550,8 @@ export default function CommitteeDetailPage() {
   const handleDeleteMediaItem = async (itemId: string) => {
     if (!(await clubConfirm('هل أنت متأكد من حذف هذه المادة الإعلامية نهائياً؟'))) return;
     try {
-      await deleteDoc(doc(db, 'media_committee_gallery', itemId));
-      setMediaGallery(mediaGallery.filter(item => item.id !== itemId));
+      const target = mediaGallery.find((item) => item.id === itemId) || { id: itemId };
+      await deleteMediaRecord(db, target);
       alert('تم حذف المادة الإعلامية بنجاح 🗑️');
     } catch (err) {
       console.error(err);
@@ -1124,7 +1125,7 @@ export default function CommitteeDetailPage() {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h2 className="text-xl font-black text-slate-900">📸 مركز رفع وتوثيق محتوى لجنة الإعلام</h2>
-                <p className="text-xs text-slate-500 mt-1">خاص برفع التغطيات المرئية والفيديوهات والصور، بحد 8 ميغابايت لكل ملف، وتخزينها سحابياً لعرضها في المنصة.</p>
+                <p className="text-xs text-slate-500 mt-1">أرشيف واحد مشترك: كل رفع هنا يظهر مباشرة في لوحة قادة الإعلام وفي تبويب قسم الإعلام بلوحة الأدمن.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
                 إجمالي المواد: {mediaGallery.length}
@@ -1151,9 +1152,9 @@ export default function CommitteeDetailPage() {
                   onChange={(e) => setMediaCategory(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
                 >
-                  <option value="تغطيات مرئية وفيديوهات 🎥">تغطيات مرئية وفيديوهات 🎥</option>
-                  <option value="صور فعاليات وتوثيق 📸">صور فعاليات وتوثيق 📸</option>
-                  <option value="تصاميم وبوسترات 🎨">تصاميم وبوسترات 🎨</option>
+                  {MEDIA_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1218,20 +1219,27 @@ export default function CommitteeDetailPage() {
                 <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لم يتم رفع أي محتوى مرئي أو صور للجنة الإعلام حتى الآن.</p>
               ) : (
                 <div className="columns-1 sm:columns-2 md:columns-3 gap-6 space-y-6">
-                  {mediaGallery.map((item) => (
+                  {mediaGallery.map((item) => {
+                    const sources = mediaFileUrls(item);
+                    const primary = sources[0] || '';
+                    return (
                     <div key={item.id} className="break-inside-avoid p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between shadow-sm hover:shadow-md transition-all">
                       <div className="space-y-2">
-                        <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{item.category}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{item.category}</span>
+                          <span className="text-[10px] bg-slate-200 text-slate-700 px-2.5 py-0.5 rounded-full font-bold">{mediaOriginLabel(item)}</span>
+                        </div>
                         <h5 className="font-extrabold text-slate-900 text-sm leading-snug">{item.title}</h5>
                         <p className="text-[10px] text-slate-400">بواسطة: {item.addedBy || item.uploadedBy} ({item.createdAt})</p>
                       </div>
 
-                      {/* حاوية مرنة تستعرض الصورة أو الفيديو بأبعاده الأصلية الكاملة */}
                       <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900/5 flex items-center justify-center min-h-[140px]">
-                        {item.mediaType === 'video' || item.mediaUrl?.includes('.mp4') || item.imageUrl?.includes('.mp4') ? (
-                          <video src={item.mediaUrl || item.imageUrl} controls className="w-full h-auto max-h-[450px] object-contain rounded-xl" />
+                        {isMediaVideo(primary, item) ? (
+                          <video src={primary} controls className="w-full h-auto max-h-[450px] object-contain rounded-xl" />
+                        ) : primary ? (
+                          <img src={primary} alt={item.title} className="w-full h-auto max-h-[450px] object-contain rounded-xl" />
                         ) : (
-                          <img src={item.mediaUrl || item.imageUrl} alt={item.title} className="w-full h-auto max-h-[450px] object-contain rounded-xl" />
+                          <p className="text-[11px] text-slate-400 font-bold p-6">لا يوجد ملف للعرض</p>
                         )}
                       </div>
 
@@ -1253,7 +1261,8 @@ export default function CommitteeDetailPage() {
                         </button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1443,11 +1452,11 @@ export default function CommitteeDetailPage() {
             </div>
 
             <div className="rounded-2xl overflow-hidden border max-h-[60vh] flex items-center justify-center bg-black">
-              {previewItem.mediaType === 'video' || previewItem.mediaUrl?.includes('.mp4') || previewItem.imageUrl?.includes('.mp4') ? (
-                <video src={previewItem.mediaUrl || previewItem.imageUrl} controls autoPlay className="max-h-[60vh] w-auto mx-auto object-contain" />
-              ) : (
-                <img src={previewItem.mediaUrl || previewItem.imageUrl} alt={previewItem.title} className="max-h-[60vh] w-auto mx-auto object-contain" />
-              )}
+              {isMediaVideo(mediaFileUrls(previewItem)[0] || '', previewItem) ? (
+                <video src={mediaFileUrls(previewItem)[0]} controls autoPlay className="max-h-[60vh] w-auto mx-auto object-contain" />
+              ) : mediaFileUrls(previewItem)[0] ? (
+                <img src={mediaFileUrls(previewItem)[0]} alt={previewItem.title} className="max-h-[60vh] w-auto mx-auto object-contain" />
+              ) : null}
             </div>
 
             <div className="flex justify-between items-center text-xs text-slate-500 pt-2">

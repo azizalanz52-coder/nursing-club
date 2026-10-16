@@ -18,6 +18,17 @@ import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { stampMemberAcceptance } from '../lib/memberAcceptance';
+import {
+  MEDIA_CATEGORIES,
+  MEDIA_GALLERY_COL,
+  MEDIA_STORAGE_FOLDER,
+  buildMediaRecord,
+  deleteMediaRecord,
+  isMediaVideo,
+  mediaFileUrls,
+  mediaOriginLabel,
+  subscribeMediaGallery,
+} from '../lib/mediaGallery';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import * as XLSX from 'xlsx';
@@ -252,18 +263,6 @@ export default function AdminDashboard() {
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = (error) => reject(error);
     });
-  };
-
-  const getMediaSources = (item: any): string[] => {
-    if (Array.isArray(item?.files) && item.files.length > 0) return item.files.filter(Boolean);
-    const urls = [item?.mediaUrl, item?.imageUrl].filter(Boolean);
-    return Array.from(new Set(urls));
-  };
-
-  const isMediaVideo = (src: string, item?: any) => {
-    if (item?.mediaType === 'video') return true;
-    const s = String(src || '').toLowerCase();
-    return s.startsWith('data:video') || s.includes('.mp4') || s.includes('.mov') || s.includes('.webm');
   };
 
   const formatMediaDate = (item: any) => {
@@ -1288,7 +1287,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
   const [mediaUploads, setMediaUploads] = useState<any[]>([]);
   const [mediaTitle, setMediaTitle] = useState<string>('');
-  const [mediaCategory, setMediaCategory] = useState<string>('تغطيات مرئية وفيديوهات');
+  const [mediaCategory, setMediaCategory] = useState<string>(MEDIA_CATEGORIES[0]);
   const [mediaFiles, setMediaFiles] = useState<string[]>([]);
   const [mediaFileObjects, setMediaFileObjects] = useState<File[]>([]);
   const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
@@ -1415,14 +1414,6 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           setSelectedEventId(eventsList[0]?.id || '');
         }
 
-        const gallerySnap = await getDocs(collection(db, 'media_committee_gallery'));
-        const uploadsSnap = await getDocs(collection(db, 'media_committee_uploads'));
-        const mediaList: any[] = [];
-        gallerySnap.forEach((d) => mediaList.push({ id: d.id, ...d.data(), _col: 'media_committee_gallery' }));
-        uploadsSnap.forEach((d) => mediaList.push({ id: d.id, ...d.data(), _col: 'media_committee_uploads' }));
-        mediaList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        setMediaUploads(mediaList);
-
         const querySnapshot = await getDocs(collection(db, 'applications'));
         const fetchedRequests = querySnapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) as Record<string, any>[];
         if (fetchedRequests.length > 0) {
@@ -1446,17 +1437,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
     fetchCloudData();
 
-    const unsubMedia = onSnapshot(collection(db, 'media_committee_gallery'), async (gallerySnap) => {
-      const gallery = gallerySnap.docs.map((d) => ({ id: d.id, ...d.data(), _col: 'media_committee_gallery' }));
-      const uploadsSnap = await getDocs(collection(db, 'media_committee_uploads'));
-      const uploads = uploadsSnap.docs.map((d) => ({ id: d.id, ...d.data(), _col: 'media_committee_uploads' }));
-      const seen = new Set(gallery.map((g: any) => g.id));
-      const merged = [...gallery, ...uploads.filter((u: any) => !seen.has(u.id))];
-      merged.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
-      setMediaUploads(merged);
-    });
-
-    return () => unsubMedia();
+    return subscribeMediaGallery(db, setMediaUploads);
   }, []);
 
   const handleDeleteIncompleteAccounts = async () => {
@@ -1897,32 +1878,22 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     try {
       setIsUploadingMedia(true);
       setCloudUploadProgress(0);
-      const uploadedUrls = await uploadClubFiles(mediaFileObjects, 'media_gallery', setCloudUploadProgress);
-      const hasVideo = mediaFileObjects.some((file) => file.type.startsWith('video'));
-
-      const mediaObj = {
-        title: mediaTitle.trim(),
+      const uploadedUrls = await uploadClubFiles(mediaFileObjects, MEDIA_STORAGE_FOLDER, setCloudUploadProgress);
+      const mediaObj = buildMediaRecord({
+        title: mediaTitle,
         category: mediaCategory,
-        files: uploadedUrls,
-        mediaUrl: uploadedUrls[0],
-        imageUrl: uploadedUrls[0],
-        mediaType: hasVideo ? 'video' : 'image',
-        createdAt: new Date().toLocaleDateString('ar-SA'),
-        timestamp: Date.now(),
+        urls: uploadedUrls,
+        isVideo: mediaFileObjects.some((file) => file.type.startsWith('video')),
         addedBy: 'لوحة الأدمن',
-        uploadedBy: 'لوحة الأدمن',
-        uploaderRole: 'أدمن',
-        committee: 'لجنة الإعلام',
         source: 'لوحة تحكم الأدمن',
-        status: 'معتمد'
-      };
+        uploaderRole: 'أدمن',
+      });
 
-      const docRef = await addDoc(collection(db, 'media_committee_gallery'), mediaObj);
-      setMediaUploads([{ id: docRef.id, ...mediaObj, _col: 'media_committee_gallery' }, ...mediaUploads]);
+      await addDoc(collection(db, MEDIA_GALLERY_COL), mediaObj);
       setMediaTitle('');
       setMediaFiles([]);
       setMediaFileObjects([]);
-      setModalMessage('تم رفع الصور والفيديوهات الخاصة بلجنة الإعلام، وهي مربوطة الآن بصفحة الأعضاء! 🎥📸');
+      setModalMessage('تم الرفع في الأرشيف المشترك. يظهر الآن في بوابة أعضاء الإعلام ولوحة قادة الإعلام.');
       setModalType('success');
     } catch (err: any) {
       console.error(err);
@@ -1937,15 +1908,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const handleDeleteMediaUpload = (id: string) => {
     triggerConfirmModal('هل أنت متأكد من حذف محتوى لجنة الإعلام هذا؟', async () => {
       try {
-        const target = mediaUploads.find((m) => m.id === id);
-        const colName = target?._col || 'media_committee_gallery';
-        await deleteDoc(doc(db, colName, id));
-        if (colName === 'media_committee_gallery') {
-          try { await deleteDoc(doc(db, 'media_committee_uploads', id)); } catch {}
-        } else {
-          try { await deleteDoc(doc(db, 'media_committee_gallery', id)); } catch {}
-        }
-        setMediaUploads(mediaUploads.filter((m) => m.id !== id));
+        const target = mediaUploads.find((m) => m.id === id) || { id };
+        await deleteMediaRecord(db, target);
         setModalMessage('تم الحذف بنجاح.');
         setModalType('success');
       } catch (err) {
@@ -3787,7 +3751,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm space-y-6">
               <div className="border-b border-slate-100 pb-4">
                 <h3 className="text-xl font-black text-rose-900">🎥 رفع وتوثيق محتوى لجنة الإعلام</h3>
-                <p className="text-xs text-slate-500">مربوط مباشرة بصفحة أعضاء لجنة الإعلام: أي صورة أو فيديو يرفعها الأعضاء تصلك هنا تلقائياً، ورفوعات الأدمن تظهر لهم أيضاً.</p>
+                <p className="text-xs text-slate-500">تبويب قسم الإعلام مربوط مباشرة ببوابة أعضاء لجنة الإعلام ولوحة قادة الإعلام: أي رفع أو حذف في أي صفحة يظهر هنا وفي الصفحتين الأخريين فوراً.</p>
               </div>
 
               <form onSubmit={handleUploadMediaCommitteeContent} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-rose-50/30 p-6 rounded-2xl border border-rose-100">
@@ -3810,9 +3774,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     onChange={(e) => setMediaCategory(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
                   >
-                    <option value="تغطيات مرئية وفيديوهات">تغطيات مرئية وفيديوهات 🎥</option>
-                    <option value="صور فوتوغرافية">صور فوتوغرافية 📸</option>
-                    <option value="موشن غرافيك">موشن غرافيك 🎬</option>
+                    {MEDIA_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -3851,12 +3815,15 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {mediaUploads.map((item) => {
-                    const sources = getMediaSources(item);
+                    const sources = mediaFileUrls(item);
                     return (
                     <div key={item.id} className="p-6 rounded-2xl border border-rose-100 bg-rose-50/10 shadow-sm space-y-4">
                       <div className="flex justify-between items-center gap-3">
                         <h4 className="font-black text-rose-900 text-sm">{item.title}</h4>
-                        <span className="text-[10px] bg-rose-100 text-rose-800 px-2.5 py-1 rounded-full font-bold shrink-0">{item.category}</span>
+                        <div className="flex flex-wrap gap-1.5 shrink-0">
+                          <span className="text-[10px] bg-rose-100 text-rose-800 px-2.5 py-1 rounded-full font-bold">{item.category}</span>
+                          <span className="text-[10px] bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-bold">{mediaOriginLabel(item)}</span>
+                        </div>
                       </div>
                       <p className="text-[11px] text-slate-500 font-bold">
                         من: {item.addedBy || item.uploadedBy || 'عضو الإعلام'}

@@ -21,6 +21,17 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { emailToPhone } from '../lib/authIdentity';
 import PageLoading from '../components/PageLoading';
 import { clubConfirm } from '../lib/clubNotice';
+import {
+  MEDIA_CATEGORIES,
+  MEDIA_GALLERY_COL,
+  MEDIA_STORAGE_FOLDER,
+  buildMediaRecord,
+  deleteMediaRecord,
+  isMediaVideo,
+  mediaFileUrls,
+  mediaOriginLabel,
+  subscribeMediaGallery,
+} from '../lib/mediaGallery';
 
 export default function CommitteeDashboard() {
   const router = useRouter();
@@ -107,7 +118,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [warningHidden, setWarningHidden] = useState(false);
 
   const [mediaTitle, setMediaTitle] = useState('');
-  const [mediaCategory, setMediaCategory] = useState('تغطية فعالية');
+  const [mediaCategory, setMediaCategory] = useState<string>(MEDIA_CATEGORIES[0]);
   const [mediaBase64, setMediaBase64] = useState('/header-banner.png');
   const [mediaUploadFile, setMediaUploadFile] = useState<File | null>(null);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
@@ -193,7 +204,6 @@ useEffect(() => {
       fetchCommitteeTasks();
       fetchAllUsers();
       fetchQualityArchives();
-      fetchMediaGallery();
       fetchEventExcuses();
       fetchPublicPartners();
       fetchCommitteeWhatsappLinks();
@@ -222,6 +232,10 @@ useEffect(() => {
       if (unsubScientific) unsubScientific();
     };
   }, [router]);
+
+  useEffect(() => {
+    return subscribeMediaGallery(db, setMediaGallery);
+  }, []);
 
   const fetchCommitteeWhatsappLinks = async () => {
     try {
@@ -578,13 +592,6 @@ useEffect(() => {
     } catch (e) { console.error(e); }
   };
 
-  const fetchMediaGallery = async () => {
-    try {
-      const snap = await getDocs(collection(db, 'media_committee_gallery'));
-      setMediaGallery(snap.docs.map(d => ({ ...d.data(), id: d.id })));
-    } catch (e) { console.error(e); }
-  };
-
   const fetchEventExcuses = async () => {
     try {
       const snap = await getDocs(collection(db, 'event_excuses'));
@@ -712,24 +719,17 @@ useEffect(() => {
     setIsUploadingMedia(true);
     setMediaUploadProgress(0);
     try {
-      const fileUrl = await uploadClubFile(mediaUploadFile, 'media_gallery', setMediaUploadProgress);
-      const isVideo = mediaUploadFile.type.startsWith('video');
-      const newObj = {
-        title: mediaTitle.trim(),
+      const fileUrl = await uploadClubFile(mediaUploadFile, MEDIA_STORAGE_FOLDER, setMediaUploadProgress);
+      const newObj = buildMediaRecord({
+        title: mediaTitle,
         category: mediaCategory,
-        imageUrl: fileUrl,
-        mediaUrl: fileUrl,
-        files: [fileUrl],
-        mediaType: isVideo ? 'video' : 'image',
-        createdAt: new Date().toLocaleDateString('ar-SA'),
-        timestamp: Date.now(),
-        addedBy: userData?.fullName || 'لجنة الإعلام',
-        uploadedBy: userData?.fullName || 'لجنة الإعلام',
-        committee: 'لجنة الإعلام',
-        source: 'لوحة اللجنة'
-      };
-      const docRef = await addDoc(collection(db, 'media_committee_gallery'), newObj);
-      setMediaGallery([{ ...newObj, id: docRef.id }, ...mediaGallery]);
+        urls: [fileUrl],
+        isVideo: mediaUploadFile.type.startsWith('video'),
+        addedBy: userData?.fullName || 'قائد الإعلام',
+        source: 'لوحة قادة الإعلام',
+        uploaderRole: 'قائد اللجنة',
+      });
+      await addDoc(collection(db, MEDIA_GALLERY_COL), newObj);
       setMediaTitle('');
       setMediaBase64('/header-banner.png');
       setMediaUploadFile(null);
@@ -745,7 +745,7 @@ useEffect(() => {
         }
       }
 
-      alert('تم رفع ونشر المادة الإعلامية سحابياً لتصل للأدمن والرؤساء بنجاح! 📸🚀');
+      alert('تم الرفع في الأرشيف المشترك. يظهر الآن في بوابة الأعضاء وتبويب قسم الإعلام بالأدمن.');
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'تعذر رفع الملف. حاول مرة أخرى.');
@@ -757,8 +757,8 @@ useEffect(() => {
 
   const handleDeleteMedia = async (id: string) => {
     if (await clubConfirm('هل أنت متأكد من حذف هذه المادة؟')) {
-      await deleteDoc(doc(db, 'media_committee_gallery', id));
-      setMediaGallery(mediaGallery.filter(m => m.id !== id));
+      const target = mediaGallery.find((m) => m.id === id) || { id };
+      await deleteMediaRecord(db, target);
     }
   };
 
@@ -2493,7 +2493,7 @@ useEffect(() => {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">📸 مركز رفع ونشر الصور ومقاطع الفيديو (لجنة الإعلام)</h3>
-                <p className="text-xs text-slate-500">ارفع صور وتغطيات الفعاليات والمقاطع لتغذية لوحة تحكم الأدمن ومكتب الرؤساء والمعرض والموقع مباشرة.</p>
+                <p className="text-xs text-slate-500">أرشيف واحد مشترك مع بوابة أعضاء الإعلام وتبويب قسم الإعلام في لوحة الأدمن. أي رفع أو حذف يتحدث في الثلاث صفحات فوراً.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
                 إجمالي المواد المرفوعة: {mediaGallery.length}
@@ -2520,8 +2520,9 @@ useEffect(() => {
                   onChange={(e) => setMediaCategory(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
                 >
-                  <option value="تغطية فعالية">تغطية فعالية</option>
-                  <option value="صور ومقاطع">صور ومقاطع أرشيفية</option>
+                  {MEDIA_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
                 </select>
               </div>
 
@@ -2561,19 +2562,39 @@ useEffect(() => {
             </form>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
-              {mediaGallery.map((item) => (
+              {mediaGallery.length === 0 ? (
+                <p className="col-span-3 text-center py-8 text-slate-400 font-bold text-xs">لم يصل أي محتوى بعد من الأعضاء أو الأدمن.</p>
+              ) : mediaGallery.map((item) => {
+                const sources = mediaFileUrls(item);
+                const primary = sources[0] || '';
+                return (
                 <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
                   <div className="space-y-1.5">
-                    <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{item.category}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{item.category}</span>
+                      <span className="text-[10px] bg-slate-200 text-slate-700 px-2.5 py-0.5 rounded-full font-bold">{mediaOriginLabel(item)}</span>
+                    </div>
                     <h5 className="font-extrabold text-slate-900 text-xs">{item.title}</h5>
-                    <p className="text-[10px] text-slate-400">تاريخ الرفع: {item.createdAt}</p>
+                    <p className="text-[10px] text-slate-400">بواسطة: {item.addedBy || item.uploadedBy} — {item.createdAt}</p>
+                  </div>
+                  <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900/5 min-h-[120px] flex items-center justify-center">
+                    {isMediaVideo(primary, item) ? (
+                      <video src={primary} controls className="w-full h-auto max-h-48 object-contain" />
+                    ) : primary ? (
+                      <img src={primary} alt={item.title} className="w-full h-auto max-h-48 object-contain" />
+                    ) : (
+                      <p className="text-[11px] text-slate-400 font-bold p-4">لا يوجد ملف للعرض</p>
+                    )}
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <a href={item.imageUrl} target="_blank" rel="noopener noreferrer" className="flex-1 py-1.5 bg-sky-50 text-sky-700 text-center font-bold text-xs rounded-lg">عرض 👁️</a>
+                    {primary ? (
+                      <a href={primary} target="_blank" rel="noopener noreferrer" className="flex-1 py-1.5 bg-sky-50 text-sky-700 text-center font-bold text-xs rounded-lg">عرض 👁️</a>
+                    ) : null}
                     <button type="button" onClick={() => handleDeleteMedia(item.id)} className="px-3 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-lg">حذف ✕</button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
