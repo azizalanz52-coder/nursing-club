@@ -20,14 +20,14 @@ export function humanizeNotice(message: string) {
     return 'ملف الشهادة كبير على الحفظ. صغّر الصورة ثم أعد المحاولة.';
   }
   if (/insufficient permissions|permission-denied|permission_denied/i.test(text)) {
-    return 'سجّل الدخول مرة أخرى ثم احفظ الشهادة';
+    return 'سجّل الدخول مرة أخرى ثم أعد المحاولة.';
   }
   return text;
 }
 
 export function inferNoticeKind(message: string): ClubNoticeKind {
   const text = humanizeNotice(message);
-  if (/تعذر|خطأ|فشل|مرفوضة|غير صحيحة|كبير على الحفظ|صلاحية/.test(text)) return 'error';
+  if (/تعذر|خطأ|فشل|مرفوضة|غير صحيحة|كبير على الحفظ|صلاحية|سجّل الدخول/.test(text)) return 'error';
   if (/لا يوجد|مكرر|مسبقا/.test(text)) return 'info';
   if (/تم |بنجاح|نجاح|مرحبا/.test(text)) return 'success';
   return 'info';

@@ -110,6 +110,11 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
+    match /scientific_committee_texts/{id} {
+      allow read: if true;
+      allow create, update, delete: if signedIn();
+    }
+
     match /student_achievements/{id} {
       allow read: if true;
       allow write: if isStaff();

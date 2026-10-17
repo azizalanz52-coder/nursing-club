@@ -65,6 +65,12 @@ function safeExtension(file: File) {
   return fromType[file.type] || '';
 }
 
+export async function requireAuthUser() {
+  const user = await waitForAuthUser(12000);
+  await user.getIdToken();
+  return user;
+}
+
 function waitForAuthUser(timeoutMs = 15000) {
   if (auth.currentUser) return Promise.resolve(auth.currentUser);
   return new Promise<NonNullable<typeof auth.currentUser>>((resolve, reject) => {

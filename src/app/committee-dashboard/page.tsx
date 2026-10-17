@@ -12,7 +12,7 @@ import HrCertificateBatches from './../components/HrCertificateBatches';
 import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { committeeIdFromName, committeeNameFromId, findMemberContext, findUserDoc, resolvePortalCommitteeId, sameMemberName, stampMemberAcceptance } from '../lib/memberAcceptance';
-import { certMediaFields, isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { certMediaFields, isOverUploadLimit, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
 import QualityEventReportForm from '../components/QualityEventReport';
@@ -773,28 +773,6 @@ useEffect(() => {
     });
   };
 
-  const uploadScientificPdf = async (file: File) => {
-    const fileExt = file.name.includes('.') ? file.name.substring(file.name.lastIndexOf('.')) : '.pdf';
-    const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${fileExt}`;
-    const storageRef = ref(storage, `scientific-texts/${safeFileName}`);
-    try {
-      const storagePromise = (async () => {
-        await uploadBytes(storageRef, file);
-        return await getDownloadURL(storageRef);
-      })();
-      const timeoutPromise = new Promise<string>((_, reject) =>
-        setTimeout(() => reject(new Error('Storage Upload Timeout')), 8000)
-      );
-      return await Promise.race([storagePromise, timeoutPromise]);
-    } catch (storageErr) {
-      console.warn('تعذر الرفع عبر Storage، التحويل الاحتياطي:', storageErr);
-      if (file.size > 700 * 1024) {
-        throw new Error('تعذر الرفع السحابي والملف أكبر من 700 كيلوبايت. صغّر الملف ثم أعد المحاولة.');
-      }
-      return await convertFileToBase64(file);
-    }
-  };
-
   const handleAddScientificTextSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!isScientificCommitteeUser()) {
@@ -818,17 +796,18 @@ useEffect(() => {
         alert('خانة الملف تقبل PDF فقط.');
         return;
       }
-      if (textPdfFile.size > 8 * 1024 * 1024) {
-        alert('حجم ملف PDF كبير جداً. الحد الأقصى 8 ميغابايت.');
+      if (isOverUploadLimit(textPdfFile)) {
+        alert(uploadLimitMessage());
         return;
       }
     }
 
     setIsUploadingScientific(true);
     try {
+      await requireAuthUser();
       let pdfUrl = '';
       if (textPdfFile) {
-        pdfUrl = await uploadScientificPdf(textPdfFile);
+        pdfUrl = await uploadClubFile(textPdfFile, 'scientific-texts');
       }
 
       const newTextObj = {

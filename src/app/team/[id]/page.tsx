@@ -14,7 +14,7 @@ import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import PageLoading from '../../components/PageLoading';
-import { certMediaFields, isOverUploadLimit, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
+import { certMediaFields, isOverUploadLimit, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
 import { canonicalPhone, normalizeUniversityId } from '../../lib/certificatesLookup';
 import { canAccessCommittee, findMemberContext, isAcceptedStatus, sameMemberName, sameMemberPhone } from '../../lib/memberAcceptance';
 import { clubConfirm, inferNoticeKind } from '../../lib/clubNotice';
@@ -591,9 +591,10 @@ export default function CommitteeDetailPage() {
 
     setIsUploadingScientific(true);
     try {
+      await requireAuthUser();
       let pdfUrl = '';
       if (textPdfFile) {
-        pdfUrl = await uploadFileToStorage(textPdfFile, 'scientific-texts');
+        pdfUrl = await uploadClubFile(textPdfFile, 'scientific-texts');
       }
       const newTextObj = {
         title: textBannerTitle.trim(),
