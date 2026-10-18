@@ -2,8 +2,11 @@
 
 import {
   createUserWithEmailAndPassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
   signInWithEmailAndPassword,
   signOut,
+  updatePassword,
 } from 'firebase/auth';
 import { deleteField, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
@@ -213,6 +216,23 @@ export async function registerWithPhonePassword(payload: {
 
   await persistSession(profileId, fullName);
   return { phone: profileId, fullName, claimed: Boolean(existingFound) };
+}
+
+export async function changeOwnPassword(currentPassword: string, newPassword: string) {
+  const user = auth.currentUser;
+  if (!user?.email) {
+    throw new Error('سجّل الدخول مرة أخرى ثم أعد المحاولة.');
+  }
+  if (newPassword.length < 6) {
+    throw new Error('يجب أن تكون كلمة المرور الجديدة 6 أحرف أو أرقام على الأقل.');
+  }
+  try {
+    const cred = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, cred);
+    await updatePassword(user, newPassword);
+  } catch (err: any) {
+    throw new Error(authErrorMessage(err));
+  }
 }
 
 export async function logoutSession() {

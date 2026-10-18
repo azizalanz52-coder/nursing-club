@@ -31,6 +31,7 @@ import {
 } from '../lib/mediaGallery';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { changeOwnPassword } from '../lib/sessionAuth';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 
@@ -243,10 +244,11 @@ export default function AdminDashboard() {
   const [sciReviewFilter, setSciReviewFilter] = useState<'pending' | 'all' | 'archived'>('pending');
   const [sciArchiveTitle, setSciArchiveTitle] = useState<string>('');
 
-  const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'name' | 'confirm'>('none');
+  const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'name' | 'confirm' | 'own-password'>('none');
   const [modalMessage, setModalMessage] = useState<string>('');
   const [activeUserPhoneForAction, setActiveUserPhoneForAction] = useState<string>('');
   const [modalInputVal, setModalInputVal] = useState<string>('');
+  const [currentPasswordInput, setCurrentPasswordInput] = useState<string>('');
   const [confirmActionCallback, setConfirmActionCallback] = useState<(() => void) | null>(null);
 
   const [showShiftModal, setShowShiftModal] = useState<boolean>(false);
@@ -1504,6 +1506,27 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     setActiveUserPhoneForAction(phone);
     setModalInputVal('');
     setModalType('password');
+  };
+
+  const openOwnPasswordModal = () => {
+    setCurrentPasswordInput('');
+    setModalInputVal('');
+    setModalType('own-password');
+  };
+
+  const submitOwnPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!currentPasswordInput.trim() || !modalInputVal.trim()) return;
+    try {
+      await changeOwnPassword(currentPasswordInput.trim(), modalInputVal.trim());
+      setCurrentPasswordInput('');
+      setModalInputVal('');
+      setModalMessage('تم تغيير كلمة مرورك. من الآن ادخل بالكلمة الجديدة، وغيّر ADMIN_PASSWORD في Vercel إذا كانت نفسها.');
+      setModalType('success');
+    } catch (err: any) {
+      setModalMessage(err?.message || 'تعذر تغيير كلمة المرور. تأكد من الكلمة الحالية.');
+      setModalType('success');
+    }
   };
 
   const submitUpdatePassword = async (e: FormEvent) => {
@@ -4291,7 +4314,16 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     </td>
                     <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
                     <td className="py-4">
-                      <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded">محمية في نظام الدخول</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded">محمية في نظام الدخول</span>
+                        <button
+                          type="button"
+                          onClick={openOwnPasswordModal}
+                          className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-lg font-bold hover:bg-amber-100 cursor-pointer shadow-sm transition-all"
+                        >
+                          تغيير كلمة مروري
+                        </button>
+                      </div>
                     </td>
                     <td className="py-4">
                       <span className="px-3 py-1 rounded-full bg-[#630517] text-[#F5D061] font-black text-[11px] inline-block" dir="ltr">
@@ -5720,6 +5752,47 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       )}
 
       {/* Modals الإدخال، التنبيهات، والتأكيد العامة */}
+      {modalType === 'own-password' && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={submitOwnPassword} className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl border border-slate-100">
+            <h3 className="text-lg font-black text-slate-900">تغيير كلمة مرور الأدمن</h3>
+            <p className="text-[11px] text-slate-500 leading-relaxed">اكتب الكلمة الحالية ثم الكلمة الجديدة. ما تحتاج صلاحية Firebase Console.</p>
+            <input
+              type="password"
+              placeholder="كلمة المرور الحالية..."
+              value={currentPasswordInput}
+              onChange={(e) => setCurrentPasswordInput(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50 focus:outline-none focus:border-[#630517]"
+              required
+            />
+            <input
+              type="password"
+              placeholder="كلمة المرور الجديدة..."
+              value={modalInputVal}
+              onChange={(e) => setModalInputVal(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50 focus:outline-none focus:border-[#630517]"
+              required
+              minLength={6}
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => { setModalType('none'); setCurrentPasswordInput(''); }}
+                className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
+              >
+                حفظ الكلمة الجديدة
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {modalType === 'password' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <form onSubmit={submitUpdatePassword} className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl border border-slate-100">
