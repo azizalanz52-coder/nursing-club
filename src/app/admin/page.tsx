@@ -4,10 +4,10 @@ import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot, increment } from 'firebase/firestore';
 import { isIncompleteUserAccount, notifyCommitteeByKeyword, omitPassword, purgeAllStoredPasswords, setUserPasswordOnPhone } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
-import { certMediaFields, filterFilesWithinLimit, isOverUploadLimit, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { certMediaFields, filterFilesWithinLimit, isOverUploadLimit, requireAuthUser, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { DEFAULT_WELCOME_BANNER, WELCOME_BANNER_ID } from '../lib/welcomeBanner';
 import { clubConfirm, inferNoticeKind } from '../lib/clubNotice';
 import { ClubNoticeDialog } from '../components/ClubNotice';
@@ -380,7 +380,7 @@ export default function AdminDashboard() {
 
   const getRealUserName = (phone: string, defaultName: string) => {
     if (!phone) return defaultName;
-    const found = usersList.find(u => u.phone === phone);
+    const found = usersList.find((u) => sameMemberPhone(u.phone, phone) || u.phone === phone);
     return found?.fullName || defaultName;
   };
 
@@ -1493,12 +1493,17 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   };
 
   const handleUpdateCaseScore = async (id: string, currentScore: number, delta: number) => {
-    const newScore = Math.max(0, currentScore + delta);
+    if (currentScore + delta < 0) return;
     try {
-      await updateDoc(doc(db, 'case_study_submissions', id), { score: newScore });
-      setCaseSubmissions(caseSubmissions.map(sub => sub.id === id ? { ...sub, score: newScore } : sub));
-    } catch (err) {
+      await requireAuthUser();
+      await updateDoc(doc(db, 'case_study_submissions', id), { score: increment(delta) });
+      setCaseSubmissions((prev) => prev.map((sub) => (
+        sub.id === id ? { ...sub, score: Math.max(0, Number(sub.score || 0) + delta) } : sub
+      )));
+    } catch (err: any) {
       console.error(err);
+      setModalMessage(err?.message || 'تعذر تعديل النقاط. سجّل الدخول ثم أعد المحاولة.');
+      setModalType('success');
     }
   };
 
@@ -1560,10 +1565,24 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     if (!trimmedName) return;
 
     try {
+      await requireAuthUser();
       const userRef = doc(db, 'users', activeUserPhoneForAction);
       await updateDoc(userRef, { fullName: trimmedName });
       setUsersList(usersList.map(u => u.phone === activeUserPhoneForAction ? { ...u, fullName: trimmedName } : u));
-      setModalMessage('تم تحديث اسم المستخدم بنجاح سحابياً! 👤');
+
+      const submissionsSnap = await getDocs(collection(db, 'case_study_submissions'));
+      await Promise.all(submissionsSnap.docs.map(async (row) => {
+        const phone = String(row.data()?.phone || row.data()?.phoneNumber || '');
+        if (!sameMemberPhone(phone, activeUserPhoneForAction) && phone !== activeUserPhoneForAction) return;
+        await updateDoc(row.ref, { studentName: trimmedName });
+      }));
+      setCaseSubmissions((prev) => prev.map((sub) => (
+        sameMemberPhone(sub.phone || sub.phoneNumber, activeUserPhoneForAction)
+          ? { ...sub, studentName: trimmedName }
+          : sub
+      )));
+
+      setModalMessage('تم تحديث الاسم في الحساب وفي لوحة الصدارة.');
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -3342,11 +3361,21 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                       const userPhone = sub.phone || sub.phoneNumber || '';
                       const rawName = sub.studentName || sub.fullName || sub.name || 'مشارك كريم';
                       const realStudentName = getRealUserName(userPhone, rawName);
+                      const phoneKey = canonicalPhone(userPhone);
+                      const phoneTotal = caseSubmissions.reduce((sum, item) => {
+                        const itemPhone = canonicalPhone(item.phone || item.phoneNumber || '');
+                        if (phoneKey && itemPhone === phoneKey) return sum + Number(item.score || 0);
+                        if (!phoneKey && item.id === sub.id) return sum + Number(item.score || 0);
+                        return sum;
+                      }, 0);
 
                       return (
                         <tr key={sub.id || idx} className="hover:bg-slate-50">
                           <td className="py-4 pr-2 font-bold text-slate-900">
                             👤 {realStudentName}
+                            {phoneTotal !== Number(sub.score || 0) ? (
+                              <span className="block text-[10px] text-pink-700 font-bold mt-0.5">المجموع لهذا الرقم: {phoneTotal} نقطة</span>
+                            ) : null}
                           </td>
                           <td className="py-4 text-slate-600 font-mono" dir="ltr">
                             📞 {userPhone || 'غير متوفر'}

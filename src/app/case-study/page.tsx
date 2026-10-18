@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
-import { collection, addDoc, getDocs, query } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, getDocs, query } from 'firebase/firestore';
+import { canonicalPhone, phoneVariants } from '../lib/certificatesLookup';
 
 interface CaseQuestion {
   id: number;
@@ -277,18 +278,44 @@ export default function CaseStudyPage() {
   const fetchLeaderboard = async () => {
     try {
       const snap = await getDocs(query(collection(db, 'case_study_submissions')));
-      const scoreMap: Record<string, number> = {};
+      const byKey: Record<string, { score: number; latestTs: number; name: string; phone: string }> = {};
 
       snap.forEach((docSnap) => {
         const data = docSnap.data();
-        const fallbackName = String(data.studentName || 'مشارك').trim();
-        const score = Number(data.score) || 0;
-        scoreMap[fallbackName] = (scoreMap[fallbackName] || 0) + score;
+        const phone = String(data.phone || data.phoneNumber || '').trim();
+        const key = canonicalPhone(phone) || `name:${String(data.studentName || 'مشارك').trim()}`;
+        const name = String(data.studentName || 'مشارك').trim();
+        const ts = Number(data.timestamp || 0);
+        if (!byKey[key]) {
+          byKey[key] = { score: 0, latestTs: 0, name, phone };
+        }
+        byKey[key].score += Number(data.score) || 0;
+        if (ts >= byKey[key].latestTs) {
+          byKey[key].latestTs = ts;
+          byKey[key].name = name;
+          if (phone) byKey[key].phone = phone;
+        }
       });
 
-      const list: LeaderboardItem[] = Object.keys(scoreMap).map((name) => ({
-        studentName: name,
-        totalScore: scoreMap[name],
+      await Promise.all(Object.values(byKey).map(async (row) => {
+        if (!row.phone) return;
+        for (const id of phoneVariants(row.phone)) {
+          try {
+            const userSnap = await getDoc(doc(db, 'users', id));
+            const fullName = String(userSnap.data()?.fullName || '').trim();
+            if (fullName) {
+              row.name = fullName;
+              return;
+            }
+          } catch {
+            // keep submission name
+          }
+        }
+      }));
+
+      const list: LeaderboardItem[] = Object.values(byKey).map((row) => ({
+        studentName: row.name,
+        totalScore: row.score,
       }));
 
       list.sort((a, b) => b.totalScore - a.totalScore);
