@@ -144,18 +144,6 @@ export async function loginWithPhonePassword(phone: string, password: string) {
         throw new Error('رقم الجوال غير مسجل في النظام. يمكنك إنشاء حساب جديد.');
       }
 
-      const passwordDoc = phoneDocs.find((item) => String(item.data?.password || '') === password);
-      if (passwordDoc) {
-        try {
-          await createAuthWithVariants(passwordDoc.id, password);
-        } catch (createErr: any) {
-          if (!isEmailTaken(createErr) && !isAuthMiss(createErr)) {
-            throw new Error(authErrorMessage(createErr));
-          }
-        }
-        return finishLogin(passwordDoc.id, passwordDoc.data);
-      }
-
       const profile = foundLegacy || phoneDocs[0];
       if (profile && isIncompleteUserAccount(profile.data)) {
         throw new Error('هذا الرقم لم يكمل إنشاء الحساب بعد. استخدم إنشاء حساب جديد.');
@@ -190,10 +178,7 @@ export async function registerWithPhonePassword(payload: {
   const existing = existingFound?.data;
   const profileId = existingFound?.id || canonicalPhone(cleanPhone) || cleanPhone;
 
-  if (existing && !isIncompleteUserAccount(existing) && existing.password && existing.password !== password) {
-    throw new Error('رقم الجوال مسجل مسبقاً. إذا نسيتِ كلمة المرور اطلبي إعادة تعيينها من الإدارة.');
-  }
-  if (existing && !isIncompleteUserAccount(existing) && !existing.password) {
+  if (existing && !isIncompleteUserAccount(existing)) {
     throw new Error('رقم الجوال مسجل مسبقاً. سجّلي الدخول، وإذا نسيتِ كلمة المرور اطلبي إعادة تعيينها من الإدارة.');
   }
 
@@ -204,9 +189,6 @@ export async function registerWithPhonePassword(payload: {
       try {
         await signInAuthWithVariants(profileId, password);
       } catch {
-        if (existing?.password && existing.password === password) {
-          return finishLogin(profileId, { ...existing, fullName });
-        }
         throw new Error('رقم الجوال مسجل مسبقاً. سجّلي الدخول أو اطلبي من الإدارة إعادة تعيين كلمة المرور.');
       }
     } else {
@@ -224,7 +206,7 @@ export async function registerWithPhonePassword(payload: {
       createdAt: existing?.createdAt || new Date().toISOString(),
       authMigrated: Boolean(auth.currentUser),
       lastActive: Date.now(),
-      password: auth.currentUser ? deleteField() : password,
+      password: deleteField(),
     },
     { merge: true }
   );

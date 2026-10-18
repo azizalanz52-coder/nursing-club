@@ -1,4 +1,4 @@
-import { Firestore, collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import { Firestore, collection, deleteField, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 import { canonicalPhone, phoneVariants } from './certificatesLookup';
 
 function isLeadershipAccount(phone: string, role?: string) {
@@ -75,27 +75,63 @@ export async function findUserDocsByPhone(db: Firestore, phone: string) {
   return docs;
 }
 
-export async function setUserPasswordOnPhone(db: Firestore, phone: string, password: string) {
+export function omitPassword<T extends Record<string, any>>(data: T) {
+  const { password: _password, ...safe } = data;
+  return safe as Omit<T, 'password'>;
+}
+
+export async function stripPasswordFields(db: Firestore, phone: string) {
   const clean = String(phone || '').trim();
   const ids = Array.from(new Set([clean, canonicalPhone(clean), ...phoneVariants(clean)].filter(Boolean)));
   let updated = 0;
-  const payload = {
-    password,
-    phone: canonicalPhone(clean) || clean,
-    passwordResetAt: new Date().toISOString(),
-  };
   for (const id of ids) {
     const ref = doc(db, 'users', id);
     const snap = await getDoc(ref);
-    if (!snap.exists()) continue;
-    await updateDoc(ref, payload);
+    if (!snap.exists() || !Object.prototype.hasOwnProperty.call(snap.data() || {}, 'password')) continue;
+    await updateDoc(ref, {
+      password: deleteField(),
+      authMigrated: true,
+      passwordResetAt: new Date().toISOString(),
+    });
     updated += 1;
   }
-  if (updated === 0 && clean) {
-    await setDoc(doc(db, 'users', canonicalPhone(clean) || clean), payload, { merge: true });
-    updated = 1;
+  return updated;
+}
+
+export async function purgeAllStoredPasswords(db: Firestore) {
+  const snap = await getDocs(collection(db, 'users'));
+  let updated = 0;
+  for (const row of snap.docs) {
+    if (!Object.prototype.hasOwnProperty.call(row.data() || {}, 'password')) continue;
+    await updateDoc(row.ref, {
+      password: deleteField(),
+      authMigrated: true,
+    });
+    updated += 1;
   }
   return updated;
+}
+
+export async function setUserPasswordOnPhone(db: Firestore, phone: string, password: string, idToken?: string) {
+  const clean = String(phone || '').trim();
+  if (!clean || password.length < 6) {
+    throw new Error('يجب أن تكون كلمة المرور 6 أحرف أو أرقام على الأقل.');
+  }
+
+  const res = await fetch('/api/auth/set-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+    },
+    body: JSON.stringify({ phone: clean, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  await stripPasswordFields(db, clean);
+  if (!res.ok) {
+    throw new Error(data.error || 'تعذر تحديث كلمة المرور في نظام الدخول.');
+  }
+  return data;
 }
 
 export async function completeOrCreateUserAccount(
@@ -104,7 +140,6 @@ export async function completeOrCreateUserAccount(
 ) {
   const phone = String(payload.phone || '').trim();
   const fullName = payload.fullName.trim();
-  const password = payload.password;
   const ref = doc(db, 'users', phone);
   const snap = await getDoc(ref);
   const existing = snap.exists() ? snap.data() : undefined;
@@ -116,12 +151,13 @@ export async function completeOrCreateUserAccount(
   await setDoc(
     ref,
     {
-      ...(existing || {}),
+      ...(omitPassword(existing || {})),
       fullName,
       phone,
-      password,
       role: existing?.role || 'عضو أساسي',
       createdAt: existing?.createdAt || new Date().toISOString(),
+      authMigrated: true,
+      password: deleteField(),
     },
     { merge: true }
   );

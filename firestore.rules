@@ -36,24 +36,37 @@ service cloud.firestore {
         && userRole().matches('.*(قائد|قائدة|رئيس لجنة|رئيسة لجنة|مشرف|جودة).*');
     }
 
+    function isClubOperator() {
+      return isStaff() || isCommitteeLeader();
+    }
+
+    function writesPassword() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['password']);
+    }
+
     match /users/{phone} {
-      allow get: if true;
-      allow list: if signedIn();
-      allow create: if signedIn() && (authPhone() == phone || isStaff() || isCommitteeLeader());
+      allow get: if signedIn()
+        || resource == null
+        || !resource.data.keys().hasAny(['password']);
+      allow list: if isClubOperator();
+      allow create: if signedIn()
+        && (authPhone() == phone || isClubOperator())
+        && !request.resource.data.keys().hasAny(['password']);
       allow delete: if isAdmin();
-      allow update: if isAdmin()
-        || isStaff()
-        || isCommitteeLeader()
-        || (signedIn() && authPhone() == phone
-            && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['role', 'assignedCommittee']))
-        || (signedIn()
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['latestNotification', 'lastActive', 'warningHidden', 'hasSeenCongrats', 'pendingCongratulation']));
+      allow update: if (isAdmin()
+          || isStaff()
+          || isCommitteeLeader()
+          || (signedIn() && authPhone() == phone
+              && !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['role', 'assignedCommittee']))
+          || (signedIn()
+              && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['latestNotification', 'lastActive', 'warningHidden', 'hasSeenCongrats', 'pendingCongratulation'])))
+        && (!request.resource.data.keys().hasAny(['password']) || !writesPassword());
     }
 
     match /applications/{id} {
-      allow read: if true;
+      allow read: if signedIn();
       allow create: if true;
       allow update, delete: if signedIn();
     }
@@ -111,12 +124,12 @@ service cloud.firestore {
     }
 
     match /scientific_committee_texts/{id} {
-      allow read: if true;
+      allow read: if signedIn();
       allow create, update, delete: if signedIn();
     }
 
     match /public_partners_relations/{id} {
-      allow read: if true;
+      allow read: if signedIn();
       allow create, update, delete: if signedIn();
     }
 
@@ -131,28 +144,29 @@ service cloud.firestore {
     }
 
     match /certificates/{id} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if signedIn();
     }
 
     match /site_certificates/{id} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if signedIn();
     }
 
     match /hr_certificate_batches/{id} {
-      allow read, write: if true;
+      allow read, write: if signedIn();
     }
 
     match /admin_documents/{id} {
-      allow read, write: if true;
+      allow read, write: if isClubOperator();
     }
 
     match /pr_documents/{id} {
-      allow read, write: if true;
+      allow read, write: if signedIn();
     }
 
     match /{document=**} {
-      allow read: if true;
-      allow write: if signedIn();
+      allow read, write: if signedIn();
     }
   }
 }

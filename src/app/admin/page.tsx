@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot } from 'firebase/firestore';
-import { isIncompleteUserAccount, notifyCommitteeByKeyword, setUserPasswordOnPhone } from '../lib/userAccounts';
+import { isIncompleteUserAccount, notifyCommitteeByKeyword, omitPassword, purgeAllStoredPasswords, setUserPasswordOnPhone } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
 import { certMediaFields, filterFilesWithinLimit, isOverUploadLimit, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { DEFAULT_WELCOME_BANNER, WELCOME_BANNER_ID } from '../lib/welcomeBanner';
@@ -17,7 +17,7 @@ import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceR
 import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
-import { sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
+import { isCommitteeLeaderRole, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
 import {
   MEDIA_CATEGORIES,
   MEDIA_GALLERY_COL,
@@ -184,11 +184,11 @@ export default function AdminDashboard() {
   
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
+  const [adminReady, setAdminReady] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter' | 'scientific-texts' | 'platform-briefing'>('case-study');
 
   const [isRegistrationClosed, setIsRegistrationClosed] = useState<boolean>(false);
 
-  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [escalatedReports, setEscalatedReports] = useState<any[]>([]);
   const [historicalVaultReports, setHistoricalVaultReports] = useState<any[]>([]);
   const [qualityEvaluationReports, setQualityEvaluationReports] = useState<any[]>([]);
@@ -289,13 +289,6 @@ export default function AdminDashboard() {
     return 'تاريخ غير محدد';
   };
 
-  const togglePasswordVisibility = (phone: string) => {
-    setShowPasswords((prev) => ({
-      ...prev,
-      [phone]: !prev[phone]
-    }));
-  };
-
   useEffect(() => {
     const checkAdminAuth = async () => {
       try {
@@ -313,28 +306,6 @@ export default function AdminDashboard() {
         });
 
         if (!firebaseUser) {
-          const storedPhone = localStorage.getItem('userPhone') || '';
-          if (isAdminPhone(storedPhone) || storedPhone) {
-            localStorage.setItem('userPhone', storedPhone);
-            if (isAdminPhone(storedPhone)) {
-              setIsSystemAdminUser(true);
-              setIsPresidentsRole(true);
-              return;
-            }
-            const storedSnap = await getDoc(doc(db, 'users', storedPhone));
-            if (storedSnap.exists()) {
-              const userRole = storedSnap.data()?.role || 'عضو أساسي';
-              if (userRole === 'System Admin') {
-                setIsSystemAdminUser(true);
-                setIsPresidentsRole(true);
-                return;
-              }
-              if (isLeadershipRole(userRole)) {
-                setIsPresidentsRole(true);
-                return;
-              }
-            }
-          }
           router.push('/login');
           return;
         }
@@ -346,49 +317,53 @@ export default function AdminDashboard() {
         if (isAdminPhone(phone)) {
           setIsSystemAdminUser(true);
           setIsPresidentsRole(true);
+          setAdminReady(true);
           return;
         }
 
         const userRef = doc(db, 'users', phone);
         const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          const userRole = userData.role || 'عضو أساسي';
 
-          if (isAdminPhone(phone) || userRole === 'System Admin') {
-            setIsSystemAdminUser(true);
-            setIsPresidentsRole(true);
-          } else if (isLeadershipRole(userRole)) {
-            setIsPresidentsRole(true);
-            setIsSystemAdminUser(false);
-          } else {
-            setIsSystemAdminUser(false);
-            setIsPresidentsRole(false);
-            if (!userRole.includes('رئيس لجنة') && !userRole.includes('مشرف')) {
-              router.push('/');
-            }
-          }
-        } else {
+        if (!userSnap.exists()) {
           router.push('/');
+          return;
         }
+
+        const userRole = String(userSnap.data()?.role || 'عضو أساسي');
+
+        if (userRole === 'System Admin') {
+          setIsSystemAdminUser(true);
+          setIsPresidentsRole(true);
+          setAdminReady(true);
+          return;
+        }
+
+        if (isLeadershipRole(userRole)) {
+          setIsPresidentsRole(true);
+          setIsSystemAdminUser(false);
+          setAdminReady(true);
+          return;
+        }
+
+        if (isCommitteeLeaderRole(userRole)) {
+          setIsSystemAdminUser(false);
+          setIsPresidentsRole(false);
+          setAdminReady(true);
+          return;
+        }
+
+        router.push('/');
       } catch (err) {
         console.error('Auth check error:', err);
+        router.push('/login');
       }
     };
 
     checkAdminAuth();
-    fetchEscalatedReports();
-    fetchHistoricalVault();
-    fetchStudentAchievements();
-    fetchCertificates();
-    fetchNewsletters();
-    fetchScientificTexts();
-    fetchCaseSubmissions();
-    fetchSiteSettings();
   }, [router]);
 
   useEffect(() => {
+    if (!adminReady) return;
     const unsub = onSnapshot(
       collection(db, 'scientific_committee_texts'),
       () => {
@@ -399,7 +374,7 @@ export default function AdminDashboard() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [adminReady]);
 
   const getRealUserName = (phone: string, defaultName: string) => {
     if (!phone) return defaultName;
@@ -1361,6 +1336,17 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const [isCleaningIncompleteUsers, setIsCleaningIncompleteUsers] = useState(false);
 
   useEffect(() => {
+    if (!adminReady) return;
+
+    fetchEscalatedReports();
+    fetchHistoricalVault();
+    fetchStudentAchievements();
+    fetchCertificates();
+    fetchNewsletters();
+    fetchScientificTexts();
+    fetchCaseSubmissions();
+    fetchSiteSettings();
+
     const fetchCloudData = async () => {
       try {
         const eventsSnap = await getDocs(collection(db, 'site_events'));
@@ -1420,8 +1406,13 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           setRequests(fetchedRequests);
         }
 
+        try {
+          await purgeAllStoredPasswords(db);
+        } catch (err) {
+          console.error(err);
+        }
         const usersSnap = await getDocs(collection(db, 'users'));
-        const fetchedUsers = usersSnap.docs.map((docSnap) => ({ phone: docSnap.id, ...docSnap.data() })) as UserAccount[];
+        const fetchedUsers = usersSnap.docs.map((docSnap) => omitPassword({ phone: docSnap.id, ...docSnap.data() })) as UserAccount[];
         setUsersList(fetchedUsers);
 
         const commSnapshot = await getDocs(collection(db, 'committees'));
@@ -1438,7 +1429,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     fetchCloudData();
 
     return subscribeMediaGallery(db, setMediaUploads);
-  }, []);
+  }, [adminReady]);
 
   const handleDeleteIncompleteAccounts = async () => {
     const stubs = usersList.filter((u) => isIncompleteUserAccount(u) && u.phone !== '0553731265');
@@ -1520,9 +1511,12 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     if (!modalInputVal.trim()) return;
 
     try {
-      await setUserPasswordOnPhone(db, activeUserPhoneForAction, modalInputVal.trim());
-      setUsersList(usersList.map(u => u.phone === activeUserPhoneForAction ? { ...u, password: modalInputVal.trim() } : u));
-      setModalMessage('تم تحديث كلمة المرور. تقدر تدخل فيها مباشرة من تسجيل الدخول.');
+      const idToken = await auth.currentUser?.getIdToken();
+      await setUserPasswordOnPhone(db, activeUserPhoneForAction, modalInputVal.trim(), idToken);
+      setUsersList(usersList.map((u) => (
+        u.phone === activeUserPhoneForAction ? omitPassword({ ...u, password: undefined }) : u
+      )));
+      setModalMessage('تم تعيين كلمة المرور في نظام الدخول. لا تُحفظ ولا تُعرض من قاعدة البيانات.');
       setModalType('success');
     } catch (err) {
       console.error(err);
@@ -2541,6 +2535,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       ? scientificTexts.filter((s) => s.archived)
       : scientificTexts.filter((s) => !s.archived);
   const groupedScientificTexts = groupTextsByArchiveTitle(filteredScientificTexts);
+
+  if (!adminReady) {
+    return (
+      <main className="min-h-screen bg-slate-50 text-slate-800 flex items-center justify-center" dir="rtl">
+        <p className="text-sm font-bold text-slate-500">جاري التحقق من صلاحية الدخول...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
@@ -4345,9 +4347,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                               type="button"
                               onClick={() => openPasswordModal(usr.phone)}
                               className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-lg font-bold hover:bg-amber-100 cursor-pointer shadow-sm transition-all"
-                              title="تعيين كلمة مرور انتقالية"
+                              title="تعيين كلمة مرور الدخول"
                             >
-                              ✏ كلمة مرور انتقالية
+                              ✏ تعيين كلمة المرور
                             </button>
                           </div>
                         </td>
@@ -5721,10 +5723,11 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       {modalType === 'password' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <form onSubmit={submitUpdatePassword} className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl border border-slate-100">
-            <h3 className="text-lg font-black text-slate-900">تعديل كلمة المرور للمستخدم</h3>
+            <h3 className="text-lg font-black text-slate-900">تعيين كلمة مرور الدخول</h3>
             <p className="text-xs text-slate-500 font-mono">رقم الجوال: {activeUserPhoneForAction}</p>
+            <p className="text-[11px] text-slate-500 leading-relaxed">تُحفظ في نظام الدخول فقط، ولا تُكتب في قاعدة البيانات ولا تظهر لأحد.</p>
             <input
-              type="text"
+              type="password"
               placeholder="كلمة المرور الجديدة..."
               value={modalInputVal}
               onChange={(e) => setModalInputVal(e.target.value)}

@@ -52,7 +52,7 @@ export default function Navbar() {
         if (storedPhone) {
           setUserPhone(storedPhone);
           if (storedName) setUserName(storedName);
-          setAdminAuth(isAdminPhone(storedPhone));
+          setAdminAuth(false);
           return;
         }
         setUserPhone(null);
@@ -69,7 +69,7 @@ export default function Navbar() {
       setUserPhone(phone);
       if (storedName) setUserName(storedName);
       if (!storedPhone && authPhone) localStorage.setItem('userPhone', authPhone);
-      setAdminAuth(isAdminPhone(phone) || isAdminPhone(authPhone));
+      setAdminAuth(isAdminPhone(authPhone));
       updateUserPresence(phone);
     });
 
@@ -276,7 +276,7 @@ export default function Navbar() {
 
   if (!mounted) return null;
 
-  const isAdmin = isAdminPhone(userPhone) || adminAuth || isPrivilegedRole(userRole);
+  const isAdmin = adminAuth || isPrivilegedRole(userRole);
   const isCommitteeLeader = listedAsLeader || isCommitteeLeaderRole(userRole) || userRole === 'General Supervisor';
   const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || isAdmin;
 

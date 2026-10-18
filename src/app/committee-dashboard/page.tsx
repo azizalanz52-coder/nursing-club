@@ -570,7 +570,10 @@ useEffect(() => {
   const fetchAllUsers = async () => {
     try {
       const snap = await getDocs(collection(db, 'users'));
-      const users = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      const users = snap.docs.map((d) => {
+        const { password: _password, ...safe } = d.data() as Record<string, any>;
+        return { ...safe, id: d.id };
+      });
       setAllUsersList(users);
     } catch (e) { console.error(e); }
   };
