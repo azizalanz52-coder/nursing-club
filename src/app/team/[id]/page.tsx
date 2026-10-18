@@ -491,6 +491,7 @@ export default function CommitteeDetailPage() {
     };
 
     try {
+      await requireAuthUser();
       const docRef = await addDoc(collection(db, 'public_partners_relations'), newPartnerObj);
       setPublicPartnersList([{ id: docRef.id, ...newPartnerObj }, ...publicPartnersList]);
       setPartnerName('');
@@ -499,9 +500,22 @@ export default function CommitteeDetailPage() {
       setPartnerNotes('');
       setPartnerStatus('قيد المراجعة');
       alert('تم إضافة الشركة وسجل التفاوض بنجاح ليراه جميع الأعضاء لمنع تكرار التواصل! 🤝🎯');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('حدث خطأ أثناء حفظ بيانات الشركة.');
+      alert(err?.message || 'حدث خطأ أثناء حفظ بيانات الشركة.');
+    }
+  };
+
+  const handleDeletePartner = async (partnerId: string) => {
+    if (!(await clubConfirm('هل أنت متأكد من حذف هذه الشركة أو المحل من السجل؟'))) return;
+    try {
+      await requireAuthUser();
+      await deleteDoc(doc(db, 'public_partners_relations', partnerId));
+      setPublicPartnersList(publicPartnersList.filter((item) => item.id !== partnerId));
+      alert('تم حذف السجل من الشراكات.');
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'تعذر حذف السجل. سجّل الدخول ثم أعد المحاولة.');
     }
   };
 
@@ -1113,6 +1127,13 @@ export default function CommitteeDetailPage() {
                     <p className="text-xs text-slate-700"><strong>المسؤول:</strong> {partner.contactPerson}</p>
                     <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-100"><strong>ملاحظات:</strong> {partner.notes}</p>
                     <p className="text-[10px] text-slate-400">بواسطة: {partner.addedBy}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePartner(partner.id)}
+                      className="w-full mt-1 py-2 bg-red-50 text-red-600 font-bold text-xs rounded-xl border border-red-200 hover:bg-red-100 cursor-pointer"
+                    >
+                      حذف السجل
+                    </button>
                   </div>
                 ))
               )}

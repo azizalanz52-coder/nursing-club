@@ -34,6 +34,44 @@ export function isRejectedStatus(status?: string | null) {
   return String(status || '').includes('مرفوض');
 }
 
+export function isCommitteeLeaderRole(role?: string | null) {
+  const value = String(role || '');
+  return (
+    value.includes('قائد') ||
+    value.includes('قائدة') ||
+    value.includes('رئيس لجنة') ||
+    value.includes('رئيسة لجنة') ||
+    value.includes('مشرف')
+  );
+}
+
+export async function findListedLeadership(
+  db: Firestore,
+  fullName?: string | null
+) {
+  const name = String(fullName || '').trim();
+  if (!name) return null;
+  try {
+    const snap = await getDocs(collection(db, 'committees'));
+    for (const row of snap.docs) {
+      const data = row.data();
+      if (
+        sameMemberName(String(data.maleLeader || ''), name) ||
+        sameMemberName(String(data.femaleLeader || ''), name)
+      ) {
+        return {
+          id: row.id,
+          name: committeeNameFromId(row.id) || String(data.name || ''),
+          data,
+        };
+      }
+    }
+  } catch (err) {
+    console.error(err);
+  }
+  return null;
+}
+
 export function committeeIdFromName(name: string) {
   const value = String(name || '');
   if (value === 'design' || value.includes('تصميم')) return 'design';

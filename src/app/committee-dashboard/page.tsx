@@ -11,7 +11,7 @@ import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
 import HrCertificateBatches from './../components/HrCertificateBatches';
 import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
-import { committeeIdFromName, committeeNameFromId, findMemberContext, findUserDoc, resolvePortalCommitteeId, sameMemberName, stampMemberAcceptance } from '../lib/memberAcceptance';
+import { committeeIdFromName, committeeNameFromId, findListedLeadership, findMemberContext, findUserDoc, isCommitteeLeaderRole, resolvePortalCommitteeId, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
 import { certMediaFields, isOverUploadLimit, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
@@ -71,6 +71,8 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
   const [isQualityTeam, setIsQualityTeam] = useState(false);
   const [isCommitteeLeader, setIsCommitteeLeader] = useState(false);
+  const [managedCommitteeId, setManagedCommitteeId] = useState('');
+  const [committeeRoster, setCommitteeRoster] = useState<any[]>([]);
 
   const [showLeaderAcceptedMembersTable, setShowLeaderAcceptedMembersTable] = useState(false);
 
@@ -512,29 +514,31 @@ useEffect(() => {
 
       const assigned = String(uData.assignedCommittee || uData.committee || '');
       const roleStr = String(uData.role || '');
+      const fullName = String(uData.fullName || storedName);
       const resolvedId = await resolvePortalCommitteeId(db, context.phone || phone, uData);
-      const leaderCommId = committeeIdFromName(assigned) || resolvedId;
-      let isListedLeader = false;
-      if (leaderCommId) {
-        try {
-          const leaderSnap = await getDoc(doc(db, 'committees', leaderCommId));
-          if (leaderSnap.exists()) {
-            const leaderData = leaderSnap.data();
-            const fullName = String(uData.fullName || storedName);
-            isListedLeader = sameMemberName(String(leaderData.maleLeader || ''), fullName) || sameMemberName(String(leaderData.femaleLeader || ''), fullName);
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      }
+      const listed = await findListedLeadership(db, fullName);
+      const leaderCommId = listed?.id || committeeIdFromName(assigned) || resolvedId;
+      const isListedLeader = Boolean(listed);
 
-      if (roleStr.includes('رئيس') || roleStr.includes('مشرف') || roleStr.includes('قائد') || isListedLeader) {
+      if (isCommitteeLeaderRole(roleStr) || roleStr.includes('رئيس') || isListedLeader) {
         setIsCommitteeLeader(true);
       } else {
         setIsCommitteeLeader(false);
       }
 
-      let resolvedComm = assigned || committeeNameFromId(resolvedId) || 'لجنة تنظيم الفعاليات';
+      let resolvedComm = assigned || listed?.name || committeeNameFromId(resolvedId) || 'لجنة تنظيم الفعاليات';
+      if (leaderCommId) setManagedCommitteeId(leaderCommId);
+      if (listed?.data && Array.isArray(listed.data.members)) {
+        setCommitteeRoster(listed.data.members);
+      } else if (leaderCommId) {
+        try {
+          const rosterSnap = await getDoc(doc(db, 'committees', leaderCommId));
+          setCommitteeRoster(Array.isArray(rosterSnap.data()?.members) ? rosterSnap.data()?.members : []);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
       if (roleStr.includes('جودة') || assigned.includes('جودة') || assigned.includes('الجودة')) {
         setIsQualityTeam(true);
         setIsCommitteeLeader(true);
@@ -622,6 +626,7 @@ useEffect(() => {
     };
 
     try {
+      await requireAuthUser();
       const docRef = await addDoc(collection(db, 'public_partners_relations'), newPartnerObj);
       setPublicPartnersList([{ ...newPartnerObj, id: docRef.id }, ...publicPartnersList]);
 
@@ -652,18 +657,26 @@ useEffect(() => {
 
   const handleUpdatePartnerStatus = async (partnerId: string, newStatus: 'قيد المراجعة' | 'وافقوا' | 'رفضوا') => {
     try {
+      await requireAuthUser();
       const pRef = doc(db, 'public_partners_relations', partnerId);
       await updateDoc(pRef, { status: newStatus });
       setPublicPartnersList(publicPartnersList.map(p => p.id === partnerId ? { ...p, status: newStatus } : p));
-    } catch (e) { console.error(e); }
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'تعذر تحديث حالة الشراكة. سجّل الدخول ثم أعد المحاولة.');
+    }
   };
 
   const handleDeletePartner = async (partnerId: string) => {
-    if (await clubConfirm('هل أنت متأكد من حذف هذه الشركة أو المحل من السجل؟')) {
-      try {
-        await deleteDoc(doc(db, 'public_partners_relations', partnerId));
-        setPublicPartnersList(publicPartnersList.filter(p => p.id !== partnerId));
-      } catch (e) { console.error(e); }
+    if (!(await clubConfirm('هل أنت متأكد من حذف هذه الشركة أو المحل من السجل؟'))) return;
+    try {
+      await requireAuthUser();
+      await deleteDoc(doc(db, 'public_partners_relations', partnerId));
+      setPublicPartnersList(publicPartnersList.filter(p => p.id !== partnerId));
+      alert('تم حذف السجل من الشراكات.');
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'تعذر حذف السجل. سجّل الدخول ثم أعد المحاولة.');
     }
   };
 
@@ -976,7 +989,13 @@ useEffect(() => {
   const transferredRequestsList = (requests || []).filter(req => req.transferredToHR === true || req.status === 'محول للموارد البشرية');
 
   const totalApplicantsCount = requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm) && (!r.acceptedCommittee || isSameCommittee(r.acceptedCommittee, currentActiveComm))).length;
-  const acceptedMembersCount = requests.filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm)).length;
+  const acceptedFromApps = requests.filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm));
+  const rosterOnlyMembers = committeeRoster.filter((member) =>
+    !acceptedFromApps.some((req) =>
+      sameMemberPhone(req.phone, member.phone) || sameMemberName(req.fullName, member.name || member.fullName)
+    )
+  );
+  const acceptedMembersCount = acceptedFromApps.length + rosterOnlyMembers.length;
 
   const handleAcceptSubmit = async () => {
     if (!selectedReqId) return;
@@ -1017,28 +1036,56 @@ useEffect(() => {
     }
   };
 
-  const handleRemoveAcceptedMember = async (memberId: string, memberPhone?: string) => {
-    if (!(await clubConfirm('هل أنت متأكد من إزالة هذا العضو من اللجنة؟ سيتم تحريره وإتاحة قبوله مجدداً.'))) return;
+  const persistCommitteeRoster = async (next: any[]) => {
+    const commId = committeeIdFromName(currentActiveComm) || managedCommitteeId;
+    if (!commId) return;
+    await setDoc(doc(db, 'committees', commId), { members: next }, { merge: true });
+    setCommitteeRoster(next);
+  };
+
+  const dropFromRoster = (name?: string, phone?: string) =>
+    committeeRoster.filter((member) => {
+      const samePhone = phone && sameMemberPhone(member.phone, phone);
+      const sameName = name && sameMemberName(member.name || member.fullName, name);
+      return !(samePhone || sameName);
+    });
+
+  const handleRemoveAcceptedMember = async (memberId: string, memberPhone?: string, memberName?: string) => {
+    if (!(await clubConfirm('هل أنت متأكد من إزالة هذا العضو من اللجنة؟'))) return;
     try {
-      const docRef = doc(db, 'applications', memberId);
-      await updateDoc(docRef, {
-        acceptedCommittee: null,
-        status: 'معلق',
-        whatsappLink: ''
-      });
+      if (memberId) {
+        const docRef = doc(db, 'applications', memberId);
+        await updateDoc(docRef, {
+          acceptedCommittee: null,
+          status: 'مرفوض',
+          whatsappLink: ''
+        });
+        setRequests(requests.map(r => r.id === memberId ? { ...r, acceptedCommittee: null, status: 'مرفوض', whatsappLink: '' } : r));
+      }
 
       if (memberPhone) {
         try {
           await stampMemberAcceptance(db, memberPhone, {
             assignedCommittee: '',
             committee: '',
-            latestNotification: `⚠️ تم تعديل حالتك الإدارية وإلغاء قبولك السابق في اللجنة. يمكنك متابعة حالة طلبك.`
+            latestNotification: `تم إلغاء انضمامك للجنة. يمكنك متابعة حالة طلبك.`
           });
         } catch (e) { console.error(e); }
       }
 
-      setRequests(requests.map(r => r.id === memberId ? { ...r, acceptedCommittee: null, status: 'معلق', whatsappLink: '' } : r));
-      alert('تم إزالة العضو من اللجنة وتحديث حالته بنجاح! 🗑️✅');
+      await persistCommitteeRoster(dropFromRoster(memberName, memberPhone));
+      alert('تم إزالة العضو من اللجنة.');
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء إزالة العضو.');
+    }
+  };
+
+  const handleRemoveRosterMember = async (member: any) => {
+    if (!(await clubConfirm('هل أنت متأكد من إزالة هذا العضو من اللجنة؟'))) return;
+    try {
+      await persistCommitteeRoster(dropFromRoster(member.name || member.fullName, member.phone));
+      alert('تم إزالة العضو من اللجنة.');
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء إزالة العضو.');
@@ -1746,6 +1793,10 @@ useEffect(() => {
   // بنك النصوص قناة خاصة: المحتوى العلمي يرسل، ولجنة التصميم تستقبل فقط
   const canAccessScientificTexts = belongsToScientificContent || belongsToDesignCommittee;
   const canAddScientificTexts = belongsToScientificContent;
+  const canManagePartners =
+    isCommitteeLeader ||
+    matchesTargetCommittee(userAssignedComm, 'لجنة العلاقات العامة') ||
+    isSameCommittee(currentActiveComm, 'لجنة العلاقات العامة');
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 p-6 md:p-10 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
@@ -2191,7 +2242,7 @@ useEffect(() => {
               </span>
             </div>
 
-            {isCommitteeLeader && (
+            {canManagePartners && (
               <form onSubmit={handleAddPartnerSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-sky-50/40 p-6 rounded-2xl border border-sky-200">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">اسم الشركة أو المحل</label>
@@ -2282,7 +2333,7 @@ useEffect(() => {
                       <p className="text-[10px] text-slate-400">أضيف بواسطة: {partner.addedBy}</p>
                     </div>
 
-                    {isCommitteeLeader && (
+                    {canManagePartners && (
                       <div className="flex justify-between items-center pt-3 border-t border-slate-200 flex-wrap gap-2">
                         <div className="flex gap-1">
                           <button type="button" onClick={() => handleUpdatePartnerStatus(partner.id, 'وافقوا')} className="px-2 py-1 bg-emerald-50 text-emerald-700 font-bold text-[10px] rounded-lg">وافقوا ✓</button>
@@ -2835,7 +2886,7 @@ useEffect(() => {
                                 </a>
                                 <button
                                   type="button"
-                                  onClick={() => handleRemoveAcceptedMember(member.id, member.phone)}
+                                  onClick={() => handleRemoveAcceptedMember(member.id, member.phone, member.fullName)}
                                   className="px-2.5 py-1 bg-red-50 text-red-600 font-bold rounded-lg text-[11px] hover:bg-red-100"
                                 >
                                   حذف ✕
@@ -2910,15 +2961,14 @@ useEffect(() => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {requests.filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm)).length === 0 ? (
+                  {acceptedFromApps.length + rosterOnlyMembers.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد أعضاء مقبولين مسجلين في هذه اللجنة حتى الآن.</td>
                     </tr>
                   ) : (
-                    requests
-                      .filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm))
-                      .map((member, mIdx) => (
-                        <tr key={mIdx} className="hover:bg-slate-50">
+                    <>
+                    {acceptedFromApps.map((member) => (
+                        <tr key={member.id} className="hover:bg-slate-50">
                           <td className="py-3 pr-2 font-bold text-slate-900">{member.fullName}</td>
                           <td className="py-3 font-mono text-slate-700" dir="ltr">{member.phone}</td>
                           <td className="py-3 text-slate-600 font-mono">{member.universityId || '-'}</td>
@@ -2927,7 +2977,8 @@ useEffect(() => {
                               {member.status || 'مقبول'}
                             </span>
                           </td>
-                          <td className="py-3 text-left pl-2 flex gap-2 justify-end items-center">
+                          <td className="py-3 text-left pl-2">
+                            <div className="flex gap-2 justify-end items-center flex-wrap">
                             <a
                               href={`https://wa.me/${member.phone?.startsWith('0') ? '966' + member.phone.substring(1) : member.phone}?text=مرحباً بك ${member.fullName}، يسعدنا انضمامك إلى (${currentActiveComm}) بنادي التمريض. 🚀`}
                               target="_blank"
@@ -2938,14 +2989,37 @@ useEffect(() => {
                             </a>
                             <button
                               type="button"
-                              onClick={() => handleRemoveAcceptedMember(member.id, member.phone)}
+                              onClick={() => handleRemoveAcceptedMember(member.id, member.phone, member.fullName)}
+                              className="px-3 py-1.5 bg-red-50 text-red-600 font-bold rounded-lg text-[11px] hover:bg-red-100 cursor-pointer shrink-0"
+                            >
+                              حذف ✕
+                            </button>
+                            </div>
+                          </td>
+                        </tr>
+                    ))}
+                    {rosterOnlyMembers.map((member, mIdx) => (
+                        <tr key={`roster-${mIdx}`} className="hover:bg-slate-50">
+                          <td className="py-3 pr-2 font-bold text-slate-900">{member.name || member.fullName}</td>
+                          <td className="py-3 font-mono text-slate-700" dir="ltr">{member.phone || '-'}</td>
+                          <td className="py-3 text-slate-600 font-mono">{member.universityId || '-'}</td>
+                          <td className="py-3">
+                            <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 font-bold border border-amber-200">
+                              {member.role || member.status || 'عضو تعاون'}
+                            </span>
+                          </td>
+                          <td className="py-3 text-left pl-2">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRosterMember(member)}
                               className="px-3 py-1.5 bg-red-50 text-red-600 font-bold rounded-lg text-[11px] hover:bg-red-100 cursor-pointer"
                             >
                               حذف ✕
                             </button>
                           </td>
                         </tr>
-                      ))
+                    ))}
+                    </>
                   )}
                 </tbody>
               </table>
@@ -3237,6 +3311,7 @@ useEffect(() => {
                           <button type="button" onClick={() => handleShiftPreference(req)} className="px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 font-bold hover:bg-sky-100 cursor-pointer text-xs" title="تحويل الطالب لرغبته التالية وتحويله للموارد البشرية">🔄 تحويل للموارد البشرية</button>
                           <button type="button" onClick={() => { setSelectedReqId(req.id); setShowAcceptModal(true); }} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 cursor-pointer text-xs">قبول ✅</button>
                           <button type="button" onClick={() => handleReject(req.id)} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-xs">رفض ✕</button>
+                          <button type="button" onClick={() => handleRemoveAcceptedMember(req.id, req.phone, req.fullName)} className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 cursor-pointer text-xs">إزالة من اللجنة</button>
                         </td>
                       </tr>
                     ))

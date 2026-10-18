@@ -10,13 +10,14 @@ import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { findCertificatesByLookup } from '../lib/certificatesLookup';
 import { emailToPhone, isAdminPhone, isPrivilegedRole } from '../lib/authIdentity';
 import { logoutSession } from '../lib/sessionAuth';
-import { findMemberContext, resolveMemberAcceptance } from '../lib/memberAcceptance';
+import { findListedLeadership, findMemberContext, isCommitteeLeaderRole, resolveMemberAcceptance } from '../lib/memberAcceptance';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
   const [userPhone, setUserPhone] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [assignedCommittee, setAssignedCommittee] = useState<string | null>(null);
+  const [listedAsLeader, setListedAsLeader] = useState(false);
   const [adminAuth, setAdminAuth] = useState<boolean>(false);
   const [mounted, setMounted] = useState(false);
   const [showNavbar, setShowNavbar] = useState(true);
@@ -58,6 +59,7 @@ export default function Navbar() {
         setUserName(null);
         setUserRole(null);
         setAssignedCommittee(null);
+        setListedAsLeader(false);
         setAdminAuth(false);
         return;
       }
@@ -125,6 +127,13 @@ export default function Navbar() {
       const acceptance = await resolveMemberAcceptance(db, userPhone, userDoc?.data || null);
       if (!cancelled && acceptance?.acceptedCommittee) {
         setAssignedCommittee(acceptance.acceptedCommittee);
+      }
+      const listed = await findListedLeadership(db, String(userDoc?.data?.fullName || storedName));
+      if (!cancelled) {
+        setListedAsLeader(Boolean(listed));
+        if (listed?.name && !userDoc?.data?.assignedCommittee && !acceptance?.acceptedCommittee) {
+          setAssignedCommittee(listed.name);
+        }
       }
 
       const userRef = doc(db, 'users', userDoc?.id || userPhone);
@@ -268,7 +277,7 @@ export default function Navbar() {
   if (!mounted) return null;
 
   const isAdmin = isAdminPhone(userPhone) || adminAuth || isPrivilegedRole(userRole);
-  const isCommitteeLeader = userRole && (userRole.includes('رئيس لجنة') || userRole.includes('قائد') || userRole.includes('مشرف') || userRole.includes('General Supervisor'));
+  const isCommitteeLeader = listedAsLeader || isCommitteeLeaderRole(userRole) || userRole === 'General Supervisor';
   const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || isAdmin;
 
   const showLeaderAlertInNavbar = (isCommitteeLeader || isQualityOperationsRoom || isAdmin) && leaderAlertMsg && showLeaderAlertBar;

@@ -17,7 +17,7 @@ import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceR
 import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
-import { stampMemberAcceptance } from '../lib/memberAcceptance';
+import { sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
 import {
   MEDIA_CATEGORIES,
   MEDIA_GALLERY_COL,
@@ -2360,6 +2360,23 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         whatsappLink: currentCommittee.whatsappLink || '',
         members: currentCommittee.members || []
       }, { merge: true });
+
+      const commName = currentCommittee.name;
+      await Promise.all(usersList.map(async (usr) => {
+        const isMale = sameMemberName(usr.fullName, currentCommittee.maleLeader);
+        const isFemale = sameMemberName(usr.fullName, currentCommittee.femaleLeader);
+        if (!isMale && !isFemale) return;
+        try {
+          await updateDoc(doc(db, 'users', usr.phone), {
+            role: isFemale ? 'قائدة لجنة' : 'رئيس لجنة',
+            assignedCommittee: commName,
+            committee: commName,
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }));
+
       setModalMessage(`تم حفظ وتحديث قادة ورابط واتساب "${currentCommittee.name}" بنجاح سحابياً! ✨`);
       setModalType('success');
     } catch (err) {
@@ -2390,10 +2407,13 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     }
   };
 
-  const handleDeleteMember = (index: number) => {
+  const handleDeleteMember = (member: { name?: string; phone?: string }) => {
     triggerConfirmModal('هل أنت متأكد من حذف هذا العضو من اللجنة؟', async () => {
-      const updatedMembers = [...(currentCommittee.members || [])];
-      updatedMembers.splice(index, 1);
+      const updatedMembers = (currentCommittee.members || []).filter((item: any) => {
+        const samePhone = member.phone && sameMemberPhone(item.phone, member.phone);
+        const sameName = member.name && sameMemberName(item.name || item.fullName, member.name);
+        return !(samePhone || sameName);
+      });
 
       setCommittees(committees.map((c) => c.id === selectedCommitteeId ? { ...c, members: updatedMembers } : c));
 
@@ -2404,6 +2424,31 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           whatsappLink: currentCommittee.whatsappLink || '',
           members: updatedMembers
         }, { merge: true });
+
+        const matchingApps = requests.filter((req) =>
+          (member.phone && sameMemberPhone(req.phone, member.phone)) ||
+          (member.name && sameMemberName(req.fullName, member.name))
+        );
+        await Promise.all(matchingApps.map(async (req) => {
+          await updateDoc(doc(db, 'applications', req.id), {
+            acceptedCommittee: null,
+            status: 'مرفوض',
+            whatsappLink: '',
+          });
+          if (req.phone) {
+            try {
+              await stampMemberAcceptance(db, req.phone, { assignedCommittee: '', committee: '' });
+            } catch {}
+          }
+        }));
+        if (matchingApps.length > 0) {
+          setRequests(requests.map((req) =>
+            matchingApps.some((hit) => hit.id === req.id)
+              ? { ...req, acceptedCommittee: null, status: 'مرفوض', whatsappLink: '' }
+              : req
+          ));
+        }
+
         setModalMessage('تم الحذف بنجاح.');
         setModalType('success');
       } catch (err) {
@@ -4317,13 +4362,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                             <option value="رئيس النادي">رئيس النادي</option>
                             <option value="نائبة الرئيس">نائبة الرئيس</option>
                             <option value="رئيس لجنة">رئيس لجنة</option>
+                            <option value="قائدة لجنة">قائدة لجنة</option>
                             <option value="عضو مميز">عضو مميز</option>
                             <option value="الجندي الخفي">الجندي الخفي 🛡️</option>
                             <option value="عضو أساسي">عضو أساسي</option>
                           </select>
                         </td>
                         <td className="py-4">
-                          {(usr.role?.includes('رئيس لجنة') || usr.role?.includes('مشرف')) ? (
+                          {(usr.role?.includes('رئيس لجنة') || usr.role?.includes('رئيسة لجنة') || usr.role?.includes('قائد') || usr.role?.includes('مشرف')) ? (
                             <select
                               value={usr.assignedCommittee || 'لجنة الإعلام'}
                               onChange={(e) => handleAssignedCommitteeChange(usr.phone, e.target.value)}
@@ -5308,7 +5354,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                             <td className="py-3 text-left pl-2">
                               <button
                                 type="button"
-                                onClick={() => handleDeleteMember(idx)}
+                                onClick={() => handleDeleteMember(m)}
                                 className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                               >
                                 حذف
