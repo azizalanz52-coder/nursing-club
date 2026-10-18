@@ -1539,11 +1539,11 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       setUsersList(usersList.map((u) => (
         u.phone === activeUserPhoneForAction ? omitPassword({ ...u, password: undefined }) : u
       )));
-      setModalMessage('تم تعيين كلمة المرور في نظام الدخول. لا تُحفظ ولا تُعرض من قاعدة البيانات.');
+      setModalMessage('تم تعيين كلمة المرور. أرسلها للعضو ويدخل فيها مباشرة.');
       setModalType('success');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setModalMessage('حدث خطأ أثناء تحديث كلمة المرور.');
+      setModalMessage(err?.message || 'حدث خطأ أثناء تحديث كلمة المرور.');
       setModalType('success');
     }
   };
