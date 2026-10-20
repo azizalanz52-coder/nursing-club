@@ -17,7 +17,7 @@ import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceR
 import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
-import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
+import { isValidUniversityId, linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { isCommitteeLeaderRole, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
 import {
   MEDIA_CATEGORIES,
@@ -110,6 +110,7 @@ interface UserAccount {
   phone: string;
   password?: string;
   fullName?: string;
+  universityId?: string;
   role?: string;
   assignedCommittee?: string;
   createdAt?: string;
@@ -245,7 +246,7 @@ export default function AdminDashboard() {
   const [sciReviewFilter, setSciReviewFilter] = useState<'pending' | 'all' | 'archived'>('pending');
   const [sciArchiveTitle, setSciArchiveTitle] = useState<string>('');
 
-  const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'name' | 'confirm' | 'own-password'>('none');
+  const [modalType, setModalType] = useState<'none' | 'success' | 'phone' | 'password' | 'name' | 'universityId' | 'confirm' | 'own-password'>('none');
   const [modalMessage, setModalMessage] = useState<string>('');
   const [activeUserPhoneForAction, setActiveUserPhoneForAction] = useState<string>('');
   const [modalInputVal, setModalInputVal] = useState<string>('');
@@ -1602,6 +1603,41 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     }
   };
 
+  const openUniversityIdModal = (phone: string, currentId: string) => {
+    setActiveUserPhoneForAction(phone);
+    setModalInputVal(currentId || '');
+    setModalType('universityId');
+  };
+
+  const submitUpdateUniversityId = async (e: FormEvent) => {
+    e.preventDefault();
+    const uni = normalizeUniversityId(modalInputVal);
+    if (!isValidUniversityId(uni)) {
+      setModalMessage('أدخل رقماً جامعياً صحيحاً من 6 إلى 12 خانة.');
+      setModalType('success');
+      return;
+    }
+
+    try {
+      await requireAuthUser();
+      await stampMemberAcceptance(db, activeUserPhoneForAction, {
+        phone: canonicalPhone(activeUserPhoneForAction) || activeUserPhoneForAction,
+        universityId: uni,
+        identityLinkedAt: Date.now(),
+      });
+      await linkCertificatesToIdentity(db, activeUserPhoneForAction, uni);
+      setUsersList(usersList.map((u) => (
+        u.phone === activeUserPhoneForAction ? { ...u, universityId: uni } : u
+      )));
+      setModalMessage('تم حفظ الرقم الجامعي وربطه بشهادات هذا الحساب.');
+      setModalType('success');
+    } catch (err) {
+      console.error(err);
+      setModalMessage('حدث خطأ أثناء حفظ الرقم الجامعي.');
+      setModalType('success');
+    }
+  };
+
   const openPhoneModal = (oldPhone: string) => {
     setActiveUserPhoneForAction(oldPhone);
     setModalInputVal(oldPhone);
@@ -2557,7 +2593,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     const matchedReq = requests.find((r) => String(r.phone).trim() === String(usr.phone).trim());
     const name = (usr.fullName || matchedReq?.fullName || '').toLowerCase();
     const phone = (usr.phone || '').toLowerCase();
-    return name.includes(q) || phone.includes(q);
+    const universityId = String(usr.universityId || matchedReq?.universityId || '').toLowerCase();
+    return name.includes(q) || phone.includes(q) || universityId.includes(q);
   };
 
   const sortUsersByName = (list: UserAccount[]) =>
@@ -4263,6 +4300,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 <h3 className="text-xl font-black text-slate-900">إدارة حسابات المستخدمين والرتب</h3>
                 <p className="text-xs text-slate-500 mt-1">
                   الحسابات المسجلة في الموقع: <strong className="text-[#630517]">{registeredAccountsCount}</strong>
+                  {` • سجلوا الرقم الجامعي: ${completeRegisteredUsers.filter((usr) => usr.universityId).length}`}
                   {userSearchQuery.trim() ? ` • المعروض الآن: ${filteredAndSortedUsers.length + 1}` : ''}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-1">
@@ -4271,7 +4309,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               </div>
               <input
                 type="text"
-                placeholder="🔍 ابحث بالاسم أو رقم الجوال..."
+                placeholder="🔍 ابحث بالاسم أو الجوال أو الرقم الجامعي..."
                 value={userSearchQuery}
                 onChange={(e) => setUserSearchQuery(e.target.value)}
                 className="px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50 focus:outline-none focus:border-[#630517] w-64"
@@ -4313,6 +4351,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     <tr className="border-b border-amber-100 text-amber-700 font-bold">
                       <th className="py-3 pr-4">الاسم</th>
                       <th className="py-3">رقم الجوال</th>
+                      <th className="py-3">الرقم الجامعي</th>
                       <th className="py-3 pl-4">الحالة</th>
                     </tr>
                   </thead>
@@ -4324,6 +4363,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                         <tr key={usr.phone}>
                           <td className="py-3 pr-4 font-bold text-slate-800">{displayName}</td>
                           <td className="py-3 font-mono text-slate-600" dir="ltr">{usr.phone}</td>
+                          <td className="py-3 font-mono text-slate-600" dir="ltr">{usr.universityId || matchedReq?.universityId || '—'}</td>
                           <td className="py-3 pl-4 text-amber-700 font-bold">بانتظار إكمال الحساب</td>
                         </tr>
                       );
@@ -4340,6 +4380,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     <th className="pb-3 pr-2">#</th>
                     <th className="pb-3">اسم المستخدم وحالة الاتصال</th>
                     <th className="pb-3">رقم الجوال (اسم الدخول)</th>
+                    <th className="pb-3">الرقم الجامعي</th>
                     <th className="pb-3">الدخول</th>
                     <th className="pb-3">الرتبة والصلاحيات</th>
                     <th className="pb-3">اللجنة المعينة ( لرئيس اللجنة )</th>
@@ -4353,6 +4394,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                       <span className="block text-[10px] text-emerald-600 font-bold mt-0.5">🟢 متصل الآن</span>
                     </td>
                     <td className="py-4 text-slate-600 font-mono font-bold" dir="ltr">0553731265</td>
+                    <td className="py-4 text-slate-400 font-bold">—</td>
                     <td className="py-4">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded">محمية في نظام الدخول</span>
@@ -4377,6 +4419,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     const isOnline = usr.lastActive && (Date.now() - usr.lastActive < 4 * 60 * 1000);
                     const matchedReq = requests.find(r => String(r.phone).trim() === String(usr.phone).trim());
                     const displayName = usr.fullName || matchedReq?.fullName || 'مستخدم مسجل';
+                    const displayUniversityId = usr.universityId || matchedReq?.universityId || '';
 
                     return (
                       <tr key={usr.phone || idx} className="hover:bg-slate-50">
@@ -4407,6 +4450,19 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                               title="تعديل رقم الجوال"
                             >
                               ✏️ تعديل الرقم
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-4 text-slate-600 font-mono" dir="ltr">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span>{displayUniversityId || 'غير مسجل'}</span>
+                            <button
+                              type="button"
+                              onClick={() => openUniversityIdModal(usr.phone, displayUniversityId)}
+                              className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg font-bold hover:bg-emerald-100 cursor-pointer shadow-sm transition-all"
+                              title="تعديل الرقم الجامعي"
+                            >
+                              ✏️ تعديل الجامعي
                             </button>
                           </div>
                         </td>
@@ -5892,6 +5948,39 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 className="px-5 py-2 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
               >
                 حفظ الاسم 👤
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {modalType === 'universityId' && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={submitUpdateUniversityId} className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl border border-slate-100">
+            <h3 className="text-lg font-black text-slate-900">تعديل الرقم الجامعي</h3>
+            <p className="text-xs text-slate-500 font-mono">رقم الجوال: {activeUserPhoneForAction}</p>
+            <input
+              type="text"
+              placeholder="مثال: 2230005939"
+              value={modalInputVal}
+              onChange={(e) => setModalInputVal(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-slate-50 focus:outline-none focus:border-[#630517] font-mono"
+              dir="ltr"
+              required
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalType('none')}
+                className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
+              >
+                حفظ الرقم الجامعي
               </button>
             </div>
           </form>
