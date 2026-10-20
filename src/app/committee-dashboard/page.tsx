@@ -11,6 +11,7 @@ import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
 import HrCertificateBatches from './../components/HrCertificateBatches';
 import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
+import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { committeeIdFromName, committeeNameFromId, findListedLeadership, findMemberContext, findUserDoc, isCommitteeLeaderRole, resolvePortalCommitteeId, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
 import { certMediaFields, isOverUploadLimit, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
@@ -343,8 +344,9 @@ useEffect(() => {
     try {
       await requireAuthUser();
       const fileUrl = await uploadClubFile(certUploadFile, 'certificates', setCertUploadProgress);
-      const phone = canonicalPhone(certStudentPhone) || certStudentPhone.trim();
-      const universityId = normalizeUniversityId(certStudentUniversityId);
+      const linked = await resolveLinkedIdentity(db, certStudentPhone, certStudentUniversityId);
+      const phone = linked.phone || canonicalPhone(certStudentPhone) || certStudentPhone.trim();
+      const universityId = linked.universityId || normalizeUniversityId(certStudentUniversityId);
       const title = certTitle.trim();
       const name = certStudentName.trim();
       const issuer = userData?.fullName || 'لجنة الموارد البشرية';
@@ -368,9 +370,19 @@ useEffect(() => {
 
       const certRef = await addDoc(collection(db, 'certificates'), newCertObj);
       await setDoc(doc(db, 'site_certificates', certRef.id), newCertObj);
+      if (phone && universityId) {
+        try {
+          await linkCertificatesToIdentity(db, phone, universityId);
+        } catch (err) {
+          console.error(err);
+        }
+      }
 
       if (phone) {
         try {
+          if (universityId) {
+            await stampMemberAcceptance(db, phone, { phone, universityId });
+          }
           await notifyExistingUser(db, phone, {
             latestNotification: `🎓 تم إصدار شهادة جديدة لك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
           });

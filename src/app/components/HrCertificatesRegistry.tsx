@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 
 type CertRecord = {
   id: string;
@@ -36,12 +37,36 @@ export default function HrCertificatesRegistry({
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   const groups = useMemo(() => {
+    const parent = new Map<string, string>();
+    const find = (key: string): string => {
+      const current = parent.get(key) || key;
+      if (current === key) return key;
+      const root = find(current);
+      parent.set(key, root);
+      return root;
+    };
+    const union = (a: string, b: string) => {
+      if (!a || !b) return;
+      const left = find(a);
+      const right = find(b);
+      if (left !== right) parent.set(right, left);
+    };
+
+    certificates.forEach((cert) => {
+      const id = `c:${cert.id}`;
+      parent.set(id, parent.get(id) || id);
+      const phone = canonicalPhone(String(cert.phone || ''));
+      const universityId = normalizeUniversityId(cert.universityId);
+      if (phone) union(id, `p:${phone}`);
+      if (universityId) union(id, `u:${universityId}`);
+    });
+
     const map = new Map<string, { key: string; name: string; phone: string; universityId: string; certs: CertRecord[] }>();
     certificates.forEach((cert) => {
-      const phone = String(cert.phone || '').trim();
-      const universityId = String(cert.universityId || '').trim();
+      const phone = canonicalPhone(String(cert.phone || '')) || String(cert.phone || '').trim();
+      const universityId = normalizeUniversityId(cert.universityId) || String(cert.universityId || '').trim();
       const name = cert.fullName || cert.recipientName || 'بدون اسم';
-      const key = phone || universityId || name;
+      const key = find(`c:${cert.id}`);
       if (!map.has(key)) map.set(key, { key, name, phone, universityId, certs: [] });
       const group = map.get(key)!;
       group.certs.push(cert);

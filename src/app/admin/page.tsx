@@ -17,6 +17,7 @@ import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceR
 import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
+import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { isCommitteeLeaderRole, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
 import {
   MEDIA_CATEGORIES,
@@ -758,27 +759,37 @@ export default function AdminDashboard() {
   const handleSaveCertificate = async (e: FormEvent) => {
     e.preventDefault();
     if (!certRecipientInput.trim() || !certTitleInput.trim()) return;
-    const phone = canonicalPhone(certPhoneInput) || certPhoneInput.trim();
-    const universityId = normalizeUniversityId(certUniversityIdInput);
-    if (!phone && !universityId) return;
-
     const certId = editingCertId ? editingCertId : Date.now().toString();
     const media = certMediaFields(certImageInput);
-    const updatedCert: CertificateItem = {
-      id: certId,
-      recipientName: certRecipientInput.trim(),
-      phone,
-      universityId,
-      password: certPasswordInput.trim() || '',
-      certTitle: certTitleInput.trim(),
-      category: certCategoryInput,
-      image: media.image || media.fileUrl,
-      description: certDescInput.trim() || 'شهادة معتمدة من نادي كلية التمريض بجامعة حفر الباطن.',
-      issueDate: new Date().toISOString()
-    };
 
     try {
+      const linked = await resolveLinkedIdentity(db, certPhoneInput, certUniversityIdInput);
+      const phone = linked.phone || canonicalPhone(certPhoneInput) || certPhoneInput.trim();
+      const universityId = linked.universityId || normalizeUniversityId(certUniversityIdInput);
+      if (!phone && !universityId) return;
+
+      const updatedCert: CertificateItem = {
+        id: certId,
+        recipientName: certRecipientInput.trim(),
+        phone,
+        universityId,
+        password: certPasswordInput.trim() || '',
+        certTitle: certTitleInput.trim(),
+        category: certCategoryInput,
+        image: media.image || media.fileUrl,
+        description: certDescInput.trim() || 'شهادة معتمدة من نادي كلية التمريض بجامعة حفر الباطن.',
+        issueDate: new Date().toISOString()
+      };
+
       await setDoc(doc(db, 'site_certificates', certId), updatedCert);
+      if (phone && universityId) {
+        try {
+          await stampMemberAcceptance(db, phone, { phone, universityId });
+          await linkCertificatesToIdentity(db, phone, universityId);
+        } catch (err) {
+          console.error(err);
+        }
+      }
       if (editingCertId) {
         setCertificates(certificates.map(c => c.id === certId ? updatedCert : c));
         setModalMessage('تم تحديث وتعديل الشهادة برقم الجوال وكلمة المرور بنجاح سحابياً! ✏️📜');

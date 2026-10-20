@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [universityId, setUniversityId] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const router = useRouter();
 
@@ -33,8 +34,8 @@ export default function LoginPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || !password || !fullName.trim()) {
-      alert('الرجاء تعبئة جميع الحقول (الاسم، الجوال، وكلمة المرور).');
+    if (!phone || !password || !fullName.trim() || !universityId.trim()) {
+      alert('الرجاء تعبئة جميع الحقول (الاسم، الجوال، الرقم الجامعي، وكلمة المرور).');
       return;
     }
     if (password.length < 6) {
@@ -47,6 +48,7 @@ export default function LoginPage() {
         phone,
         password,
         fullName: fullName.trim(),
+        universityId: universityId.trim(),
       });
       router.push('/');
     } catch (err: any) {
@@ -112,6 +114,18 @@ export default function LoginPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-[#630517]"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">الرقم الجامعي</label>
+              <input
+                type="text"
+                placeholder="مثال: 2230005939"
+                value={universityId}
+                onChange={(e) => setUniversityId(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-[#630517]"
+                dir="ltr"
                 required
               />
             </div>

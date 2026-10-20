@@ -8,6 +8,7 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [universityId, setUniversityId] = useState('');
   const [isRegistering, setIsRegistering] = useState(false); // للتبديل بين تسجيل الدخول وإنشاء الحساب
 
   if (!isOpen) return null;
@@ -37,8 +38,8 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
   // --- دالة إنشاء حساب جديد تلقائياً ---
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || !password || !fullName.trim()) {
-      await clubNotice('الرجاء تعبئة جميع الحقول (الاسم، الجوال، وكلمة المرور).', 'info');
+    if (!phone || !password || !fullName.trim() || !universityId.trim()) {
+      await clubNotice('الرجاء تعبئة جميع الحقول (الاسم، الجوال، الرقم الجامعي، وكلمة المرور).', 'info');
       return;
     }
 
@@ -52,6 +53,7 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
         phone,
         password,
         fullName: fullName.trim(),
+        universityId: universityId.trim(),
       });
       await clubNotice(
         result.claimed
@@ -143,6 +145,19 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-[#630517]"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">الرقم الجامعي</label>
+              <input
+                type="text"
+                placeholder="مثال: 2230005939"
+                value={universityId}
+                onChange={(e) => setUniversityId(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-[#630517]"
+                dir="ltr"
                 required
               />
             </div>

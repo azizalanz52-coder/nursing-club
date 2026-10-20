@@ -11,8 +11,9 @@ import {
 import { deleteField, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { isAdminPhone, normalizePhone, phoneToEmail } from './authIdentity';
-import { canonicalPhone, phoneVariants } from './certificatesLookup';
+import { canonicalPhone, normalizeUniversityId, phoneVariants } from './certificatesLookup';
 import { findUserDoc } from './memberAcceptance';
+import { clearStoredUniversityId, isValidUniversityId, linkCertificatesToIdentity, persistUniversityId } from './memberIdentity';
 import { findUserDocsByPhone, isIncompleteUserAccount } from './userAccounts';
 
 function authErrorMessage(err: any) {
@@ -51,9 +52,10 @@ function isEmailTaken(err: any) {
   return String(err?.code || '').includes('email-already-in-use');
 }
 
-async function persistSession(phone: string, fullName?: string) {
+async function persistSession(phone: string, fullName?: string, universityId?: string) {
   localStorage.setItem('userPhone', phone);
   if (fullName) localStorage.setItem('userName', fullName);
+  if (universityId) persistUniversityId(universityId);
   sessionStorage.removeItem('adminToken');
 }
 
@@ -112,7 +114,7 @@ async function finishLogin(profileId: string, profile?: Record<string, any> | nu
   const fullName = String(
     profile?.fullName || (isAdminPhone(profileId) ? 'عبدالعزيز العنزي (المشرف العام)' : 'مستخدم مسجل')
   );
-  await persistSession(profileId, fullName);
+  await persistSession(profileId, fullName, normalizeUniversityId(profile?.universityId));
   const signedIn = Boolean(auth.currentUser);
   try {
     await setDoc(
@@ -165,10 +167,15 @@ export async function registerWithPhonePassword(payload: {
   phone: string;
   password: string;
   fullName: string;
+  universityId?: string;
 }) {
   const cleanPhone = normalizePhone(payload.phone);
   const fullName = payload.fullName.trim();
   const password = payload.password;
+  const universityId = normalizeUniversityId(payload.universityId);
+  if (payload.universityId && !isValidUniversityId(universityId)) {
+    throw new Error('أدخل رقماً جامعياً صحيحاً من 6 إلى 12 خانة.');
+  }
 
   if (isAdminPhone(cleanPhone)) {
     throw new Error('هذا الرقم محجوز لإدارة النادي. استخدم تسجيل الدخول.');
@@ -205,6 +212,7 @@ export async function registerWithPhonePassword(payload: {
       ...(existing || {}),
       fullName,
       phone: profileId,
+      ...(universityId ? { universityId } : {}),
       role: existing?.role || 'عضو أساسي',
       createdAt: existing?.createdAt || new Date().toISOString(),
       authMigrated: Boolean(auth.currentUser),
@@ -214,7 +222,14 @@ export async function registerWithPhonePassword(payload: {
     { merge: true }
   );
 
-  await persistSession(profileId, fullName);
+  await persistSession(profileId, fullName, universityId);
+  if (universityId) {
+    try {
+      await linkCertificatesToIdentity(db, profileId, universityId);
+    } catch (err) {
+      console.error(err);
+    }
+  }
   return { phone: profileId, fullName, claimed: Boolean(existingFound) };
 }
 
@@ -243,5 +258,6 @@ export async function logoutSession() {
   }
   localStorage.removeItem('userPhone');
   localStorage.removeItem('userName');
+  clearStoredUniversityId();
   sessionStorage.removeItem('adminToken');
 }
