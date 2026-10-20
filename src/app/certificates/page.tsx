@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
 import { findCertificatesByLookup } from './../lib/certificatesLookup';
+import { certDisplayUrl } from './../lib/uploadFile';
+import { readStoredUniversityId } from './../lib/memberIdentity';
 
 interface CertificateItem {
   id: string;
@@ -70,8 +72,13 @@ export default function CertificatesPortal() {
 
     setLoading(true);
     try {
-      const found = await findCertificatesByLookup(db, phoneInput);
-      let list: CertificateItem[] = found.map((data) => ({
+      const lookups = Array.from(new Set([phoneInput.trim(), readStoredUniversityId()].filter(Boolean)));
+      const mapped = new Map<string, any>();
+      for (const lookup of lookups) {
+        const found = await findCertificatesByLookup(db, lookup);
+        found.forEach((data) => mapped.set(data.id, data));
+      }
+      let list: CertificateItem[] = Array.from(mapped.values()).map((data) => ({
         id: data.id,
         recipientName: data.recipientName || data.fullName || 'المستفيد',
         phone: data.phone || '',
@@ -79,7 +86,7 @@ export default function CertificatesPortal() {
         password: data.password,
         certTitle: data.certTitle || data.title || 'شهادة مشاركة',
         category: data.category || 'شهادة مشاركة فعالية',
-        image: data.image || data.fileUrl || '',
+        image: certDisplayUrl(data),
         issueDate: data.issueDate || data.dateStr || '',
         description: data.description || '',
       }));

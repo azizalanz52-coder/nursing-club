@@ -298,6 +298,21 @@ export function certMediaFields(fileUrl: string) {
   return { fileUrl, image: fileUrl };
 }
 
+export function certDisplayUrl(cert: { fileUrl?: string; image?: string; file?: string } | null | undefined) {
+  const fileUrl = String(cert?.fileUrl || '');
+  const image = String(cert?.image || '');
+  const file = String(cert?.file || '');
+  return fileUrl || image || file;
+}
+
+export function omitHeavyCertMedia<T extends Record<string, any>>(cert: T) {
+  const { fileUrl, image, file, ...rest } = cert;
+  return {
+    ...rest,
+    hasFile: Boolean(fileUrl || image || file),
+  } as Omit<T, 'fileUrl' | 'image' | 'file'> & { hasFile: boolean };
+}
+
 export async function uploadClubFiles(
   files: File[],
   folderPath: string,

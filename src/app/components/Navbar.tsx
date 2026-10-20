@@ -8,6 +8,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { findCertificatesByLookup } from '../lib/certificatesLookup';
+import { readStoredUniversityId } from '../lib/memberIdentity';
+import { certDisplayUrl } from '../lib/uploadFile';
 import { emailToPhone, isAdminPhone, isPrivilegedRole } from '../lib/authIdentity';
 import { logoutSession } from '../lib/sessionAuth';
 import { findListedLeadership, findMemberContext, isCommitteeLeaderRole, resolveMemberAcceptance } from '../lib/memberAcceptance';
@@ -229,7 +231,13 @@ export default function Navbar() {
 
     setSearchStatus('جاري استعلام الشهادات...');
     try {
-      let foundCerts = await findCertificatesByLookup(db, lookup);
+      const lookups = Array.from(new Set([lookup, readStoredUniversityId()].filter(Boolean)));
+      const mapped = new Map<string, any>();
+      for (const value of lookups) {
+        const found = await findCertificatesByLookup(db, value);
+        found.forEach((cert) => mapped.set(cert.id, cert));
+      }
+      let foundCerts = Array.from(mapped.values());
 
       if (cleanPassword) {
         foundCerts = foundCerts.filter((cert: any) => !cert.password || cert.password === cleanPassword);
@@ -572,7 +580,7 @@ export default function Navbar() {
                 {memberCertificates.map((cert) => {
                   const certTitle = cert.title || cert.certTitle || 'شهادة شكر وتقدير';
                   const recipientName = cert.fullName || cert.recipientName || 'المستفيد';
-                  const certFile = cert.fileUrl || cert.image || cert.file;
+                  const certFile = certDisplayUrl(cert);
                   const category = cert.category || 'شهادة مشاركة فعالية';
 
                   return (

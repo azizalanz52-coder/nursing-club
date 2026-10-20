@@ -13,7 +13,7 @@ import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { committeeIdFromName, committeeNameFromId, findListedLeadership, findMemberContext, findUserDoc, isCommitteeLeaderRole, resolvePortalCommitteeId, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
-import { certMediaFields, isOverUploadLimit, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { certMediaFields, isOverUploadLimit, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
 import QualityEventReportForm from '../components/QualityEventReport';
@@ -299,7 +299,9 @@ useEffect(() => {
       ]);
       const mapped = new Map<string, any>();
       [...hrSnap.docs, ...siteSnap.docs].forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
-      const list = Array.from(mapped.values()).sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+      const list = Array.from(mapped.values())
+        .map((cert) => omitHeavyCertMedia(cert))
+        .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
       setIssuedHrCertificates(list);
     } catch (e) {
       console.error(e);
@@ -389,7 +391,7 @@ useEffect(() => {
         } catch (er) { console.error(er); }
       }
 
-      setIssuedHrCertificates(prev => [{ id: certRef.id, ...newCertObj }, ...prev]);
+      setIssuedHrCertificates((prev) => [{ id: certRef.id, ...omitHeavyCertMedia(newCertObj) }, ...prev]);
       setCertStudentName('');
       setCertStudentPhone('');
       setCertStudentUniversityId('');

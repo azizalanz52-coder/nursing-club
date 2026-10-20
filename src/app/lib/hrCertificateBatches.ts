@@ -43,6 +43,24 @@ export function sameEventTitle(a: string, b: string) {
   return normalizePersonName(a) === normalizePersonName(b);
 }
 
+export function eventTitleFromCertLabel(label: string) {
+  return norm(label).replace(/^شهادة\s*مشاركة\s*/u, '').trim() || norm(label);
+}
+
+export function eventsRelated(a: string, b: string) {
+  if (sameEventTitle(a, b)) return true;
+  const left = normalizePersonName(a);
+  const right = normalizePersonName(b);
+  if (!left || !right) return false;
+  const [short, long] = left.length <= right.length ? [left, right] : [right, left];
+  return short.length >= 10 && long.includes(short);
+}
+
+export function stableBatchId(eventTitle: string) {
+  const key = normalizePersonName(eventTitle).replace(/\s+/g, '_');
+  return `event_${key}`.slice(0, 120);
+}
+
 export function isSameEligiblePerson(a: CertEligiblePerson, b: CertEligiblePerson) {
   const aUniv = normalizeUniversityId(a.universityId);
   const bUniv = normalizeUniversityId(b.universityId);
@@ -243,8 +261,42 @@ export function personHasCertificate(
     });
     if (!samePerson) return false;
     const title = `${norm(cert.title)} ${norm(cert.certTitle)}`;
-    return !event || title.includes(event);
+    if (!event) return true;
+    return title.includes(event) || event.includes(norm(cert.certTitle || cert.title));
   });
+}
+
+export function certEventLabel(cert: { title?: string; certTitle?: string }) {
+  return norm(cert.certTitle || cert.title);
+}
+
+export function peopleFromEventCertificates(
+  certificates: Array<{
+    fullName?: string;
+    recipientName?: string;
+    phone?: string;
+    universityId?: string;
+    title?: string;
+    certTitle?: string;
+  }>,
+  eventTitle: string
+) {
+  const people: CertEligiblePerson[] = [];
+  certificates.forEach((cert) => {
+    const label = certEventLabel(cert);
+    if (!eventsRelated(label, eventTitle) && !eventsRelated(eventTitleFromCertLabel(label), eventTitle)) return;
+    const person = {
+      fullName: String(cert.fullName || cert.recipientName || '').trim(),
+      phone: String(cert.phone || '').trim(),
+      universityId: String(cert.universityId || '').trim(),
+    };
+    if (!person.fullName) return;
+    if (people.some((item) => isSameEligiblePerson(item, person) || normalizePersonName(item.fullName) === normalizePersonName(person.fullName))) {
+      return;
+    }
+    people.push(person);
+  });
+  return people;
 }
 
 export function suggestedCertTitle(eventTitle: string) {

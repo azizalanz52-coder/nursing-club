@@ -14,7 +14,7 @@ import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import PageLoading from '../../components/PageLoading';
-import { certMediaFields, isOverUploadLimit, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
+import { certMediaFields, isOverUploadLimit, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
 import { canonicalPhone, normalizeUniversityId } from '../../lib/certificatesLookup';
 import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../../lib/memberIdentity';
 import { canAccessCommittee, findMemberContext, isAcceptedStatus, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../../lib/memberAcceptance';
@@ -369,7 +369,9 @@ export default function CommitteeDetailPage() {
         if (needsHr) {
           const mapped = new Map<string, any>();
           [...hrSnap.docs, ...siteSnap.docs].forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
-          const certList = Array.from(mapped.values()).sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+          const certList = Array.from(mapped.values())
+            .map((cert) => omitHeavyCertMedia(cert))
+            .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
           setIssuedHrCertificates(certList);
         }
 
@@ -777,7 +779,7 @@ export default function CommitteeDetailPage() {
         } catch (er) { console.error(er); }
       }
 
-      setIssuedHrCertificates(prev => [{ id: certRef.id, ...newCertObj }, ...prev]);
+      setIssuedHrCertificates((prev) => [{ id: certRef.id, ...omitHeavyCertMedia(newCertObj) }, ...prev]);
       setCertStudentName('');
       setCertStudentPhone('');
       setCertStudentUniversityId('');

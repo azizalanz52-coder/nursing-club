@@ -106,11 +106,15 @@ export async function findCertificatesByLookup(db: Firestore, lookup: string) {
   const collect = async (field: 'phone' | 'universityId', values: string[]) => {
     for (const val of values) {
       if (!val) continue;
-      const [hrSnap, siteSnap] = await Promise.all([
-        getDocs(query(collection(db, 'certificates'), where(field, '==', val))),
-        getDocs(query(collection(db, 'site_certificates'), where(field, '==', val))),
-      ]);
-      [...hrSnap.docs, ...siteSnap.docs].forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
+      try {
+        const [hrSnap, siteSnap] = await Promise.all([
+          getDocs(query(collection(db, 'certificates'), where(field, '==', val))),
+          getDocs(query(collection(db, 'site_certificates'), where(field, '==', val))),
+        ]);
+        [...hrSnap.docs, ...siteSnap.docs].forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 

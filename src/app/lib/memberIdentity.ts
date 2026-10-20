@@ -1,4 +1,4 @@
-import { Firestore, collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { Firestore, collection, doc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { emailToPhone } from './authIdentity';
 import {
   canonicalPhone,
@@ -101,10 +101,7 @@ export async function linkCertificatesToIdentity(db: Firestore, phone: string, u
 
     for (const col of ['certificates', 'site_certificates'] as const) {
       try {
-        const ref = doc(db, col, cert.id);
-        const snap = await getDoc(ref);
-        if (!snap.exists()) continue;
-        await updateDoc(ref, patch);
+        await updateDoc(doc(db, col, cert.id), patch);
         updated += 1;
       } catch (err) {
         console.error(err);
@@ -155,4 +152,52 @@ export async function saveUniversityIdAndLink(db: Firestore, universityId: strin
   persistUniversityId(uni);
   await linkCertificatesToIdentity(db, canonicalPhone(profileId) || profileId, uni);
   return { phone: profileId, universityId: uni };
+}
+
+export async function repairCertificateIdentities(
+  db: Firestore,
+  certificates: Array<{ id: string; phone?: string; universityId?: string }>,
+  people: Array<{ phone?: string; universityId?: string }>
+) {
+  const byUni = new Map<string, string>();
+  const byPhone = new Map<string, string>();
+
+  const remember = (phoneValue?: string, universityIdValue?: string) => {
+    const phone = canonicalPhone(String(phoneValue || ''));
+    const universityId = normalizeUniversityId(universityIdValue);
+    if (universityId && phone && !byUni.has(universityId)) byUni.set(universityId, phone);
+    if (phone && universityId && !byPhone.has(phone)) byPhone.set(phone, universityId);
+  };
+
+  people.forEach((person) => remember(person.phone, person.universityId));
+  certificates.forEach((cert) => remember(cert.phone, cert.universityId));
+
+  try {
+    const apps = await getDocs(collection(db, 'applications'));
+    apps.forEach((row) => remember(String(row.data()?.phone || ''), String(row.data()?.universityId || '')));
+  } catch (err) {
+    console.error(err);
+  }
+
+  let updated = 0;
+  for (const cert of certificates) {
+    if (!cert.id) continue;
+    const phone = canonicalPhone(String(cert.phone || ''));
+    const universityId = normalizeUniversityId(cert.universityId);
+    const patch: Record<string, string> = {};
+    if (!phone && universityId && byUni.get(universityId)) patch.phone = byUni.get(universityId)!;
+    if (!universityId && phone && byPhone.get(phone)) patch.universityId = byPhone.get(phone)!;
+    if (!Object.keys(patch).length) continue;
+
+    for (const col of ['certificates', 'site_certificates'] as const) {
+      try {
+        await updateDoc(doc(db, col, cert.id), patch);
+        updated += 1;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }
+
+  return updated;
 }

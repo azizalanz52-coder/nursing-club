@@ -3627,7 +3627,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     <div key={cert.id} className="p-6 rounded-2xl border border-sky-200 bg-sky-50/20 shadow-sm flex flex-col justify-between space-y-4">
                       <div className="space-y-3">
                         <div className="flex items-center gap-3">
-                          <img src={cert.image || '/logo.png'} alt={cert.certTitle} className="w-14 h-14 rounded-2xl object-cover border-2 border-sky-400 shadow" />
+                          <img src={cert.image || cert.fileUrl || '/logo.png'} alt={cert.certTitle} className="w-14 h-14 rounded-2xl object-cover border-2 border-sky-400 shadow" />
                           <div>
                             <h4 className="font-black text-slate-900 text-sm">👤 {cert.recipientName}</h4>
                             <span className="text-[10px] text-slate-500 font-mono block" dir="ltr">📞 {cert.phone || 'غير مسجل'}</span>
