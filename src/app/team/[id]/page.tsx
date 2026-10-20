@@ -220,6 +220,7 @@ export default function CommitteeDetailPage() {
   const [certCategory, setCertCategory] = useState('شهادة مشاركة فعالية');
   const [certUploadFile, setCertUploadFile] = useState<File | null>(null);
   const [isUploadingCert, setIsUploadingCert] = useState(false);
+  const [certUploadProgress, setCertUploadProgress] = useState(0);
   const [issuedHrCertificates, setIssuedHrCertificates] = useState<any[]>([]);
 
   useEffect(() => {
@@ -726,8 +727,10 @@ export default function CommitteeDetailPage() {
     }
 
     setIsUploadingCert(true);
+    setCertUploadProgress(8);
     try {
-      const fileUrl = await uploadClubFile(certUploadFile, 'certificates');
+      await requireAuthUser();
+      const fileUrl = await uploadClubFile(certUploadFile, 'certificates', setCertUploadProgress);
       const phone = canonicalPhone(certStudentPhone) || certStudentPhone.trim();
       const universityId = normalizeUniversityId(certStudentUniversityId);
       const title = certTitle.trim();
@@ -774,6 +777,7 @@ export default function CommitteeDetailPage() {
       alert(err?.message || 'حدث خطأ أثناء رفع الشهادة.');
     } finally {
       setIsUploadingCert(false);
+      setCertUploadProgress(0);
     }
   };
 
@@ -1021,7 +1025,7 @@ export default function CommitteeDetailPage() {
                   disabled={isUploadingCert}
                   className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-black text-xs shadow hover:brightness-110 cursor-pointer disabled:opacity-60"
                 >
-                  {isUploadingCert ? 'جاري رفع الشهادة...' : 'رفع الشهادة للمستفيد'}
+                  {uploadingLabel(isUploadingCert, certUploadProgress, 'رفع الشهادة للمستفيد')}
                 </button>
               </div>
             </form>

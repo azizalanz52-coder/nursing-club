@@ -177,6 +177,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [certCategory, setCertCategory] = useState('شهادة مشاركة فعالية');
   const [certUploadFile, setCertUploadFile] = useState<File | null>(null);
   const [isUploadingCert, setIsUploadingCert] = useState(false);
+  const [certUploadProgress, setCertUploadProgress] = useState(0);
   const [issuedHrCertificates, setIssuedHrCertificates] = useState<any[]>([]);
 
   // حقول رفع ملفات الجودة (Word, Excel, PDF) — مسار مستقل عن تقييم اللجان
@@ -338,8 +339,10 @@ useEffect(() => {
     }
 
     setIsUploadingCert(true);
+    setCertUploadProgress(8);
     try {
-      const fileUrl = await uploadClubFile(certUploadFile, 'certificates');
+      await requireAuthUser();
+      const fileUrl = await uploadClubFile(certUploadFile, 'certificates', setCertUploadProgress);
       const phone = canonicalPhone(certStudentPhone) || certStudentPhone.trim();
       const universityId = normalizeUniversityId(certStudentUniversityId);
       const title = certTitle.trim();
@@ -386,6 +389,7 @@ useEffect(() => {
       alert(err?.message || 'حدث خطأ أثناء رفع الشهادة.');
     } finally {
       setIsUploadingCert(false);
+      setCertUploadProgress(0);
     }
   };
 
@@ -2459,7 +2463,7 @@ useEffect(() => {
                 disabled={isUploadingCert}
                 className="bg-[#630517] text-[#F5D061] px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:brightness-110 cursor-pointer disabled:opacity-60"
               >
-                {isUploadingCert ? 'جاري رفع الشهادة...' : 'رفع الشهادة للمستفيد'}
+                {uploadingLabel(isUploadingCert, certUploadProgress, 'رفع الشهادة للمستفيد')}
               </button>
             </form>
 

@@ -99,8 +99,15 @@ async function compressImageToDataUrl(file: File, maxBytes = FIRESTORE_SAFE_BYTE
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error('تعذر قراءة الصورة.'));
+      const timer = setTimeout(() => reject(new Error('تعذر قراءة الصورة.')), 15000);
+      image.onload = () => {
+        clearTimeout(timer);
+        resolve(image);
+      };
+      image.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error('تعذر قراءة الصورة.'));
+      };
       image.src = objectUrl;
     });
 
@@ -147,10 +154,27 @@ function isVideoFile(file: File) {
 function isRetryableUploadError(error: unknown) {
   const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: string }).code) : '';
   const message = error instanceof Error ? error.message : String(error || '');
+  if (message.includes('STORAGE_TIMEOUT')) return true;
   if (code.includes('unauthorized') || message.includes('unauthorized')) return false;
   if (code.includes('unauthenticated') || message.includes('unauthenticated')) return false;
   if (code.includes('quota') || code.includes('invalid-checksum')) return false;
   return true;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label = 'STORAGE_TIMEOUT') {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(label)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
 }
 
 function startProgressTicker(file: File, onProgress?: (percent: number) => void) {
@@ -217,15 +241,16 @@ async function uploadToStorage(file: File, folderPath: string, onProgress?: (per
 
   const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`;
   const storageRef = ref(storage, `${folderPath}/${safeFileName}`);
+  const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name);
   onProgress?.(12);
 
   try {
-    const url = await uploadDirect(file, storageRef, onProgress);
+    const url = await withTimeout(uploadDirect(file, storageRef, onProgress), isImage ? 15000 : 22000);
     onProgress?.(100);
     return url;
   } catch (error) {
-    if (!isRetryableUploadError(error)) throw error;
-    const url = await uploadResumable(file, storageRef, onProgress);
+    if (isImage || !isRetryableUploadError(error)) throw error;
+    const url = await withTimeout(uploadResumable(file, storageRef, onProgress), 28000);
     onProgress?.(100);
     return url;
   }
