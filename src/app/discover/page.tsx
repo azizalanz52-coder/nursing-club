@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { CLUB_GOALS, CLUB_MISSION, CLUB_VISION } from '../lib/clubIdentity';
 
 const DEFAULT_PASSION_SLIDES = [
   {
@@ -280,7 +281,7 @@ export default function DiscoverPage() {
             استكشف عالمنا
           </span>
           <h1 className="text-4xl sm:text-5xl font-black text-slate-900">عن نادي التمريض</h1>
-          <p className="text-slate-600 text-sm sm:text-base mt-2">تعرف على رؤيتنا، أنشطتنا، وشركاء النجاح</p>
+          <p className="text-slate-600 text-sm sm:text-base mt-2">الرؤية، الرسالة، الأهداف، والأنشطة تحت مظلة كلية التمريض</p>
         </Reveal>
       </div>
 
@@ -387,25 +388,25 @@ export default function DiscoverPage() {
             </Reveal>
             <Reveal delay={80}>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight">
-                نبذة عن نادي التمريض ورؤيتنا المستقبلية
+                ناديٌ ينظر إلى الغد، لا يكتفي بلحظة النشاط
               </h2>
             </Reveal>
             <Reveal delay={160}>
-              <p className="text-slate-600 leading-relaxed text-base font-medium">
-                نُعد المظلة الرسمية لطلاب وطالبات تخصص التمريض في جامعة حفر الباطن. نسعى لخلق بيئة محفزة تجمع بين التميز الأكاديمي، المهارات القيادية، والممارسات الإنسانية الراقية لخدمة المجتمع الجامعي والمحلي.
+              <p className="text-slate-600 leading-relaxed text-[15px] font-medium">
+                نحن المظلة الطلابية الرسمية لتخصص التمريض في جامعة حفر الباطن. لا نقدم فعالية وتنتهي؛ نُعدّ طالباً يحمل المهنة أمانة، ويرى في كليته بيتاً علمياً يستحق أن يُمثَّل بأحسن صورة.
               </p>
             </Reveal>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
               <Reveal delay={220}>
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm h-full">
-                  <h4 className="font-bold text-[#630517] text-lg mb-2">رؤيتنا</h4>
-                  <p className="text-sm text-slate-600 leading-relaxed">الريادة والتميز في إعداد كوادر تمريضية قيادية ومؤثرة مجتمعياً واهتماماً بالمهنة.</p>
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm h-full space-y-2">
+                  <h4 className="font-black text-[#630517] text-lg">رؤيتنا</h4>
+                  <p className="text-[15px] text-slate-600 leading-8">{CLUB_VISION}</p>
                 </div>
               </Reveal>
               <Reveal delay={300}>
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm h-full">
-                  <h4 className="font-bold text-[#630517] text-lg mb-2">رسالتنا</h4>
-                  <p className="text-sm text-slate-600 leading-relaxed">تمكين الأعضاء وتنمية مهاراتهم عبر برامج وفعاليات نوعية وثقافية متقدمة.</p>
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm h-full space-y-2">
+                  <h4 className="font-black text-[#630517] text-lg">رسالتنا</h4>
+                  <p className="text-[15px] text-slate-600 leading-8">{CLUB_MISSION}</p>
                 </div>
               </Reveal>
             </div>
@@ -460,6 +461,33 @@ export default function DiscoverPage() {
               </div>
             </div>
           </Reveal>
+        </div>
+      </section>
+
+      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-white border-y border-slate-200 overflow-hidden">
+        <div className="max-w-6xl mx-auto space-y-10">
+          <Reveal className="text-center max-w-2xl mx-auto space-y-3">
+            <span className="inline-block px-4 py-1.5 rounded-full bg-[#630517]/10 border border-[#630517]/20 text-[#630517] text-xs font-extrabold tracking-widest uppercase">
+              أهدافنا
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900">ستة مقاصد نسير إليها</h2>
+            <p className="text-slate-600 text-[15px] leading-8">
+              ليست شعارات للوحة؛ هي ما نقيس به عمل اللجان وأثر الطالب بعد كل برنامج.
+            </p>
+          </Reveal>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {CLUB_GOALS.map((goal, index) => (
+              <Reveal key={goal.title} delay={index * 70}>
+                <article className="h-full rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-2">
+                  <p className="text-[11px] font-black text-[#F5D061] bg-[#630517] inline-block px-2.5 py-1 rounded-full">
+                    0{index + 1}
+                  </p>
+                  <h3 className="font-black text-[#630517] text-[15px]">{goal.title}</h3>
+                  <p className="text-slate-600 text-[15px] leading-8">{goal.body}</p>
+                </article>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </section>
 
