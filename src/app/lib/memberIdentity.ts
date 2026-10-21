@@ -100,11 +100,17 @@ export async function linkCertificatesToIdentity(db: Firestore, phone: string, u
     if (!Object.keys(patch).length) continue;
 
     for (const col of ['certificates', 'site_certificates'] as const) {
+      const ref = doc(db, col, cert.id);
       try {
-        await updateDoc(doc(db, col, cert.id), patch);
+        await updateDoc(ref, patch);
         updated += 1;
       } catch (err) {
-        console.error(err);
+        try {
+          await updateDoc(ref, { ...patch, image: '' });
+          updated += 1;
+        } catch (inner) {
+          console.error(inner || err);
+        }
       }
     }
   }

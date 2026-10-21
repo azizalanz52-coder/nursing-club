@@ -305,6 +305,87 @@ export function certDisplayUrl(cert: { fileUrl?: string; image?: string; file?: 
   return fileUrl || image || file;
 }
 
+export function certFileCandidates(cert: { fileUrl?: string; image?: string; file?: string } | null | undefined) {
+  return Array.from(new Set([cert?.fileUrl, cert?.image, cert?.file].map((value) => String(value || '').trim()).filter(Boolean)));
+}
+
+function decodeCertBase64(raw: string) {
+  const cleaned = raw.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
+  const pad = cleaned.length % 4;
+  return atob(pad ? `${cleaned}${'='.repeat(4 - pad)}` : cleaned);
+}
+
+function openBlob(bytes: Uint8Array, mimeType: string, certTitle: string) {
+  const blob = new Blob([bytes], { type: mimeType });
+  const blobUrl = URL.createObjectURL(blob);
+  const win = window.open(blobUrl, '_blank');
+  if (win) return;
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = `${certTitle || 'الشهادة'}.${mimeType.includes('pdf') ? 'pdf' : 'jpg'}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+export function openCertificateFile(fileData: string, certTitle: string) {
+  if (!fileData) throw new Error('empty');
+  if (/^https?:\/\//i.test(fileData) || fileData.startsWith('blob:')) {
+    window.open(fileData, '_blank');
+    return;
+  }
+
+  let mimeType = 'image/jpeg';
+  let payload = fileData.trim();
+
+  if (payload.startsWith('data:')) {
+    const parts = payload.split(',');
+    const match = parts[0].match(/:(.*?);/);
+    if (match) mimeType = match[1];
+    payload = parts.slice(1).join(',');
+    try {
+      const binary = decodeCertBase64(payload);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      openBlob(bytes, mimeType, certTitle);
+      return;
+    } catch {
+      const a = document.createElement('a');
+      a.href = fileData;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.download = `${certTitle || 'الشهادة'}.${mimeType.includes('pdf') ? 'pdf' : 'jpg'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+  }
+
+  if (payload.startsWith('JVBERi0')) mimeType = 'application/pdf';
+  else if (payload.startsWith('iVBORw0KGgo')) mimeType = 'image/png';
+  else if (payload.startsWith('/9j/')) mimeType = 'image/jpeg';
+
+  const binary = decodeCertBase64(payload);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  openBlob(bytes, mimeType, certTitle);
+}
+
+export function openCertificateMedia(cert: { fileUrl?: string; image?: string; file?: string; title?: string; certTitle?: string } | null | undefined) {
+  const title = String(cert?.certTitle || cert?.title || 'الشهادة');
+  const candidates = certFileCandidates(cert);
+  if (!candidates.length) throw new Error('empty');
+  let lastError: unknown;
+  for (const src of candidates) {
+    try {
+      openCertificateFile(src, title);
+      return;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('unreadable');
+}
+
 export function omitHeavyCertMedia<T extends Record<string, any>>(cert: T) {
   const { fileUrl, image, file, ...rest } = cert;
   return {

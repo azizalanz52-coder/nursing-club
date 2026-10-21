@@ -9,7 +9,7 @@ import { auth, db } from '../lib/firebase';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { findCertificatesByLookup } from '../lib/certificatesLookup';
 import { readStoredUniversityId } from '../lib/memberIdentity';
-import { certDisplayUrl } from '../lib/uploadFile';
+import { certDisplayUrl, openCertificateMedia } from '../lib/uploadFile';
 import { emailToPhone, isAdminPhone, isPrivilegedRole } from '../lib/authIdentity';
 import { logoutSession } from '../lib/sessionAuth';
 import { findListedLeadership, findMemberContext, isCommitteeLeaderRole, resolveMemberAcceptance } from '../lib/memberAcceptance';
@@ -162,60 +162,12 @@ export default function Navbar() {
     }
   };
 
-  // دالة فتح واستعراض الملفات سواء كانت Base64 أو PDF أو روابط مباشرة
-  const handleViewOrDownloadFile = (fileData: string, certTitle: string) => {
-    if (!fileData) return;
-
-    // 1. إذا كان رابطاً مباشراً بروتوكول http/https
-    if (fileData.startsWith('http://') || fileData.startsWith('https://')) {
-      window.open(fileData, '_blank');
-      return;
-    }
-
-    // 2. إذا كان الملف نصاً مشفراً Base64 أو Data URI
+  const handleViewOrDownloadFile = (cert: any) => {
     try {
-      let mimeType = 'image/jpeg';
-      let base64Pure = fileData.trim();
-
-      if (base64Pure.startsWith('data:')) {
-        const parts = base64Pure.split(',');
-        const match = parts[0].match(/:(.*?);/);
-        if (match) mimeType = match[1];
-        base64Pure = parts[1] || '';
-      } else {
-        // اكتشاف الصيغة تلقائياً في حال عدم وجود البادئة
-        if (base64Pure.startsWith('JVBERi0')) {
-          mimeType = 'application/pdf';
-        } else if (base64Pure.startsWith('iVBORw0KGgo')) {
-          mimeType = 'image/png';
-        } else if (base64Pure.startsWith('/9j/')) {
-          mimeType = 'image/jpeg';
-        }
-      }
-
-      base64Pure = base64Pure.replace(/\s/g, '');
-
-      const byteCharacters = atob(base64Pure);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: mimeType });
-      const blobUrl = URL.createObjectURL(blob);
-
-      const win = window.open(blobUrl, '_blank');
-      if (!win) {
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `${certTitle || 'الشهادة'}.${mimeType.includes('pdf') ? 'pdf' : 'jpg'}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
+      openCertificateMedia(cert);
     } catch (err) {
       console.error('Error decoding file:', err);
-      alert('حدث خطأ أثناء قراءة ملف الشهادة. يرجى التأكد من إعادة رفع الملف بصيغة سليمة.');
+      alert('تعذر فتح ملف الشهادة. جرّب الاستعلام بالجوال والرقم الجامعي معاً، أو تواصل مع الموارد البشرية لإعادة رفع الملف.');
     }
   };
 
@@ -601,7 +553,7 @@ export default function Navbar() {
                         {certFile && (
                           <button
                             type="button"
-                            onClick={() => handleViewOrDownloadFile(certFile, certTitle)}
+                            onClick={() => handleViewOrDownloadFile(cert)}
                             className="shrink-0 px-3.5 py-1.5 bg-[#630517] text-[#F5D061] font-bold rounded-xl shadow hover:brightness-110 transition-all text-xs cursor-pointer"
                           >
                             استعراض

@@ -1,4 +1,6 @@
 import { Firestore, collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { auth } from './firebase';
+import { emailToPhone } from './authIdentity';
 
 export function normalizeLookupValue(value: string) {
   return String(value || '')
@@ -45,12 +47,25 @@ export function universityIdVariants(value: string) {
   return Array.from(new Set([id, raw].filter(Boolean)));
 }
 
+export function looksLikeUniversityId(value: string) {
+  const id = normalizeUniversityId(value);
+  if (!/^\d{6,12}$/.test(id)) return false;
+  const asPhone = canonicalPhone(id);
+  return !(asPhone.length === 10 && asPhone.startsWith('05'));
+}
+
 function storedIdentity() {
   if (typeof window === 'undefined') return { phone: '', universityId: '' };
   return {
     phone: canonicalPhone(localStorage.getItem('userPhone') || ''),
     universityId: normalizeUniversityId(localStorage.getItem('userUniversityId') || ''),
   };
+}
+
+function sessionPhone() {
+  const stored = storedIdentity().phone;
+  const fromAuth = canonicalPhone(emailToPhone(auth.currentUser?.email || ''));
+  return stored || fromAuth;
 }
 
 function identityMatchesLookup(lookup: string, phone: string, universityId: string) {
@@ -79,25 +94,39 @@ async function readUserIdentity(db: Firestore, phone: string) {
   return null;
 }
 
+function rememberIdentity(phones: Set<string>, unis: Set<string>, phone?: string, universityId?: string) {
+  phoneVariants(phone || '').forEach((item) => phones.add(item));
+  universityIdVariants(universityId || '').forEach((item) => unis.add(item));
+}
+
 export async function findCertificatesByLookup(db: Firestore, lookup: string) {
   const value = normalizeLookupValue(lookup);
   if (!value) return [] as any[];
 
-  const phones = new Set(phoneVariants(value));
-  const unis = new Set(universityIdVariants(value));
+  const phones = new Set<string>();
+  const unis = new Set<string>();
+  const lookupIsUniversityId = looksLikeUniversityId(value);
 
-  const stored = storedIdentity();
-  if (identityMatchesLookup(value, stored.phone, stored.universityId)) {
-    phoneVariants(stored.phone).forEach((item) => phones.add(item));
-    universityIdVariants(stored.universityId).forEach((item) => unis.add(item));
+  if (lookupIsUniversityId) {
+    rememberIdentity(phones, unis, '', value);
+  } else {
+    rememberIdentity(phones, unis, value, value);
   }
 
-  const maybePhone = canonicalPhone(value);
-  if (maybePhone) {
-    const user = await readUserIdentity(db, maybePhone);
-    if (user) {
-      phoneVariants(user.phone).forEach((item) => phones.add(item));
-      universityIdVariants(user.universityId).forEach((item) => unis.add(item));
+  const stored = storedIdentity();
+  const livePhone = sessionPhone();
+  if (identityMatchesLookup(value, stored.phone || livePhone, stored.universityId)) {
+    rememberIdentity(phones, unis, stored.phone || livePhone, stored.universityId);
+  }
+
+  const identityPhones = Array.from(
+    new Set([canonicalPhone(value), livePhone, stored.phone].filter((item) => item && !looksLikeUniversityId(item)))
+  );
+  for (const id of identityPhones) {
+    const user = await readUserIdentity(db, id);
+    if (!user) continue;
+    if (identityMatchesLookup(value, user.phone, user.universityId)) {
+      rememberIdentity(phones, unis, user.phone, user.universityId);
     }
   }
 
