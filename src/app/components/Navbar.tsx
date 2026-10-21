@@ -6,10 +6,10 @@ import Image from 'next/image';
 import LoginModal from './LoginModal';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
-import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { findCertificatesByLookup } from '../lib/certificatesLookup';
 import { readStoredUniversityId } from '../lib/memberIdentity';
-import { certDisplayUrl, openCertificateMedia } from '../lib/uploadFile';
+import { certDisplayUrl, resolveCertificatePreview, type CertificatePreview } from '../lib/uploadFile';
 import { emailToPhone, isAdminPhone, isPrivilegedRole } from '../lib/authIdentity';
 import { logoutSession } from '../lib/sessionAuth';
 import { findListedLeadership, findMemberContext, isCommitteeLeaderRole, resolveMemberAcceptance } from '../lib/memberAcceptance';
@@ -41,6 +41,7 @@ export default function Navbar() {
   const [passwordInput, setPasswordInput] = useState('');
   const [memberCertificates, setMemberCertificates] = useState<any[]>([]);
   const [searchStatus, setSearchStatus] = useState('');
+  const [certPreview, setCertPreview] = useState<CertificatePreview | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -162,13 +163,37 @@ export default function Navbar() {
     }
   };
 
-  const handleViewOrDownloadFile = (cert: any) => {
+  const closeCertPreview = () => {
+    setCertPreview((current) => {
+      if (current?.revoke) URL.revokeObjectURL(current.revoke);
+      return null;
+    });
+  };
+
+  const handleViewOrDownloadFile = async (cert: any) => {
+    const tryPreview = (item: any) => resolveCertificatePreview(item);
+
     try {
-      openCertificateMedia(cert);
+      setCertPreview(tryPreview(cert));
+      return;
     } catch (err) {
       console.error('Error decoding file:', err);
-      alert('تعذر فتح ملف الشهادة. جرّب الاستعلام بالجوال والرقم الجامعي معاً، أو تواصل مع الموارد البشرية لإعادة رفع الملف.');
     }
+
+    try {
+      if (cert?.id) {
+        for (const col of ['certificates', 'site_certificates'] as const) {
+          const snap = await getDoc(doc(db, col, cert.id));
+          if (!snap.exists()) continue;
+          setCertPreview(tryPreview({ id: snap.id, ...snap.data() }));
+          return;
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
+    alert('ملف الشهادة غير مكتمل. تواصل مع الموارد البشرية لإعادة رفعه.');
   };
 
   const handleFetchCertificatesFromNav = async (e: React.FormEvent) => {
@@ -569,6 +594,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => {
+                closeCertPreview();
                 setShowCertModal(false);
                 setMemberCertificates([]);
                 setSearchStatus('');
@@ -579,6 +605,45 @@ export default function Navbar() {
             >
               إغلاق ✕
             </button>
+          </div>
+        </div>
+      )}
+
+      {certPreview && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/70 p-3" dir="rtl">
+          <div className="bg-white rounded-3xl w-full max-w-lg max-h-[90dvh] overflow-hidden shadow-2xl flex flex-col">
+            <div className="px-4 py-3 bg-[#630517] text-[#F5D061] font-black text-sm flex items-center justify-between gap-3">
+              <span className="truncate">{certPreview.title}</span>
+              <button type="button" onClick={closeCertPreview} className="shrink-0 text-white text-xs font-bold">
+                إغلاق
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto bg-slate-100 min-h-[18rem] grid place-items-center p-3">
+              {certPreview.isPdf ? (
+                <iframe title={certPreview.title} src={certPreview.src} className="w-full h-[70dvh] rounded-xl bg-white" />
+              ) : (
+                <img
+                  src={certPreview.src}
+                  alt={certPreview.title}
+                  className="max-w-full max-h-[70dvh] object-contain rounded-xl"
+                  onError={() => {
+                    closeCertPreview();
+                    alert('ملف الشهادة تالف أو غير مكتمل. تواصل مع الموارد البشرية لإعادة رفعه.');
+                  }}
+                />
+              )}
+            </div>
+            <div className="p-3">
+              <a
+                href={certPreview.src}
+                download={`${certPreview.title}.${certPreview.isPdf ? 'pdf' : 'jpg'}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs"
+              >
+                تحميل أو فتح بتبويب جديد
+              </a>
+            </div>
           </div>
         </div>
       )}

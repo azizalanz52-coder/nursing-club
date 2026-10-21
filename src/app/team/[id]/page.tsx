@@ -14,7 +14,8 @@ import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import PageLoading from '../../components/PageLoading';
-import { certMediaFields, isOverUploadLimit, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
+import { isOverUploadLimit, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
+import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../../lib/issueCertificate';
 import { canonicalPhone, normalizeUniversityId } from '../../lib/certificatesLookup';
 import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../../lib/memberIdentity';
 import { canAccessCommittee, findMemberContext, isAcceptedStatus, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../../lib/memberAcceptance';
@@ -741,6 +742,7 @@ export default function CommitteeDetailPage() {
       const name = certStudentName.trim();
       const issuer = currentUserName || 'لجنة الموارد البشرية';
 
+      const existing = findExistingIssuedCertificate(issuedHrCertificates, { phone, universityId }, title);
       const newCertObj = {
         fullName: name,
         recipientName: name,
@@ -749,17 +751,19 @@ export default function CommitteeDetailPage() {
         title,
         certTitle: title,
         category: certCategory,
-        ...certMediaFields(fileUrl),
         issuedBy: issuer,
-        createdAt: Date.now(),
-        dateStr: new Date().toLocaleDateString('ar-SA'),
-        issueDate: new Date().toISOString(),
-        description: `صادرة من لجنة الموارد البشرية • ${issuer}`,
-        password: '',
+        createdAt: existing?.createdAt || Date.now(),
+        dateStr: existing?.dateStr || new Date().toLocaleDateString('ar-SA'),
+        issueDate: existing?.issueDate || new Date().toISOString(),
+        description: existing?.description || `صادرة من لجنة الموارد البشرية • ${issuer}`,
+        password: existing?.password || '',
       };
 
-      const certRef = await addDoc(collection(db, 'certificates'), newCertObj);
-      await setDoc(doc(db, 'site_certificates', certRef.id), newCertObj);
+      const saved = await upsertIssuedCertificate(db, {
+        existingId: existing?.id,
+        record: newCertObj,
+        fileUrl,
+      });
       if (phone && universityId) {
         try {
           await linkCertificatesToIdentity(db, phone, universityId);
@@ -774,18 +778,25 @@ export default function CommitteeDetailPage() {
             await stampMemberAcceptance(db, phone, { phone, universityId });
           }
           await notifyExistingUser(db, phone, {
-            latestNotification: `🎓 تم إصدار شهادة جديدة لك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
+            latestNotification: saved.created
+              ? `🎓 تم إصدار شهادة جديدة لك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
+              : `🎓 تم تحديث ملف شهادتك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
           });
         } catch (er) { console.error(er); }
       }
 
-      setIssuedHrCertificates((prev) => [{ id: certRef.id, ...omitHeavyCertMedia(newCertObj) }, ...prev]);
+      setIssuedHrCertificates((prev) => [
+        { id: saved.id, ...omitHeavyCertMedia(newCertObj), hasFile: true },
+        ...prev.filter((cert) => cert.id !== saved.id),
+      ]);
       setCertStudentName('');
       setCertStudentPhone('');
       setCertStudentUniversityId('');
       setCertTitle('');
       setCertUploadFile(null);
-      alert('تم رفع الشهادة. المستفيد يستعلم بالجوال أو الرقم الجامعي.');
+      alert(saved.created
+        ? 'تم رفع الشهادة. المستفيد يستعلم بالجوال أو الرقم الجامعي.'
+        : 'تم تحديث ملف الشهادة على نفس السجل. الشهادة السابقة لم تُحذف.');
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'حدث خطأ أثناء رفع الشهادة.');

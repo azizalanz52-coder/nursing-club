@@ -7,7 +7,8 @@ import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot, increment } from 'firebase/firestore';
 import { isIncompleteUserAccount, notifyCommitteeByKeyword, omitPassword, purgeAllStoredPasswords, setUserPasswordOnPhone } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
-import { certMediaFields, filterFilesWithinLimit, isOverUploadLimit, requireAuthUser, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { filterFilesWithinLimit, isOverUploadLimit, isPlaceholderCertMedia, requireAuthUser, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/issueCertificate';
 import { DEFAULT_WELCOME_BANNER, WELCOME_BANNER_ID } from '../lib/welcomeBanner';
 import { clubConfirm, inferNoticeKind } from '../lib/clubNotice';
 import { ClubNoticeDialog } from '../components/ClubNotice';
@@ -136,6 +137,7 @@ interface CertificateItem {
   certTitle: string;
   category: string;
   image: string;
+  fileUrl?: string;
   issueDate: string;
   description: string;
 }
@@ -216,6 +218,7 @@ export default function AdminDashboard() {
   const [certTitleInput, setCertTitleInput] = useState<string>('');
   const [certCategoryInput, setCertCategoryInput] = useState<string>('شهادة شكر وتقدير');
   const [certImageInput, setCertImageInput] = useState<string>('/logo.png');
+  const [certImageDirty, setCertImageDirty] = useState(false);
   const [certDescInput, setCertDescInput] = useState<string>('');
 
   const emptyExamRow = (): ExamEntry => ({ course: '', courseCode: '', date: '', time: '', location: '', notes: '' });
@@ -757,11 +760,21 @@ export default function AdminDashboard() {
     });
   };
 
+  const resetCertForm = () => {
+    setEditingCertId(null);
+    setCertRecipientInput('');
+    setCertPhoneInput('');
+    setCertUniversityIdInput('');
+    setCertPasswordInput('');
+    setCertTitleInput('');
+    setCertDescInput('');
+    setCertImageInput('/logo.png');
+    setCertImageDirty(false);
+  };
+
   const handleSaveCertificate = async (e: FormEvent) => {
     e.preventDefault();
     if (!certRecipientInput.trim() || !certTitleInput.trim()) return;
-    const certId = editingCertId ? editingCertId : Date.now().toString();
-    const media = certMediaFields(certImageInput);
 
     try {
       const linked = await resolveLinkedIdentity(db, certPhoneInput, certUniversityIdInput);
@@ -769,20 +782,37 @@ export default function AdminDashboard() {
       const universityId = linked.universityId || normalizeUniversityId(certUniversityIdInput);
       if (!phone && !universityId) return;
 
-      const updatedCert: CertificateItem = {
-        id: certId,
+      const title = certTitleInput.trim();
+      const existing = editingCertId
+        ? certificates.find((cert) => cert.id === editingCertId)
+        : findExistingIssuedCertificate(certificates, { phone, universityId }, title);
+      const existingId = editingCertId || existing?.id;
+      const newFile = certImageDirty ? certImageInput : '';
+      if (!existingId && isPlaceholderCertMedia(newFile)) {
+        setModalMessage('ارفع ملف الشهادة قبل الإصدار.');
+        setModalType('success');
+        return;
+      }
+
+      const record = {
         recipientName: certRecipientInput.trim(),
+        fullName: certRecipientInput.trim(),
         phone,
         universityId,
         password: certPasswordInput.trim() || '',
-        certTitle: certTitleInput.trim(),
+        certTitle: title,
+        title,
         category: certCategoryInput,
-        image: media.image || media.fileUrl,
         description: certDescInput.trim() || 'شهادة معتمدة من نادي كلية التمريض بجامعة حفر الباطن.',
-        issueDate: new Date().toISOString()
+        issueDate: existing?.issueDate || new Date().toISOString(),
       };
 
-      await setDoc(doc(db, 'site_certificates', certId), updatedCert);
+      const saved = await upsertIssuedCertificate(db, {
+        existingId,
+        record,
+        fileUrl: newFile,
+      });
+
       if (phone && universityId) {
         try {
           await stampMemberAcceptance(db, phone, { phone, universityId });
@@ -791,25 +821,31 @@ export default function AdminDashboard() {
           console.error(err);
         }
       }
-      if (editingCertId) {
-        setCertificates(certificates.map(c => c.id === certId ? updatedCert : c));
-        setModalMessage('تم تحديث وتعديل الشهادة برقم الجوال وكلمة المرور بنجاح سحابياً! ✏️📜');
-      } else {
-        setCertificates([updatedCert, ...certificates]);
-        setModalMessage('تم اصدار ونشر الشهادة وربطها برقم الجوال وكلمة المرور بنجاح! 🎓✨');
-      }
-      setEditingCertId(null);
-      setCertRecipientInput('');
-      setCertPhoneInput('');
-      setCertUniversityIdInput('');
-      setCertPasswordInput('');
-      setCertTitleInput('');
-      setCertDescInput('');
-      setCertImageInput('/logo.png');
+
+      const keptImage = existing?.image || existing?.fileUrl || '';
+      const updatedCert: CertificateItem = {
+        id: saved.id,
+        recipientName: record.recipientName,
+        phone,
+        universityId,
+        password: record.password,
+        certTitle: title,
+        category: certCategoryInput,
+        image: isPlaceholderCertMedia(newFile) ? keptImage : newFile,
+        fileUrl: isPlaceholderCertMedia(newFile) ? existing?.fileUrl : newFile,
+        description: record.description,
+        issueDate: record.issueDate,
+      };
+
+      setCertificates((prev) => [updatedCert, ...prev.filter((cert) => cert.id !== saved.id)]);
+      setModalMessage(saved.created
+        ? 'تم اصدار ونشر الشهادة وربطها برقم الجوال وكلمة المرور بنجاح! 🎓✨'
+        : 'تم تحديث الشهادة. السجل السابق بقي كما هو وتم استبدال الملف فقط إذا رفعته.');
+      resetCertForm();
       setModalType('success');
     } catch (err) {
       console.error(err);
-      setModalMessage('حدث خطأ أثناء حفظ الشهادة.');
+      setModalMessage(err instanceof Error ? err.message : 'حدث خطأ أثناء حفظ الشهادة. السجل لم يُحذف.');
       setModalType('success');
     }
   };
@@ -823,7 +859,8 @@ export default function AdminDashboard() {
     setCertTitleInput(cert.certTitle);
     setCertCategoryInput(cert.category || 'شهادة شكر وتقدير');
     setCertDescInput(cert.description);
-    setCertImageInput(cert.image || '/logo.png');
+    setCertImageInput('/logo.png');
+    setCertImageDirty(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -3500,16 +3537,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 {editingCertId && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setEditingCertId(null);
-                      setCertRecipientInput('');
-                      setCertPhoneInput('');
-                      setCertUniversityIdInput('');
-                      setCertPasswordInput('');
-                      setCertTitleInput('');
-                      setCertDescInput('');
-                      setCertImageInput('/logo.png');
-                    }}
+                    onClick={resetCertForm}
                     className="text-xs text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-xl hover:bg-red-100"
                   >
                     إلغاء التعديل ✕
@@ -3621,6 +3649,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                       try {
                         const url = await uploadClubFile(file, 'certificates');
                         setCertImageInput(url);
+                        setCertImageDirty(true);
                       } catch (err) {
                         setModalMessage(err instanceof Error ? err.message : 'تعذر رفع ملف الشهادة.');
                         setModalType('success');

@@ -291,6 +291,13 @@ export async function uploadClubFile(
   }
 }
 
+export function isPlaceholderCertMedia(value: unknown) {
+  const raw = String(value || '').trim();
+  if (!raw || raw === 'undefined' || raw === 'null') return true;
+  const lower = raw.toLowerCase();
+  return lower === '/logo.png' || lower.endsWith('/logo.png');
+}
+
 export function certMediaFields(fileUrl: string) {
   if (fileUrl.startsWith('data:')) {
     return { fileUrl, image: '' };
@@ -305,80 +312,85 @@ export function certDisplayUrl(cert: { fileUrl?: string; image?: string; file?: 
   return fileUrl || image || file;
 }
 
-export function certFileCandidates(cert: { fileUrl?: string; image?: string; file?: string } | null | undefined) {
-  return Array.from(new Set([cert?.fileUrl, cert?.image, cert?.file].map((value) => String(value || '').trim()).filter(Boolean)));
+export function certFileCandidates(cert: Record<string, any> | null | undefined) {
+  return Array.from(
+    new Set(
+      [cert?.fileUrl, cert?.image, cert?.file, cert?.pdfUrl, cert?.url, cert?.mediaUrl, cert?.imageUrl]
+        .map((value) => String(value || '').trim())
+        .filter((value) => value && value !== 'undefined' && value !== 'null')
+    )
+  );
 }
+
+export type CertificatePreview = {
+  src: string;
+  mime: string;
+  isPdf: boolean;
+  title: string;
+  revoke?: string;
+};
 
 function decodeCertBase64(raw: string) {
   const cleaned = raw.replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
   const pad = cleaned.length % 4;
-  return atob(pad ? `${cleaned}${'='.repeat(4 - pad)}` : cleaned);
+  const binary = atob(pad ? `${cleaned}${'='.repeat(4 - pad)}` : cleaned);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
-function openBlob(bytes: Uint8Array, mimeType: string, certTitle: string) {
-  const blob = new Blob([bytes], { type: mimeType });
-  const blobUrl = URL.createObjectURL(blob);
-  const win = window.open(blobUrl, '_blank');
-  if (win) return;
-  const a = document.createElement('a');
-  a.href = blobUrl;
-  a.download = `${certTitle || 'الشهادة'}.${mimeType.includes('pdf') ? 'pdf' : 'jpg'}`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+function sniffMime(payload: string, fallback = 'image/jpeg') {
+  if (payload.startsWith('JVBERi0') || payload.includes('application/pdf')) return 'application/pdf';
+  if (payload.startsWith('iVBORw0KGgo')) return 'image/png';
+  if (payload.startsWith('/9j/')) return 'image/jpeg';
+  if (payload.startsWith('R0lGOD')) return 'image/gif';
+  if (payload.startsWith('UklGR')) return 'image/webp';
+  return fallback;
 }
 
-export function openCertificateFile(fileData: string, certTitle: string) {
-  if (!fileData) throw new Error('empty');
-  if (/^https?:\/\//i.test(fileData) || fileData.startsWith('blob:')) {
-    window.open(fileData, '_blank');
-    return;
+function previewFromSource(fileData: string, title: string): CertificatePreview {
+  const src = fileData.trim();
+  if (!src) throw new Error('empty');
+
+  if (/^https?:\/\//i.test(src) || src.startsWith('blob:') || src.startsWith('/')) {
+    const mime = sniffMime(src, /\.pdf($|\?)/i.test(src) ? 'application/pdf' : 'image/jpeg');
+    return { src, mime, isPdf: mime.includes('pdf'), title };
   }
 
-  let mimeType = 'image/jpeg';
-  let payload = fileData.trim();
-
-  if (payload.startsWith('data:')) {
-    const parts = payload.split(',');
-    const match = parts[0].match(/:(.*?);/);
-    if (match) mimeType = match[1];
-    payload = parts.slice(1).join(',');
+  let mime = 'image/jpeg';
+  let payload = src;
+  if (src.startsWith('data:')) {
+    const comma = src.indexOf(',');
+    const header = comma >= 0 ? src.slice(0, comma) : src;
+    const match = header.match(/:(.*?);/);
+    if (match?.[1]) mime = match[1];
+    payload = comma >= 0 ? src.slice(comma + 1) : '';
     try {
-      const binary = decodeCertBase64(payload);
-      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-      openBlob(bytes, mimeType, certTitle);
-      return;
+      const bytes = decodeCertBase64(payload);
+      const blob = new Blob([bytes], { type: mime || sniffMime(payload) });
+      const blobUrl = URL.createObjectURL(blob);
+      mime = blob.type || mime;
+      return { src: blobUrl, mime, isPdf: mime.includes('pdf'), title, revoke: blobUrl };
     } catch {
-      const a = document.createElement('a');
-      a.href = fileData;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.download = `${certTitle || 'الشهادة'}.${mimeType.includes('pdf') ? 'pdf' : 'jpg'}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      return;
+      return { src, mime: sniffMime(src, mime), isPdf: /pdf/i.test(mime + src), title };
     }
   }
 
-  if (payload.startsWith('JVBERi0')) mimeType = 'application/pdf';
-  else if (payload.startsWith('iVBORw0KGgo')) mimeType = 'image/png';
-  else if (payload.startsWith('/9j/')) mimeType = 'image/jpeg';
-
-  const binary = decodeCertBase64(payload);
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  openBlob(bytes, mimeType, certTitle);
+  mime = sniffMime(payload);
+  const bytes = decodeCertBase64(payload);
+  const blob = new Blob([bytes], { type: mime });
+  const blobUrl = URL.createObjectURL(blob);
+  return { src: blobUrl, mime, isPdf: mime.includes('pdf'), title, revoke: blobUrl };
 }
 
-export function openCertificateMedia(cert: { fileUrl?: string; image?: string; file?: string; title?: string; certTitle?: string } | null | undefined) {
+export function resolveCertificatePreview(cert: Record<string, any> | null | undefined): CertificatePreview {
   const title = String(cert?.certTitle || cert?.title || 'الشهادة');
   const candidates = certFileCandidates(cert);
   if (!candidates.length) throw new Error('empty');
   let lastError: unknown;
   for (const src of candidates) {
     try {
-      openCertificateFile(src, title);
-      return;
+      return previewFromSource(src, title);
     } catch (err) {
       lastError = err;
     }
