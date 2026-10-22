@@ -134,7 +134,7 @@ export default function NewsletterPage() {
   }, []);
 
   const examBoards = useMemo(
-    () => items.filter((item) => item.type === 'exam-schedule' && item.exams.length > 0),
+    () => items.filter((item) => item.type === 'exam-schedule' && (item.exams?.length || 0) > 0),
     [items]
   );
 
@@ -151,7 +151,7 @@ export default function NewsletterPage() {
   const nextExam = useMemo(() => {
     const upcoming = examBoards
       .flatMap((board) =>
-        board.exams.map((exam) => ({
+        (board.exams || []).map((exam) => ({
           ...exam,
           cohort: board.examCohort,
           semester: board.examSemester,
@@ -175,7 +175,7 @@ export default function NewsletterPage() {
         !q ||
         board.title.includes(q) ||
         board.examCohort?.includes(q) ||
-        board.exams.some((exam) => exam.course.includes(q) || (exam.courseCode || '').includes(q));
+        (board.exams || []).some((exam) => exam.course.includes(q) || (exam.courseCode || '').includes(q));
       return cohortOk && searchOk;
     });
   }, [examBoards, filter, cohort, queryText]);
@@ -419,7 +419,7 @@ export default function NewsletterPage() {
                               board.title,
                               `<h1>${board.title}</h1><p>${board.examCohort || ''} ${board.examSemester ? '• ' + board.examSemester : ''}</p>
                               <table><thead><tr><th>المادة</th><th>الرمز</th><th>التاريخ</th><th>الوقت</th><th>القاعة</th><th>ملاحظات</th></tr></thead>
-                              <tbody>${board.exams
+                              <tbody>${(board.exams || [])
                                 .map(
                                   (exam) =>
                                     `<tr><td>${exam.course}</td><td>${exam.courseCode || '—'}</td><td>${formatArDate(exam.date)}</td><td>${exam.time || '—'}</td><td>${exam.location || '—'}</td><td>${exam.notes || '—'}</td></tr>`
@@ -450,7 +450,7 @@ export default function NewsletterPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {board.exams.map((exam, idx) => {
+                            {(board.exams || []).map((exam, idx) => {
                               const status = examStatus(exam.date);
                               return (
                                 <tr key={`${board.id}-${idx}`} className="border-b border-stone-100 last:border-0">
@@ -482,7 +482,7 @@ export default function NewsletterPage() {
                       </div>
 
                       <div className="md:hidden p-4 space-y-3">
-                        {board.exams.map((exam, idx) => {
+                        {(board.exams || []).map((exam, idx) => {
                           const status = examStatus(exam.date);
                           return (
                             <div key={`${board.id}-m-${idx}`} className="rounded-2xl border border-stone-200 p-4 space-y-2">

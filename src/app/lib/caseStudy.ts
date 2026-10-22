@@ -208,6 +208,6 @@ export async function grantThursdayPersistence(db: Firestore, submissions: Array
 export async function loadCaseSubmissions(db: Firestore) {
   const snap = await getDocs(collection(db, 'case_study_submissions'));
   return snap.docs
-    .map((row) => ({ id: row.id, ...row.data() }))
+    .map((row) => ({ id: row.id, ...row.data() } as Record<string, any>))
     .sort((a, b) => submissionMs(b) - submissionMs(a));
 }

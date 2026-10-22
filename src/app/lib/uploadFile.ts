@@ -3,8 +3,8 @@ import { getDownloadURL, ref, uploadBytes, uploadBytesResumable } from 'firebase
 import { auth, storage } from './firebase';
 
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-export const MAX_IMAGE_UPLOAD_BYTES = 15 * 1024 * 1024;
-export const MAX_VIDEO_UPLOAD_BYTES = 48 * 1024 * 1024;
+export const MAX_IMAGE_UPLOAD_BYTES = 8 * 1024 * 1024;
+export const MAX_VIDEO_UPLOAD_BYTES = 8 * 1024 * 1024;
 const FIRESTORE_SAFE_BYTES = 450 * 1024;
 
 function isVideoFile(file: File) {
@@ -29,9 +29,9 @@ export function uploadLimitMessage() {
 
 export function mediaUploadLimitMessage(file?: File) {
   if (file && isVideoFile(file)) {
-    return 'المقطع أكبر من 48 ميغابايت. صغّره من الهاتف أو ارفعه على واي فاي.';
+    return 'المقطع أكبر من 8 ميغابايت. صغّره ثم أعد المحاولة، أو فعّل التخزين السحابي لرفع مقاطع أكبر.';
   }
-  return 'الصورة أكبر من 15 ميغابايت. صغّرها ثم أعد المحاولة.';
+  return 'الصورة أكبر من 8 ميغابايت. صغّرها ثم أعد المحاولة.';
 }
 
 export function assertUploadSize(file: File) {
@@ -56,11 +56,36 @@ export function uploadingLabel(isUploading: boolean, progress: number, idleText:
   return `جاري الرفع... ${progress}%`;
 }
 
+const STORAGE_PLAN_MESSAGE =
+  'التخزين السحابي مقفل في Firebase حتى تُرقّى الخطة. من الكونسول اضغط Upgrade project واختر Blaze، ثم ادخل Storage واضغط Get started. التكلفة للنادي شبه صفر، وبعدها الرفع يشتغل.';
+
 function storageErrorMessage(error: unknown) {
   const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: string }).code) : '';
   const message = error instanceof Error ? error.message : String(error || '');
+  let extra = '';
+  try {
+    extra = JSON.stringify(error ?? {});
+  } catch {
+    extra = '';
+  }
+  const hay = `${code} ${message} ${extra}`.toLowerCase();
+  if (
+    hay.includes('billing') ||
+    hay.includes('upgrade') ||
+    hay.includes('pricing') ||
+    hay.includes('blaze') ||
+    hay.includes('pay-as-you-go') ||
+    hay.includes('bucket') ||
+    hay.includes('404') ||
+    (hay.includes('unknown') && (hay.includes('server') || hay.includes('storage')))
+  ) {
+    return STORAGE_PLAN_MESSAGE;
+  }
   if (code.includes('unauthorized') || message.includes('unauthorized')) {
     return 'صلاحية الرفع مرفوضة. سجّل الدخول مرة أخرى ثم أعد المحاولة.';
+  }
+  if (code.includes('unauthenticated') || message.includes('unauthenticated')) {
+    return 'سجّل الدخول ثم أعد رفع الملف.';
   }
   if (code.includes('retry-limit') || code.includes('network') || message.includes('network')) {
     return 'ضعف في الاتصال أثناء الرفع. أعد المحاولة.';
@@ -93,11 +118,13 @@ export async function requireAuthUser() {
 }
 
 function waitForAuthUser(timeoutMs = 15000) {
-  if (auth.currentUser) return Promise.resolve(auth.currentUser);
+  const existing = auth.currentUser;
+  if (existing) return Promise.resolve(existing);
   return new Promise<NonNullable<typeof auth.currentUser>>((resolve, reject) => {
     const timer = setTimeout(() => {
       unsub();
-      if (auth.currentUser) resolve(auth.currentUser);
+      const later = auth.currentUser;
+      if (later) resolve(later);
       else reject(new Error('سجّل الدخول ثم أعد رفع الملف.'));
     }, timeoutMs);
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -232,6 +259,7 @@ function isRetryableUploadError(error: unknown) {
   if (code.includes('unauthorized') || message.includes('unauthorized')) return false;
   if (code.includes('unauthenticated') || message.includes('unauthenticated')) return false;
   if (code.includes('quota') || code.includes('invalid-checksum')) return false;
+  if (code.includes('unknown') || message.includes('404') || message.toLowerCase().includes('billing')) return false;
   return true;
 }
 
@@ -321,8 +349,8 @@ async function uploadToStorage(
   const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`;
   const storageRef = ref(storage, `${folderPath}/${safeFileName}`);
   const video = isVideoFile(file);
-  const limit = timeoutMs ?? (video ? 300000 : file.size > 2 * 1024 * 1024 ? 120000 : 70000);
-  const useResumable = video || file.size >= 700 * 1024;
+  const limit = timeoutMs ?? (video ? 25000 : 12000);
+  const useResumable = Boolean(video);
   onProgress?.(12);
 
   try {
@@ -357,18 +385,18 @@ export async function uploadMediaFile(
   }
 
   try {
-    return await uploadToStorage(payload, folderPath, onProgress, isVideoFile(payload) ? 300000 : 90000);
+    return await uploadToStorage(payload, folderPath, onProgress, isVideoFile(payload) ? 25000 : 12000);
   } catch (error) {
-    const mapped = storageErrorMessage(error);
-    const timedOut = mapped.includes('STORAGE_TIMEOUT') || String(error).includes('STORAGE_TIMEOUT');
-    if (timedOut) {
-      throw new Error(
-        isVideoFile(file)
-          ? 'المقطع كبير على الشبكة الحالية. ابقَ على الصفحة وحاول على واي فاي.'
-          : 'تعذر رفع الصورة. أعد المحاولة على واي فاي دون إغلاق الصفحة.'
-      );
+    if (isImageFile(file)) {
+      onProgress?.(62);
+      const dataUrl = await compressImageToDataUrl(payload);
+      onProgress?.(100);
+      return dataUrl;
     }
-    throw new Error(mapped);
+
+    throw new Error(
+      'الفيديو يحتاج تفعيل التخزين السحابي من Firebase: Upgrade project ثم Blaze ثم Storage → Get started. الصور تُرفع الآن بدون ذلك.'
+    );
   }
 }
 
@@ -407,7 +435,7 @@ export async function uploadClubFile(
   assertUploadSize(file);
 
   try {
-    return await uploadToStorage(file, folderPath, onProgress);
+    return await uploadToStorage(file, folderPath, onProgress, isVideoFile(file) ? 25000 : 12000);
   } catch (error) {
     if (isImageFile(file)) {
       onProgress?.(55);

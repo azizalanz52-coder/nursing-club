@@ -156,7 +156,7 @@ export async function saveUniversityIdAndLink(db: Firestore, universityId: strin
 
 export async function repairCertificateIdentities(
   db: Firestore,
-  certificates: Array<{ id: string; phone?: string; universityId?: string }>,
+  certificates: Array<{ id?: string; phone?: string; universityId?: string }>,
   people: Array<{ phone?: string; universityId?: string }>
 ) {
   const byUni = new Map<string, string>();

@@ -85,16 +85,16 @@ export function newsCoverSrc(image?: string) {
   return isPlaceholderImage(image) ? DEFAULT_NEWS_IMAGE : String(image);
 }
 
-function article(partial: NewsletterItem): NewsletterItem {
+function article(partial: Omit<NewsletterItem, 'image'> & { image?: string }): NewsletterItem {
   return {
     type: 'article',
     featured: false,
-    image: DEFAULT_NEWS_IMAGE,
     link: '',
     exams: [],
     examCohort: '',
     examSemester: '',
     ...partial,
+    image: partial.image || DEFAULT_NEWS_IMAGE,
   };
 }
 

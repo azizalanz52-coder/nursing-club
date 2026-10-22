@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { buildCommitteeRadar, CommitteeRadarCard } from '../../lib/committeeRadar';
+import { buildCommitteeRadar, CommitteeRadarCard, openCommitteeRadarPrint } from '../../lib/committeeRadar';
 
 type Props = {
   committees: any[];
@@ -135,7 +135,13 @@ export default function CommitteePerformanceRadar({
             <StatBox label="سلبيات للمتابعة" value={String(issueCount)} />
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => openCommitteeRadarPrint({
+                cards,
+                clubScore,
+                strengthCount,
+                issueCount,
+                extractedAt: today,
+              })}
               className="px-4 py-3 rounded-2xl bg-amber-300 text-indigo-950 font-black text-xs hover:bg-amber-200 print:hidden"
             >
               طباعة التقرير للكلية

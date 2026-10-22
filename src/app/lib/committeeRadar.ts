@@ -187,3 +187,273 @@ export function buildCommitteeRadar(
     };
   });
 }
+
+function escapeHtml(value: string) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function radarPolygon(scores: number[], cx: number, cy: number, maxR: number) {
+  const n = Math.max(scores.length, 1);
+  return scores.map((score, i) => {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    const r = (Math.max(0, Math.min(100, score)) / 100) * maxR;
+    return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`;
+  }).join(' ');
+}
+
+function buildRadarSvg(cards: CommitteeRadarCard[]) {
+  const cx = 240;
+  const cy = 240;
+  const maxR = 148;
+  const n = Math.max(cards.length, 1);
+  const scores = cards.map((card) => card.score);
+  const rings = [25, 50, 75, 100].map((level) => {
+    const pts = radarPolygon(Array(n).fill(level), cx, cy, maxR);
+    return `<polygon points="${pts}" fill="none" stroke="#e7d7a8" stroke-width="1"/>`;
+  }).join('');
+  const axes = cards.map((card, i) => {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    const x = cx + maxR * Math.cos(angle);
+    const y = cy + maxR * Math.sin(angle);
+    const lx = cx + (maxR + 36) * Math.cos(angle);
+    const ly = cy + (maxR + 36) * Math.sin(angle);
+    const label = escapeHtml(card.name.replace('لجنة ', ''));
+    const r = (card.score / 100) * maxR;
+    return `
+      <line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#f3e6b8" stroke-width="1"/>
+      <text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="700" fill="#630517">${label}</text>
+      <circle cx="${cx + r * Math.cos(angle)}" cy="${cy + r * Math.sin(angle)}" r="4.5" fill="#630517"/>
+    `;
+  }).join('');
+  const shape = radarPolygon(scores.length ? scores : [0], cx, cy, maxR);
+  return `
+    <svg viewBox="0 0 480 480" width="420" height="420" role="img" aria-label="خريطة رادار اللجان">
+      ${rings}
+      ${axes}
+      <polygon points="${shape}" fill="rgba(99,5,23,0.18)" stroke="#630517" stroke-width="2.5"/>
+    </svg>
+  `;
+}
+
+export function openCommitteeRadarPrint(params: {
+  cards: CommitteeRadarCard[];
+  clubScore: number;
+  strengthCount: number;
+  issueCount: number;
+  extractedAt: string;
+}) {
+  if (typeof window === 'undefined') return;
+  const { cards, clubScore, strengthCount, issueCount, extractedAt } = params;
+  const origin = window.location.origin;
+  const rows = cards.map((card) => `
+    <tr>
+      <td>${escapeHtml(card.name)}</td>
+      <td class="num">${card.score}%</td>
+      <td class="num">${card.output}%</td>
+      <td class="num">${card.readiness}%</td>
+      <td class="num">${card.discipline}%</td>
+      <td>${escapeHtml(card.status)}</td>
+    </tr>
+  `).join('');
+
+  const sections = cards.map((card) => `
+    <article class="card">
+      <div class="card-head">
+        <div>
+          <h3>${escapeHtml(card.name)}</h3>
+          <p class="kpi">${escapeHtml(card.kpiLabel)}: ${card.kpiValue}</p>
+        </div>
+        <div class="score">
+          <strong>${card.score}%</strong>
+          <span>${escapeHtml(card.status)}</span>
+        </div>
+      </div>
+      <div class="meters">
+        <span>إنتاج ${card.output}%</span>
+        <span>جاهزية ${card.readiness}%</span>
+        <span>انضباط ${card.discipline}%</span>
+      </div>
+      <div class="split">
+        <div>
+          <h4 class="pos">الإيجابيات</h4>
+          ${(card.positives.length ? card.positives : ['لا توجد إيجابيات مسجّلة.']).map((item) => `<p class="pill green">+ ${escapeHtml(item)}</p>`).join('')}
+        </div>
+        <div>
+          <h4 class="neg">السلبيات للمتابعة</h4>
+          ${(card.negatives.length ? card.negatives : ['لا توجد سلبيات تشغيلية مسجّلة.']).map((item) => `<p class="pill red">${card.negatives.length ? '− ' : ''}${escapeHtml(item)}</p>`).join('')}
+        </div>
+      </div>
+      ${card.note ? `<p class="note">${escapeHtml(card.note)}</p>` : ''}
+    </article>
+  `).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>رادار أداء اللجان الشامل</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #1e293b;
+      font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+      direction: rtl;
+      line-height: 1.65;
+    }
+    body { padding: 8mm 10mm; }
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+    .brand img { height: 42px; width: auto; object-fit: contain; }
+    .rule { width: 1px; height: 36px; background: #e2e8f0; }
+    h1 { margin: 0; color: #630517; font-size: 22px; font-weight: 900; text-align: center; }
+    .kicker, .sub, .date {
+      text-align: center;
+      margin: 4px 0 0;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .kicker { color: #B45309; letter-spacing: 0.04em; }
+    .gold { height: 3px; background: linear-gradient(90deg, #630517, #F5D061, #630517); border: 0; margin: 14px 0 18px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .stat {
+      border: 1px solid #ead9a4;
+      background: #fffaf0;
+      border-radius: 12px;
+      text-align: center;
+      padding: 10px 8px;
+    }
+    .stat strong { display: block; color: #630517; font-size: 22px; }
+    .stat span { font-size: 11px; font-weight: 800; color: #7c5a12; }
+    .radar-wrap { text-align: center; margin: 6px 0 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px; }
+    th, td { border: 1px solid #d6c38a; padding: 8px 10px; text-align: right; }
+    th { background: #630517; color: #F5D061; font-weight: 900; }
+    td.num { font-weight: 900; color: #630517; text-align: center; }
+    h2 {
+      color: #630517;
+      font-size: 15px;
+      margin: 18px 0 10px;
+      border-right: 4px solid #F5D061;
+      padding-right: 8px;
+    }
+    .card {
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .card-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .card-head h3 { margin: 0; font-size: 16px; color: #111827; }
+    .kpi { margin: 2px 0 0; font-size: 11px; color: #64748b; font-weight: 700; }
+    .score { text-align: left; }
+    .score strong { display: block; font-size: 22px; color: #630517; }
+    .score span { font-size: 11px; font-weight: 900; color: #92400e; }
+    .meters { display: flex; gap: 8px; margin: 10px 0; font-size: 11px; font-weight: 800; }
+    .meters span { background: #f8fafc; border-radius: 999px; padding: 4px 10px; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pos { color: #166534; font-size: 12px; margin: 0 0 6px; }
+    .neg { color: #991b1b; font-size: 12px; margin: 0 0 6px; }
+    .pill { margin: 0 0 6px; padding: 7px 9px; border-radius: 8px; font-size: 11px; font-weight: 700; }
+    .green { background: #f0fdf4; color: #166534; }
+    .red { background: #fef2f2; color: #991b1b; }
+    .note { margin: 8px 0 0; font-size: 11px; color: #64748b; }
+    .method { font-size: 12px; color: #334155; background: #f8fafc; border-right: 4px solid #630517; padding: 12px 14px; border-radius: 10px; }
+    .footer { margin-top: 18px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+    @media print {
+      body { padding: 0; }
+      .card, table, .stats, .radar-wrap, .method, .brand { break-inside: avoid; page-break-inside: avoid; }
+      thead { display: table-header-group; }
+    }
+  </style>
+</head>
+<body>
+  <div class="brand">
+    <img src="${origin}/logo.png" alt="نادي التمريض" />
+    <div class="rule"></div>
+    <img src="${origin}/uhb-logo.png" alt="جامعة حفر الباطن" />
+  </div>
+  <p class="kicker">وثيقة رقابية داخلية • نادي التمريض • جامعة حفر الباطن</p>
+  <h1>رادار أداء اللجان الشامل</h1>
+  <p class="sub">رصد الإنتاج المسجّل، جاهزية القيادة، والانضباط. لا يكتفي بالنشاط الشكلي.</p>
+  <p class="date">تاريخ الاستخراج: ${escapeHtml(extractedAt)}</p>
+  <hr class="gold" />
+  <div class="stats">
+    <div class="stat"><strong>${clubScore}%</strong><span>مؤشر النادي</span></div>
+    <div class="stat"><strong>${strengthCount}</strong><span>إيجابيات مرصودة</span></div>
+    <div class="stat"><strong>${issueCount}</strong><span>سلبيات للمتابعة</span></div>
+  </div>
+  <h2>جدول المؤشرات</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>اللجنة</th>
+        <th>المؤشر</th>
+        <th>إنتاج</th>
+        <th>جاهزية</th>
+        <th>انضباط</th>
+        <th>الحالة</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <h2>خريطة الرادار</h2>
+  <div class="radar-wrap">${buildRadarSvg(cards)}</div>
+  <h2>تفصيل اللجان</h2>
+  ${sections}
+  <h2>منهج القياس</h2>
+  <div class="method">
+    الدرجة = إنتاج المنصة + جاهزية القيادة والكادر + الانضباط (بلاغات الجودة). الإعلام يُقاس بالمواد المرفوعة، والموارد البشرية بالشهادات، والعلاقات العامة بالشراكات، والمحتوى العلمي بالنصوص، والجودة بالتقارير، والتصميم وتنظيم الفعاليات بالقيادة والكادر وما يُوثَّق رسميًا.
+  </div>
+  <div class="footer">نادي التمريض • جامعة حفر الباطن • وثيقة داخلية ${new Date().getFullYear()}</div>
+</body>
+</html>`;
+
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  document.body.appendChild(iframe);
+  const frameDoc = iframe.contentDocument;
+  if (!frameDoc) {
+    iframe.remove();
+    alert('تعذر تجهيز ملف الطباعة. أعد المحاولة.');
+    return;
+  }
+  frameDoc.open();
+  frameDoc.write(html);
+  frameDoc.close();
+
+  let printed = false;
+  const printFrame = () => {
+    if (printed) return;
+    printed = true;
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } finally {
+      window.setTimeout(() => iframe.remove(), 2000);
+    }
+  };
+  iframe.addEventListener('load', () => window.setTimeout(printFrame, 350));
+  window.setTimeout(printFrame, 900);
+}

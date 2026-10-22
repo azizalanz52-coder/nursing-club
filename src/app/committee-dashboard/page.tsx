@@ -25,9 +25,8 @@ import PageLoading from '../components/PageLoading';
 import { clubConfirm } from '../lib/clubNotice';
 import {
   MEDIA_CATEGORIES,
-  MEDIA_GALLERY_COL,
   MEDIA_STORAGE_FOLDER,
-  buildMediaRecord,
+  saveMediaRecords,
   deleteMediaRecord,
   isMediaVideo,
   mediaFileUrls,
@@ -187,11 +186,6 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [qualityFileName, setQualityFileName] = useState('');
   const [qualityUploadFile, setQualityUploadFile] = useState<File | null>(null);
   const [isUploadingQualityFile, setIsUploadingQualityFile] = useState(false);
-
-useEffect(() => {
-  // ... الكود الحالي ...
-  fetchQualityUploadedFiles(); // <-- أضف هذا السطر هنا
-}, [router]); 
 
   useEffect(() => {
     let unsubScientific: (() => void) | undefined;
@@ -533,7 +527,7 @@ useEffect(() => {
       }
 
       if (uData.latestNotification && !uData.warningHidden) {
-        setLeaderCustomAlert(uData.latestNotification);
+        setLeaderCustomAlert(String(uData.latestNotification));
       }
 
       if (phone === '0553731265' || isPrivilegedRole(String(uData.role || ''))) {
@@ -766,9 +760,10 @@ useEffect(() => {
     setIsUploadingMedia(true);
     setMediaUploadProgress(0);
     try {
+      const coverageTitle = mediaTitle.trim();
       const urls = await uploadMediaFiles(mediaUploadFiles, MEDIA_STORAGE_FOLDER, setMediaUploadProgress);
-      const newObj = buildMediaRecord({
-        title: mediaTitle,
+      await saveMediaRecords(db, {
+        title: coverageTitle,
         category: mediaCategory,
         urls,
         isVideo: mediaUploadFiles.some((file) => file.type.startsWith('video')),
@@ -776,11 +771,10 @@ useEffect(() => {
         source: 'لوحة قادة الإعلام',
         uploaderRole: isCommitteeLeader ? 'قائد اللجنة' : 'عضو لجنة',
       });
-      await addDoc(collection(db, MEDIA_GALLERY_COL), newObj);
       setMediaTitle('');
       setMediaBase64('/header-banner.png');
       setMediaUploadFiles([]);
-      notifyLeadership(db, `📸 رفعت لجنة الإعلام تغطية جديدة: ${newObj.title}`).catch(() => undefined);
+      notifyLeadership(db, `📸 رفعت لجنة الإعلام تغطية جديدة: ${coverageTitle}`).catch(() => undefined);
       alert('تم الرفع. التغطية ظهرت في أرشيف اللجنة والأدمن.');
     } catch (err: any) {
       console.error(err);
@@ -2600,7 +2594,7 @@ useEffect(() => {
                     جاهز للرفع: {mediaUploadFiles.length} ملف — {mediaUploadFiles.map((file) => file.name).join('، ')}
                   </p>
                 ) : (
-                  <p className="text-[11px] text-slate-500">الصور تُضغط تلقائياً قبل الرفع. المقطع حتى 48 ميغابايت، ويفضّل الواي فاي.</p>
+                  <p className="text-[11px] text-slate-500">حد الرفع 8 ميغابايت. الصور تُحفظ حتى لو التخزين السحابي مقفل. الفيديو ينتظر تفعيل Storage.</p>
                 )}
               </div>
 

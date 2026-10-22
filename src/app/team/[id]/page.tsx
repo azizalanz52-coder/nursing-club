@@ -24,7 +24,7 @@ import { ClubNoticeDialog } from '../../components/ClubNotice';
 import {
   MEDIA_CATEGORIES,
   MEDIA_STORAGE_FOLDER,
-  buildMediaRecord,
+  saveMediaRecords,
   deleteMediaRecord,
   isMediaVideo,
   mediaFileUrls,
@@ -537,7 +537,7 @@ export default function CommitteeDetailPage() {
       setMediaUploadProgress(0);
 
       const urls = await uploadMediaFiles(mediaFiles, MEDIA_STORAGE_FOLDER, setMediaUploadProgress);
-      const newObj = buildMediaRecord({
+      await saveMediaRecords(db, {
         title: mediaTitle,
         category: mediaCategory,
         urls,
@@ -546,8 +546,6 @@ export default function CommitteeDetailPage() {
         source: 'بوابة أعضاء لجنة الإعلام',
         uploaderRole: 'عضو لجنة',
       });
-
-      await addDoc(collection(db, 'media_committee_gallery'), newObj);
 
       setMediaTitle('');
       setMediaFiles([]);
@@ -1221,7 +1219,7 @@ export default function CommitteeDetailPage() {
                   }}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white cursor-pointer"
                 />
-                <p className="text-[11px] text-slate-500">الصور تُضغط تلقائياً. المقطع حتى 48 ميغابايت، ويفضّل الواي فاي.</p>
+                <p className="text-[11px] text-slate-500">حد الرفع 8 ميغابايت. الصور تُحفظ حتى لو التخزين السحابي مقفل.</p>
               </div>
 
               {mediaFiles.length > 0 && (

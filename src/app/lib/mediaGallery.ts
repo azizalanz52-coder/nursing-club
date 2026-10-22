@@ -1,4 +1,4 @@
-import { Firestore, collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { Firestore, addDoc, collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 
 export const MEDIA_GALLERY_COL = 'media_committee_gallery';
 export const MEDIA_LEGACY_COL = 'media_committee_uploads';
@@ -26,6 +26,43 @@ export function isMediaVideo(src: string, item?: any) {
     value.includes('.webm') ||
     value.includes('video')
   );
+}
+
+export function isInlineMediaUrl(url: string) {
+  return String(url || '').startsWith('data:');
+}
+
+export async function saveMediaRecords(
+  db: Firestore,
+  opts: {
+    title: string;
+    category: string;
+    urls: string[];
+    isVideo: boolean;
+    addedBy: string;
+    source: string;
+    uploaderRole: string;
+  }
+) {
+  const urls = opts.urls.filter(Boolean);
+  if (urls.length === 0) {
+    throw new Error('لا توجد ملفات صالحة للحفظ. أعد اختيار الصورة ثم ارفع.');
+  }
+  const col = collection(db, MEDIA_GALLERY_COL);
+  const splitInline = urls.length > 1 && urls.some(isInlineMediaUrl);
+  const batches = splitInline ? urls.map((url) => [url]) : [urls];
+  for (let i = 0; i < batches.length; i++) {
+    const batch = batches[i];
+    await addDoc(
+      col,
+      buildMediaRecord({
+        ...opts,
+        title: batches.length > 1 ? `${opts.title} (${i + 1})` : opts.title,
+        urls: batch,
+        isVideo: batch.some((url) => isMediaVideo(url)) || (opts.isVideo && !batch.some(isInlineMediaUrl)),
+      })
+    );
+  }
 }
 
 export function buildMediaRecord(opts: {

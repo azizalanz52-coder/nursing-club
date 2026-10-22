@@ -142,12 +142,28 @@ export default function DiscoverPage() {
         ]);
 
         if (!passionSnap.empty) {
-          const slides = passionSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          const slides = passionSnap.docs.map((d) => {
+            const data = d.data() as Partial<(typeof DEFAULT_PASSION_SLIDES)[number]>;
+            return {
+              id: d.id,
+              image: data.image || '/header-banner.png',
+              quote: data.quote || '',
+            };
+          });
           if (slides.length > 0) setPassionSlides(slides);
         }
 
         if (!discoverSnap.empty) {
-          const eventsList = discoverSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          const eventsList = discoverSnap.docs.map((d) => {
+            const data = d.data() as Partial<(typeof DEFAULT_DISCOVER_EVENTS)[number]>;
+            return {
+              id: d.id,
+              title: data.title || 'فعالية',
+              category: data.category || '',
+              description: data.description || '',
+              images: Array.isArray(data.images) && data.images.length ? data.images : ['/header-banner.png'],
+            };
+          });
           if (eventsList.length > 0) setDiscoverEvents(eventsList);
         }
 

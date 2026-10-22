@@ -84,12 +84,9 @@ export default function Navbar() {
       }
     });
 
-    document.body.style.paddingTop = '85px';
-
     return () => {
       unsubAuth();
       unsubSettings();
-      document.body.style.paddingTop = '0px';
     };
   }, []);
 

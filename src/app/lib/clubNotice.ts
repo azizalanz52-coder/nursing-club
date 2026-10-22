@@ -17,7 +17,7 @@ export function bindClubNoticeHandler(next: NoticeHandler | null) {
 export function humanizeNotice(message: string) {
   const text = String(message || '');
   if (/longer than|1048487|exceeds the maximum/i.test(text) || (/fileUrl|property/i.test(text) && /longer/i.test(text))) {
-    return 'ملف الشهادة كبير على الحفظ. صغّر الصورة ثم أعد المحاولة.';
+    return 'الملف كبير على الحفظ. صغّر الصورة ثم أعد المحاولة.';
   }
   if (/insufficient permissions|permission-denied|permission_denied/i.test(text)) {
     return 'سجّل الدخول مرة أخرى ثم أعد المحاولة.';

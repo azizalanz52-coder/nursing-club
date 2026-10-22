@@ -53,7 +53,7 @@ import {
   MEDIA_CATEGORIES,
   MEDIA_GALLERY_COL,
   MEDIA_STORAGE_FOLDER,
-  buildMediaRecord,
+  saveMediaRecords,
   deleteMediaRecord,
   isMediaVideo,
   mediaFileUrls,
@@ -2153,7 +2153,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       setIsUploadingMedia(true);
       setCloudUploadProgress(0);
       const uploadedUrls = await uploadMediaFiles(mediaFileObjects, MEDIA_STORAGE_FOLDER, setCloudUploadProgress);
-      const mediaObj = buildMediaRecord({
+      await saveMediaRecords(db, {
         title: mediaTitle,
         category: mediaCategory,
         urls: uploadedUrls,
@@ -2162,8 +2162,6 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         source: 'لوحة تحكم الأدمن',
         uploaderRole: 'أدمن',
       });
-
-      await addDoc(collection(db, MEDIA_GALLERY_COL), mediaObj);
       setMediaTitle('');
       setMediaFiles([]);
       setMediaFileObjects([]);
@@ -2831,13 +2829,13 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061]" dir="rtl">
       
       <div className="bg-white border-b border-slate-200 py-3 px-4 sm:px-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center shadow-sm">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-start sm:items-center gap-3 min-w-0">
           <span className="w-10 h-10 rounded-xl bg-[#630517] text-[#F5D061] flex items-center justify-center font-black text-lg shadow shrink-0">
             UHB
           </span>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-base sm:text-lg font-black text-slate-900 leading-snug">لوحة تحكم نادي التمريض</h1>
-            <p className="text-xs text-slate-500">سحابي متكامل ☁ • إدارة اللجان والفعاليات والطلبات</p>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <h1 className="text-base sm:text-lg font-black text-slate-900 leading-snug break-words">لوحة تحكم نادي التمريض</h1>
+            <p className="text-xs text-slate-500 leading-snug">سحابي متكامل ☁ • إدارة اللجان والفعاليات والطلبات</p>
           </div>
         </div>
 
@@ -4214,7 +4212,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر صوراً أو مقاطع (تُضغط الصور تلقائياً، المقطع حتى 48 ميغابايت)</label>
+                  <label className="text-xs font-bold text-slate-700">اختر صوراً أو مقاطع (حد الرفع 8 ميغابايت)</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
