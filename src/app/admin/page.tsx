@@ -1655,6 +1655,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     };
   }, [caseDayFilter, caseSubmissions, usersList]);
 
+  const caseStudyParticipantCount = useMemo(() => {
+    const people = new Set<string>();
+    for (const sub of caseSubmissions) {
+      people.add(personPhone(sub) || String(sub.id));
+    }
+    return people.size;
+  }, [caseSubmissions]);
+
   const openPasswordModal = (phone: string) => {
     setActiveUserPhoneForAction(phone);
     setModalInputVal('');
@@ -2834,6 +2842,10 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               <span className="block text-2xl font-black text-amber-300">{certificates.length}</span>
               <span className="text-[10px] font-bold text-white/90">إجمالي الشهادات</span>
             </div>
+            <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 text-center">
+              <span className="block text-2xl font-black text-pink-300">{caseStudyParticipantCount}</span>
+              <span className="text-[10px] font-bold text-white/90">مشاركو دراسة الحالة</span>
+            </div>
           </div>
         </div>
 
@@ -2863,7 +2875,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'case-study' ? 'bg-[#9d174d] text-white shadow-md scale-105' : 'bg-pink-50 text-pink-900 border border-pink-200 hover:bg-pink-100'
             }`}
           >
-            🩺 دراسة الحالة ({caseSubmissions.length})
+            🩺 دراسة الحالة ({caseStudyParticipantCount})
           </button>
 
           {isSystemAdminUser && (
@@ -3516,9 +3528,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 <h3 className="text-xl font-black text-pink-900">🎀 دراسة الحالة — أسبوع سرطان الثدي</h3>
                 <p className="text-xs text-slate-500">نقاط الحل مفصولة عن زيادات الإدارة. الزيادات الجديدة تظهر باسم من زادها.</p>
               </div>
-              <span className="px-3 py-1 rounded-full bg-pink-100 text-pink-800 font-bold text-xs">
-                إجمالي المشاركات: {caseSubmissions.length}
-              </span>
+              <div className="flex flex-wrap gap-2">
+                <span className="px-3 py-1 rounded-full bg-pink-100 text-pink-800 font-bold text-xs">
+                  المشاركون: {caseStudyParticipantCount}
+                </span>
+                <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
+                  المشاركات: {caseSubmissions.length}
+                </span>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-end gap-3 bg-pink-50/60 border border-pink-100 rounded-2xl p-4">

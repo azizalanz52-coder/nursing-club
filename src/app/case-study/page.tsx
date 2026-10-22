@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
 import { collection, addDoc, doc, getDoc, getDocs, query } from 'firebase/firestore';
@@ -29,6 +29,7 @@ interface CaseDraft {
 interface LeaderboardItem {
   studentName: string;
   totalScore: number;
+  phone: string;
 }
 
 interface RevealedBonus {
@@ -230,6 +231,7 @@ export default function CaseStudyPage() {
 
   const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  const myLeaderboardRowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const seed = dailySeed();
@@ -277,6 +279,14 @@ export default function CaseStudyPage() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (!showLeaderboardModal) return;
+    const timer = window.setTimeout(() => {
+      myLeaderboardRowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [showLeaderboardModal, leaderboard]);
+
   const fetchLeaderboard = async () => {
     try {
       const snap = await getDocs(query(collection(db, 'case_study_submissions')));
@@ -318,10 +328,11 @@ export default function CaseStudyPage() {
       const list: LeaderboardItem[] = Object.values(byKey).map((row) => ({
         studentName: row.name,
         totalScore: row.score,
+        phone: canonicalPhone(row.phone),
       }));
 
       list.sort((a, b) => b.totalScore - a.totalScore);
-      setLeaderboard(list.slice(0, 30));
+      setLeaderboard(list);
     } catch (err) {
       console.error(err);
     }
@@ -361,7 +372,10 @@ export default function CaseStudyPage() {
   const getMaxPossibleScore = () => 3 + (revealedBonus?.amount || 0);
 
   const decideBonus = (answers: Record<number, number>) => {
-    const rank = leaderboard.findIndex((item) => item.studentName === studentName.trim()) + 1;
+    const myPhone = canonicalPhone(studentPhone);
+    const rank = leaderboard.findIndex((item) => (
+      (myPhone && item.phone === myPhone) || item.studentName === studentName.trim()
+    )) + 1;
     const rng = mulberry32(dailySeed() ^ hashSeed(`${studentPhone}|${studentName}|bonus`));
     const amount = bonusAmountForRank(rank, rng);
     if (amount <= 0) return null;
@@ -470,40 +484,61 @@ export default function CaseStudyPage() {
       {showLeaderboardModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-slate-200 text-right" dir="rtl">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-              <h3 className="text-xl font-black text-[#9d174d] flex items-center gap-2">
-                <span>🏆</span> لوحة صدارة أسبوع سرطان الثدي
-              </h3>
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4 gap-3">
+              <div>
+                <h3 className="text-xl font-black text-[#9d174d] flex items-center gap-2">
+                  <span>🏆</span> لوحة صدارة أسبوع سرطان الثدي
+                </h3>
+                <p className="text-[11px] font-bold text-slate-500 mt-1">كل المشاركين: {leaderboard.length}</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowLeaderboardModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 flex items-center justify-center cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 flex items-center justify-center cursor-pointer shrink-0"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-2.5 max-h-72 overflow-y-auto pl-1">
+            <div className="space-y-2.5 max-h-[70vh] overflow-y-auto pl-1">
               {leaderboard.length === 0 ? (
                 <p className="text-center text-xs text-slate-400 py-8 font-medium">لا توجد سجلات صدارة حتى الآن، كن أول المشاركين!</p>
               ) : (
-                leaderboard.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-pink-50/70 border border-pink-100 text-xs font-bold">
-                    <div className="flex items-center gap-3">
-                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black ${
-                        idx === 0 ? 'bg-amber-400 text-slate-900 shadow-sm' :
-                        idx === 1 ? 'bg-slate-300 text-slate-800' :
-                        idx === 2 ? 'bg-amber-700 text-white' : 'bg-pink-200 text-pink-900'
+                leaderboard.map((item, idx) => {
+                  const myPhone = canonicalPhone(studentPhone);
+                  const isMe = Boolean(
+                    (myPhone && item.phone === myPhone) ||
+                    (!myPhone && studentName.trim() && item.studentName === studentName.trim())
+                  );
+                  return (
+                    <div
+                      key={item.phone || `${item.studentName}-${idx}`}
+                      ref={isMe ? myLeaderboardRowRef : undefined}
+                      className={`flex items-center justify-between p-3 rounded-2xl text-xs font-bold ${
+                        isMe
+                          ? 'bg-[#630517] text-white border-2 border-[#F5D061] shadow-md'
+                          : 'bg-pink-50/70 border border-pink-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${
+                          isMe ? 'bg-[#F5D061] text-[#630517]' :
+                          idx === 0 ? 'bg-amber-400 text-slate-900 shadow-sm' :
+                          idx === 1 ? 'bg-slate-300 text-slate-800' :
+                          idx === 2 ? 'bg-amber-700 text-white' : 'bg-pink-200 text-pink-900'
+                        }`}>
+                          {idx + 1}
+                        </span>
+                        <span className={isMe ? 'text-white' : 'text-slate-800 truncate'}>{item.studentName}</span>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold shrink-0 ${
+                        isMe ? 'bg-[#F5D061] text-[#630517]' : 'bg-[#be185d] text-white'
                       }`}>
-                        {idx + 1}
+                        ⭐ {item.totalScore} نقطة
                       </span>
-                      <span className="text-slate-800">{item.studentName}</span>
                     </div>
-                    <span className="bg-[#be185d] text-white px-3 py-1 rounded-full text-xs font-mono font-bold">
-                      ⭐ {item.totalScore} نقطة
-                    </span>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
