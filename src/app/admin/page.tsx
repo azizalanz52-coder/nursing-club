@@ -88,6 +88,7 @@ interface EventItem {
   status: 'upcoming' | 'past';
   poster: string;
   description: string;
+  createdAt?: number;
 }
 
 interface BannerItem {
@@ -2261,6 +2262,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
     const eventId = editingEventId ? editingEventId : Date.now().toString();
+    const existing = editingEventId ? events.find((ev) => ev.id === eventId) : undefined;
     const eventObj: EventItem = {
       id: eventId,
       title: newTitle,
@@ -2268,7 +2270,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       location: newLocation || 'جامعة حفر الباطن',
       status: newStatus,
       poster: newPoster,
-      description: newDesc || 'فعالية تابعة لنادي التمريض.'
+      description: newDesc || 'فعالية تابعة لنادي التمريض.',
+      createdAt: existing?.createdAt || Date.now(),
     };
 
     try {

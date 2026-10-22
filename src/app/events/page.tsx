@@ -4,65 +4,21 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
-
-interface EventItem {
-  id: string;
-  title: string;
-  date: string;
-  location: string;
-  status: 'upcoming' | 'past';
-  poster: string;
-  description: string;
-}
-
-const DEFAULT_EVENTS: EventItem[] = [
-  {
-    id: '1',
-    title: 'اليوم العالمي للتمريض',
-    date: '26 سبتمبر 2026',
-    location: 'مسرح المبنى 2',
-    status: 'upcoming',
-    poster: '/header-banner.png',
-    description: 'فعالية تابعة لنادي التمريض.'
-  },
-  {
-    id: '2',
-    title: 'حفل تدشين كلية التمريض',
-    date: '5 أكتوبر 2025',
-    location: 'الطلاب: كلية التمريض الطالبات: مسرح الياسمين',
-    status: 'past',
-    poster: '/logo.png',
-    description: 'فعالية تابعة لنادي التمريض.'
-  },
-  {
-    id: '3',
-    title: 'الإسعافات الأولية',
-    date: '27 أبريل 2026',
-    location: 'الطلاب: المعرض الدائم الطالبات: أمام المسرح الطلابي',
-    status: 'past',
-    poster: '/header-banner.png',
-    description: 'فعالية تابعة لنادي التمريض.'
-  }
-];
+import { sortEventsByLatest, type ClubEvent } from '../lib/clubEvents';
 
 export default function EventsPage() {
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
-  const [events, setEvents] = useState<EventItem[]>(DEFAULT_EVENTS);
+  const [events, setEvents] = useState<ClubEvent[]>([]);
 
-  // Fetch Cloud Events from Firebase Firestore
   useEffect(() => {
     const fetchCloudEvents = async () => {
       try {
         const eventsSnap = await getDocs(collection(db, 'site_events'));
-        if (!eventsSnap.empty) {
-          const eventsList: EventItem[] = [];
-          eventsSnap.forEach((d) => {
-            eventsList.push({ id: d.id, ...d.data() } as EventItem);
-          });
-          if (eventsList.length > 0) {
-            setEvents(eventsList);
-          }
-        }
+        const eventsList: ClubEvent[] = [];
+        eventsSnap.forEach((d) => {
+          eventsList.push({ id: d.id, ...d.data() } as ClubEvent);
+        });
+        setEvents(sortEventsByLatest(eventsList));
       } catch (err) {
         console.error('Error fetching cloud events:', err);
       }
