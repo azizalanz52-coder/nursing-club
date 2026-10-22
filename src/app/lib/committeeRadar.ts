@@ -12,6 +12,8 @@ export type RadarEvidence = {
   partnersCount: number;
   scientificTexts: number;
   eventsCount: number;
+  designWorks: number;
+  designEvents: number;
   qualityEvaluations: number;
   qualityFiles: number;
   escalatedByCommittee: Record<string, number>;
@@ -71,7 +73,7 @@ export function buildCommitteeRadar(
     const leadersCount = Number(hasLeader(comm.maleLeader)) + Number(hasLeader(comm.femaleLeader));
     const reports = evidence.escalatedByCommittee[comm.name] || 0;
     const isQuality = key === 'quality';
-    const isField = key === 'design' || key === 'events';
+    const isField = key === 'events';
 
     const readiness = isQuality
       ? clamp((leadersCount / 2) * 100)
@@ -110,10 +112,10 @@ export function buildCommitteeRadar(
       output = ratio(evidence.eventsCount, 4);
       note = 'العمل الأساسي تنظيمي وميداني (مجموعات واتساب وتنسيق الحضور). المنصة ترصد ما يُوثَّق رسميًا بالإضافة للجاهزية القيادية.';
     } else if (key === 'design') {
-      kpiLabel = 'مواد بصرية مرتبطة باللجنة';
-      kpiValue = members;
-      output = clamp(28 + leadersCount * 16 + Math.min(28, members * 6));
-      note = 'عمل اللجنة تصميمي وخارج المنصة بنسبة كبيرة. المؤشر يعتمد على اكتمال القيادة والكادر والانضباط، لا على عدد التصاميم المسلَّمة ورقيًا.';
+      kpiLabel = 'تصاميم مرفوعة للفعاليات';
+      kpiValue = evidence.designWorks;
+      output = clamp(ratio(evidence.designWorks, 6) * 0.7 + ratio(evidence.designEvents, 4) * 0.3);
+      note = 'الإنتاج = التصاميم المرفوعة على المنصة لكل فعالية. النقاط ولوحة الشرف تُضاف يدوياً من لوحة قادة اللجنة.';
     } else if (key === 'quality') {
       kpiLabel = 'ملفات وتقييمات رقابية';
       kpiValue = evidence.qualityEvaluations + evidence.qualityFiles;
@@ -152,6 +154,12 @@ export function buildCommitteeRadar(
     if (key === 'scientific' && evidence.scientificTexts === 0) negatives.push('بنك النصوص فارغ.');
     if (key === 'events' && evidence.eventsCount > 0) positives.push(`رُصدت ${evidence.eventsCount} فعالية على المنصة.`);
     if (key === 'events' && evidence.eventsCount === 0) negatives.push('لا توجد فعاليات موثّقة على المنصة بعد.');
+    if (key === 'design' && evidence.designWorks > 0) {
+      positives.push(`رُصد ${evidence.designWorks} تصميم على ${evidence.designEvents} فعالية.`);
+    }
+    if (key === 'design' && evidence.designWorks === 0) {
+      negatives.push('لا توجد تصاميم مرفوعة للفعاليات على المنصة.');
+    }
     if (key === 'quality' && evidence.qualityEvaluations > 0) positives.push(`${evidence.qualityEvaluations} تقييم أداء موثّق بالإيجابيات والسلبيات.`);
     if (key === 'quality' && evidence.qualityFiles > 0) positives.push(`${evidence.qualityFiles} ملف رقابي مرفوع.`);
     if (key === 'quality' && evidence.qualityEvaluations + evidence.qualityFiles === 0) {
@@ -423,7 +431,7 @@ export function openCommitteeRadarPrint(params: {
   ${sections}
   <h2>منهج القياس</h2>
   <div class="method">
-    الدرجة = إنتاج المنصة + جاهزية القيادة والكادر + الانضباط (بلاغات الجودة). الإعلام يُقاس بالمواد المرفوعة، والموارد البشرية بالشهادات، والعلاقات العامة بالشراكات، والمحتوى العلمي بالنصوص، والجودة بالتقارير، والتصميم وتنظيم الفعاليات بالقيادة والكادر وما يُوثَّق رسميًا.
+    الدرجة = إنتاج المنصة + جاهزية القيادة والكادر + الانضباط (بلاغات الجودة). الإعلام يُقاس بالمواد المرفوعة، والموارد البشرية بالشهادات، والعلاقات العامة بالشراكات، والمحتوى العلمي بالنصوص، والتصميم بالتصاميم المرفوعة لكل فعالية، والجودة بالتقارير، وتنظيم الفعاليات بالقيادة والكادر وما يُوثَّق رسميًا.
   </div>
   <div class="footer">نادي التمريض • جامعة حفر الباطن • وثيقة داخلية ${new Date().getFullYear()}</div>
 </body>

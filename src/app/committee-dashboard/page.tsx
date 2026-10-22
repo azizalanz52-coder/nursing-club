@@ -17,6 +17,7 @@ import { filterMediaFilesWithinLimit, isOverUploadLimit, mediaUploadLimitMessage
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/issueCertificate';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
+import DesignWorksBoard from '../components/DesignWorksBoard';
 import QualityEventReportForm from '../components/QualityEventReport';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -2762,6 +2763,18 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
               }}
             />
           </div>
+        )}
+
+        {belongsToDesignCommittee && (
+          <DesignWorksBoard
+            actorName={userData?.fullName || localStorage.getItem('userName') || 'عضو لجنة التصميم'}
+            actorPhone={userPhone || ''}
+            source="لوحة قادة التصميم"
+            uploaderRole={isCommitteeLeader ? 'قائد اللجنة' : 'عضو لجنة'}
+            eventSuggestions={scientificArchiveOptions}
+            canUpload
+            canDelete
+          />
         )}
 
         {isQualityTeam && (

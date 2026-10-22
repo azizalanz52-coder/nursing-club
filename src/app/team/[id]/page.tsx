@@ -13,6 +13,7 @@ import QualityEventReportForm from '../../components/QualityEventReport';
 import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
+import DesignWorksBoard from '../../components/DesignWorksBoard';
 import PageLoading from '../../components/PageLoading';
 import { filterMediaFilesWithinLimit, isOverUploadLimit, mediaUploadLimitMessage, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../../lib/uploadFile';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../../lib/issueCertificate';
@@ -1411,6 +1412,18 @@ export default function CommitteeDetailPage() {
               }}
             />
           </div>
+        )}
+
+        {isDesignCommittee && (
+          <DesignWorksBoard
+            actorName={currentUserName || 'عضو لجنة التصميم'}
+            actorPhone={currentUserPhone}
+            source="بوابة أعضاء لجنة التصميم"
+            uploaderRole="عضو لجنة"
+            eventSuggestions={eventsList.map((item: any) => String(item.title || '')).filter(Boolean)}
+            canUpload
+            canDelete
+          />
         )}
 
         {/* مهام اللجنة (Checklist Tasks) والربط مع الجودة */}

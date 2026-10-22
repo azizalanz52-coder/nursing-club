@@ -48,18 +48,25 @@ export default function CommitteePerformanceRadar({
   const [hrCertificates, setHrCertificates] = useState(certificates.length);
   const [fieldPartners, setFieldPartners] = useState(partners.length);
   const [committeeTexts, setCommitteeTexts] = useState(0);
+  const [designWorks, setDesignWorks] = useState(0);
+  const [designEvents, setDesignEvents] = useState(0);
 
   useEffect(() => {
     const loadExtra = async () => {
       try {
-        const [hrSnap, partnerSnap, textSnap] = await Promise.all([
+        const [hrSnap, partnerSnap, textSnap, designSnap] = await Promise.all([
           getDocs(collection(db, 'certificates')),
           getDocs(collection(db, 'public_partners_relations')),
           getDocs(collection(db, 'scientific_committee_texts')),
+          getDocs(collection(db, 'design_committee_works')),
         ]);
         setHrCertificates(Math.max(certificates.length, hrSnap.size));
         setFieldPartners(Math.max(partners.length, partnerSnap.size));
         setCommitteeTexts(textSnap.size);
+        setDesignWorks(designSnap.size);
+        setDesignEvents(new Set(
+          designSnap.docs.map((row) => String(row.data()?.eventTitle || '').trim()).filter(Boolean)
+        ).size);
       } catch (err) {
         console.error(err);
         setHrCertificates(certificates.length);
@@ -88,6 +95,8 @@ export default function CommitteePerformanceRadar({
       partnersCount: fieldPartners,
       scientificTexts: Math.max(scientificTexts.length, committeeTexts),
       eventsCount: events.length,
+      designWorks,
+      designEvents,
       qualityEvaluations: qualityEvaluationReports.length,
       qualityFiles: qualityUploadedFiles.length,
       escalatedByCommittee,
@@ -102,6 +111,8 @@ export default function CommitteePerformanceRadar({
     scientificTexts.length,
     committeeTexts,
     events.length,
+    designWorks,
+    designEvents,
     qualityEvaluationReports.length,
     qualityUploadedFiles.length,
     escalatedReports,
@@ -165,7 +176,8 @@ export default function CommitteePerformanceRadar({
             <li><strong>العلاقات العامة:</strong> سجل الشراكات والرعاة.</li>
             <li><strong>المحتوى العلمي:</strong> النصوص المعتمدة.</li>
             <li><strong>الجودة:</strong> التقارير والتقييمات. جهاز رقابي بلا أعضاء.</li>
-            <li><strong>التصميم وتنظيم الفعاليات:</strong> عملهما ميداني/تنسيقي؛ يُقاسان بالقيادة والكادر والانضباط وما يُوثَّق على المنصة.</li>
+            <li><strong>التصميم:</strong> التصاميم المرفوعة لكل فعالية وعدد الفعاليات المغطاة.</li>
+            <li><strong>تنظيم الفعاليات:</strong> عمل ميداني؛ يُقاس بالقيادة والكادر والانضباط وما يُوثَّق على المنصة.</li>
           </ul>
           <p className="text-[11px] text-slate-500 bg-slate-50 rounded-xl p-3">
             الدرجة = إنتاج المنصة + جاهزية القيادة والكادر + الانضباط (بلاغات الجودة). ليست تقييمًا شخصيًا، بل سجل تشغيلي.

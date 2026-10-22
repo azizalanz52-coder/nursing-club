@@ -15,6 +15,7 @@ import { ClubNoticeDialog } from '../components/ClubNotice';
 import HrCertificateBatches from '../components/HrCertificateBatches';
 import { printQualityEventReport, QUALITY_EVENT_REPORTS, computedSuccessIndex, recommendationLabel, type QualityEventReport } from '../lib/qualityEventReport';
 import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
+import DesignWorksBoard from '../components/DesignWorksBoard';
 import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import CollegeAdministrationEditor from '../components/admin/CollegeAdministrationEditor';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
@@ -197,7 +198,7 @@ export default function AdminDashboard() {
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
   const [adminReady, setAdminReady] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter' | 'scientific-texts' | 'platform-briefing' | 'college-admin'>('case-study');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'design-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter' | 'scientific-texts' | 'platform-briefing' | 'college-admin'>('case-study');
 
   const [isRegistrationClosed, setIsRegistrationClosed] = useState<boolean>(false);
 
@@ -3001,6 +3002,16 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
           <button
             type="button"
+            onClick={() => setActiveTab('design-committee')}
+            className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl font-bold text-[11px] sm:text-sm transition-all shadow-sm ${
+              activeTab === 'design-committee' ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105' : 'bg-amber-50 text-[#630517] border border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            🎨 تصاميم لجنة التصميم
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('historical-vault')}
             className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl font-bold text-[11px] sm:text-sm transition-all shadow-sm ${
               activeTab === 'historical-vault' ? 'bg-amber-700 text-white shadow-md scale-105' : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
@@ -4301,6 +4312,18 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === 'design-committee' && (
+          <DesignWorksBoard
+            actorName="إدارة النادي"
+            actorPhone=""
+            source="لوحة تحكم الأدمن"
+            uploaderRole="أدمن"
+            eventSuggestions={events.map((item: any) => String(item.title || '')).filter(Boolean)}
+            canUpload={false}
+            canDelete
+          />
         )}
 
         {activeTab === 'performance-radar' && (
