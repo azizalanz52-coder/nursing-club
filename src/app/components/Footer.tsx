@@ -1,14 +1,25 @@
+import Link from 'next/link';
+
 export default function Footer() {
   return (
     <footer className="bg-[#630517] text-white py-7 border-t border-[#F5D061]/20" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
 
-        <p className="flex flex-wrap items-center justify-center xl:justify-start gap-x-2 gap-y-1 text-xs text-amber-50/80 font-medium">
-          <span className="whitespace-nowrap">جميع الحقوق محفوظة</span>
-          <span className="text-[#F5D061]">•</span>
-          <span className="whitespace-nowrap">نادي التمريض بجامعة حفر الباطن</span>
-          <span className="whitespace-nowrap">© 2026</span>
-        </p>
+        <div className="flex flex-col items-center xl:items-start gap-2">
+          <p className="flex flex-wrap items-center justify-center xl:justify-start gap-x-2 gap-y-1 text-xs text-amber-50/80 font-medium">
+            <span className="whitespace-nowrap">جميع الحقوق محفوظة</span>
+            <span className="text-[#F5D061]">•</span>
+            <span className="whitespace-nowrap">نادي التمريض بجامعة حفر الباطن</span>
+            <span className="whitespace-nowrap">© 2026</span>
+          </p>
+          <div className="flex flex-wrap items-center justify-center xl:justify-start gap-x-3 gap-y-1 text-[11px] font-black text-[#F5D061]">
+            <Link href="/college" className="hover:text-white">إدارة كلية التمريض</Link>
+            <span className="text-white/40">•</span>
+            <Link href="/discover" className="hover:text-white">اكتشف النادي</Link>
+            <span className="text-white/40">•</span>
+            <Link href="/team" className="hover:text-white">قيادة النادي</Link>
+          </div>
+        </div>
 
         <div className="flex flex-col items-center gap-3 lg:flex-row lg:flex-wrap lg:justify-center xl:justify-end">
           <div className="flex flex-col sm:flex-row items-center gap-2 text-xs font-bold">

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
@@ -16,8 +16,23 @@ import HrCertificateBatches from '../components/HrCertificateBatches';
 import { printQualityEventReport, QUALITY_EVENT_REPORTS, computedSuccessIndex, recommendationLabel, type QualityEventReport } from '../lib/qualityEventReport';
 import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
 import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
+import CollegeAdministrationEditor from '../components/admin/CollegeAdministrationEditor';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
+import {
+  addDaysYmd,
+  adjustmentsOf,
+  formatCaseDate,
+  formatDayLabel,
+  grantThursdayPersistence,
+  isRiyadhThursday,
+  loadCaseSubmissions,
+  personPhone,
+  riyadhParts,
+  scoreBreakdown,
+  submissionDayKey,
+  type ScoreAdjustment,
+} from '../lib/caseStudy';
 import { isValidUniversityId, linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { isCommitteeLeaderRole, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
 import {
@@ -190,7 +205,7 @@ export default function AdminDashboard() {
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
   const [adminReady, setAdminReady] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter' | 'scientific-texts' | 'platform-briefing'>('case-study');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter' | 'scientific-texts' | 'platform-briefing' | 'college-admin'>('case-study');
 
   const [isRegistrationClosed, setIsRegistrationClosed] = useState<boolean>(false);
 
@@ -201,6 +216,8 @@ export default function AdminDashboard() {
   const [qualityEventReports, setQualityEventReports] = useState<QualityEventReport[]>([]);
 
   const [caseSubmissions, setCaseSubmissions] = useState<any[]>([]);
+  const [caseDayFilter, setCaseDayFilter] = useState(riyadhParts().ymd);
+  const [grantingPersistence, setGrantingPersistence] = useState(false);
 
   const [studentAchievements, setStudentAchievements] = useState<StudentAchievement[]>([]);
   const [editingAchievementId, setEditingAchievementId] = useState<string | null>(null);
@@ -421,19 +438,7 @@ export default function AdminDashboard() {
 
   const fetchCaseSubmissions = async () => {
     try {
-      const snap = await getDocs(collection(db, 'case_study_submissions'));
-      const list = await Promise.all(snap.docs.map(async (d) => {
-        const data = d.data();
-        let finalDate = data.createdAt || data.submittedAt;
-        if (!finalDate) {
-          finalDate = new Date().toISOString();
-          try {
-            await updateDoc(doc(db, 'case_study_submissions', d.id), { createdAt: finalDate });
-          } catch (err) {}
-        }
-        return { id: d.id, ...data, createdAt: finalDate };
-      }));
-      setCaseSubmissions(list);
+      setCaseSubmissions(await loadCaseSubmissions(db));
     } catch (e) {
       console.error(e);
     }
@@ -1545,9 +1550,27 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     if (currentScore + delta < 0) return;
     try {
       await requireAuthUser();
-      await updateDoc(doc(db, 'case_study_submissions', id), { score: increment(delta) });
+      const actorPhone = canonicalPhone(emailToPhone(auth.currentUser?.email || '') || localStorage.getItem('userPhone') || '');
+      const actorName = getRealUserName(actorPhone, 'لوحة الأدمن');
+      const current = caseSubmissions.find((sub) => sub.id === id) || {};
+      const entry: ScoreAdjustment = {
+        delta,
+        byPhone: actorPhone,
+        byName: actorName,
+        at: Date.now(),
+      };
+      await updateDoc(doc(db, 'case_study_submissions', id), {
+        score: increment(delta),
+        scoreAdjustments: [...adjustmentsOf(current), entry],
+      });
       setCaseSubmissions((prev) => prev.map((sub) => (
-        sub.id === id ? { ...sub, score: Math.max(0, Number(sub.score || 0) + delta) } : sub
+        sub.id === id
+          ? {
+              ...sub,
+              score: Math.max(0, Number(sub.score || 0) + delta),
+              scoreAdjustments: [...adjustmentsOf(sub), entry],
+            }
+          : sub
       )));
     } catch (err: any) {
       console.error(err);
@@ -1555,6 +1578,82 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       setModalType('success');
     }
   };
+
+  const handleGrantThursdayPersistence = async () => {
+    setGrantingPersistence(true);
+    try {
+      await requireAuthUser();
+      const granted = await grantThursdayPersistence(db, caseSubmissions);
+      await fetchCaseSubmissions();
+      setModalMessage(granted
+        ? `تم صرف شكر الاستمرارية لـ ${granted} مشاركين (+2 لمن أكمل الأيام الخمسة).`
+        : 'ما فيه أحد مستحق اليوم، أو البونص انصرف مسبقاً.');
+      setModalType('success');
+    } catch (err: any) {
+      setModalMessage(err?.message || 'تعذر صرف بونص الاستمرارية.');
+      setModalType('success');
+    } finally {
+      setGrantingPersistence(false);
+    }
+  };
+
+  const caseDayPeople = useMemo(() => {
+    const day = caseDayFilter || riyadhParts().ymd;
+    const weekAgo = addDaysYmd(day, -7);
+    const groups = new Map<string, {
+      phone: string;
+      name: string;
+      rows: any[];
+      total: number;
+      solve: number;
+      admin: number;
+      unverified: number;
+      persistence: number;
+    }>();
+    const weekAgoTotals = new Map<string, number>();
+
+    const take = (sub: any, intoWeekAgo = false) => {
+      const phone = personPhone(sub);
+      const key = phone || String(sub.id);
+      if (intoWeekAgo) {
+        weekAgoTotals.set(key, (weekAgoTotals.get(key) || 0) + Number(sub.score || 0));
+        return;
+      }
+      const br = scoreBreakdown(sub);
+      const current = groups.get(key) || {
+        phone,
+        name: '',
+        rows: [] as any[],
+        total: 0,
+        solve: 0,
+        admin: 0,
+        unverified: 0,
+        persistence: 0,
+      };
+      current.rows.push(sub);
+      current.total += br.total;
+      current.solve += br.solve;
+      current.admin += br.adminLogged;
+      current.unverified += br.unverified;
+      current.persistence += br.persistence;
+      current.name = getRealUserName(phone, String(sub.studentName || sub.fullName || current.name || 'مشارك'));
+      groups.set(key, current);
+    };
+
+    for (const sub of caseSubmissions) {
+      const key = submissionDayKey(sub);
+      if (key === day) take(sub);
+      if (key === weekAgo) take(sub, true);
+    }
+
+    return {
+      day,
+      weekAgo,
+      people: Array.from(groups.values())
+        .map((person) => ({ ...person, weekAgoTotal: weekAgoTotals.get(person.phone || person.rows[0]?.id) || 0 }))
+        .sort((a, b) => b.total - a.total),
+    };
+  }, [caseDayFilter, caseSubmissions, usersList]);
 
   const openPasswordModal = (phone: string) => {
     setActiveUserPhoneForAction(phone);
@@ -2865,6 +2964,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             { id: 'banners', label: '🖼️ بنر الترحيب' },
             { id: 'requests', label: '📥 طلبات الانضمام والأكسل' },
             { id: 'suggestions', label: '💡 آراء ومقترحات الطلاب' },
+            { id: 'college-admin', label: '🏛️ إدارة كلية التمريض' },
             { id: 'discover', label: '🖼️ معرض "اكتشف النادي"' },
             { id: 'passion', label: '✨ بطاقة "شغف وعطاء"' },
             { id: 'events', label: '📅 الفعاليات والبوسترات' },
@@ -3414,87 +3514,102 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-pink-900">🎀 دراسة الحالة — أسبوع سرطان الثدي</h3>
-                <p className="text-xs text-slate-500">متابعة المشاركين في تحدي Pink October، درجاتهم، وأرقام جوالاتهم.</p>
+                <p className="text-xs text-slate-500">نقاط الحل مفصولة عن زيادات الإدارة. الزيادات الجديدة تظهر باسم من زادها.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-pink-100 text-pink-800 font-bold text-xs">
                 إجمالي المشاركات: {caseSubmissions.length}
               </span>
             </div>
 
+            <div className="flex flex-wrap items-end gap-3 bg-pink-50/60 border border-pink-100 rounded-2xl p-4">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-600">عرض يوم</label>
+                <input
+                  type="date"
+                  value={caseDayFilter}
+                  onChange={(e) => setCaseDayFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-pink-200 text-xs bg-white"
+                />
+              </div>
+              <button type="button" onClick={() => setCaseDayFilter(riyadhParts().ymd)} className="px-3 py-2 rounded-xl bg-white border border-pink-200 text-[11px] font-bold text-pink-900">اليوم</button>
+              <button type="button" onClick={() => setCaseDayFilter(addDaysYmd(riyadhParts().ymd, -1))} className="px-3 py-2 rounded-xl bg-white border border-pink-200 text-[11px] font-bold text-pink-900">أمس</button>
+              <button type="button" onClick={() => setCaseDayFilter(addDaysYmd(caseDayFilter || riyadhParts().ymd, -7))} className="px-3 py-2 rounded-xl bg-white border border-pink-200 text-[11px] font-bold text-pink-900">قبل أسبوع</button>
+              <div className="text-[11px] text-slate-600 font-bold pb-2">
+                {formatDayLabel(caseDayPeople.day)} • مقارنة مع {formatDayLabel(caseDayPeople.weekAgo)}
+              </div>
+              <button
+                type="button"
+                disabled={grantingPersistence || !isRiyadhThursday()}
+                onClick={() => void handleGrantThursdayPersistence()}
+                className="mr-auto px-4 py-2 rounded-xl bg-[#9d174d] text-white text-[11px] font-black disabled:opacity-40"
+              >
+                {grantingPersistence ? 'جاري الصرف...' : 'صرف شكر الاستمرارية (+2 لمن أكمل 5 أيام)'}
+              </button>
+            </div>
+
             {caseSubmissions.length === 0 ? (
               <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                 <p className="text-sm font-bold">لم يتم تسجيل أي مشاركات في دراسة الحالة حتى الآن.</p>
               </div>
+            ) : caseDayPeople.people.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-sm font-bold">لا مشاركات في هذا اليوم. غيّر التاريخ للرجوع لأيام سابقة.</p>
+              </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                      <th className="pb-3 pr-2">اسم الطالب / المشارك (الاسم الحقيقي)</th>
-                      <th className="pb-3">رقم الجوال</th>
-                      <th className="pb-3">الدرجة / النقاط</th>
-                      <th className="pb-3">تاريخ ووقت المشاركة</th>
-                      <th className="pb-3 text-left pl-2">الإجراءات وصلاحيات النقاط</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {caseSubmissions.map((sub, idx) => {
-                      const formattedDate = sub.createdAt || sub.submittedAt
-                        ? new Date(sub.createdAt || sub.submittedAt).toLocaleString('ar-SA')
-                        : new Date().toLocaleString('ar-SA');
+              <div className="space-y-4">
+                {caseDayPeople.people.map((person) => (
+                  <div key={person.phone || person.rows[0]?.id} className="rounded-2xl border border-pink-100 bg-pink-50/30 p-4 space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-black text-slate-900 text-sm">👤 {person.name}</p>
+                        <p className="text-[11px] font-mono text-slate-500" dir="ltr">{person.phone || 'بدون رقم'}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-[11px] font-bold">
+                        <span className="px-2.5 py-1 rounded-full bg-white border border-pink-200 text-pink-900">هذا اليوم: {person.total}</span>
+                        <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700">قبل أسبوع: {person.weekAgoTotal}</span>
+                        <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800">من الحل: {person.solve}</span>
+                        <span className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-800">إدارة: +{person.admin}</span>
+                        {person.persistence > 0 ? <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800">استمرارية: +{person.persistence}</span> : null}
+                        {person.unverified > 0 ? <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-800">غير موثّق: +{person.unverified}</span> : null}
+                      </div>
+                    </div>
 
-                      const userPhone = sub.phone || sub.phoneNumber || '';
-                      const rawName = sub.studentName || sub.fullName || sub.name || 'مشارك كريم';
-                      const realStudentName = getRealUserName(userPhone, rawName);
-                      const phoneKey = canonicalPhone(userPhone);
-                      const phoneTotal = caseSubmissions.reduce((sum, item) => {
-                        const itemPhone = canonicalPhone(item.phone || item.phoneNumber || '');
-                        if (phoneKey && itemPhone === phoneKey) return sum + Number(item.score || 0);
-                        if (!phoneKey && item.id === sub.id) return sum + Number(item.score || 0);
-                        return sum;
-                      }, 0);
-
+                    {person.rows.map((sub) => {
+                      const br = scoreBreakdown(sub);
+                      const logs = adjustmentsOf(sub);
                       return (
-                        <tr key={sub.id || idx} className="hover:bg-slate-50">
-                          <td className="py-4 pr-2 font-bold text-slate-900">
-                            👤 {realStudentName}
-                            {phoneTotal !== Number(sub.score || 0) ? (
-                              <span className="block text-[10px] text-pink-700 font-bold mt-0.5">المجموع لهذا الرقم: {phoneTotal} نقطة</span>
-                            ) : null}
-                          </td>
-                          <td className="py-4 text-slate-600 font-mono" dir="ltr">
-                            📞 {userPhone || 'غير متوفر'}
-                          </td>
-                          <td className="py-4">
-                            <span className="px-3 py-1 rounded-full bg-pink-100 text-pink-800 font-bold text-xs font-mono">
-                              ⭐ {sub.score || 0} نقطة
-                            </span>
-                          </td>
-                          <td className="py-4 text-slate-500 font-mono" dir="ltr">
-                            🕒 {formattedDate}
-                          </td>
-                          <td className="py-4 text-left pl-2 flex items-center gap-1.5 justify-end flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, 1)}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer text-[11px]"
-                            >
-                              + بونص 🟢
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, -1)}
-                              className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer text-[11px]"
-                            >
-                              - خصم 🟠
-                            </button>
-
+                        <div key={sub.id} className="bg-white rounded-2xl border border-pink-100 p-3 space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                            <span className="text-slate-500 font-bold">🕒 {formatCaseDate(sub)}</span>
+                            <span className="font-black text-pink-900">المجموع: {br.total} نقطة</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 font-bold">
+                            حل {br.solve}
+                            {br.surprise > 0 ? ` • مفاجأة +${br.surprise}` : ''}
+                            {br.persistence > 0 ? ` • استمرارية +${br.persistence}` : ''}
+                            {br.adminLogged ? ` • إدارة ${br.adminLogged > 0 ? '+' : ''}${br.adminLogged}` : ''}
+                            {br.unverified > 0 ? ` • زيادة قديمة غير موثّقة +${br.unverified}` : ''}
+                          </p>
+                          {logs.length > 0 ? (
+                            <div className="space-y-1">
+                              {logs.map((log, logIdx) => (
+                                <p key={`${sub.id}-${log.at}-${logIdx}`} className="text-[11px] text-slate-700 bg-slate-50 rounded-xl px-3 py-1.5">
+                                  {log.delta > 0 ? `+${log.delta}` : log.delta} من {log.byName || 'لوحة الأدمن'}
+                                  <span className="text-slate-400 mr-2">{formatCaseDate({ timestamp: log.at })}</span>
+                                </p>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-slate-400">ما فيه زيادة موثّقة بعد. أي +بونص من الآن ينكتب باسم من ضغطه.</p>
+                          )}
+                          <div className="flex flex-wrap gap-1.5 justify-end">
+                            <button type="button" onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, 1)} className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer text-[11px]">+ بونص 🟢</button>
+                            <button type="button" onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, -1)} className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer text-[11px]">- خصم 🟠</button>
                             <button
                               type="button"
                               onClick={() => {
-                                setCertRecipientInput(realStudentName);
-                                setCertPhoneInput(userPhone);
+                                setCertRecipientInput(person.name);
+                                setCertPhoneInput(person.phone);
                                 setCertTitleInput('شهادة مشاركة في دراسة الحالة الطبية');
                                 setCertCategoryInput('شهادة اجتياز دورة');
                                 setActiveTab('certificates');
@@ -3504,21 +3619,13 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                             >
                               إصدار شهادة 📜
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCaseSubmission(sub.id)}
-                              className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-[11px]"
-                              title="إزالة من لوحة الصدارة"
-                            >
-                              حذف من الصدارة 🗑️
-                            </button>
-                          </td>
-                        </tr>
+                            <button type="button" onClick={() => handleDeleteCaseSubmission(sub.id)} className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer text-[11px]">حذف 🗑️</button>
+                          </div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -4602,6 +4709,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             )}
           </div>
         )}
+
+        {activeTab === 'college-admin' && <CollegeAdministrationEditor />}
 
         {activeTab === 'discover' && (
           <div className="space-y-8">

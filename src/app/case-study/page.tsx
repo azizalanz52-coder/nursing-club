@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { db } from './../lib/firebase';
 import { collection, addDoc, doc, getDoc, getDocs, query } from 'firebase/firestore';
 import { canonicalPhone, phoneVariants } from '../lib/certificatesLookup';
+import { loadCaseSubmissions, persistenceForSubmit, personPhone, riyadhParts, submissionDayKey } from '../lib/caseStudy';
 
 interface CaseQuestion {
   id: number;
@@ -220,6 +221,7 @@ export default function CaseStudyPage() {
   const [showResults, setShowResults] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
   const [revealedBonus, setRevealedBonus] = useState<RevealedBonus | null>(null);
+  const [persistenceBonus, setPersistenceBonus] = useState(0);
 
   const [studentName, setStudentName] = useState('');
   const [studentPhone, setStudentPhone] = useState('');
@@ -327,17 +329,15 @@ export default function CaseStudyPage() {
 
   const checkIfAlreadySubmitted = async (phone: string) => {
     try {
-      const snap = await getDocs(query(collection(db, 'case_study_submissions')));
-      snap.docs.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.phone !== phone) return;
-        const submissionDate = new Date(data.timestamp).toDateString();
-        const todayDate = new Date().toDateString();
-        if (submissionDate === todayDate) {
-          setHasSubmittedToday(true);
-          setShowResults(true);
-        }
-      });
+      const list = await loadCaseSubmissions(db);
+      const today = riyadhParts().ymd;
+      const key = canonicalPhone(phone);
+      const todayRow = list.find((row) => personPhone(row) === key && submissionDayKey(row) === today);
+      if (todayRow) {
+        setHasSubmittedToday(true);
+        setShowResults(true);
+        setPersistenceBonus(Number(todayRow.persistenceBonus || 0));
+      }
     } catch (err) {
       console.error(err);
     }
@@ -390,22 +390,39 @@ export default function CaseStudyPage() {
     setSubmitting(true);
     try {
       const bonus = decideBonus(selectedAnswers);
-      const score = calculateScore(bonus, selectedAnswers);
-      const now = new Date();
+      const solveScore = calculateScore(bonus, selectedAnswers);
+      const now = Date.now();
+      const existing = await loadCaseSubmissions(db);
+      const phoneKey = canonicalPhone(studentPhone) || studentPhone.trim();
+      const today = riyadhParts(now).ymd;
+      if (existing.some((row) => personPhone(row) === phoneKey && submissionDayKey(row) === today)) {
+        setHasSubmittedToday(true);
+        setShowResults(true);
+        alert('تم تسجيل حل اليوم مسبقاً. الانتظار حتى يتجدد التحدي.');
+        return;
+      }
+      const persistence = persistenceForSubmit(existing, phoneKey, now);
+      const score = solveScore + persistence.amount;
+      const when = new Date(now);
 
       await addDoc(collection(db, 'case_study_submissions'), {
         studentName: studentName.trim(),
-        phone: studentPhone.trim(),
+        phone: canonicalPhone(studentPhone) || studentPhone.trim(),
         score,
+        solveScore,
         total: activeCases.length,
         bonusQuestionId: bonus?.questionId || null,
         bonusAmount: bonus?.amount || 0,
-        timestamp: Date.now(),
-        dateStr: now.toLocaleDateString('ar-SA'),
-        timeStr: now.toLocaleTimeString('ar-SA'),
+        persistenceBonus: persistence.amount,
+        persistenceWeek: persistence.weekKey || null,
+        timestamp: now,
+        createdAt: when.toISOString(),
+        dateStr: when.toLocaleDateString('ar-EG', { timeZone: 'Asia/Riyadh' }),
+        timeStr: when.toLocaleTimeString('ar-EG', { timeZone: 'Asia/Riyadh' }),
       });
 
       setRevealedBonus(bonus);
+      setPersistenceBonus(persistence.amount);
       setHasSubmittedToday(true);
       setShowResults(true);
       fetchLeaderboard();
@@ -595,7 +612,12 @@ export default function CaseStudyPage() {
           </form>
         ) : (
           <div className="bg-pink-50 border-2 border-pink-300 p-6 rounded-3xl space-y-3 text-center">
-            <h3 className="text-xl font-black text-pink-900">Your Score: {calculateScore()} / {getMaxPossibleScore()} Points! 🎉</h3>
+            <h3 className="text-xl font-black text-pink-900">Your Score: {calculateScore() + persistenceBonus} / {getMaxPossibleScore() + persistenceBonus} Points! 🎉</h3>
+            {persistenceBonus > 0 ? (
+              <p className="text-sm text-pink-900 font-black bg-white/80 border border-pink-200 rounded-2xl px-4 py-3">
+                🌸 شكراً لاستمراريتك معنا طول الأسبوع في الحل
+              </p>
+            ) : null}
             {revealedBonus ? (
               <p className="text-xs text-amber-800 font-bold">ظهر بونص مفاجئ بعد التسليم على الحالة {revealedBonus.questionId}.</p>
             ) : (
