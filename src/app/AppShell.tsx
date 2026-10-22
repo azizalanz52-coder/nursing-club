@@ -12,29 +12,24 @@ export default function AppShell({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
 
   useEffect(() => {
-    if (sessionStorage.getItem(SPLASH_KEY) === '1') {
-      setShowSplash(false);
-      return;
-    }
+    if (sessionStorage.getItem(SPLASH_KEY) === '1') return;
 
+    setShowSplash(true);
     const timer = setTimeout(() => {
       sessionStorage.setItem(SPLASH_KEY, '1');
       setShowSplash(false);
-    }, 3800);
+    }, 2400);
     return () => clearTimeout(timer);
   }, []);
 
   return (
     <>
-      {showSplash ? <OpeningSplash /> : (
-        <>
-          <Navbar />
-          {children}
-        </>
-      )}
+      <Navbar />
+      {children}
+      {showSplash ? <OpeningSplash /> : null}
       <ClubNoticeHost />
     </>
   );

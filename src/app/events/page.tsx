@@ -34,7 +34,7 @@ export default function EventsPage() {
   });
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12 pt-28" dir="rtl">
+    <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         
         <div className="flex justify-between items-center">

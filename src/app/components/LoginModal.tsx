@@ -78,6 +78,11 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-md p-4" dir="rtl">
       <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border border-slate-100">
         <div className="text-center space-y-2">
+          <div className="flex items-center justify-center gap-3 mb-3" dir="ltr">
+            <img src="/logo.png" alt="نادي التمريض" className="h-10 w-auto object-contain" />
+            <div className="w-px h-8 bg-slate-200" />
+            <img src="/uhb-logo.png" alt="جامعة حفر الباطن" className="h-10 w-auto object-contain" />
+          </div>
           <h3 className="text-2xl font-black text-slate-950">
             {isRegistering ? 'إنشاء حساب جديد 📝' : 'تسجيل الدخول / حسابي'}
           </h3>

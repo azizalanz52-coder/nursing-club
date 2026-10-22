@@ -94,10 +94,14 @@ function Reveal({
         setShown(true);
         io.disconnect();
       },
-      { threshold: 0.14, rootMargin: '0px 0px -48px 0px' }
+      { threshold: 0, rootMargin: '160px 0px 160px 0px' }
     );
     io.observe(el);
-    return () => io.disconnect();
+    const fallback = window.setTimeout(() => setShown(true), 180);
+    return () => {
+      io.disconnect();
+      window.clearTimeout(fallback);
+    };
   }, []);
 
   return (

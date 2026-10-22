@@ -1,5 +1,5 @@
-import OpeningSplash from './components/OpeningSplash';
+import PageLoading from './components/PageLoading';
 
 export default function LoadingScreen() {
-  return <OpeningSplash />;
+  return <PageLoading title="جاري التحميل" />;
 }

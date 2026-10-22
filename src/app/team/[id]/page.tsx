@@ -14,7 +14,7 @@ import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import PageLoading from '../../components/PageLoading';
-import { isOverUploadLimit, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../../lib/uploadFile';
+import { filterMediaFilesWithinLimit, isOverUploadLimit, mediaUploadLimitMessage, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../../lib/uploadFile';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../../lib/issueCertificate';
 import { canonicalPhone, normalizeUniversityId } from '../../lib/certificatesLookup';
 import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../../lib/memberIdentity';
@@ -199,7 +199,7 @@ export default function CommitteeDetailPage() {
   const [mediaGallery, setMediaGallery] = useState<any[]>([]);
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaCategory, setMediaCategory] = useState<string>(MEDIA_CATEGORIES[0]);
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
   const [mediaUploadProgress, setMediaUploadProgress] = useState(0);
 
@@ -527,12 +527,8 @@ export default function CommitteeDetailPage() {
   // رفع صورة أو فيديو (خاص بلجنة الإعلام) - مربوط بقاعدة البيانات المركزية
   const handleUploadMediaSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!mediaTitle.trim() || !mediaFile) {
+    if (!mediaTitle.trim() || mediaFiles.length === 0) {
       alert('يرجى كتابة عنوان التغطية واختيار ملف الصورة أو الفيديو.');
-      return;
-    }
-    if (isOverUploadLimit(mediaFile)) {
-      alert(uploadLimitMessage());
       return;
     }
 
@@ -540,12 +536,12 @@ export default function CommitteeDetailPage() {
       setIsUploadingMedia(true);
       setMediaUploadProgress(0);
 
-      const downloadUrl = await uploadClubFile(mediaFile, MEDIA_STORAGE_FOLDER, setMediaUploadProgress);
+      const urls = await uploadMediaFiles(mediaFiles, MEDIA_STORAGE_FOLDER, setMediaUploadProgress);
       const newObj = buildMediaRecord({
         title: mediaTitle,
         category: mediaCategory,
-        urls: [downloadUrl],
-        isVideo: mediaFile.type.startsWith('video'),
+        urls,
+        isVideo: mediaFiles.some((file) => file.type.startsWith('video')),
         addedBy: currentUserName || 'عضو الإعلام',
         source: 'بوابة أعضاء لجنة الإعلام',
         uploaderRole: 'عضو لجنة',
@@ -554,8 +550,8 @@ export default function CommitteeDetailPage() {
       await addDoc(collection(db, 'media_committee_gallery'), newObj);
 
       setMediaTitle('');
-      setMediaFile(null);
-      alert('تم الرفع في الأرشيف المشترك. يظهر الآن لقادة الإعلام وفي تبويب قسم الإعلام بالأدمن.');
+      setMediaFiles([]);
+      alert('تم الرفع. التغطية ظهرت لقادة الإعلام وفي تبويب الإعلام بالأدمن.');
     } catch (err: any) {
       console.error('Error uploading media:', err);
       alert(err?.message || 'حدث خطأ أثناء رفع الملف، يرجى المحاولة مرة أخرى.');
@@ -1210,44 +1206,34 @@ export default function CommitteeDetailPage() {
               </div>
 
               <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-bold text-slate-700">اختر الملف (الحد 8 ميغابايت لكل صورة أو فيديو)</label>
+                <label className="text-xs font-bold text-slate-700">اختر صوراً أو مقاطع (أكثر من ملف دفعة واحدة)</label>
                 <input
                   type="file"
                   accept="image/*,video/*"
+                  multiple
                   onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (isOverUploadLimit(file)) {
-                      alert(uploadLimitMessage());
-                      e.target.value = '';
-                      setMediaFile(null);
-                      return;
-                    }
-                    setMediaFile(file);
+                    const picked = Array.from(e.target.files || []);
+                    e.target.value = '';
+                    if (!picked.length) return;
+                    const { accepted, rejected } = filterMediaFilesWithinLimit(picked);
+                    if (rejected.length > 0) alert(mediaUploadLimitMessage(rejected[0]));
+                    if (accepted.length > 0) setMediaFiles((prev) => [...prev, ...accepted]);
                   }}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white cursor-pointer"
-                  required
                 />
+                <p className="text-[11px] text-slate-500">الصور تُضغط تلقائياً. المقطع حتى 48 ميغابايت، ويفضّل الواي فاي.</p>
               </div>
 
-              {/* معاينة الملف قبل الرفع النهائي بأبعاد متناسبة */}
-              {mediaFile && (
+              {mediaFiles.length > 0 && (
                 <div className="sm:col-span-2 p-4 bg-white rounded-2xl border border-purple-200 space-y-2">
-                  <span className="text-xs font-bold text-purple-800">👁️ ملف جاهز للرفع السحابي: {mediaFile.name}</span>
-                  <div className="max-h-72 overflow-hidden rounded-xl bg-slate-900/5 flex items-center justify-center p-2">
-                    {mediaFile.type.startsWith('video') ? (
-                      <video src={URL.createObjectURL(mediaFile)} controls className="max-h-72 w-auto object-contain rounded-xl" />
-                    ) : (
-                      <img src={URL.createObjectURL(mediaFile)} alt="معاينة" className="max-h-72 w-auto object-contain rounded-xl" />
-                    )}
-                  </div>
+                  <span className="text-xs font-bold text-purple-800">جاهز للرفع: {mediaFiles.length} ملف — {mediaFiles.map((file) => file.name).join('، ')}</span>
                 </div>
               )}
 
               <div className="sm:col-span-2 pt-2 space-y-2">
                 <button
                   type="submit"
-                  disabled={isUploadingMedia}
+                  disabled={isUploadingMedia || mediaFiles.length === 0}
                   className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 disabled:bg-slate-400 cursor-pointer"
                 >
                   {uploadingLabel(isUploadingMedia, mediaUploadProgress, '+ رفع ونشر محتوى لجنة الإعلام سحابياً 🎬')}

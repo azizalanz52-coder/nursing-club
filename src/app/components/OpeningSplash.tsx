@@ -1,6 +1,8 @@
+'use client';
+
 export default function OpeningSplash() {
   return (
-    <main className="fixed inset-0 z-50 flex flex-col overflow-hidden" dir="rtl">
+    <main className="fixed inset-0 z-[90] flex flex-col overflow-hidden pointer-events-none" dir="rtl">
       <style>{`
         @keyframes nursCoverIn {
           from { opacity: 0; transform: translateY(12px); }

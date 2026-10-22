@@ -12,7 +12,7 @@ import { readStoredUniversityId } from '../lib/memberIdentity';
 import { certDisplayUrl, resolveCertificatePreview, type CertificatePreview } from '../lib/uploadFile';
 import { emailToPhone, isAdminPhone, isPrivilegedRole } from '../lib/authIdentity';
 import { logoutSession } from '../lib/sessionAuth';
-import { findListedLeadership, findMemberContext, isCommitteeLeaderRole, resolveMemberAcceptance } from '../lib/memberAcceptance';
+import { committeeNameFromId, findListedLeadership, findMemberContext, isCommitteeLeaderRole, resolveMemberAcceptance, resolvePortalCommitteeId } from '../lib/memberAcceptance';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
@@ -21,7 +21,6 @@ export default function Navbar() {
   const [assignedCommittee, setAssignedCommittee] = useState<string | null>(null);
   const [listedAsLeader, setListedAsLeader] = useState(false);
   const [adminAuth, setAdminAuth] = useState<boolean>(false);
-  const [mounted, setMounted] = useState(false);
   const [showNavbar, setShowNavbar] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -44,7 +43,6 @@ export default function Navbar() {
   const [certPreview, setCertPreview] = useState<CertificatePreview | null>(null);
 
   useEffect(() => {
-    setMounted(true);
     sessionStorage.removeItem('adminToken');
 
     const unsubAuth = onAuthStateChanged(auth, (user) => {
@@ -114,7 +112,8 @@ export default function Navbar() {
       const applyUser = (data: Record<string, unknown>) => {
         const currentRole = String(data.role || 'عضو أساسي');
         setUserRole(currentRole);
-        if (data.assignedCommittee) setAssignedCommittee(String(data.assignedCommittee));
+        const committee = String(data.assignedCommittee || data.committee || '').trim();
+        if (committee) setAssignedCommittee(committee);
         if (data.fullName) {
           setUserName(String(data.fullName));
           localStorage.setItem('userName', String(data.fullName));
@@ -134,9 +133,13 @@ export default function Navbar() {
       const listed = await findListedLeadership(db, String(userDoc?.data?.fullName || storedName));
       if (!cancelled) {
         setListedAsLeader(Boolean(listed));
-        if (listed?.name && !userDoc?.data?.assignedCommittee && !acceptance?.acceptedCommittee) {
+        if (listed?.name && !userDoc?.data?.assignedCommittee && !userDoc?.data?.committee && !acceptance?.acceptedCommittee) {
           setAssignedCommittee(listed.name);
         }
+      }
+      if (!cancelled && !acceptance?.acceptedCommittee && !userDoc?.data?.assignedCommittee && !userDoc?.data?.committee && !listed?.name) {
+        const portalId = await resolvePortalCommitteeId(db, userPhone, userDoc?.data || null);
+        if (portalId) setAssignedCommittee(committeeNameFromId(portalId) || portalId);
       }
 
       const userRef = doc(db, 'users', userDoc?.id || userPhone);
@@ -259,17 +262,22 @@ export default function Navbar() {
     window.location.href = '/';
   };
 
-  if (!mounted) return null;
-
   const isAdmin = adminAuth || isPrivilegedRole(userRole);
   const isCommitteeLeader = listedAsLeader || isCommitteeLeaderRole(userRole) || userRole === 'General Supervisor';
-  const isQualityOperationsRoom = assignedCommittee?.includes('الجودة والتطوير') || isAdmin;
+  const isQualityOperationsRoom = Boolean(assignedCommittee?.includes('الجودة والتطوير')) || isAdmin;
+  const isCommitteeMember = Boolean(assignedCommittee);
+  const showCommitteePortal = Boolean(userName && isCommitteeMember && !isAdmin);
+  const committeePortalLabel = isQualityOperationsRoom
+    ? 'غرفة العمليات'
+    : isCommitteeLeader
+      ? 'لوحة اللجنة'
+      : 'بوابتي';
 
   const showLeaderAlertInNavbar = (isCommitteeLeader || isQualityOperationsRoom || isAdmin) && leaderAlertMsg && showLeaderAlertBar;
 
   return (
     <>
-      <header className={`w-full bg-white border-b border-slate-100 fixed top-0 z-50 transition-transform duration-300 ${showNavbar ? 'translate-y-0' : '-translate-y-full'}`}>
+      <header className={`w-full bg-white border-b border-slate-100 sticky top-0 z-50 transition-transform duration-300 ${showNavbar ? 'translate-y-0' : '-translate-y-full'}`}>
         
         <div className="max-w-7xl mx-auto px-3 sm:px-5 xl:px-8 h-20 flex items-center justify-between gap-3" dir="rtl">
           
@@ -299,9 +307,11 @@ export default function Navbar() {
 
           <nav className="hidden xl:flex items-center gap-3 2xl:gap-5 text-sm font-semibold text-slate-700 shrink-0">
             <Link href="/" className="hover:text-rose-900 transition-colors whitespace-nowrap">الرئيسية</Link>
-            <Link href="/check-status" className="hover:text-rose-900 transition-colors text-[#630517] font-black whitespace-nowrap">استعلام القبول</Link>
+            <Link href="/discover" className="hover:text-rose-900 transition-colors whitespace-nowrap">اكتشف</Link>
             <Link href="/events" className="hover:text-rose-900 transition-colors whitespace-nowrap">الفعاليات</Link>
+            <Link href="/newsletter" className="hover:text-rose-900 transition-colors whitespace-nowrap">النشرة</Link>
             <Link href="/case-study" className="hover:text-rose-900 transition-colors text-[#630517] font-black whitespace-nowrap">CASE STUDY</Link>
+            <Link href="/check-status" className="hover:text-rose-900 transition-colors text-[#630517] font-black whitespace-nowrap">استعلام القبول</Link>
             
             <button
               type="button"
@@ -325,17 +335,19 @@ export default function Navbar() {
                   </Link>
                 )}
 
-                {isCommitteeLeader && !isAdmin && (
+                {showCommitteePortal && (
                   <Link 
                     href="/committee-dashboard"
                     className={`px-3 py-2 rounded-xl text-xs font-black shadow transition-all flex items-center gap-1.5 whitespace-nowrap ${
                       isQualityOperationsRoom 
                         ? 'bg-rose-950 text-[#F5D061] border border-amber-400 animate-pulse' 
-                        : 'bg-amber-600 text-white hover:bg-amber-700'
+                        : isCommitteeLeader
+                          ? 'bg-amber-600 text-white hover:bg-amber-700'
+                          : 'bg-[#630517] text-[#F5D061] hover:brightness-110'
                     }`}
                   >
-                    <span>{isQualityOperationsRoom ? '⚡' : '🛠'}</span>
-                    <span>{isQualityOperationsRoom ? 'غرفة العمليات' : 'لوحة اللجنة'}</span>
+                    <span>{isQualityOperationsRoom ? '⚡' : isCommitteeLeader ? '🛠' : '🩺'}</span>
+                    <span>{committeePortalLabel}</span>
                   </Link>
                 )}
 
@@ -431,9 +443,11 @@ export default function Navbar() {
           <div className="xl:hidden absolute top-full right-0 left-0 bg-white border-b border-slate-200 shadow-2xl p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-200" dir="rtl">
             <nav className="flex flex-col space-y-3 text-sm font-bold text-slate-700 pb-4 border-b border-slate-100">
               <Link href="/" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الرئيسية</Link>
-              <Link href="/check-status" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">استعلام عن القبول</Link>
+              <Link href="/discover" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">اكتشف النادي</Link>
               <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الفعاليات</Link>
+              <Link href="/newsletter" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">النشرة</Link>
               <Link href="/case-study" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">CASE STUDY</Link>
+              <Link href="/check-status" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">استعلام عن القبول</Link>
               
               <div className="py-1">
                 {!isRegistrationClosed ? (
@@ -484,10 +498,10 @@ export default function Navbar() {
                     </Link>
                   )}
 
-                  {isCommitteeLeader && !isAdmin && (
-                    <Link href="/committee-dashboard" onClick={() => setMobileMenuOpen(false)} className={`w-full py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2 ${isQualityOperationsRoom ? 'bg-rose-950 text-[#F5D061] border border-amber-400' : 'bg-amber-600 text-white'}`}>
-                      <span>{isQualityOperationsRoom ? '⚡' : '🛠'}</span>
-                      <span>{isQualityOperationsRoom ? 'غرفة العمليات المركزية' : 'لوحة تحكم اللجنة'}</span>
+                  {showCommitteePortal && (
+                    <Link href="/committee-dashboard" onClick={() => setMobileMenuOpen(false)} className={`w-full py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2 ${isQualityOperationsRoom ? 'bg-rose-950 text-[#F5D061] border border-amber-400' : isCommitteeLeader ? 'bg-amber-600 text-white' : 'bg-[#630517] text-[#F5D061]'}`}>
+                      <span>{isQualityOperationsRoom ? '⚡' : isCommitteeLeader ? '🛠' : '🩺'}</span>
+                      <span>{isQualityOperationsRoom ? 'غرفة العمليات المركزية' : isCommitteeLeader ? 'لوحة تحكم اللجنة' : 'بوابتي'}</span>
                     </Link>
                   )}
                 </div>

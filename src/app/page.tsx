@@ -54,7 +54,7 @@ export default function Home() {
           <div className="absolute -top-20 left-[-8%] h-64 w-64 rounded-full bg-[#F5D061]/15 blur-3xl pointer-events-none" />
           <div className="relative z-10 text-center space-y-6">
             <span className="inline-block px-4 py-1.5 bg-[#F5D061]/15 text-[#F5D061] text-xs font-black rounded-full border border-[#F5D061]/30">
-              النشرة الأكاديمية
+              النشرة
             </span>
             <h2 className="text-3xl sm:text-5xl font-black text-white leading-tight">
               النشرة الأسبوعية
@@ -66,7 +66,7 @@ export default function Home() {
               href="/newsletter"
               className="px-8 py-4 bg-[#F5D061] text-[#630517] font-black text-sm shadow-xl hover:brightness-105 transition-all inline-flex items-center gap-2 rounded-2xl"
             >
-              فتح النشرة الأكاديمية
+              فتح النشرة
             </Link>
           </div>
         </div>

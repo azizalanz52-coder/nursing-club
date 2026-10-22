@@ -17,7 +17,11 @@ export default function Footer() {
             <span className="text-white/40">•</span>
             <Link href="/discover" className="hover:text-white">اكتشف النادي</Link>
             <span className="text-white/40">•</span>
-            <Link href="/team" className="hover:text-white">قيادة النادي</Link>
+            <Link href="/newsletter" className="hover:text-white">النشرة</Link>
+            <span className="text-white/40">•</span>
+            <Link href="/events" className="hover:text-white">الفعاليات</Link>
+            <span className="text-white/40">•</span>
+            <Link href="/team" className="hover:text-white">القادة</Link>
           </div>
         </div>
 

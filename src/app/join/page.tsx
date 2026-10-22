@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import PageLoading from '../components/PageLoading';
 
 const COMMITTEES = [
   'لجنة التصميم',
@@ -39,7 +40,7 @@ export default function JoinPage() {
     experience: '',
   });
 
-  const [isRegistrationClosed, setIsRegistrationClosed] = useState(false);
+  const [isRegistrationClosed, setIsRegistrationClosed] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
@@ -74,6 +75,7 @@ export default function JoinPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isRegistrationClosed !== false) return;
     setLoading(true);
     setError('');
 
@@ -114,6 +116,10 @@ export default function JoinPage() {
       setLoading(false);
     }
   };
+
+  if (isRegistrationClosed === null) {
+    return <PageLoading title="جاري التحقق من حالة الانضمام" />;
+  }
 
   // إذا تم إغلاق النموذج من لوحة التحكم، تظهر صفحة القفل فوراً
   if (isRegistrationClosed) {

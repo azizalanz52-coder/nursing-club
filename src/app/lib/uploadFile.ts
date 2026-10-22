@@ -3,14 +3,35 @@ import { getDownloadURL, ref, uploadBytes, uploadBytesResumable } from 'firebase
 import { auth, storage } from './firebase';
 
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+export const MAX_IMAGE_UPLOAD_BYTES = 15 * 1024 * 1024;
+export const MAX_VIDEO_UPLOAD_BYTES = 48 * 1024 * 1024;
 const FIRESTORE_SAFE_BYTES = 450 * 1024;
+
+function isVideoFile(file: File) {
+  return file.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+}
+
+function isImageFile(file: File) {
+  return file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name);
+}
 
 export function isOverUploadLimit(file: File) {
   return file.size > MAX_UPLOAD_BYTES;
 }
 
+export function isOverMediaUploadLimit(file: File) {
+  return isVideoFile(file) ? file.size > MAX_VIDEO_UPLOAD_BYTES : file.size > MAX_IMAGE_UPLOAD_BYTES;
+}
+
 export function uploadLimitMessage() {
   return 'حجم الملف أكبر من 8 ميغابايت. صغّر الملف ثم أعد المحاولة.';
+}
+
+export function mediaUploadLimitMessage(file?: File) {
+  if (file && isVideoFile(file)) {
+    return 'المقطع أكبر من 48 ميغابايت. صغّره من الهاتف أو ارفعه على واي فاي.';
+  }
+  return 'الصورة أكبر من 15 ميغابايت. صغّرها ثم أعد المحاولة.';
 }
 
 export function assertUploadSize(file: File) {
@@ -147,8 +168,61 @@ async function compressImageToDataUrl(file: File, maxBytes = FIRESTORE_SAFE_BYTE
   }
 }
 
-function isVideoFile(file: File) {
-  return file.type.startsWith('video/') || /\.(mp4|mov|webm)$/i.test(file.name);
+async function compressImageForUpload(file: File): Promise<File> {
+  if (!isImageFile(file) || file.size < 380 * 1024) return file;
+  if (/\.(gif)$/i.test(file.name) || file.type === 'image/gif') return file;
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      const timer = setTimeout(() => reject(new Error('تعذر قراءة الصورة.')), 12000);
+      image.onload = () => {
+        clearTimeout(timer);
+        resolve(image);
+      };
+      image.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error('تعذر قراءة الصورة.'));
+      };
+      image.src = objectUrl;
+    });
+
+    const paint = (maxDim: number, quality: number) => {
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
+      if (Math.max(width, height) > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('تعذر ضغط الصورة.');
+      canvas.width = width;
+      canvas.height = height;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      return new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error('تعذر ضغط الصورة.'))),
+          'image/jpeg',
+          quality
+        );
+      });
+    };
+
+    let blob = await paint(1600, 0.82);
+    if (blob.size > 1.15 * 1024 * 1024) blob = await paint(1280, 0.72);
+    if (blob.size >= file.size * 0.92) return file;
+    const base = file.name.replace(/\.[^.]+$/, '') || 'cover';
+    return new File([blob], `${base}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
+  } catch {
+    return file;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 function isRetryableUploadError(error: unknown) {
@@ -235,25 +309,94 @@ async function uploadResumable(file: File, storageRef: ReturnType<typeof ref>, o
   }
 }
 
-async function uploadToStorage(file: File, folderPath: string, onProgress?: (percent: number) => void) {
+async function uploadToStorage(
+  file: File,
+  folderPath: string,
+  onProgress?: (percent: number) => void,
+  timeoutMs?: number
+) {
   const user = await waitForAuthUser(12000);
   await user.getIdToken();
 
   const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`;
   const storageRef = ref(storage, `${folderPath}/${safeFileName}`);
-  const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name);
+  const video = isVideoFile(file);
+  const limit = timeoutMs ?? (video ? 300000 : file.size > 2 * 1024 * 1024 ? 120000 : 70000);
+  const useResumable = video || file.size >= 700 * 1024;
   onProgress?.(12);
 
   try {
-    const url = await withTimeout(uploadDirect(file, storageRef, onProgress), isImage ? 15000 : 22000);
+    const url = await withTimeout(
+      useResumable ? uploadResumable(file, storageRef, onProgress) : uploadDirect(file, storageRef, onProgress),
+      limit
+    );
     onProgress?.(100);
     return url;
   } catch (error) {
-    if (isImage || !isRetryableUploadError(error)) throw error;
-    const url = await withTimeout(uploadResumable(file, storageRef, onProgress), 28000);
+    if (useResumable || !isRetryableUploadError(error)) throw error;
+    const url = await withTimeout(uploadResumable(file, storageRef, onProgress), limit);
     onProgress?.(100);
     return url;
   }
+}
+
+export async function uploadMediaFile(
+  file: File,
+  folderPath: string,
+  onProgress?: (percent: number) => void
+): Promise<string> {
+  if (isOverMediaUploadLimit(file)) {
+    throw new Error(mediaUploadLimitMessage(file));
+  }
+
+  let payload = file;
+  if (isImageFile(file)) {
+    onProgress?.(8);
+    payload = await compressImageForUpload(file);
+    onProgress?.(20);
+  }
+
+  try {
+    return await uploadToStorage(payload, folderPath, onProgress, isVideoFile(payload) ? 300000 : 90000);
+  } catch (error) {
+    const mapped = storageErrorMessage(error);
+    const timedOut = mapped.includes('STORAGE_TIMEOUT') || String(error).includes('STORAGE_TIMEOUT');
+    if (timedOut) {
+      throw new Error(
+        isVideoFile(file)
+          ? 'المقطع كبير على الشبكة الحالية. ابقَ على الصفحة وحاول على واي فاي.'
+          : 'تعذر رفع الصورة. أعد المحاولة على واي فاي دون إغلاق الصفحة.'
+      );
+    }
+    throw new Error(mapped);
+  }
+}
+
+export async function uploadMediaFiles(
+  files: File[],
+  folderPath: string,
+  onProgress?: (percent: number) => void
+): Promise<string[]> {
+  const urls: string[] = [];
+  if (files.length === 0) return urls;
+  for (let i = 0; i < files.length; i++) {
+    urls.push(
+      await uploadMediaFile(files[i], folderPath, (percent) => {
+        onProgress?.(Math.round(((i + percent / 100) / files.length) * 100));
+      })
+    );
+  }
+  return urls;
+}
+
+export function filterMediaFilesWithinLimit(files: File[]) {
+  const accepted: File[] = [];
+  const rejected: File[] = [];
+  for (const file of files) {
+    if (isOverMediaUploadLimit(file)) rejected.push(file);
+    else accepted.push(file);
+  }
+  return { accepted, rejected };
 }
 
 export async function uploadClubFile(
@@ -266,7 +409,7 @@ export async function uploadClubFile(
   try {
     return await uploadToStorage(file, folderPath, onProgress);
   } catch (error) {
-    if (file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name)) {
+    if (isImageFile(file)) {
       onProgress?.(55);
       const dataUrl = await compressImageToDataUrl(file);
       onProgress?.(100);

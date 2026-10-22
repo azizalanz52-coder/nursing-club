@@ -21,8 +21,14 @@ interface BannerItem {
 export default function Hero() {
   const [banners, setBanners] = useState<BannerItem[]>([DEFAULT_WELCOME_BANNER]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [live, setLive] = useState(false);
 
   useEffect(() => {
+    setLive(true);
+  }, []);
+
+  useEffect(() => {
+    if (!live) return;
     localStorage.removeItem('UHB_BANNERS');
     const unsub = onSnapshot(
       collection(db, 'site_banners'),
@@ -60,7 +66,7 @@ export default function Hero() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [live]);
 
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -77,7 +83,7 @@ export default function Hero() {
 
   return (
     <section 
-      className={`relative min-h-[92vh] flex items-center justify-center overflow-hidden px-4 sm:px-6 lg:px-8 text-white pt-36 pb-20 ${
+      className={`relative min-h-[85vh] flex items-center justify-center overflow-hidden px-4 sm:px-6 lg:px-8 text-white pt-10 pb-16 ${
         isPink
           ? 'bg-gradient-to-br from-[#4a0326] via-[#9d174d] to-[#be185d]'
           : 'bg-[radial-gradient(ellipse_at_50%_0%,rgba(245,208,97,0.18),transparent_42%),linear-gradient(165deg,#2a050c_0%,#630517_48%,#1a0208_100%)]'

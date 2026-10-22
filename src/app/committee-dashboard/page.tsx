@@ -13,14 +13,14 @@ import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { committeeIdFromName, committeeNameFromId, findListedLeadership, findMemberContext, findUserDoc, isCommitteeLeaderRole, resolvePortalCommitteeId, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
-import { isOverUploadLimit, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { filterMediaFilesWithinLimit, isOverUploadLimit, mediaUploadLimitMessage, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/issueCertificate';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
 import QualityEventReportForm from '../components/QualityEventReport';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { emailToPhone } from '../lib/authIdentity';
+import { emailToPhone, isPrivilegedRole } from '../lib/authIdentity';
 import PageLoading from '../components/PageLoading';
 import { clubConfirm } from '../lib/clubNotice';
 import {
@@ -88,7 +88,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     'لجنة الجودة والتطوير'
   ]);
   const [selectedMonitoredCommittee, setSelectedMonitoredCommittee] = useState<string>('لجنة التصميم');
-  const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('لجنة تنظيم الفعاليات');
+  const [selectedManagedCommittee, setSelectedManagedCommittee] = useState<string>('');
   const [preferenceFilterTab, setPreferenceFilterTab] = useState<'pref-1' | 'pref-2' | 'pref-3'>('pref-1');
 
   const [announcementText, setAnnouncementText] = useState('');
@@ -124,7 +124,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaCategory, setMediaCategory] = useState<string>(MEDIA_CATEGORIES[0]);
   const [mediaBase64, setMediaBase64] = useState('/header-banner.png');
-  const [mediaUploadFile, setMediaUploadFile] = useState<File | null>(null);
+  const [mediaUploadFiles, setMediaUploadFiles] = useState<File[]>([]);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [mediaUploadProgress, setMediaUploadProgress] = useState(0);
   const [mediaGallery, setMediaGallery] = useState<any[]>([]);
@@ -536,7 +536,7 @@ useEffect(() => {
         setLeaderCustomAlert(uData.latestNotification);
       }
 
-      if (phone === '0553731265' || uData.role === 'System Admin' || uData.role === 'General Supervisor') {
+      if (phone === '0553731265' || isPrivilegedRole(String(uData.role || ''))) {
         router.push('/admin');
         return;
       }
@@ -548,14 +548,20 @@ useEffect(() => {
       const listed = await findListedLeadership(db, fullName);
       const leaderCommId = listed?.id || committeeIdFromName(assigned) || resolvedId;
       const isListedLeader = Boolean(listed);
+      const qualityMember = roleStr.includes('جودة') || assigned.includes('جودة') || assigned.includes('الجودة') || resolvedId === 'quality';
 
-      if (isCommitteeLeaderRole(roleStr) || roleStr.includes('رئيس') || isListedLeader) {
+      if (isCommitteeLeaderRole(roleStr) || isListedLeader || qualityMember) {
         setIsCommitteeLeader(true);
       } else {
         setIsCommitteeLeader(false);
       }
 
-      let resolvedComm = assigned || listed?.name || committeeNameFromId(resolvedId) || 'لجنة تنظيم الفعاليات';
+      const resolvedComm = assigned || listed?.name || committeeNameFromId(resolvedId) || '';
+      if (!resolvedComm && !qualityMember) {
+        router.push('/member');
+        setLoading(false);
+        return;
+      }
       if (leaderCommId) setManagedCommitteeId(leaderCommId);
       if (listed?.data && Array.isArray(listed.data.members)) {
         setCommitteeRoster(listed.data.members);
@@ -568,7 +574,7 @@ useEffect(() => {
         }
       }
 
-      if (roleStr.includes('جودة') || assigned.includes('جودة') || assigned.includes('الجودة')) {
+      if (qualityMember) {
         setIsQualityTeam(true);
         setIsCommitteeLeader(true);
       } else {
@@ -752,45 +758,30 @@ useEffect(() => {
 
   const handleUploadMediaSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!mediaTitle.trim() || !mediaUploadFile) {
+    if (!mediaTitle.trim() || mediaUploadFiles.length === 0) {
       alert('اكتب العنوان واختر صورة أو فيديو.');
-      return;
-    }
-    if (isOverUploadLimit(mediaUploadFile)) {
-      alert(uploadLimitMessage());
       return;
     }
 
     setIsUploadingMedia(true);
     setMediaUploadProgress(0);
     try {
-      const fileUrl = await uploadClubFile(mediaUploadFile, MEDIA_STORAGE_FOLDER, setMediaUploadProgress);
+      const urls = await uploadMediaFiles(mediaUploadFiles, MEDIA_STORAGE_FOLDER, setMediaUploadProgress);
       const newObj = buildMediaRecord({
         title: mediaTitle,
         category: mediaCategory,
-        urls: [fileUrl],
-        isVideo: mediaUploadFile.type.startsWith('video'),
-        addedBy: userData?.fullName || 'قائد الإعلام',
+        urls,
+        isVideo: mediaUploadFiles.some((file) => file.type.startsWith('video')),
+        addedBy: userData?.fullName || 'عضو الإعلام',
         source: 'لوحة قادة الإعلام',
-        uploaderRole: 'قائد اللجنة',
+        uploaderRole: isCommitteeLeader ? 'قائد اللجنة' : 'عضو لجنة',
       });
       await addDoc(collection(db, MEDIA_GALLERY_COL), newObj);
       setMediaTitle('');
       setMediaBase64('/header-banner.png');
-      setMediaUploadFile(null);
-
-      for (const usr of allUsersList) {
-        const cStr = usr.assignedCommittee || usr.committee || '';
-        if (cStr.includes('التصميم') || cStr.includes('الاعلام') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
-          try {
-            await setDoc(doc(db, 'users', usr.id), {
-              latestNotification: `📸 [تحديث إعلامي جديد]: أضافت لجنة الإعلام مادة جديدة (${newObj.title})`
-            }, { merge: true });
-          } catch (er) { console.error(er); }
-        }
-      }
-
-      alert('تم الرفع في الأرشيف المشترك. يظهر الآن في بوابة الأعضاء وتبويب قسم الإعلام بالأدمن.');
+      setMediaUploadFiles([]);
+      notifyLeadership(db, `📸 رفعت لجنة الإعلام تغطية جديدة: ${newObj.title}`).catch(() => undefined);
+      alert('تم الرفع. التغطية ظهرت في أرشيف اللجنة والأدمن.');
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'تعذر رفع الملف. حاول مرة أخرى.');
@@ -2550,7 +2541,7 @@ useEffect(() => {
           </div>
         )}
 
-        {(isSameCommittee(currentActiveComm, 'لجنة الإعلام') || isSameCommittee(currentActiveComm, 'لجنة الاعلام')) && isCommitteeLeader && (
+        {(isSameCommittee(currentActiveComm, 'لجنة الإعلام') || isSameCommittee(currentActiveComm, 'لجنة الاعلام')) && (
           <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
@@ -2589,37 +2580,46 @@ useEffect(() => {
               </div>
 
               <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-bold text-slate-700">اختر ملف الصورة أو الفيديو (الحد 8 ميغابايت)</label>
+                <label className="text-xs font-bold text-slate-700">اختر صوراً أو مقاطع (أكثر من ملف دفعة واحدة)</label>
                 <input
                   type="file"
                   accept="image/*,video/*"
+                  multiple
                   onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (isOverUploadLimit(file)) {
-                      alert(uploadLimitMessage());
-                      e.target.value = '';
-                      setMediaUploadFile(null);
-                      return;
-                    }
-                    setMediaUploadFile(file);
+                    const picked = Array.from(e.target.files || []);
+                    e.target.value = '';
+                    if (!picked.length) return;
+                    const { accepted, rejected } = filterMediaFilesWithinLimit(picked);
+                    if (rejected.length > 0) alert(mediaUploadLimitMessage(rejected[0]));
+                    if (accepted.length > 0) setMediaUploadFiles((prev) => [...prev, ...accepted]);
                   }}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-600 file:text-white cursor-pointer"
-                  required
                 />
-                {mediaUploadFile ? (
-                  <p className="text-[11px] text-purple-800 font-bold">الملف الجاهز: {mediaUploadFile.name}</p>
-                ) : null}
+                {mediaUploadFiles.length > 0 ? (
+                  <p className="text-[11px] text-purple-800 font-bold">
+                    جاهز للرفع: {mediaUploadFiles.length} ملف — {mediaUploadFiles.map((file) => file.name).join('، ')}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-500">الصور تُضغط تلقائياً قبل الرفع. المقطع حتى 48 ميغابايت، ويفضّل الواي فاي.</p>
+                )}
               </div>
 
-              <div className="sm:col-span-2 pt-2">
+              <div className="sm:col-span-2 pt-2 space-y-2">
                 <button
                   type="submit"
-                  disabled={isUploadingMedia}
+                  disabled={isUploadingMedia || mediaUploadFiles.length === 0}
                   className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer disabled:opacity-60"
                 >
                   {uploadingLabel(isUploadingMedia, mediaUploadProgress, '+ رفع ونشر المواد سحابياً (تصل للأدمن) 🎬')}
                 </button>
+                {isUploadingMedia ? (
+                  <div className="h-2 rounded-full bg-purple-100 overflow-hidden" dir="ltr">
+                    <div
+                      className={`h-full bg-purple-600 ${mediaUploadProgress <= 0 ? 'w-1/3 animate-pulse' : 'transition-all duration-200'}`}
+                      style={mediaUploadProgress > 0 ? { width: `${mediaUploadProgress}%` } : undefined}
+                    />
+                  </div>
+                ) : null}
               </div>
             </form>
 
