@@ -33,6 +33,20 @@ import {
   submissionDayKey,
   type ScoreAdjustment,
 } from '../lib/caseStudy';
+import {
+  NEWS_CAT,
+  WEEKDAY_LABEL,
+  cadenceForCategory,
+  formatMonthKey,
+  DEFAULT_NEWS_IMAGE,
+  isPlaceholderImage,
+  newsCoverSrc,
+  riyadhMonthKey,
+  seedDefaultNewsletters,
+  type ExamEntry,
+  type NewsletterItem,
+  type Weekday,
+} from '../lib/newsletter';
 import { isValidUniversityId, linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { isCommitteeLeaderRole, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
 import {
@@ -157,29 +171,6 @@ interface CertificateItem {
   description: string;
 }
 
-interface ExamEntry {
-  course: string;
-  courseCode?: string;
-  date: string;
-  time?: string;
-  location?: string;
-  notes?: string;
-}
-
-interface NewsletterItem {
-  id: string;
-  title: string;
-  category: string;
-  content: string;
-  link?: string;
-  date: string;
-  image: string;
-  type?: 'article' | 'exam-schedule';
-  featured?: boolean;
-  examCohort?: string;
-  examSemester?: string;
-  exams?: ExamEntry[];
-}
 
 interface ScientificTextItem {
   id: string;
@@ -246,9 +237,13 @@ export default function AdminDashboard() {
   const [newsCategoryInput, setNewsCategoryInput] = useState<string>('أخبار النادي الأسبوعية');
   const [newsContentInput, setNewsContentInput] = useState<string>('');
   const [newsLinkInput, setNewsLinkInput] = useState<string>('');
-  const [newsImageInput, setNewsImageInput] = useState<string>('/logo.png');
+  const [newsImageInput, setNewsImageInput] = useState<string>(DEFAULT_NEWS_IMAGE);
   const [newsTypeInput, setNewsTypeInput] = useState<'article' | 'exam-schedule'>('article');
   const [newsFeaturedInput, setNewsFeaturedInput] = useState<boolean>(false);
+  const [newsMonthInput, setNewsMonthInput] = useState(riyadhMonthKey());
+  const [newsWeekdayInput, setNewsWeekdayInput] = useState<Weekday>((riyadhParts().weekday as Weekday) || 'Sun');
+  const [newsAdminFilter, setNewsAdminFilter] = useState<'all' | string>('all');
+  const [seedingNewsletter, setSeedingNewsletter] = useState(false);
   const [examCohortInput, setExamCohortInput] = useState<string>('دفعة 2024');
   const [examSemesterInput, setExamSemesterInput] = useState<string>('');
   const [examRows, setExamRows] = useState<ExamEntry[]>([emptyExamRow()]);
@@ -466,6 +461,11 @@ export default function AdminDashboard() {
 
   const fetchNewsletters = async () => {
     try {
+      try {
+        await seedDefaultNewsletters(db);
+      } catch {
+        // seeding needs write access; the list still loads for viewing
+      }
       const snap = await getDocs(collection(db, 'site_newsletters'));
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as NewsletterItem[];
       setNewsletters(list);
@@ -669,12 +669,14 @@ export default function AdminDashboard() {
   const resetNewsletterForm = () => {
     setEditingNewsletterId(null);
     setNewsTitleInput('');
-    setNewsCategoryInput('أخبار النادي الأسبوعية');
+    setNewsCategoryInput(NEWS_CAT.club);
     setNewsContentInput('');
     setNewsLinkInput('');
-    setNewsImageInput('/logo.png');
+    setNewsImageInput(DEFAULT_NEWS_IMAGE);
     setNewsTypeInput('article');
     setNewsFeaturedInput(false);
+    setNewsMonthInput(riyadhMonthKey());
+    setNewsWeekdayInput((riyadhParts().weekday as Weekday) || 'Sun');
     setExamCohortInput('دفعة 2024');
     setExamSemesterInput('');
     setExamRows([emptyExamRow()]);
@@ -703,10 +705,12 @@ export default function AdminDashboard() {
     }
 
     const newsId = editingNewsletterId ? editingNewsletterId : Date.now().toString();
+    const category = isExam ? NEWS_CAT.exams : newsCategoryInput;
+    const existing = newsletters.find((item) => item.id === newsId);
     const updatedNews: NewsletterItem = {
       id: newsId,
       title: newsTitleInput.trim(),
-      category: isExam ? 'جداول الاختبارات' : newsCategoryInput,
+      category,
       content: newsContentInput.trim(),
       link: newsLinkInput.trim(),
       image: newsImageInput,
@@ -716,7 +720,15 @@ export default function AdminDashboard() {
       examCohort: isExam ? examCohortInput.trim() : '',
       examSemester: isExam ? examSemesterInput.trim() : '',
       exams: isExam ? cleanedExams : [],
+      cadence: cadenceForCategory(category),
     };
+    if (category === NEWS_CAT.tips) {
+      updatedNews.weekday = newsWeekdayInput;
+    }
+    if (category === NEWS_CAT.club) {
+      updatedNews.monthKey = newsMonthInput;
+      updatedNews.featured = true;
+    }
 
     try {
       await setDoc(doc(db, 'site_newsletters', newsId), updatedNews);
@@ -740,12 +752,14 @@ export default function AdminDashboard() {
     const isExam = news.type === 'exam-schedule' || (news.exams && news.exams.length > 0);
     setEditingNewsletterId(news.id);
     setNewsTitleInput(news.title);
-    setNewsCategoryInput(news.category || 'أخبار النادي الأسبوعية');
+    setNewsCategoryInput(news.category || NEWS_CAT.club);
     setNewsContentInput(news.content);
     setNewsLinkInput(news.link || '');
-    setNewsImageInput(news.image || '/logo.png');
+    setNewsImageInput(news.image || DEFAULT_NEWS_IMAGE);
     setNewsTypeInput(isExam ? 'exam-schedule' : 'article');
     setNewsFeaturedInput(Boolean(news.featured));
+    setNewsMonthInput(news.monthKey || riyadhMonthKey());
+    setNewsWeekdayInput(news.weekday || (riyadhParts().weekday as Weekday) || 'Sun');
     setExamCohortInput(news.examCohort || 'دفعة 2024');
     setExamSemesterInput(news.examSemester || '');
     setExamRows(news.exams && news.exams.length ? news.exams : [emptyExamRow()]);
@@ -763,6 +777,38 @@ export default function AdminDashboard() {
         console.error(err);
       }
     });
+  };
+
+  const handleSeedNewsletterDefaults = async () => {
+    setSeedingNewsletter(true);
+    try {
+      await requireAuthUser();
+      const { added, updated } = await seedDefaultNewsletters(db);
+      await fetchNewsletters();
+      setModalMessage(added || updated
+        ? `تم تحديث النشرة: ${added} جديداً و${updated} محدثاً. عدّل الصور من البطاقات متى جهزت.`
+        : 'المحتوى الأساسي موجود مسبقاً. عدّل النصوص والصور من البطاقات أسفل.');
+      setModalType('success');
+    } catch (err: any) {
+      setModalMessage(err?.message || 'تعذر نشر المحتوى الأساسي. سجّل الدخول ثم أعد المحاولة.');
+      setModalType('success');
+    } finally {
+      setSeedingNewsletter(false);
+    }
+  };
+
+  const handleNewsletterImage = async (news: NewsletterItem, file: File) => {
+    try {
+      await requireAuthUser();
+      const image = await convertFileToBase64(file);
+      await updateDoc(doc(db, 'site_newsletters', news.id), { image });
+      setNewsletters((prev) => prev.map((item) => (item.id === news.id ? { ...item, image } : item)));
+      setModalMessage('تم حفظ الصورة على هذا الإصدار.');
+      setModalType('success');
+    } catch (err: any) {
+      setModalMessage(err?.message || 'تعذر رفع الصورة.');
+      setModalType('success');
+    }
   };
 
   const resetCertForm = () => {
@@ -3287,9 +3333,17 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                   <h3 className="text-xl font-black text-[#630517]">
                     {editingNewsletterId ? 'تعديل إصدار النشرة' : 'النشرة الأكاديمية وجداول اختبارات الدفعات'}
                   </h3>
-                  <p className="text-xs text-slate-500">انشر جدولاً لدفعة معيّنة أو خبراً/مصدراً، ويظهر مباشرة في صفحة النشرة.</p>
+                  <p className="text-xs text-slate-500">النصائح تتبدل يومياً، أخبار النادي تظهر حسب الشهر، ومصادر الهيئة تبقى ظاهرة. عدّل النص والصورة لأي بطاقة من هنا.</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    disabled={seedingNewsletter}
+                    onClick={() => void handleSeedNewsletterDefaults()}
+                    className="text-xs font-black text-white bg-[#630517] px-3 py-1.5 rounded-xl hover:brightness-110 disabled:opacity-50"
+                  >
+                    {seedingNewsletter ? 'جاري النشر...' : 'نشر النصوص الأساسية'}
+                  </button>
                   <Link
                     href="/newsletter"
                     target="_blank"
@@ -3348,11 +3402,10 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                         onChange={(e) => setNewsCategoryInput(e.target.value)}
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
                       >
-                        <option value="أخبار النادي الأسبوعية">أخبار النادي الأسبوعية</option>
-                        <option value="مصادر اختبار الهيئة">مصادر اختبار الهيئة</option>
-                        <option value="تحديثات كلية التمريض">تحديثات كلية التمريض</option>
-                        <option value="نصائح دراسية">نصائح دراسية</option>
-                        <option value="مقالات وابتكارات">مقالات وابتكارات</option>
+                        <option value={NEWS_CAT.tips}>نصائح دراسية (تتبدل كل يوم)</option>
+                        <option value={NEWS_CAT.scfhs}>مصادر اختبار الهيئة</option>
+                        <option value={NEWS_CAT.club}>أخبار النادي (شهرية)</option>
+                        <option value={NEWS_CAT.college}>تحديثات كلية التمريض</option>
                       </select>
                     </div>
                   ) : (
@@ -3375,6 +3428,33 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                         <option value="الامتياز" />
                         <option value="جميع الدفعات" />
                       </datalist>
+                    </div>
+                  )}
+
+                  {newsTypeInput === 'article' && newsCategoryInput === NEWS_CAT.tips && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">يوم ظهور النصيحة</label>
+                      <select
+                        value={newsWeekdayInput}
+                        onChange={(e) => setNewsWeekdayInput(e.target.value as Weekday)}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
+                      >
+                        {(Object.keys(WEEKDAY_LABEL) as Weekday[]).map((day) => (
+                          <option key={day} value={day}>{WEEKDAY_LABEL[day]}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {newsTypeInput === 'article' && newsCategoryInput === NEWS_CAT.club && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">شهر الملخص</label>
+                      <input
+                        type="month"
+                        value={newsMonthInput}
+                        onChange={(e) => setNewsMonthInput(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white"
+                      />
                     </div>
                   )}
 
@@ -3480,14 +3560,44 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             </div>
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-xl font-black text-slate-900">ما هو منشور في النشرة ({newsletters.length})</h3>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-xl font-black text-slate-900">ما هو منشور في النشرة ({newsletters.length})</h3>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: 'all', label: 'الكل' },
+                    { id: NEWS_CAT.club, label: 'أخبار النادي' },
+                    { id: NEWS_CAT.tips, label: 'نصائح يومية' },
+                    { id: NEWS_CAT.scfhs, label: 'مصادر الهيئة' },
+                    { id: NEWS_CAT.college, label: 'الكلية' },
+                    { id: 'exams', label: 'جداول' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setNewsAdminFilter(item.id)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-black ${
+                        newsAdminFilter === item.id ? 'bg-[#630517] text-[#F5D061]' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {newsletters.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <p className="text-sm font-bold">لا يوجد إصدار بعد. انشر جدولاً أو خبراً ليظهر للطلاب فوراً.</p>
+                  <p className="text-sm font-bold">لا يوجد إصدار بعد. اضغط «نشر النصوص الأساسية» أو أضف خبراً يدوياً.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {newsletters.map((news) => {
+                  {newsletters
+                    .filter((news) => {
+                      const isExam = news.type === 'exam-schedule' || (news.exams && news.exams.length > 0);
+                      if (newsAdminFilter === 'all') return true;
+                      if (newsAdminFilter === 'exams') return Boolean(isExam);
+                      return news.category === newsAdminFilter;
+                    })
+                    .map((news) => {
                     const isExam = news.type === 'exam-schedule' || (news.exams && news.exams.length > 0);
                     return (
                       <div key={news.id} className="p-6 rounded-2xl border border-[#630517]/15 bg-[#630517]/[0.03] shadow-sm flex flex-col justify-between space-y-4">
@@ -3496,7 +3606,15 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                             <span className="text-[10px] bg-[#630517] text-[#F5D061] px-2.5 py-0.5 rounded-full font-bold">
                               {isExam ? news.examCohort || 'جدول اختبارات' : news.category}
                             </span>
-                            {news.featured && <span className="text-[10px] font-black text-amber-700">مثبّت</span>}
+                            {news.weekday ? <span className="text-[10px] font-black text-slate-500">{WEEKDAY_LABEL[news.weekday]}</span> : null}
+                            {news.monthKey ? <span className="text-[10px] font-black text-slate-500">{formatMonthKey(news.monthKey)}</span> : null}
+                          </div>
+                          <div className={`h-28 rounded-xl overflow-hidden flex items-center justify-center ${isPlaceholderImage(news.image) ? 'bg-[#630517] p-4' : 'bg-white border border-slate-100'}`}>
+                            <img
+                              src={newsCoverSrc(news.image)}
+                              alt=""
+                              className={isPlaceholderImage(news.image) ? 'max-h-16 object-contain' : 'w-full h-full object-cover'}
+                            />
                           </div>
                           <h4 className="font-black text-slate-900 text-sm">{news.title}</h4>
                           {isExam ? (
@@ -3505,8 +3623,20 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                             <p className="text-slate-700 text-xs bg-white p-3 rounded-xl border border-slate-100 leading-relaxed line-clamp-4">{news.content}</p>
                           )}
                         </div>
-                        <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[11px]">
-                          <span className="text-slate-400">{news.date ? new Date(news.date).toLocaleDateString('ar-SA') : ''}</span>
+                        <div className="pt-2 border-t border-slate-200 flex flex-wrap justify-between items-center gap-2 text-[11px]">
+                          <label className="px-3 py-1 rounded-lg bg-white border border-slate-200 font-bold text-[#630517] cursor-pointer">
+                            صورة
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) void handleNewsletterImage(news, file);
+                                e.currentTarget.value = '';
+                              }}
+                            />
+                          </label>
                           <div className="flex gap-2">
                             <button type="button" onClick={() => handleEditNewsletterClick(news)} className="px-3 py-1 rounded-lg bg-amber-50 text-[#630517] font-bold hover:bg-amber-100 cursor-pointer">تعديل</button>
                             <button type="button" onClick={() => handleDeleteNewsletter(news.id)} className="px-3 py-1 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer">حذف</button>

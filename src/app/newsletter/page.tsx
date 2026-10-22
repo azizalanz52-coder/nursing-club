@@ -4,41 +4,41 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
-
-type NewsType = 'article' | 'exam-schedule';
-
-interface ExamEntry {
-  course: string;
-  courseCode?: string;
-  date: string;
-  time?: string;
-  location?: string;
-  notes?: string;
-}
-
-interface NewsletterItem {
-  id: string;
-  title: string;
-  category: string;
-  content: string;
-  link?: string;
-  date: string;
-  image: string;
-  type: NewsType;
-  featured?: boolean;
-  examCohort?: string;
-  examSemester?: string;
-  exams: ExamEntry[];
-}
+import {
+  NEWS_CAT,
+  WEEKDAY_LABEL,
+  examSources,
+  formatMonthKey,
+  isPlaceholderImage,
+  monthlyClubNews,
+  newsCoverSrc,
+  riyadhMonthKey,
+  todaysStudyTips,
+  type NewsletterItem,
+} from '../lib/newsletter';
+import { riyadhParts } from '../lib/caseStudy';
 
 const FILTERS = [
   { id: 'all', label: 'الكل' },
+  { id: NEWS_CAT.club, label: 'أخبار النادي' },
+  { id: NEWS_CAT.tips, label: 'نصائح دراسية' },
+  { id: NEWS_CAT.scfhs, label: 'مصادر الهيئة' },
   { id: 'exams', label: 'جداول الاختبارات' },
-  { id: 'أخبار النادي الأسبوعية', label: 'أخبار النادي' },
-  { id: 'مصادر اختبار الهيئة', label: 'مصادر الهيئة' },
-  { id: 'تحديثات كلية التمريض', label: 'الكلية' },
-  { id: 'نصائح دراسية', label: 'نصائح دراسية' },
+  { id: NEWS_CAT.college, label: 'الكلية' },
 ] as const;
+
+function NewsCover({ image, tall }: { image?: string; tall?: boolean }) {
+  const branded = isPlaceholderImage(image);
+  return (
+    <div className={`${tall ? 'min-h-[180px] h-full' : 'h-40'} bg-[#630517] flex items-center justify-center overflow-hidden ${branded ? 'p-6' : ''}`}>
+      <img
+        src={newsCoverSrc(image)}
+        alt=""
+        className={branded ? 'max-h-24 w-auto object-contain' : 'w-full h-full object-cover'}
+      />
+    </div>
+  );
+}
 
 function startOfDay(d: Date) {
   const x = new Date(d);
@@ -108,7 +108,7 @@ export default function NewsletterPage() {
           return {
             id: docSnap.id,
             title: data.title || 'إصدار النشرة',
-            category: data.category || 'أخبار النادي الأسبوعية',
+            category: data.category || NEWS_CAT.club,
             content: data.content || '',
             link: data.link || '',
             date: data.date || '',
@@ -118,6 +118,10 @@ export default function NewsletterPage() {
             examCohort: data.examCohort || 'جميع الدفعات',
             examSemester: data.examSemester || '',
             exams,
+            cadence: data.cadence,
+            weekday: data.weekday,
+            monthKey: data.monthKey,
+            slot: data.slot,
           } as NewsletterItem;
         });
         list.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
@@ -162,11 +166,6 @@ export default function NewsletterPage() {
     return upcoming[0] || null;
   }, [examBoards]);
 
-  const featured = useMemo(
-    () => articles.find((item) => item.featured) || articles[0] || null,
-    [articles]
-  );
-
   const visibleBoards = useMemo(() => {
     if (filter !== 'all' && filter !== 'exams') return [];
     return examBoards.filter((board) => {
@@ -181,15 +180,30 @@ export default function NewsletterPage() {
     });
   }, [examBoards, filter, cohort, queryText]);
 
+  const todayTips = useMemo(() => todaysStudyTips(articles), [articles]);
+  const monthNews = useMemo(() => monthlyClubNews(articles), [articles]);
+  const scfhsItems = useMemo(() => examSources(articles), [articles]);
+  const todayWeekday = WEEKDAY_LABEL[riyadhParts().weekday as keyof typeof WEEKDAY_LABEL] || '';
+  const thisMonthLabel = formatMonthKey(riyadhMonthKey());
+
   const visibleArticles = useMemo(() => {
     if (filter === 'exams') return [];
-    return articles.filter((item) => {
+    const q = queryText.trim();
+    const pool =
+      filter === NEWS_CAT.tips ? todayTips :
+      filter === NEWS_CAT.club ? monthNews :
+      filter === NEWS_CAT.scfhs ? scfhsItems :
+      articles.filter((item) => {
+        if (item.category === NEWS_CAT.tips) return todayTips.some((tip) => tip.id === item.id);
+        if (item.category === NEWS_CAT.club) return monthNews.some((news) => news.id === item.id);
+        return true;
+      });
+    return pool.filter((item) => {
       const catOk = filter === 'all' || item.category === filter;
-      const q = queryText.trim();
       const searchOk = !q || item.title.includes(q) || item.content.includes(q) || item.category.includes(q);
       return catOk && searchOk;
     });
-  }, [articles, filter, queryText]);
+  }, [articles, filter, queryText, todayTips, monthNews, scfhsItems]);
 
   const latestStamp = items[0]?.date
     ? new Date(items[0].date).toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -217,7 +231,7 @@ export default function NewsletterPage() {
               <p className="text-[#F5D061] text-xs font-black">نادي التمريض • جامعة حفر الباطن</p>
               <h1 className="text-3xl sm:text-5xl font-black leading-tight">النشرة الأسبوعية</h1>
               <p className="text-amber-50/85 text-sm max-w-xl leading-relaxed">
-                جداول اختبارات دفعات كلية التمريض، أخبار النادي، ومصادر اختبار الهيئة — من مكان واحد، لحظة ما تُنشر من الإدارة.
+                نصيحة دراسية تتجدد كل يوم، مصادر اختبار الهيئة، أخبار النادي كل شهر، وجداول اختبارات الدفعات — من مكان واحد لحظة ما تُحدَّث من لوحة التحكم.
               </p>
               {latestStamp && (
                 <p className="text-[11px] text-white/60 font-bold">آخر نشر: {latestStamp}</p>
@@ -295,6 +309,91 @@ export default function NewsletterPage() {
           </div>
         ) : (
           <>
+            {(() => {
+              const summary = monthNews.find((item) => !queryText || item.title.includes(queryText) || item.content.includes(queryText));
+              if (!summary || (filter !== 'all' && filter !== NEWS_CAT.club)) return null;
+              return (
+                <section className="space-y-4">
+                  <div>
+                    <p className="text-[11px] font-black text-[#630517]">أخبار النادي</p>
+                    <h2 className="text-2xl font-black">ملخص {thisMonthLabel}</h2>
+                  </div>
+                  <article className="rounded-3xl overflow-hidden bg-white border border-stone-200 shadow-sm grid md:grid-cols-[0.9fr_1.1fr]">
+                    <NewsCover image={summary.image} tall />
+                    <div className="p-6 space-y-3">
+                      <span className="text-[10px] font-black bg-[#F5D061]/20 text-[#630517] px-2.5 py-1 rounded-full">ملخص شهري</span>
+                      <h3 className="text-2xl font-black leading-snug">{summary.title}</h3>
+                      <p className="text-sm text-stone-600 leading-relaxed">{summary.content}</p>
+                    </div>
+                  </article>
+                </section>
+              );
+            })()}
+
+            {(() => {
+              const tips = todayTips.filter((item) => !queryText || item.title.includes(queryText) || item.content.includes(queryText));
+              if (!tips.length || (filter !== 'all' && filter !== NEWS_CAT.tips)) return null;
+              const [lead, ...rest] = tips;
+              return (
+                <section className="space-y-4">
+                  <div>
+                    <p className="text-[11px] font-black text-[#630517]">نصائح دراسية</p>
+                    <h2 className="text-2xl font-black">نصائح {todayWeekday}</h2>
+                  </div>
+                  <article className="rounded-3xl overflow-hidden bg-white border border-stone-200 shadow-sm grid md:grid-cols-[0.9fr_1.1fr]">
+                    <NewsCover image={lead.image} tall />
+                    <div className="p-6 space-y-3">
+                      <span className="text-[10px] font-black bg-[#F5D061]/20 text-[#630517] px-2.5 py-1 rounded-full">
+                        نصيحة اليوم • {todayWeekday}
+                      </span>
+                      <h3 className="text-2xl font-black leading-snug">{lead.title}</h3>
+                      <p className="text-sm text-stone-600 leading-relaxed">{lead.content}</p>
+                    </div>
+                  </article>
+                  {rest.length > 0 && (
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {rest.map((item) => (
+                        <article key={item.id} className="rounded-3xl bg-white border border-stone-200 overflow-hidden shadow-sm flex flex-col">
+                          <NewsCover image={item.image} />
+                          <div className="p-5 flex flex-col gap-2 flex-1">
+                            <span className="self-start text-[10px] font-black bg-stone-100 text-[#630517] px-2.5 py-1 rounded-full">نصيحة إضافية</span>
+                            <h3 className="font-black text-lg leading-snug">{item.title}</h3>
+                            <p className="text-xs text-stone-600 leading-relaxed flex-1">{item.content}</p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })()}
+
+            {scfhsItems.length > 0 && (filter === 'all' || filter === NEWS_CAT.scfhs) && (
+              <section className="space-y-4">
+                <div>
+                  <p className="text-[11px] font-black text-[#630517]">مصادر اختبار الهيئة</p>
+                  <h2 className="text-2xl font-black">روابط رسمية للمتابعة</h2>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {scfhsItems.filter((item) => !queryText || item.title.includes(queryText) || item.content.includes(queryText)).map((item) => (
+                    <article key={item.id} className="rounded-3xl bg-white border border-stone-200 overflow-hidden flex flex-col shadow-sm">
+                      <NewsCover image={item.image} />
+                      <div className="p-5 flex flex-col gap-3 flex-1">
+                        <span className="self-start text-[10px] font-black bg-stone-100 text-[#630517] px-2.5 py-1 rounded-full">{item.category}</span>
+                        <h3 className="font-black text-lg leading-snug">{item.title}</h3>
+                        <p className="text-xs text-stone-600 leading-relaxed flex-1">{item.content}</p>
+                        {item.link ? (
+                          <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-xs font-black text-[#630517]">
+                            فتح المصدر الرسمي ↗
+                          </a>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {visibleBoards.length > 0 && (
               <section className="space-y-4">
                 <div className="flex items-end justify-between gap-3">
@@ -407,42 +506,22 @@ export default function NewsletterPage() {
               </section>
             )}
 
-            {featured && filter === 'all' && !queryText && (
-              <section className="rounded-3xl overflow-hidden bg-white border border-stone-200 shadow-sm grid md:grid-cols-[0.9fr_1.1fr]">
-                <div className="min-h-[180px] bg-[#630517] flex items-center justify-center p-6">
-                  <img src={featured.image || '/logo.png'} alt="" className="max-h-40 object-contain" />
-                </div>
-                <div className="p-6 space-y-3">
-                  <span className="text-[10px] font-black bg-[#F5D061]/20 text-[#630517] px-2.5 py-1 rounded-full">{featured.category}</span>
-                  <h2 className="text-2xl font-black leading-snug">{featured.title}</h2>
-                  <p className="text-sm text-stone-600 leading-relaxed">{featured.content}</p>
-                  {featured.link && (
-                    <a href={featured.link} target="_blank" rel="noopener noreferrer" className="inline-block text-xs font-black text-[#630517]">
-                      فتح المصدر ↗
-                    </a>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {visibleArticles.length > 0 && (
+            {visibleArticles.filter((item) => item.category === NEWS_CAT.college).length > 0 && (filter === 'all' || filter === NEWS_CAT.college) && (
               <section className="space-y-4">
-                <h2 className="text-2xl font-black">من النشرة</h2>
+                <h2 className="text-2xl font-black">تحديثات الكلية</h2>
                 <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {visibleArticles.map((item) => (
-                    <article key={item.id} className="rounded-3xl bg-white border border-stone-200 p-5 flex flex-col gap-3 shadow-sm">
-                      <span className="self-start text-[10px] font-black bg-stone-100 text-[#630517] px-2.5 py-1 rounded-full">
-                        {item.category}
-                      </span>
-                      <h3 className="font-black text-lg leading-snug">{item.title}</h3>
-                      <p className="text-xs text-stone-600 leading-relaxed flex-1">{item.content}</p>
-                      <div className="flex items-center justify-between gap-2 text-[11px] text-stone-400 font-bold">
-                        <span>{item.date ? new Date(item.date).toLocaleDateString('ar-SA') : ''}</span>
-                        {item.link && (
-                          <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-[#630517]">
-                            المصدر
+                  {visibleArticles.filter((item) => item.category === NEWS_CAT.college).map((item) => (
+                    <article key={item.id} className="rounded-3xl bg-white border border-stone-200 overflow-hidden flex flex-col shadow-sm">
+                      <NewsCover image={item.image} />
+                      <div className="p-5 flex flex-col gap-3 flex-1">
+                        <span className="self-start text-[10px] font-black bg-stone-100 text-[#630517] px-2.5 py-1 rounded-full">{item.category}</span>
+                        <h3 className="font-black text-lg leading-snug">{item.title}</h3>
+                        <p className="text-xs text-stone-600 leading-relaxed flex-1">{item.content}</p>
+                        {item.link ? (
+                          <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-xs font-black text-[#630517]">
+                            فتح الرابط ↗
                           </a>
-                        )}
+                        ) : null}
                       </div>
                     </article>
                   ))}
@@ -452,8 +531,12 @@ export default function NewsletterPage() {
 
             {!loading && visibleBoards.length === 0 && visibleArticles.length === 0 && (
               <div className="rounded-3xl bg-white border border-dashed border-stone-300 p-12 text-center space-y-2">
-                <p className="text-lg font-black text-[#630517]">النشرة بانتظار أول إصدار</p>
-                <p className="text-sm text-stone-500">عند نشر خبر أو جدول اختبارات من لوحة التحكم، يظهر هنا مباشرة.</p>
+                <p className="text-lg font-black text-[#630517]">
+                  {filter === NEWS_CAT.college ? 'لا توجد تحديثات للكلية بعد' :
+                    filter === 'exams' ? 'لا يوجد جدول اختبارات منشور بعد' :
+                    'لا يوجد محتوى في هذا التبويب بعد'}
+                </p>
+                <p className="text-sm text-stone-500">أضف النص والصورة من تبويب النشرة في لوحة التحكم، وتظهر هنا مباشرة.</p>
               </div>
             )}
           </>
