@@ -86,133 +86,159 @@ function bonusAmountForRank(rank: number, rng: () => number) {
 const masterCasePool: CaseDraft[] = [
   {
     difficulty: 'Easy',
-    title: 'New Breast Lump at a Pink October Booth',
-    scenario: 'A 34-year-old woman reports a painless, hard lump in the upper outer quadrant of her left breast for two weeks. She feels well and has no family history of cancer. What is the priority nursing action?',
+    title: 'Hypoglycemia on the Ward',
+    scenario: 'A 54-year-old man with type 2 diabetes is pale, sweaty, and confused. Capillary blood glucose is 52 mg/dL (2.9 mmol/L) and he can still swallow. What is the priority nursing action?',
     options: [
-      'Reassure her that painless lumps in young women are usually harmless and need no follow-up',
-      'Advise clinical breast assessment and referral for diagnostic imaging without waiting for the lump to vanish',
-      'Ask her to massage the lump daily and return only if it becomes painful',
-      'Start oral antibiotics for presumed mastitis because she is young and otherwise healthy'
+      'Give 15 g of fast-acting carbohydrate now, recheck glucose in 15 minutes, and stay with him',
+      'Leave him to sleep it off because night-time low readings are expected on insulin',
+      'Give a long-acting insulin dose to stabilize the blood sugar',
+      'Start a high-protein meal first and delay glucose until after breakfast'
     ],
-    correctIndex: 1,
-    explanation: 'A new, painless, hard breast lump is a warning sign at any age. The nurse must not delay assessment. Clinical exam and imaging (ultrasound or mammography as indicated) are the first evidence-based steps.'
+    correctIndex: 0,
+    explanation: 'Conscious hypoglycemia is treated with a rapid carbohydrate source, then reassessment. Insulin would worsen the drop. The nurse stays with the patient until the glucose rises and he is safe.'
   },
   {
     difficulty: 'Easy',
-    title: 'Breast Awareness Health Teaching',
-    scenario: 'During a student campaign, a woman with regular cycles asks when and how she should check her breasts. What is the most accurate nursing teaching?',
+    title: 'Saturated Postoperative Dressing',
+    scenario: 'Two hours after abdominal surgery the dressing is soaked with bright red blood, the patient’s heart rate is 118, and blood pressure is 92/58 mmHg. What should the nurse do first?',
     options: [
-      'Examine the breasts only once a year on her birthday, even if a new change appears earlier',
-      'Squeeze breast tissue firmly every morning because aggressive self-exam finds cancer sooner',
-      'Know how her breasts normally look and feel, and report any new change; a few days after menses is often easiest',
-      'Skip breast awareness until age 50 because screening is not useful in younger women'
+      'Remove the dressing completely to inspect the whole wound in the corridor',
+      'Apply firm pressure, reinforce the dressing, keep the patient supine, and call the surgical team now',
+      'Walk the patient to the bathroom so gravity reduces bleeding',
+      'Wait for the next scheduled vital-sign round before reporting'
     ],
-    correctIndex: 2,
-    explanation: 'Guidance emphasizes breast awareness, not harsh daily squeezing. Knowing the baseline and reporting new changes (lump, dimpling, nipple discharge, inversion) is key. After menses, swelling is lower, so changes are easier to notice.'
+    correctIndex: 1,
+    explanation: 'Fresh bleeding with tachycardia and hypotension is hemorrhage until proven otherwise. Reinforce, protect circulation, and notify the surgeon. Do not delay or fully uncover an actively bleeding wound without help.'
   },
   {
     difficulty: 'Easy',
-    title: 'Inflammatory Breast Changes vs Infection',
-    scenario: 'A 46-year-old woman has rapidly worsening redness, warmth, and peau d’orange swelling of the whole breast, with little pain and no fever. A week of antibiotics did not help. What should the nurse do first?',
+    title: 'Fall Risk in a Confused Older Adult',
+    scenario: 'An 82-year-old with delirium tries to climb over the bed rails at night. Which nursing action best prevents injury?',
     options: [
-      'Continue the same antibiotic for another two weeks because cellulitis can be slow to clear',
-      'Teach warm compresses and tight bras until the redness fades on its own',
-      'Reassure her that peau d’orange is a normal skin reaction to humidity',
-      'Flag possible inflammatory breast cancer, stop assuming simple infection, and urge urgent specialist review'
-    ],
-    correctIndex: 3,
-    explanation: 'Rapid whole-breast redness, peau d’orange, and failure of antibiotics raise concern for inflammatory breast cancer. The nurse should not keep treating this as routine mastitis. Urgent clinical and oncologic assessment is required.'
-  },
-  {
-    difficulty: 'Moderate',
-    title: 'Post-Mastectomy Lymphedema Precautions',
-    scenario: 'A woman is 48 hours after left modified radical mastectomy with axillary lymph node dissection. Which discharge instruction best reduces lymphedema risk?',
-    options: [
-      'Avoid blood pressure cuffs, injections, and tight jewelry on the affected arm; elevate it and start prescribed gentle range-of-motion',
-      'Measure blood pressure and draw blood from the operative arm because it is closer to the dressing',
-      'Keep the affected arm hanging down at all times so fluid drains toward the fingers',
-      'Wrap ice packs tightly around the axilla for 24 hours to prevent any arm movement'
-    ],
-    correctIndex: 0,
-    explanation: 'After axillary dissection the affected arm is at high lymphedema risk. Protect it from constriction and trauma, elevate it, and use prescribed early mobility. Venipuncture or BP on that arm is avoided when possible.'
-  },
-  {
-    difficulty: 'Moderate',
-    title: 'Chemotherapy Neutropenia and Fever',
-    scenario: 'A patient on doxorubicin-based chemotherapy for breast cancer has an absolute neutrophil count of 800/mm³ and a temperature of 38.4°C. What is the priority nursing action?',
-    options: [
-      'Encourage a large family gathering to lift her mood while she waits for the next clinic slot',
-      'Give an antipyretic only and send her home because low-grade fever is expected after chemotherapy',
-      'Treat this as a possible oncologic emergency: limit infection exposure, notify the physician, and prepare for cultures and prompt antibiotics',
-      'Start high-dose iron tablets to raise the neutrophil count before calling the team'
-    ],
-    correctIndex: 2,
-    explanation: 'Neutropenic fever is an emergency. Rapid assessment, protective isolation, cultures, and timely antibiotics reduce sepsis risk. Crowds, delay, or treating fever as “normal” after chemo are unsafe.'
-  },
-  {
-    difficulty: 'Moderate',
-    title: 'Mammography Counseling After Pink October Screening',
-    scenario: 'A 52-year-old woman is anxious after a screening mammogram recall. The nurse explains the next step. Which statement is most accurate?',
-    options: [
-      'A recall always means cancer, so she should book mastectomy counseling today',
-      'She should ignore the letter if she has no symptoms, because screening recalls are usually computer errors',
-      'She must stop all breast self-awareness until the repeat images are done',
-      'A recall is common and needs extra views or ultrasound; it is not a diagnosis, and keeping the appointment is the right next step'
-    ],
-    correctIndex: 3,
-    explanation: 'Many women are recalled for extra images. That is not a cancer diagnosis. The nurse reduces panic, explains the process, and stresses attending the follow-up rather than assuming the worst or ignoring the letter.'
-  },
-  {
-    difficulty: 'Hard',
-    title: 'Tamoxifen and Thromboembolic Warning',
-    scenario: 'A premenopausal woman with estrogen-receptor-positive breast cancer is on tamoxifen. She reports sudden left-calf pain, swelling, and mild shortness of breath. What is the critical nursing response?',
-    options: [
-      'Tell her to walk more because tamoxifen-related leg pain is always a muscle strain',
-      'Recognize possible DVT or pulmonary embolism: send her for emergency care now and hold tamoxifen until she is evaluated',
-      'Advise her to double tonight’s dose to reduce inflammation in the calf',
-      'Apply a heating pad and book a routine review in two weeks if the swelling remains'
+      'Raise all four side rails and leave him alone so he learns to stay in bed',
+      'Place the bed in the lowest position, keep the call bell in reach, stay close, and use a sitter or frequent rounding',
+      'Tie his wrists loosely to the bed frame until morning',
+      'Turn off the room light completely so he sleeps more deeply'
     ],
     correctIndex: 1,
-    explanation: 'Tamoxifen raises venous thromboembolism risk. Sudden unilateral calf pain with dyspnea needs emergency evaluation for DVT/PE. Do not delay care or continue the drug until a physician assesses her.'
+    explanation: 'Low bed, supervision, and a clear call system reduce falls. All four rails and restraints increase injury and are not first-line. Darkness worsens confusion.'
   },
   {
-    difficulty: 'Hard',
-    title: 'Trastuzumab and Cardiac Warning Signs',
-    scenario: 'A woman receiving trastuzumab for HER2-positive breast cancer reports new exertional dyspnea, ankle swelling, and needing two pillows to sleep. What should the nurse do?',
+    difficulty: 'Easy',
+    title: 'Anaphylaxis After IV Antibiotic',
+    scenario: 'Minutes after starting IV ceftriaxone a patient develops wheeze, facial swelling, and blood pressure 80/50 mmHg. What is the immediate nursing action?',
     options: [
-      'Hold further trastuzumab until the team reviews her, report possible cardiac toxicity, and arrange urgent assessment',
-      'Reassure her that ankle swelling is expected after every infusion and send her home',
-      'Give an extra diuretic from a previous prescription and continue today’s infusion as usual',
-      'Increase IV fluid rate to improve circulation before the next dose'
+      'Stop the infusion, call for help, maintain the airway, and prepare intramuscular epinephrine as ordered',
+      'Slow the infusion rate and watch for 30 minutes before calling anyone',
+      'Give an oral antihistamine only and continue the antibiotic',
+      'Sit the patient upright and send a family member to the pharmacy'
     ],
     correctIndex: 0,
-    explanation: 'Trastuzumab can cause left ventricular dysfunction. New dyspnea, edema, and orthopnea are red flags. The nurse holds the dose, notifies the team, and seeks cardiac review rather than treating this as routine infusion discomfort.'
+    explanation: 'Anaphylaxis needs the drug stopped at once, airway support, and epinephrine. Slowing the infusion or relying on an antihistamine alone is unsafe.'
   },
   {
-    difficulty: 'Hard',
-    title: 'Psychosocial Support After Mastectomy',
-    scenario: 'A newly diagnosed patient refuses to look at her surgical site, says “I am no longer a woman,” and withdraws from her family. Which nursing approach is most therapeutic?',
+    difficulty: 'Moderate',
+    title: 'Chest Pain Suggesting ACS',
+    scenario: 'A 61-year-old man has crushing substernal pain radiating to the left arm, diaphoresis, and nausea. He is on the medical ward. What is the priority nursing sequence?',
     options: [
-      'Tell her she should feel lucky because many women die from delayed diagnosis',
-      'Require her to view the incision immediately so acceptance happens faster',
-      'Sit with her, acknowledge grief and body-image loss, screen for depression, and offer counseling without rushing her',
-      'Leave her without nursing contact for several days so she can adjust in isolation'
+      'Give a large meal first because indigestion is the most likely cause',
+      'Let him walk to radiology without a wheelchair to save time',
+      'Keep him at rest, apply oxygen if hypoxic, obtain a 12-lead ECG, and notify the physician immediately',
+      'Start a vigorous chest-wall massage to relieve muscle spasm'
     ],
     correctIndex: 2,
-    explanation: 'Grief and body-image disturbance are expected after mastectomy. Presence, validation, depression screening, and referral to psycho-oncology or a support group are evidence-based. Forcing confrontation or minimizing feelings harms trust.'
+    explanation: 'Suspected acute coronary syndrome: rest, ECG, oxygen if needed, and rapid medical review. Walking or assuming indigestion delays reperfusion.'
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'Heart Failure Fluid Overload',
+    scenario: 'A patient with chronic heart failure has new orthopnea, 2 kg gain in two days, and crackles in both bases. Which nursing action is most appropriate first?',
+    options: [
+      'Encourage extra oral fluids to thin pulmonary secretions',
+      'Lay the patient flat to improve venous return',
+      'Sit the patient upright, monitor oxygen saturation, restrict fluids as ordered, and report the change',
+      'Stop the prescribed diuretic until the crackles disappear'
+    ],
+    correctIndex: 2,
+    explanation: 'Upright position, oxygenation, fluid restriction, and prompt reporting are standard for decompensated heart failure. Flat position and extra fluids worsen overload.'
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'Suicide Safety Statement',
+    scenario: 'A 28-year-old admitted with depression says, “Everyone would be better if I went to sleep forever.” What is the immediate priority nursing action?',
+    options: [
+      'Change the subject to lift the mood and leave the room',
+      'Ask directly about suicidal thoughts and plan, stay with the patient, and start continuous observation',
+      'Tell the patient not to say things like that because it upsets the staff',
+      'Document the sentence and reassess only on the next shift'
+    ],
+    correctIndex: 1,
+    explanation: 'Direct suicide inquiry and 1-to-1 safety are mandatory after a statement of hopelessness with possible intent. Delay or argument increases risk.'
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'Blood Transfusion Reaction',
+    scenario: 'Ten minutes into a packed red-cell transfusion the patient has chills, back pain, and a temperature rise of 1.5°C. What should the nurse do first?',
+    options: [
+      'Stop the transfusion, keep the IV line open with normal saline, and notify the physician and blood bank',
+      'Slow the rate and cover the patient with extra blankets',
+      'Add another unit of blood to finish faster',
+      'Give the remaining blood because mild chills are expected'
+    ],
+    correctIndex: 0,
+    explanation: 'Any suspected transfusion reaction: stop the blood, maintain IV access with saline, and alert the team and blood bank. Continuing the unit can worsen hemolysis.'
   },
   {
     difficulty: 'Hard',
-    title: 'Paclitaxel Neuropathy During Treatment',
-    scenario: 'A woman on weekly paclitaxel says her fingertips are numb, she drops cups, and night pain in her feet is worse. What is the safest nursing action?',
+    title: 'Early Sepsis Recognition',
+    scenario: 'A postoperative patient is restless, hypotensive (86/54), tachycardic (124), febrile, and has decreased urine output. What is the priority nursing action?',
     options: [
-      'Tell her to ignore the symptoms because neuropathy always disappears after the last cycle',
-      'Advise buying tighter shoes so her feet feel more stable when she walks',
-      'Give two extra tablet doses of acetaminophen and proceed with today’s full infusion unchanged',
-      'Report new functional neuropathy before the infusion, hold the dose if the protocol requires it, and ask the team about dose review'
+      'Encourage ambulation in the corridor to raise the blood pressure',
+      'Recognize possible sepsis, give oxygen as needed, obtain cultures if ordered, and escalate for rapid fluids and antibiotics',
+      'Wait for the next routine lab draw tomorrow morning',
+      'Give a sedative so the restlessness settles before calling the physician'
     ],
-    correctIndex: 3,
-    explanation: 'Progressive paclitaxel neuropathy with functional loss needs prompt reporting. Continuing a full dose without review can worsen damage. The nurse documents the change, follows hold parameters, and involves the prescriber.'
+    correctIndex: 1,
+    explanation: 'Hypotension, tachycardia, fever, and oliguria after surgery suggest sepsis. Early escalation, cultures, fluids, and antibiotics save lives. Sedation or delay hides shock.'
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Hyperkalemia with ECG Changes',
+    scenario: 'A patient with acute kidney injury has potassium 6.8 mEq/L and peaked T waves. What is the critical nursing response?',
+    options: [
+      'Give a banana smoothie to replace electrolytes',
+      'Place on cardiac monitoring, notify the physician immediately, and prepare ordered emergency treatments such as calcium or insulin-glucose',
+      'Send the patient for an unsupervised walk to lower potassium through exercise',
+      'Hold all monitoring because lab error is more likely than true hyperkalemia'
+    ],
+    correctIndex: 1,
+    explanation: 'Severe hyperkalemia with ECG changes is a cardiac emergency. Monitor, call the team, and prepare membrane-stabilizing and shifting therapy. Do not add potassium.'
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Magnesium Sulfate Toxicity',
+    scenario: 'A woman on magnesium sulfate for preeclampsia has absent deep tendon reflexes, respiratory rate 10/min, and slurred speech. What should the nurse do?',
+    options: [
+      'Increase the magnesium infusion to prevent a seizure',
+      'Stop the infusion, support the airway, notify the physician, and prepare calcium gluconate as the antidote',
+      'Encourage her to walk to the bathroom unassisted',
+      'Give an extra oral magnesium tablet'
+    ],
+    correctIndex: 1,
+    explanation: 'Loss of reflexes and respiratory depression mean magnesium toxicity. Stop the drug, protect breathing, and give calcium gluconate as ordered.'
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Rising Intracranial Pressure',
+    scenario: 'After a head injury a patient becomes drowsy, has a new unequal pupil, and vomits without nausea. What is the safest nursing action?',
+    options: [
+      'Sit him forward and let him sleep without observation',
+      'Keep the head of bed elevated as ordered, avoid clustering painful care, and report possible rising ICP immediately',
+      'Give a large hypotonic fluid bolus to improve cerebral perfusion',
+      'Ask the family to shake him until he answers questions'
+    ],
+    correctIndex: 1,
+    explanation: 'Decreasing consciousness, pupillary change, and projectile vomiting are ICP warning signs. Elevate the head, reduce stimulation, and escalate. Hypotonic fluids and shaking worsen injury.'
   }
 ];
 
@@ -449,22 +475,22 @@ export default function CaseStudyPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-pink-50 to-slate-50 text-slate-900 pb-20 relative" dir="ltr">
-      <div className="bg-gradient-to-r from-[#9d174d] via-[#be185d] to-[#f472b6] text-white py-12 px-4 sm:px-6 shadow-xl border-b-4 border-pink-200">
+    <main className="min-h-screen bg-[#F6F0E8] text-slate-900 pb-20 relative" dir="ltr">
+      <div className="bg-gradient-to-r from-[#3a020c] via-[#630517] to-[#4A030F] text-white py-12 px-4 sm:px-6 shadow-xl border-b-4 border-[#F5D061]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
           <div className="space-y-3 text-center sm:text-left">
-            <div className="inline-flex items-center gap-2 bg-white text-[#9d174d] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
-              <span>🎀 Pink October • Breast Cancer Awareness</span>
+            <div className="inline-flex items-center gap-2 bg-[#F5D061] text-[#630517] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
+              <span>⚡ Daily Clinical Challenge</span>
             </div>
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
-              Breast Cancer Nursing Challenge
+              Clinical Case Study Challenge
             </h1>
-            <div className="bg-pink-950/30 border border-white/25 px-4 py-2 rounded-2xl text-xs sm:text-sm text-pink-50 font-medium inline-block" dir="rtl">
+            <div className="bg-black/20 border border-[#F5D061]/30 px-4 py-2 rounded-2xl text-xs sm:text-sm text-amber-50 font-medium inline-block" dir="rtl">
               ⏱️ <span>يتجدد التحدي اليومي بعد: </span>
-              <strong className="text-white font-black px-1">{timeLeft || 'جاري التحديث...'}</strong>
+              <strong className="text-[#F5D061] font-black px-1">{timeLeft || 'جاري التحديث...'}</strong>
             </div>
             <div>
-              <Link href="/" className="text-xs text-pink-100 hover:underline font-bold inline-block pt-1">
+              <Link href="/" className="text-xs text-[#F5D061] hover:underline font-bold inline-block pt-1">
                 ← Back to Home | العودة للرئيسية
               </Link>
             </div>
@@ -473,7 +499,7 @@ export default function CaseStudyPage() {
           <button
             type="button"
             onClick={() => setShowLeaderboardModal(true)}
-            className="flex items-center gap-2 bg-white text-[#9d174d] px-6 py-3.5 rounded-2xl font-black text-xs shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border border-pink-100"
+            className="flex items-center gap-2 bg-[#F5D061] text-[#630517] px-6 py-3.5 rounded-2xl font-black text-xs shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border border-white/20"
           >
             <span className="text-lg">🏆</span>
             <span>لوحة الصدارة</span>
@@ -486,8 +512,8 @@ export default function CaseStudyPage() {
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-slate-200 text-right" dir="rtl">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4 gap-3">
               <div>
-                <h3 className="text-xl font-black text-[#9d174d] flex items-center gap-2">
-                  <span>🏆</span> لوحة صدارة أسبوع سرطان الثدي
+                <h3 className="text-xl font-black text-[#630517] flex items-center gap-2">
+                  <span>🏆</span> لوحة صدارة دراسة الحالة
                 </h3>
                 <p className="text-[11px] font-bold text-slate-500 mt-1">كل المشاركين: {leaderboard.length}</p>
               </div>
@@ -517,7 +543,7 @@ export default function CaseStudyPage() {
                       className={`flex items-center justify-between p-3 rounded-2xl text-xs font-bold ${
                         isMe
                           ? 'bg-[#630517] text-white border-2 border-[#F5D061] shadow-md'
-                          : 'bg-pink-50/70 border border-pink-100'
+                          : 'bg-[#630517]/5 border border-[#630517]/10'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -525,14 +551,14 @@ export default function CaseStudyPage() {
                           isMe ? 'bg-[#F5D061] text-[#630517]' :
                           idx === 0 ? 'bg-amber-400 text-slate-900 shadow-sm' :
                           idx === 1 ? 'bg-slate-300 text-slate-800' :
-                          idx === 2 ? 'bg-amber-700 text-white' : 'bg-pink-200 text-pink-900'
+                          idx === 2 ? 'bg-amber-700 text-white' : 'bg-[#F5D061]/40 text-[#630517]'
                         }`}>
                           {idx + 1}
                         </span>
                         <span className={isMe ? 'text-white' : 'text-slate-800 truncate'}>{item.studentName}</span>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold shrink-0 ${
-                        isMe ? 'bg-[#F5D061] text-[#630517]' : 'bg-[#be185d] text-white'
+                        isMe ? 'bg-[#F5D061] text-[#630517]' : 'bg-[#630517] text-[#F5D061]'
                       }`}>
                         ⭐ {item.totalScore} نقطة
                       </span>
@@ -545,7 +571,7 @@ export default function CaseStudyPage() {
             <button
               type="button"
               onClick={() => setShowLeaderboardModal(false)}
-              className="w-full py-3 rounded-2xl bg-[#9d174d] text-white font-black text-xs shadow-md cursor-pointer hover:brightness-110"
+              className="w-full py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow-md cursor-pointer hover:brightness-110"
             >
               إغلاق
             </button>
@@ -559,7 +585,7 @@ export default function CaseStudyPage() {
           const earnedBonus = Boolean(surpriseBonus && selectedAnswers[item.id] === item.correctIndex);
 
           return (
-            <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-pink-100 shadow-sm space-y-6 relative overflow-hidden">
+            <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-[#630517]/15 shadow-sm space-y-6 relative overflow-hidden">
               {earnedBonus ? (
                 <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white p-3 rounded-2xl shadow-md flex items-center justify-between font-extrabold text-xs" dir="rtl">
                   <div className="flex items-center gap-2">
@@ -573,8 +599,8 @@ export default function CaseStudyPage() {
               ) : null}
 
               <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
-                <span className="font-black text-[#9d174d] text-base flex items-center gap-2">
-                  <span>🎀</span> {item.title}
+                <span className="font-black text-[#630517] text-base flex items-center gap-2">
+                  <span>🩺</span> {item.title}
                 </span>
                 <span className={`text-xs font-bold px-3 py-1 rounded-full ${
                   item.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-800' :
@@ -584,7 +610,7 @@ export default function CaseStudyPage() {
                 </span>
               </div>
 
-              <div className="bg-pink-50/70 p-4 rounded-2xl border border-pink-100 text-sm font-medium leading-relaxed text-slate-800">
+              <div className="bg-[#630517]/5 p-4 rounded-2xl border border-[#630517]/10 text-sm font-medium leading-relaxed text-slate-800">
                 {item.scenario}
               </div>
 
@@ -595,12 +621,12 @@ export default function CaseStudyPage() {
                     const isSelected = selectedAnswers[item.id] === optIdx;
                     const isCorrect = optIdx === item.correctIndex;
 
-                    let btnStyle = 'bg-white border-slate-200 hover:bg-pink-50 text-slate-800';
+                    let btnStyle = 'bg-white border-slate-200 hover:bg-amber-50 text-slate-800';
                     if (showResults) {
-                      if (isCorrect) btnStyle = 'bg-pink-600 text-white border-pink-700 font-bold';
+                      if (isCorrect) btnStyle = 'bg-[#630517] text-[#F5D061] border-[#4A030F] font-bold';
                       else if (isSelected && !isCorrect) btnStyle = 'bg-rose-700 text-white border-rose-800 font-bold';
                     } else if (isSelected) {
-                      btnStyle = 'bg-[#9d174d] text-white border-[#9d174d] font-bold shadow-md';
+                      btnStyle = 'bg-[#630517] text-white border-[#630517] font-bold shadow-md';
                     }
 
                     return (
@@ -622,8 +648,8 @@ export default function CaseStudyPage() {
               </div>
 
               {showResults && (
-                <div className="p-4 rounded-2xl bg-pink-50 border border-pink-200 text-xs text-pink-950 space-y-1">
-                  <strong className="text-[#9d174d]">💡 Breast Cancer Clinical Rationale:</strong>
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-stone-800 space-y-1">
+                  <strong className="text-[#630517]">💡 Clinical Rationale:</strong>
                   <p className="leading-relaxed">{item.explanation}</p>
                 </div>
               )}
@@ -632,38 +658,38 @@ export default function CaseStudyPage() {
         })}
 
         {!showResults ? (
-          <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-pink-100 shadow-sm space-y-4 text-center">
-            <div className="p-4 bg-pink-50/70 rounded-2xl border border-pink-100 text-xs text-slate-700 font-medium">
-              🔒 Connected Profile: <strong className="text-[#9d174d]">{studentName || 'مستخدم مسجل'}</strong> (Phone: <span dir="ltr">{studentPhone || '---'}</span>)
-              <p className="text-[10px] text-slate-400 mt-1">Your response will be recorded for Pink October Breast Cancer Leaderboard.</p>
+          <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-[#630517]/15 shadow-sm space-y-4 text-center">
+            <div className="p-4 bg-[#630517]/5 rounded-2xl border border-[#630517]/10 text-xs text-slate-700 font-medium">
+              🔒 Connected Profile: <strong className="text-[#630517]">{studentName || 'مستخدم مسجل'}</strong> (Phone: <span dir="ltr">{studentPhone || '---'}</span>)
+              <p className="text-[10px] text-slate-400 mt-1">Your response will be recorded on the clinical case-study leaderboard.</p>
             </div>
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-gradient-to-r from-[#9d174d] to-[#f472b6] text-white py-4 rounded-2xl font-black text-sm shadow-xl hover:brightness-110 active:scale-98 transition-all cursor-pointer border border-white/20"
+              className="w-full bg-[#630517] text-[#F5D061] py-4 rounded-2xl font-black text-sm shadow-xl hover:brightness-110 active:scale-98 transition-all cursor-pointer border border-white/20"
             >
-              {submitting ? 'Submitting...' : 'Submit Answers & Save Pink October Score 🎀'}
+              {submitting ? 'Submitting...' : 'Submit Answers & Save Score 🩺'}
             </button>
           </form>
         ) : (
-          <div className="bg-pink-50 border-2 border-pink-300 p-6 rounded-3xl space-y-3 text-center">
-            <h3 className="text-xl font-black text-pink-900">Your Score: {calculateScore() + persistenceBonus} / {getMaxPossibleScore() + persistenceBonus} Points! 🎉</h3>
+          <div className="bg-amber-50 border-2 border-[#F5D061] p-6 rounded-3xl space-y-3 text-center">
+            <h3 className="text-xl font-black text-[#630517]">Your Score: {calculateScore() + persistenceBonus} / {getMaxPossibleScore() + persistenceBonus} Points! 🎉</h3>
             {persistenceBonus > 0 ? (
-              <p className="text-sm text-pink-900 font-black bg-white/80 border border-pink-200 rounded-2xl px-4 py-3">
+              <p className="text-sm text-[#630517] font-black bg-white/80 border border-[#F5D061] rounded-2xl px-4 py-3">
                 🌸 شكراً لاستمراريتك معنا طول الأسبوع في الحل
               </p>
             ) : null}
             {revealedBonus ? (
               <p className="text-xs text-amber-800 font-bold">ظهر بونص مفاجئ بعد التسليم على الحالة {revealedBonus.questionId}.</p>
             ) : (
-              <p className="text-xs text-pink-800 font-medium">ما ظهر بونص اليوم على نتيجتك. المنافسة تشتد في التحديات القادمة.</p>
+              <p className="text-xs text-stone-600 font-medium">ما ظهر بونص اليوم على نتيجتك. المنافسة تشتد في التحديات القادمة.</p>
             )}
-            <p className="text-xs text-pink-800 font-medium">
-              شكراً لمشاركتك في أسبوع التوعية بسرطان الثدي. تم تسجيل إجابتك وتحديث نقاطك بنجاح.
+            <p className="text-xs text-stone-600 font-medium">
+              شكراً لمشاركتك في دراسة الحالة. تم تسجيل إجابتك وتحديث نقاطك بنجاح.
             </p>
-            <div className="bg-white/80 p-3 rounded-2xl border border-pink-200 text-xs text-slate-700 font-bold" dir="rtl">
+            <div className="bg-white/80 p-3 rounded-2xl border border-[#F5D061]/50 text-xs text-slate-700 font-bold" dir="rtl">
               ⏱️ <span>التحدي اليومي القادم متاح بعد: </span>
-              <span className="text-[#9d174d] font-black">{timeLeft}</span>
+              <span className="text-[#630517] font-black">{timeLeft}</span>
             </div>
           </div>
         )}

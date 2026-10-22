@@ -2918,7 +2918,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             type="button"
             onClick={() => setActiveTab('case-study')}
             className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
-              activeTab === 'case-study' ? 'bg-[#9d174d] text-white shadow-md scale-105' : 'bg-pink-50 text-pink-900 border border-pink-200 hover:bg-pink-100'
+              activeTab === 'case-study' ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105' : 'bg-amber-50 text-[#630517] border border-amber-200 hover:bg-amber-100'
             }`}
           >
             🩺 دراسة الحالة ({caseStudyParticipantCount})
@@ -3652,14 +3652,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         )}
 
         {activeTab === 'case-study' && (
-          <div className="bg-white rounded-3xl p-8 border border-pink-200 shadow-sm space-y-6">
+          <div className="bg-white rounded-3xl p-8 border border-[#630517]/20 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-pink-900">🎀 دراسة الحالة — أسبوع سرطان الثدي</h3>
+                <h3 className="text-xl font-black text-[#630517]">🩺 دراسة الحالة</h3>
                 <p className="text-xs text-slate-500">نقاط الحل مفصولة عن زيادات الإدارة. الزيادات الجديدة تظهر باسم من زادها.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1 rounded-full bg-pink-100 text-pink-800 font-bold text-xs">
+                <span className="px-3 py-1 rounded-full bg-amber-50 text-[#630517] font-bold text-xs">
                   المشاركون: {caseStudyParticipantCount}
                 </span>
                 <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
@@ -3668,19 +3668,19 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-end gap-3 bg-pink-50/60 border border-pink-100 rounded-2xl p-4">
+            <div className="flex flex-wrap items-end gap-3 bg-[#630517]/5 border border-[#630517]/10 rounded-2xl p-4">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-600">عرض يوم</label>
                 <input
                   type="date"
                   value={caseDayFilter}
                   onChange={(e) => setCaseDayFilter(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-pink-200 text-xs bg-white"
+                  className="px-3 py-2 rounded-xl border border-[#630517]/20 text-xs bg-white"
                 />
               </div>
-              <button type="button" onClick={() => setCaseDayFilter(riyadhParts().ymd)} className="px-3 py-2 rounded-xl bg-white border border-pink-200 text-[11px] font-bold text-pink-900">اليوم</button>
-              <button type="button" onClick={() => setCaseDayFilter(addDaysYmd(riyadhParts().ymd, -1))} className="px-3 py-2 rounded-xl bg-white border border-pink-200 text-[11px] font-bold text-pink-900">أمس</button>
-              <button type="button" onClick={() => setCaseDayFilter(addDaysYmd(caseDayFilter || riyadhParts().ymd, -7))} className="px-3 py-2 rounded-xl bg-white border border-pink-200 text-[11px] font-bold text-pink-900">قبل أسبوع</button>
+              <button type="button" onClick={() => setCaseDayFilter(riyadhParts().ymd)} className="px-3 py-2 rounded-xl bg-white border border-[#630517]/20 text-[11px] font-bold text-[#630517]">اليوم</button>
+              <button type="button" onClick={() => setCaseDayFilter(addDaysYmd(riyadhParts().ymd, -1))} className="px-3 py-2 rounded-xl bg-white border border-[#630517]/20 text-[11px] font-bold text-[#630517]">أمس</button>
+              <button type="button" onClick={() => setCaseDayFilter(addDaysYmd(caseDayFilter || riyadhParts().ymd, -7))} className="px-3 py-2 rounded-xl bg-white border border-[#630517]/20 text-[11px] font-bold text-[#630517]">قبل أسبوع</button>
               <div className="text-[11px] text-slate-600 font-bold pb-2">
                 {formatDayLabel(caseDayPeople.day)} • مقارنة مع {formatDayLabel(caseDayPeople.weekAgo)}
               </div>
@@ -3688,7 +3688,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 type="button"
                 disabled={grantingPersistence || !isRiyadhThursday()}
                 onClick={() => void handleGrantThursdayPersistence()}
-                className="mr-auto px-4 py-2 rounded-xl bg-[#9d174d] text-white text-[11px] font-black disabled:opacity-40"
+                className="mr-auto px-4 py-2 rounded-xl bg-[#630517] text-[#F5D061] text-[11px] font-black disabled:opacity-40"
               >
                 {grantingPersistence ? 'جاري الصرف...' : 'صرف شكر الاستمرارية (+2 لمن أكمل 5 أيام)'}
               </button>
@@ -3705,14 +3705,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             ) : (
               <div className="space-y-4">
                 {caseDayPeople.people.map((person) => (
-                  <div key={person.phone || person.rows[0]?.id} className="rounded-2xl border border-pink-100 bg-pink-50/30 p-4 space-y-3">
+                  <div key={person.phone || person.rows[0]?.id} className="rounded-2xl border border-[#630517]/15 bg-[#630517]/[0.03] p-4 space-y-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="font-black text-slate-900 text-sm">👤 {person.name}</p>
                         <p className="text-[11px] font-mono text-slate-500" dir="ltr">{person.phone || 'بدون رقم'}</p>
                       </div>
                       <div className="flex flex-wrap gap-2 text-[11px] font-bold">
-                        <span className="px-2.5 py-1 rounded-full bg-white border border-pink-200 text-pink-900">هذا اليوم: {person.total}</span>
+                        <span className="px-2.5 py-1 rounded-full bg-white border border-[#630517]/20 text-[#630517]">هذا اليوم: {person.total}</span>
                         <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700">قبل أسبوع: {person.weekAgoTotal}</span>
                         <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800">من الحل: {person.solve}</span>
                         <span className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-800">إدارة: +{person.admin}</span>
@@ -3725,10 +3725,10 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                       const br = scoreBreakdown(sub);
                       const logs = adjustmentsOf(sub);
                       return (
-                        <div key={sub.id} className="bg-white rounded-2xl border border-pink-100 p-3 space-y-2">
+                        <div key={sub.id} className="bg-white rounded-2xl border border-[#630517]/10 p-3 space-y-2">
                           <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
                             <span className="text-slate-500 font-bold">🕒 {formatCaseDate(sub)}</span>
-                            <span className="font-black text-pink-900">المجموع: {br.total} نقطة</span>
+                            <span className="font-black text-[#630517]">المجموع: {br.total} نقطة</span>
                           </div>
                           <p className="text-[11px] text-slate-600 font-bold">
                             حل {br.solve}

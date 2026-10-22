@@ -135,10 +135,10 @@ export default function CollegeAdministrationPage() {
           <Reveal>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-white p-1.5">
-                <Image src="/uhb-logo.jpeg" alt="جامعة حفر الباطن" width={48} height={48} className="w-full h-full object-contain rounded-xl" />
+                <Image src="/uhb-logo.png" alt="جامعة حفر الباطن" width={48} height={48} className="w-full h-full object-contain" />
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-white p-1.5">
-                <Image src="/logo.png" alt="نادي التمريض" width={48} height={48} className="w-full h-full object-contain" />
+              <div className="w-[4.6rem] h-12 rounded-2xl bg-white px-1.5 py-1.5">
+                <Image src="/logo.png" alt="نادي التمريض" width={74} height={48} className="w-full h-full object-contain" />
               </div>
             </div>
           </Reveal>

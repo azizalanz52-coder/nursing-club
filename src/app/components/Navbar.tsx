@@ -274,21 +274,21 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-3 sm:px-5 xl:px-8 h-20 flex items-center justify-between gap-3" dir="rtl">
           
           <Link href="/" className="flex items-center gap-2 xl:gap-3 shrink-0" onClick={() => setMobileMenuOpen(false)}>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" dir="ltr">
               <Image
                 src="/logo.png"
                 alt="شعار نادي التمريض"
-                width={36}
-                height={36}
-                className="object-contain w-9 h-auto"
+                width={120}
+                height={80}
+                className="object-contain h-10 w-auto max-w-[7.2rem]"
               />
-              <div className="w-[1px] h-8 bg-slate-200"></div>
+              <div className="w-px h-9 bg-slate-200"></div>
               <Image
-                src="/uhb-logo.jpeg"
+                src="/uhb-logo.png"
                 alt="شعار جامعة حفر الباطن"
-                width={36}
-                height={36}
-                className="object-contain w-9 h-auto rounded-lg"
+                width={80}
+                height={88}
+                className="object-contain h-10 w-auto max-w-[2.6rem]"
               />
             </div>
             <div className="min-w-0">
@@ -301,7 +301,7 @@ export default function Navbar() {
             <Link href="/" className="hover:text-rose-900 transition-colors whitespace-nowrap">الرئيسية</Link>
             <Link href="/check-status" className="hover:text-rose-900 transition-colors text-[#630517] font-black whitespace-nowrap">استعلام القبول</Link>
             <Link href="/events" className="hover:text-rose-900 transition-colors whitespace-nowrap">الفعاليات</Link>
-            <Link href="/case-study" className="hover:text-pink-800 transition-colors text-[#be185d] font-black whitespace-nowrap">CASE STUDY</Link>
+            <Link href="/case-study" className="hover:text-rose-900 transition-colors text-[#630517] font-black whitespace-nowrap">CASE STUDY</Link>
             
             <button
               type="button"
@@ -433,7 +433,7 @@ export default function Navbar() {
               <Link href="/" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الرئيسية</Link>
               <Link href="/check-status" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">استعلام عن القبول</Link>
               <Link href="/events" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الفعاليات</Link>
-              <Link href="/case-study" onClick={() => setMobileMenuOpen(false)} className="text-[#be185d] font-black transition-colors py-1">CASE STUDY</Link>
+              <Link href="/case-study" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">CASE STUDY</Link>
               
               <div className="py-1">
                 {!isRegistrationClosed ? (

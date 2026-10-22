@@ -23,7 +23,7 @@ export default function AppShell({
     const timer = setTimeout(() => {
       sessionStorage.setItem(SPLASH_KEY, '1');
       setShowSplash(false);
-    }, 3000);
+    }, 3800);
     return () => clearTimeout(timer);
   }, []);
 
