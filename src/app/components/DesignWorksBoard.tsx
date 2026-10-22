@@ -41,8 +41,10 @@ export default function DesignWorksBoard({
   canUpload = true,
   canDelete = true,
 }: Props) {
+  const OTHER_EVENT = '__other__';
   const [works, setWorks] = useState<DesignWork[]>([]);
-  const [eventTitle, setEventTitle] = useState('');
+  const [eventPick, setEventPick] = useState('');
+  const [eventCustom, setEventCustom] = useState('');
   const [kind, setKind] = useState<string>(DESIGN_KINDS[0]);
   const [title, setTitle] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -59,6 +61,7 @@ export default function DesignWorksBoard({
     const fromWorks = works.map((item) => item.eventTitle).filter(Boolean);
     return Array.from(new Set([...eventSuggestions, ...fromWorks].map((item) => item.trim()).filter(Boolean)));
   }, [eventSuggestions, works]);
+  const eventTitle = eventPick === OTHER_EVENT || suggestionList.length === 0 ? eventCustom : eventPick;
 
   const handleUpload = async (e: FormEvent) => {
     e.preventDefault();
@@ -130,20 +133,33 @@ export default function DesignWorksBoard({
         <form onSubmit={handleUpload} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#630517]/5 p-5 rounded-2xl border border-[#F5D061]/40">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">اسم الفعالية *</label>
-            <input
-              type="text"
-              list="design-event-titles"
-              placeholder="مثال: يوم الصحة النفسية العالمي"
-              value={eventTitle}
-              onChange={(e) => setEventTitle(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-              required
-            />
-            <datalist id="design-event-titles">
-              {suggestionList.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
+            {suggestionList.length > 0 ? (
+              <select
+                value={eventPick}
+                onChange={(e) => setEventPick(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
+                required
+              >
+                <option value="" disabled>اختر اسم الفعالية</option>
+                {suggestionList.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+                <option value={OTHER_EVENT}>فعالية أخرى — اكتب الاسم</option>
+              </select>
+            ) : null}
+            {suggestionList.length === 0 || eventPick === OTHER_EVENT ? (
+              <input
+                type="text"
+                placeholder="اكتب اسم الفعالية"
+                value={eventCustom}
+                onChange={(e) => {
+                  setEventCustom(e.target.value);
+                  if (suggestionList.length === 0) setEventPick(OTHER_EVENT);
+                }}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
+                required
+              />
+            ) : null}
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">نوع التصميم</label>
