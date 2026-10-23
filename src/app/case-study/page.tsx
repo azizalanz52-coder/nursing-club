@@ -93,163 +93,179 @@ function bonusAmountForRank(rank: number, rng: () => number) {
   return 0;
 }
 
+const DIFFICULTY_LABEL: Record<CaseQuestion['difficulty'], string> = {
+  Easy: 'أساسي',
+  Moderate: 'متوسط',
+  Hard: 'صعب جداً',
+};
+
+const DAILY_DIFFICULTY_MIXES: Array<[CaseQuestion['difficulty'], CaseQuestion['difficulty'], CaseQuestion['difficulty']]> = [
+  ['Hard', 'Hard', 'Easy'],
+  ['Easy', 'Easy', 'Hard'],
+  ['Hard', 'Moderate', 'Easy'],
+  ['Hard', 'Hard', 'Moderate'],
+  ['Easy', 'Hard', 'Moderate'],
+  ['Moderate', 'Hard', 'Hard'],
+  ['Hard', 'Easy', 'Hard'],
+];
+
 const masterCasePool: CaseDraft[] = [
   {
     difficulty: 'Easy',
     title: 'Hypoglycemia on the Ward',
-    scenario: 'A 54-year-old man with type 2 diabetes is pale, sweaty, and confused. Capillary blood glucose is 52 mg/dL (2.9 mmol/L) and he can still swallow. What is the priority nursing action?',
+    scenario: 'A 54-year-old man with type 2 diabetes is pale, sweaty, and confused. Capillary glucose is 52 mg/dL (2.9 mmol/L) and he can still swallow. What is the priority nursing action?',
     options: [
-      'Give 15 g of fast-acting carbohydrate now, recheck glucose in 15 minutes, and stay with him',
-      'Leave him to sleep it off because night-time low readings are expected on insulin',
-      'Give a long-acting insulin dose to stabilize the blood sugar',
-      'Start a high-protein meal first and delay glucose until after breakfast'
+      'Give 15 g of rapid carbohydrate now, stay at the bedside, and recheck glucose in 15 minutes',
+      'Hold oral sugar, give 50% dextrose IV first, and recheck after the next vital-sign round',
+      'Give a protein snack first, then juice only if the confusion has not settled in ten minutes',
+      'Give 15 g of carbohydrate now, then 4 units of regular insulin to block a rebound high',
     ],
     correctIndex: 0,
-    explanation: 'Conscious hypoglycemia is treated with a rapid carbohydrate source, then reassessment. Insulin would worsen the drop. The nurse stays with the patient until the glucose rises and he is safe.'
+    explanation: 'If he can swallow, give 15 g of fast carbohydrate, stay with him, and recheck. IV dextrose is for when he cannot take oral sugar. Insulin or delaying carbohydrate worsens the drop.',
   },
   {
     difficulty: 'Easy',
     title: 'Saturated Postoperative Dressing',
-    scenario: 'Two hours after abdominal surgery the dressing is soaked with bright red blood, the patient’s heart rate is 118, and blood pressure is 92/58 mmHg. What should the nurse do first?',
+    scenario: 'Two hours after abdominal surgery the dressing is soaked with bright red blood, heart rate is 118, and blood pressure is 92/58 mmHg. What should the nurse do first?',
     options: [
-      'Remove the dressing completely to inspect the whole wound in the corridor',
-      'Apply firm pressure, reinforce the dressing, keep the patient supine, and call the surgical team now',
-      'Walk the patient to the bathroom so gravity reduces bleeding',
-      'Wait for the next scheduled vital-sign round before reporting'
+      'Remove the dressing fully to measure the bleed, then call the surgeon with the exact volume',
+      'Apply firm pressure, reinforce the dressing, keep him supine, and call the surgical team now',
+      'Sit him upright, reinforce the dressing, and give a fluid bolus while waiting for the next review',
+      'Apply pressure for five minutes, then walk him back if the stain has not widened further',
     ],
     correctIndex: 1,
-    explanation: 'Fresh bleeding with tachycardia and hypotension is hemorrhage until proven otherwise. Reinforce, protect circulation, and notify the surgeon. Do not delay or fully uncover an actively bleeding wound without help.'
+    explanation: 'Bright blood with tachycardia and hypotension is hemorrhage. Reinforce, protect circulation, and call the surgeon. Uncovering the wound, sitting him up, or delaying wastes time.',
   },
   {
     difficulty: 'Easy',
     title: 'Fall Risk in a Confused Older Adult',
-    scenario: 'An 82-year-old with delirium tries to climb over the bed rails at night. Which nursing action best prevents injury?',
+    scenario: 'An 82-year-old with delirium tries to climb over the bed rails at night. Which action best prevents injury right now?',
     options: [
-      'Raise all four side rails and leave him alone so he learns to stay in bed',
-      'Place the bed in the lowest position, keep the call bell in reach, stay close, and use a sitter or frequent rounding',
-      'Tie his wrists loosely to the bed frame until morning',
-      'Turn off the room light completely so he sleeps more deeply'
+      'Raise three side rails, dim the lights, and check him every two hours from the nurses’ station',
+      'Lower the bed, keep the call bell in reach, stay close, and arrange a sitter or frequent rounding',
+      'Apply a vest restraint as a last safety step and review the order at the morning handover',
+      'Give an extra night sedative now, leave the bed mid-height, and ask the family to watch from a chair',
     ],
     correctIndex: 1,
-    explanation: 'Low bed, supervision, and a clear call system reduce falls. All four rails and restraints increase injury and are not first-line. Darkness worsens confusion.'
+    explanation: 'Low bed, a reachable bell, and a person nearby reduce falls. Extra rails, restraints, darkness, and sedation raise injury risk in delirium.',
   },
   {
     difficulty: 'Easy',
     title: 'Anaphylaxis After IV Antibiotic',
-    scenario: 'Minutes after starting IV ceftriaxone a patient develops wheeze, facial swelling, and blood pressure 80/50 mmHg. What is the immediate nursing action?',
+    scenario: 'Minutes after IV ceftriaxone starts, the patient has wheeze, facial swelling, and blood pressure 80/50 mmHg. What is the immediate nursing action?',
     options: [
-      'Stop the infusion, call for help, maintain the airway, and prepare intramuscular epinephrine as ordered',
-      'Slow the infusion rate and watch for 30 minutes before calling anyone',
-      'Give an oral antihistamine only and continue the antibiotic',
-      'Sit the patient upright and send a family member to the pharmacy'
+      'Stop the infusion, call for help, protect the airway, and prepare intramuscular epinephrine as ordered',
+      'Slow the infusion, give oxygen, and prepare epinephrine only if the wheeze lasts ten minutes',
+      'Stop the infusion, give IV hydrocortisone first, and keep epinephrine if the swelling grows',
+      'Keep a slow antibiotic drip, give an antihistamine, and call after the next set of vitals',
     ],
     correctIndex: 0,
-    explanation: 'Anaphylaxis needs the drug stopped at once, airway support, and epinephrine. Slowing the infusion or relying on an antihistamine alone is unsafe.'
+    explanation: 'Anaphylaxis: stop the drug, support the airway, and give epinephrine. Steroids or antihistamines do not reverse shock, and slowing the infusion wastes time.',
   },
   {
     difficulty: 'Moderate',
     title: 'Chest Pain Suggesting ACS',
-    scenario: 'A 61-year-old man has crushing substernal pain radiating to the left arm, diaphoresis, and nausea. He is on the medical ward. What is the priority nursing sequence?',
+    scenario: 'A 61-year-old man on the medical ward has crushing substernal pain to the left arm, sweating, and nausea. Which sequence is the priority?',
     options: [
-      'Give a large meal first because indigestion is the most likely cause',
-      'Let him walk to radiology without a wheelchair to save time',
-      'Keep him at rest, apply oxygen if hypoxic, obtain a 12-lead ECG, and notify the physician immediately',
-      'Start a vigorous chest-wall massage to relieve muscle spasm'
+      'Give antacid and sit him forward first, then obtain an ECG if the pain is still present',
+      'Walk him to the ECG room without delay so the tracing is done before the pain fades',
+      'Keep him at rest, give oxygen if hypoxic, obtain a 12-lead ECG, and notify the physician now',
+      'Start GTN from the ward stock, then call the physician only if the pain score stays above 7',
     ],
     correctIndex: 2,
-    explanation: 'Suspected acute coronary syndrome: rest, ECG, oxygen if needed, and rapid medical review. Walking or assuming indigestion delays reperfusion.'
+    explanation: 'Treat this as ACS: rest, ECG, oxygen if needed, and immediate medical review. Antacid first, walking, or unsupervised GTN delays reperfusion.',
   },
   {
     difficulty: 'Moderate',
     title: 'Heart Failure Fluid Overload',
-    scenario: 'A patient with chronic heart failure has new orthopnea, 2 kg gain in two days, and crackles in both bases. Which nursing action is most appropriate first?',
+    scenario: 'A patient with chronic heart failure has new orthopnea, 2 kg gain in two days, and crackles at both bases. What is the first nursing action?',
     options: [
-      'Encourage extra oral fluids to thin pulmonary secretions',
-      'Lay the patient flat to improve venous return',
-      'Sit the patient upright, monitor oxygen saturation, restrict fluids as ordered, and report the change',
-      'Stop the prescribed diuretic until the crackles disappear'
+      'Encourage oral fluids to thin secretions, sit him upright, and reassess after the next weight',
+      'Lay him semi-flat with legs raised, give oxygen, and hold the morning diuretic until review',
+      'Sit the patient upright, check oxygen saturation, keep the fluid limit, and report the change',
+      'Sit him upright, give a normal saline bolus for the lowish pressure, then report if crackles worsen',
     ],
     correctIndex: 2,
-    explanation: 'Upright position, oxygenation, fluid restriction, and prompt reporting are standard for decompensated heart failure. Flat position and extra fluids worsen overload.'
+    explanation: 'Sit upright, protect oxygen, keep the fluid limit, and report decompensation. Extra fluid, a flatter position, or holding the diuretic worsen overload.',
   },
   {
     difficulty: 'Moderate',
     title: 'Suicide Safety Statement',
-    scenario: 'A 28-year-old admitted with depression says, “Everyone would be better if I went to sleep forever.” What is the immediate priority nursing action?',
+    scenario: 'A 28-year-old admitted with depression says, “Everyone would be better if I went to sleep forever.” What is the immediate priority?',
     options: [
-      'Change the subject to lift the mood and leave the room',
-      'Ask directly about suicidal thoughts and plan, stay with the patient, and start continuous observation',
-      'Tell the patient not to say things like that because it upsets the staff',
-      'Document the sentence and reassess only on the next shift'
+      'Offer a quiet room and television, then return in thirty minutes to see if the mood has settled',
+      'Ask directly about suicidal thoughts and a plan, stay with the patient, and start continuous observation',
+      'Ask about the plan, then leave him with a roommate while the risk form is completed at the desk',
+      'Document the sentence, notify the next shift, and start 15-minute checks after handover',
     ],
     correctIndex: 1,
-    explanation: 'Direct suicide inquiry and 1-to-1 safety are mandatory after a statement of hopelessness with possible intent. Delay or argument increases risk.'
+    explanation: 'Ask about intent and plan, stay, and keep continuous observation. A delayed check, leaving the room, or waiting for handover misses the danger.',
   },
   {
     difficulty: 'Moderate',
     title: 'Blood Transfusion Reaction',
-    scenario: 'Ten minutes into a packed red-cell transfusion the patient has chills, back pain, and a temperature rise of 1.5°C. What should the nurse do first?',
+    scenario: 'Ten minutes into packed red cells the patient has chills, back pain, and a temperature rise of 1.5°C. What should the nurse do first?',
     options: [
-      'Stop the transfusion, keep the IV line open with normal saline, and notify the physician and blood bank',
-      'Slow the rate and cover the patient with extra blankets',
-      'Add another unit of blood to finish faster',
-      'Give the remaining blood because mild chills are expected'
+      'Stop the transfusion, keep the line open with normal saline, and notify the physician and blood bank',
+      'Slow the transfusion, give an antipyretic, and continue the same unit if the chills begin to fade',
+      'Stop the blood, keep the line open with the remaining packed cells, and call the blood bank',
+      'Pause ten minutes, restart at half rate, and send a new crossmatch only if fever rises again',
     ],
     correctIndex: 0,
-    explanation: 'Any suspected transfusion reaction: stop the blood, maintain IV access with saline, and alert the team and blood bank. Continuing the unit can worsen hemolysis.'
+    explanation: 'Any suspected reaction: stop the blood, keep saline access, and alert the team and blood bank. Continuing the unit or flushing with leftover cells can worsen hemolysis.',
   },
   {
     difficulty: 'Hard',
     title: 'Early Sepsis Recognition',
-    scenario: 'A postoperative patient is restless, hypotensive (86/54), tachycardic (124), febrile, and has decreased urine output. What is the priority nursing action?',
+    scenario: 'A postoperative patient is restless, hypotensive 86/54, tachycardic 124, febrile, and oliguric. Which action is the true priority?',
     options: [
-      'Encourage ambulation in the corridor to raise the blood pressure',
-      'Recognize possible sepsis, give oxygen as needed, obtain cultures if ordered, and escalate for rapid fluids and antibiotics',
-      'Wait for the next routine lab draw tomorrow morning',
-      'Give a sedative so the restlessness settles before calling the physician'
+      'Give oxygen, obtain a lactate if ordered, and wait for the next temperature before escalating antibiotics',
+      'Recognize possible sepsis, give oxygen as needed, obtain cultures if ordered, and escalate for fluids and antibiotics now',
+      'Treat restlessness with a light sedative, give a fluid challenge, and call if the blood pressure stays low',
+      'Start oxygen, send blood cultures, and give leftover oral antibiotics until the physician arrives at rounds',
     ],
     correctIndex: 1,
-    explanation: 'Hypotension, tachycardia, fever, and oliguria after surgery suggest sepsis. Early escalation, cultures, fluids, and antibiotics save lives. Sedation or delay hides shock.'
+    explanation: 'Fever, hypotension, tachycardia, and oliguria after surgery are sepsis until proven otherwise. Escalate now. Waiting for another temperature, sedation, or leftover oral drugs hide shock.',
   },
   {
     difficulty: 'Hard',
     title: 'Hyperkalemia with ECG Changes',
     scenario: 'A patient with acute kidney injury has potassium 6.8 mEq/L and peaked T waves. What is the critical nursing response?',
     options: [
-      'Give a banana smoothie to replace electrolytes',
-      'Place on cardiac monitoring, notify the physician immediately, and prepare ordered emergency treatments such as calcium or insulin-glucose',
-      'Send the patient for an unsupervised walk to lower potassium through exercise',
-      'Hold all monitoring because lab error is more likely than true hyperkalemia'
+      'Repeat the potassium first to exclude hemolysis, then start monitoring if the repeat is still high',
+      'Start cardiac monitoring, notify the physician now, and prepare ordered calcium or insulin-glucose treatment',
+      'Start monitoring, give sodium polystyrene now from stock, and call the physician after the next ECG',
+      'Notify the physician, hold the next potassium, and wait for dialysis review before any acute treatment',
     ],
     correctIndex: 1,
-    explanation: 'Severe hyperkalemia with ECG changes is a cardiac emergency. Monitor, call the team, and prepare membrane-stabilizing and shifting therapy. Do not add potassium.'
+    explanation: 'Peaked T waves with K 6.8 is a cardiac emergency. Monitor, call, and prepare membrane stabilization and shifting. Do not wait for a repeat, resin, or dialysis review.',
   },
   {
     difficulty: 'Hard',
     title: 'Magnesium Sulfate Toxicity',
     scenario: 'A woman on magnesium sulfate for preeclampsia has absent deep tendon reflexes, respiratory rate 10/min, and slurred speech. What should the nurse do?',
     options: [
-      'Increase the magnesium infusion to prevent a seizure',
+      'Reduce the magnesium rate by half, give oxygen, and call if the respiratory rate falls below 8',
       'Stop the infusion, support the airway, notify the physician, and prepare calcium gluconate as the antidote',
-      'Encourage her to walk to the bathroom unassisted',
-      'Give an extra oral magnesium tablet'
+      'Stop the infusion, give calcium gluconate, then restart magnesium at a lower rate to prevent a seizure',
+      'Keep the infusion, stimulate the reflexes, and prepare calcium gluconate only if oxygen saturation drops',
     ],
     correctIndex: 1,
-    explanation: 'Loss of reflexes and respiratory depression mean magnesium toxicity. Stop the drug, protect breathing, and give calcium gluconate as ordered.'
+    explanation: 'Lost reflexes plus slow breathing is magnesium toxicity. Stop the infusion, protect the airway, and give calcium gluconate as ordered. Do not restart or merely reduce the rate.',
   },
   {
     difficulty: 'Hard',
     title: 'Rising Intracranial Pressure',
-    scenario: 'After a head injury a patient becomes drowsy, has a new unequal pupil, and vomits without nausea. What is the safest nursing action?',
+    scenario: 'After a head injury the patient becomes drowsy, has a new unequal pupil, and vomits without nausea. What is the safest nursing action?',
     options: [
-      'Sit him forward and let him sleep without observation',
-      'Keep the head of bed elevated as ordered, avoid clustering painful care, and report possible rising ICP immediately',
-      'Give a large hypotonic fluid bolus to improve cerebral perfusion',
-      'Ask the family to shake him until he answers questions'
+      'Lay him flat to raise cerebral perfusion, avoid extra stimulation, and report the pupil change at the next round',
+      'Keep the head of bed elevated as ordered, avoid clustering painful care, and report rising ICP now',
+      'Elevate the head, cluster a full neuro exam with suction now, and call if the pupil remains unequal',
+      'Keep the head elevated, give a hypotonic bolus for perfusion, and report after the next GCS check',
     ],
     correctIndex: 1,
-    explanation: 'Decreasing consciousness, pupillary change, and projectile vomiting are ICP warning signs. Elevate the head, reduce stimulation, and escalate. Hypotonic fluids and shaking worsen injury.'
-  }
+    explanation: 'Drowsiness, a new unequal pupil, and projectile vomiting warn of rising ICP. Elevate the head, reduce stimulation, and escalate now. Flat position, clustering, or hypotonic fluid worsen injury.',
+  },
 ];
 
 export default function CaseStudyPage() {
@@ -264,6 +280,8 @@ export default function CaseStudyPage() {
   const [studentPhone, setStudentPhone] = useState('');
   const [hasSubmittedToday, setHasSubmittedToday] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [recordedScore, setRecordedScore] = useState<number | null>(null);
+  const [recordedMax, setRecordedMax] = useState<number | null>(null);
 
   const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
@@ -271,10 +289,15 @@ export default function CaseStudyPage() {
 
   useEffect(() => {
     const seed = dailySeed();
-    const rng = mulberry32(seed);
-    const pool = shuffleInPlace([...masterCasePool], rng).slice(0, 3);
-
-    const selectedDaily = pool.map((item, index) => {
+    const mix = DAILY_DIFFICULTY_MIXES[seed % DAILY_DIFFICULTY_MIXES.length];
+    const usedTitles = new Set<string>();
+    const selectedDaily = mix.map((level, index) => {
+      const levelPool = shuffleInPlace(
+        masterCasePool.filter((item) => item.difficulty === level && !usedTitles.has(item.title)),
+        mulberry32(seed + hashSeed(level) + 31 + (index * 97))
+      );
+      const item = levelPool[0];
+      usedTitles.add(item.title);
       const optionRng = mulberry32(seed + ((index + 1) * 9176));
       const optionEntries = item.options.map((text, optionIndex) => ({
         text,
@@ -370,12 +393,32 @@ export default function CaseStudyPage() {
       const key = canonicalPhone(phone);
       const todayRow = list.find((row) => personPhone(row) === key && submissionDayKey(row) === today);
       if (todayRow) {
-        setHasSubmittedToday(true);
-        setShowResults(true);
-        setPersistenceBonus(Number(todayRow.persistenceBonus || 0));
+        applySavedSubmission(todayRow);
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const applySavedSubmission = (row: Record<string, any>) => {
+    const persistence = Number(row.persistenceBonus || 0);
+    const bonusAmount = Number(row.bonusAmount || 0);
+    const totalCases = Number(row.total || 3);
+    setHasSubmittedToday(true);
+    setShowResults(true);
+    setPersistenceBonus(persistence);
+    setRecordedScore(Number(row.score || 0));
+    setRecordedMax(totalCases + bonusAmount + persistence);
+    if (row.bonusQuestionId) {
+      setRevealedBonus({ questionId: Number(row.bonusQuestionId), amount: bonusAmount });
+    }
+    const savedAnswers = row.answers;
+    if (savedAnswers && typeof savedAnswers === 'object') {
+      const next: Record<number, number> = {};
+      Object.entries(savedAnswers).forEach(([key, value]) => {
+        next[Number(key)] = Number(value);
+      });
+      setSelectedAnswers(next);
     }
   };
 
@@ -434,9 +477,9 @@ export default function CaseStudyPage() {
       const existing = await loadCaseSubmissions(db);
       const phoneKey = canonicalPhone(studentPhone) || studentPhone.trim();
       const today = riyadhParts(now).ymd;
-      if (existing.some((row) => personPhone(row) === phoneKey && submissionDayKey(row) === today)) {
-        setHasSubmittedToday(true);
-        setShowResults(true);
+      const already = existing.find((row) => personPhone(row) === phoneKey && submissionDayKey(row) === today);
+      if (already) {
+        applySavedSubmission(already);
         alert('تم تسجيل حل اليوم مسبقاً. الانتظار حتى يتجدد التحدي.');
         return;
       }
@@ -454,6 +497,7 @@ export default function CaseStudyPage() {
         bonusAmount: bonus?.amount || 0,
         persistenceBonus: persistence.amount,
         persistenceWeek: persistence.weekKey || null,
+        answers: selectedAnswers,
         timestamp: now,
         createdAt: when.toISOString(),
         dateStr: when.toLocaleDateString('ar-EG', { timeZone: 'Asia/Riyadh' }),
@@ -462,6 +506,8 @@ export default function CaseStudyPage() {
 
       setRevealedBonus(bonus);
       setPersistenceBonus(persistence.amount);
+      setRecordedScore(score);
+      setRecordedMax(activeCases.length + (bonus?.amount || 0) + persistence.amount);
       setHasSubmittedToday(true);
       setShowResults(true);
       await fetchLeaderboard();
@@ -614,7 +660,7 @@ export default function CaseStudyPage() {
                   item.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-800' :
                   item.difficulty === 'Moderate' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
                 }`}>
-                  Level: {item.difficulty}
+                  {DIFFICULTY_LABEL[item.difficulty]}
                 </span>
               </div>
 
@@ -643,9 +689,9 @@ export default function CaseStudyPage() {
                         type="button"
                         onClick={() => handleSelectOption(item.id, optIdx)}
                         disabled={showResults || hasSubmittedToday}
-                        className={`w-full text-left p-4 rounded-2xl border text-xs sm:text-sm transition-all cursor-pointer flex items-center justify-between ${btnStyle}`}
+                        className={`w-full text-left p-4 min-h-[4.75rem] rounded-2xl border text-xs sm:text-sm transition-all cursor-pointer flex items-center justify-between ${btnStyle}`}
                       >
-                        <span className="pr-4">{opt}</span>
+                        <span className="pr-4 leading-relaxed">{opt}</span>
                         <span className="w-6 h-6 rounded-full border flex items-center justify-center text-[11px] font-bold shrink-0">
                           {optIdx + 1}
                         </span>
@@ -683,7 +729,7 @@ export default function CaseStudyPage() {
           </form>
         ) : (
           <div className="bg-amber-50 border-2 border-[#F5D061] p-6 rounded-3xl space-y-3 text-center">
-            <h3 className="text-xl font-black text-[#630517]">Your Score: {calculateScore() + persistenceBonus} / {getMaxPossibleScore() + persistenceBonus} Points! 🎉</h3>
+            <h3 className="text-xl font-black text-[#630517]">نتيجتك: {recordedScore ?? (calculateScore() + persistenceBonus)} / {recordedMax ?? (getMaxPossibleScore() + persistenceBonus)}</h3>
             {persistenceBonus > 0 ? (
               <p className="text-sm text-[#630517] font-black bg-white/80 border border-[#F5D061] rounded-2xl px-4 py-3">
                 🌸 شكراً لاستمراريتك معنا طول الأسبوع في الحل
