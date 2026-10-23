@@ -82,3 +82,49 @@ export function sortEventsByLatest(events: ClubEvent[]): ClubEvent[] {
 export function latestClubEvents(events: ClubEvent[], limit = 3): ClubEvent[] {
   return sortEventsByLatest(events.filter((event) => isCurrentSeasonEvent(event))).slice(0, limit);
 }
+
+export type CampusVenueLine = {
+  label: string;
+  text: string;
+};
+
+function splitOneVenueChunk(text: string): CampusVenueLine[] {
+  const value = text.replace(/\s+/g, ' ').trim();
+  if (!value) return [];
+
+  const tokens = [
+    { label: 'الطلاب', index: value.search(/الطلاب/) },
+    { label: 'الطالبات', index: value.search(/الطالبات/) },
+  ].filter((token) => token.index >= 0).sort((a, b) => a.index - b.index);
+
+  if (tokens.length === 0) return [{ label: '', text: value }];
+
+  const lines: CampusVenueLine[] = [];
+  if (tokens[0].index > 0) {
+    const prefix = value.slice(0, tokens[0].index).replace(/[\s:：\-–—,،|/]+$/u, '').trim();
+    if (prefix) lines.push({ label: '', text: prefix });
+  }
+
+  tokens.forEach((token, index) => {
+    const start = token.index + token.label.length;
+    const end = index + 1 < tokens.length ? tokens[index + 1].index : value.length;
+    const body = value
+      .slice(start, end)
+      .replace(/^[\s:：\-–—,،|/]+/u, '')
+      .replace(/[\s:：\-–—,،|/]+$/u, '')
+      .trim();
+    if (body) lines.push({ label: token.label, text: body });
+  });
+
+  return lines.length ? lines : [{ label: '', text: value }];
+}
+
+export function splitCampusVenue(value?: string): CampusVenueLine[] {
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  return raw
+    .split(/\n+/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .flatMap((chunk) => splitOneVenueChunk(chunk));
+}

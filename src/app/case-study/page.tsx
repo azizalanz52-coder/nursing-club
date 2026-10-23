@@ -3,9 +3,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
-import { collection, addDoc, doc, getDoc, getDocs, query } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { canonicalPhone, phoneVariants } from '../lib/certificatesLookup';
-import { loadCaseSubmissions, persistenceForSubmit, personPhone, riyadhParts, submissionDayKey } from '../lib/caseStudy';
+import {
+  CASE_STUDY_DISTINGUISHED_COUNT,
+  aggregateCaseLeaderboard,
+  loadCaseSubmissions,
+  persistenceForSubmit,
+  personPhone,
+  riyadhParts,
+  submissionDayKey,
+} from '../lib/caseStudy';
+import { syncCaseStudyDistinguished } from '../lib/distinguishedMembers';
 import { ClubIcon } from '../components/icons';
 
 interface CaseQuestion {
@@ -316,34 +325,17 @@ export default function CaseStudyPage() {
 
   const fetchLeaderboard = async () => {
     try {
-      const snap = await getDocs(query(collection(db, 'case_study_submissions')));
-      const byKey: Record<string, { score: number; latestTs: number; name: string; phone: string }> = {};
+      const submissions = await loadCaseSubmissions(db);
+      const rows = aggregateCaseLeaderboard(submissions);
 
-      snap.forEach((docSnap) => {
-        const data = docSnap.data();
-        const phone = String(data.phone || data.phoneNumber || '').trim();
-        const key = canonicalPhone(phone) || `name:${String(data.studentName || 'مشارك').trim()}`;
-        const name = String(data.studentName || 'مشارك').trim();
-        const ts = Number(data.timestamp || 0);
-        if (!byKey[key]) {
-          byKey[key] = { score: 0, latestTs: 0, name, phone };
-        }
-        byKey[key].score += Number(data.score) || 0;
-        if (ts >= byKey[key].latestTs) {
-          byKey[key].latestTs = ts;
-          byKey[key].name = name;
-          if (phone) byKey[key].phone = phone;
-        }
-      });
-
-      await Promise.all(Object.values(byKey).map(async (row) => {
+      await Promise.all(rows.map(async (row) => {
         if (!row.phone) return;
         for (const id of phoneVariants(row.phone)) {
           try {
             const userSnap = await getDoc(doc(db, 'users', id));
             const fullName = String(userSnap.data()?.fullName || '').trim();
             if (fullName) {
-              row.name = fullName;
+              row.studentName = fullName;
               return;
             }
           } catch {
@@ -352,14 +344,20 @@ export default function CaseStudyPage() {
         }
       }));
 
-      const list: LeaderboardItem[] = Object.values(byKey).map((row) => ({
-        studentName: row.name,
-        totalScore: row.score,
-        phone: canonicalPhone(row.phone),
-      }));
+      setLeaderboard(rows.map((row) => ({
+        studentName: row.studentName,
+        totalScore: row.totalScore,
+        phone: row.phone,
+      })));
 
-      list.sort((a, b) => b.totalScore - a.totalScore);
-      setLeaderboard(list);
+      const signedIn = Boolean(localStorage.getItem('userPhone') || localStorage.getItem('phone'));
+      if (signedIn) {
+        try {
+          await syncCaseStudyDistinguished(db, submissions);
+        } catch (syncErr) {
+          console.error(syncErr);
+        }
+      }
     } catch (err) {
       console.error(err);
     }
@@ -466,7 +464,7 @@ export default function CaseStudyPage() {
       setPersistenceBonus(persistence.amount);
       setHasSubmittedToday(true);
       setShowResults(true);
-      fetchLeaderboard();
+      await fetchLeaderboard();
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء حفظ النتيجة، تأكد من الاتصال بقاعدة البيانات.');
@@ -516,7 +514,7 @@ export default function CaseStudyPage() {
                 <h3 className="text-xl font-black text-[#630517] flex items-center gap-2">
                   <ClubIcon name="trophy" size={18} /> لوحة صدارة دراسة الحالة
                 </h3>
-                <p className="text-[11px] font-bold text-slate-500 mt-1">كل المشاركين: {leaderboard.length}</p>
+                <p className="text-[11px] font-bold text-slate-500 mt-1">كل المشاركين: {leaderboard.length} · أول {CASE_STUDY_DISTINGUISHED_COUNT} يحملون رتبة عضو مميز</p>
               </div>
               <button
                 type="button"
@@ -556,7 +554,16 @@ export default function CaseStudyPage() {
                         }`}>
                           {idx + 1}
                         </span>
-                        <span className={isMe ? 'text-white' : 'text-slate-800 truncate'}>{item.studentName}</span>
+                        <div className="min-w-0">
+                          <span className={`block truncate ${isMe ? 'text-white' : 'text-slate-800'}`}>{item.studentName}</span>
+                          {idx < CASE_STUDY_DISTINGUISHED_COUNT ? (
+                            <span className={`mt-0.5 inline-flex items-center gap-1 text-[10px] font-black ${
+                              isMe ? 'text-[#F5D061]' : 'text-amber-700'
+                            }`}>
+                              <ClubIcon name="medal" size={11} /> عضو مميز
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold shrink-0 ${
                         isMe ? 'bg-[#F5D061] text-[#630517]' : 'bg-[#630517] text-[#F5D061]'

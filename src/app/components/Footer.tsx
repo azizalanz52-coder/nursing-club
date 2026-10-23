@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { SocialIcon } from './icons';
+import { ClubIcon, SocialIcon } from './icons';
 
 export default function Footer() {
   return (
@@ -13,17 +13,13 @@ export default function Footer() {
             <span className="whitespace-nowrap">نادي التمريض بجامعة حفر الباطن</span>
             <span className="whitespace-nowrap">© 2026</span>
           </p>
-          <div className="flex flex-wrap items-center justify-center xl:justify-start gap-x-3 gap-y-1 text-[11px] font-black text-[#F5D061]">
-            <Link href="/college" className="hover:text-white">إدارة كلية التمريض</Link>
-            <span className="text-white/40">•</span>
-            <Link href="/discover" className="hover:text-white">اكتشف النادي</Link>
-            <span className="text-white/40">•</span>
-            <Link href="/newsletter" className="hover:text-white">النشرة</Link>
-            <span className="text-white/40">•</span>
-            <Link href="/events" className="hover:text-white">الفعاليات</Link>
-            <span className="text-white/40">•</span>
-            <Link href="/team" className="hover:text-white">القادة</Link>
-          </div>
+          <Link
+            href="/faq"
+            className="inline-flex items-center gap-1.5 text-[11px] font-black text-[#F5D061] hover:text-white"
+          >
+            <ClubIcon name="info" size={13} />
+            الأسئلة الشائعة
+          </Link>
         </div>
 
         <div className="flex flex-col items-center gap-3 lg:flex-row lg:flex-wrap lg:justify-center xl:justify-end">

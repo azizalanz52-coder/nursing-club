@@ -211,3 +211,49 @@ export async function loadCaseSubmissions(db: Firestore) {
     .map((row) => ({ id: row.id, ...row.data() } as Record<string, any>))
     .sort((a, b) => submissionMs(b) - submissionMs(a));
 }
+
+export type CaseLeaderboardRow = {
+  phone: string;
+  studentName: string;
+  totalScore: number;
+  latestTs: number;
+};
+
+export const CASE_STUDY_DISTINGUISHED_COUNT = 5;
+
+export function aggregateCaseLeaderboard(submissions: Array<Record<string, any>>): CaseLeaderboardRow[] {
+  const byKey: Record<string, CaseLeaderboardRow> = {};
+
+  for (const data of submissions) {
+    const rawPhone = String(data.phone || data.phoneNumber || '').trim();
+    const phone = canonicalPhone(rawPhone);
+    const studentName = String(data.studentName || 'مشارك').trim() || 'مشارك';
+    const key = phone || `name:${studentName}`;
+    const latestTs = submissionMs(data);
+    if (!byKey[key]) {
+      byKey[key] = { phone, studentName, totalScore: 0, latestTs: 0 };
+    }
+    byKey[key].totalScore += Number(data.score) || 0;
+    if (latestTs >= byKey[key].latestTs) {
+      byKey[key].latestTs = latestTs;
+      byKey[key].studentName = studentName;
+      if (phone) byKey[key].phone = phone;
+    }
+  }
+
+  return Object.values(byKey).sort((a, b) => (
+    b.totalScore - a.totalScore
+    || a.latestTs - b.latestTs
+    || a.studentName.localeCompare(b.studentName, 'ar')
+  ));
+}
+
+export function topCaseStudyPhones(
+  submissions: Array<Record<string, any>>,
+  count = CASE_STUDY_DISTINGUISHED_COUNT
+) {
+  return aggregateCaseLeaderboard(submissions)
+    .filter((row) => row.phone)
+    .slice(0, count)
+    .map((row) => row.phone);
+}

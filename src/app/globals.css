@@ -95,6 +95,43 @@ html[lang="ar"] :is(header, footer) :is(a, button, span, p) {
   animation: discover-float 4.5s ease-in-out infinite;
 }
 
+@keyframes leader-logo-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-8px) scale(1.05); }
+}
+
+@keyframes leader-logo-glow {
+  0%, 100% { opacity: 0.28; transform: scale(0.86); }
+  50% { opacity: 0.72; transform: scale(1.18); }
+}
+
+@keyframes leader-card-shine {
+  0% { transform: translateX(-130%) skewX(-18deg); }
+  100% { transform: translateX(280%) skewX(-18deg); }
+}
+
+.leader-logo-mark {
+  animation: leader-logo-float 3.4s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+.leader-logo-glow {
+  animation: leader-logo-glow 3.4s ease-in-out infinite;
+}
+
+.leader-card-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  background: linear-gradient(90deg, transparent, rgba(255, 246, 210, 0.28), transparent);
+  animation: leader-card-shine 3.2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 6;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .discover-reveal,
   .discover-reveal.is-in {
@@ -105,7 +142,10 @@ html[lang="ar"] :is(header, footer) :is(a, button, span, p) {
   }
 
   .discover-shine::after,
-  .discover-float {
+  .discover-float,
+  .leader-logo-mark,
+  .leader-logo-glow,
+  .leader-card-shine::after {
     animation: none;
   }
 }

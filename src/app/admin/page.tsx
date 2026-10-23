@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'rea
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot, increment } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot, increment, deleteField } from 'firebase/firestore';
 import { isIncompleteUserAccount, notifyCommitteeByKeyword, omitPassword, purgeAllStoredPasswords, setUserPasswordOnPhone } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
 import { filterFilesWithinLimit, filterMediaFilesWithinLimit, isOverUploadLimit, isPlaceholderCertMedia, mediaUploadLimitMessage, requireAuthUser, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
@@ -19,7 +19,9 @@ import DesignWorksBoard from '../components/DesignWorksBoard';
 import { IconText } from '../components/icons';
 import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import CollegeAdministrationEditor from '../components/admin/CollegeAdministrationEditor';
-import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
+import FaqEditor from '../components/admin/FaqEditor';
+import { DISTINGUISHED_MEMBER_ROLE, emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
+import { CASE_STUDY_DISTINGUISHED_FLAG, syncCaseStudyDistinguished } from '../lib/distinguishedMembers';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import {
   addDaysYmd,
@@ -199,7 +201,7 @@ export default function AdminDashboard() {
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
   const [adminReady, setAdminReady] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'design-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter' | 'scientific-texts' | 'platform-briefing' | 'college-admin'>('case-study');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'design-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter' | 'scientific-texts' | 'platform-briefing' | 'college-admin' | 'faq'>('case-study');
 
   const [isRegistrationClosed, setIsRegistrationClosed] = useState<boolean>(false);
 
@@ -436,9 +438,24 @@ export default function AdminDashboard() {
 
   const fetchCaseSubmissions = async () => {
     try {
-      setCaseSubmissions(await loadCaseSubmissions(db));
+      const rows = await loadCaseSubmissions(db);
+      setCaseSubmissions(rows);
+      await applyDistinguishedRanks(rows);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const applyDistinguishedRanks = async (rows: Array<Record<string, any>>) => {
+    try {
+      const touched = await syncCaseStudyDistinguished(db, rows);
+      if (!touched.size) return;
+      setUsersList((prev) => prev.map((u) => {
+        const nextRole = touched.get(u.phone) || touched.get(canonicalPhone(u.phone));
+        return nextRole ? { ...u, role: nextRole } : u;
+      }));
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -936,7 +953,9 @@ export default function AdminDashboard() {
     
     try {
       await deleteDoc(doc(db, 'case_study_submissions', id));
-      setCaseSubmissions(caseSubmissions.filter(sub => sub.id !== id));
+      const next = caseSubmissions.filter(sub => sub.id !== id);
+      setCaseSubmissions(next);
+      await applyDistinguishedRanks(next);
       setModalMessage('تمت الإزالة من لوحة الصدارة بنجاح.');
       setModalType('success');
     } catch (err) {
@@ -1565,7 +1584,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       const userRef = doc(db, 'users', phone);
       await updateDoc(userRef, { 
         role: newRole,
-        latestNotification: `مبروك! تم ترقيتك وتعيين رتبتك إلى (${newRole}) بنجاح 🎉`
+        latestNotification: `مبروك! تم ترقيتك وتعيين رتبتك إلى (${newRole}) بنجاح 🎉`,
+        [CASE_STUDY_DISTINGUISHED_FLAG]: newRole === DISTINGUISHED_MEMBER_ROLE ? false : deleteField(),
       });
       setUsersList(usersList.map((u) => u.phone === phone ? { ...u, role: newRole } : u));
       setModalMessage(`تم تحديث رتبة العضو إلى (${newRole}) بنجاح سحابياً! 🚀`);
@@ -1612,7 +1632,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         score: increment(delta),
         scoreAdjustments: [...adjustmentsOf(current), entry],
       });
-      setCaseSubmissions((prev) => prev.map((sub) => (
+      const next = caseSubmissions.map((sub) => (
         sub.id === id
           ? {
               ...sub,
@@ -1620,7 +1640,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               scoreAdjustments: [...adjustmentsOf(sub), entry],
             }
           : sub
-      )));
+      ));
+      setCaseSubmissions(next);
+      await applyDistinguishedRanks(next);
     } catch (err: any) {
       console.error(err);
       setModalMessage(err?.message || 'تعذر تعديل النقاط. سجّل الدخول ثم أعد المحاولة.');
@@ -3040,6 +3062,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             { id: 'requests', label: '📥 طلبات الانضمام والأكسل' },
             { id: 'suggestions', label: '💡 آراء ومقترحات الطلاب' },
             { id: 'college-admin', label: '🏛️ إدارة كلية التمريض' },
+            { id: 'faq', label: '❓ الأسئلة الشائعة' },
             { id: 'discover', label: '🖼️ معرض "اكتشف النادي"' },
             { id: 'passion', label: '✨ بطاقة "شغف وعطاء"' },
             { id: 'events', label: '📅 الفعاليات والبوسترات' },
@@ -4896,6 +4919,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
         {activeTab === 'college-admin' && <CollegeAdministrationEditor />}
 
+        {activeTab === 'faq' && <FaqEditor />}
+
         {activeTab === 'discover' && (
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
@@ -5139,21 +5164,21 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                   <label className="text-xs font-bold text-slate-600">التاريخ</label>
                   <input
                     type="text"
-                    placeholder="مثال: 25 سبتمبر 2026"
+                    placeholder="مثال: الطلاب: 11/10 — الطالبات: 12/10"
                     value={newDate}
                     onChange={(e) => setNewDate(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
                   />
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-600">المكان</label>
-                  <input
-                    type="text"
-                    placeholder="مثال: مسرح جامعة حفر الباطن"
+                  <textarea
+                    rows={2}
+                    placeholder={'الطلاب: مبنى 2 المعرض الدائم\nالطالبات: ...'}
                     value={newLocation}
                     onChange={(e) => setNewLocation(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517]"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#630517] resize-y min-h-[4.5rem]"
                   />
                 </div>
 

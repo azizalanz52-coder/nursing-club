@@ -172,6 +172,7 @@ const EMOJI_ICONS: Record<string, ClubIconName> = {
   '🚨': 'siren',
   '⚠️': 'alert',
   '💡': 'lightbulb',
+  '❓': 'info',
   '📰': 'newspaper',
   '🏆': 'trophy',
   '🎥': 'video',

@@ -6,6 +6,7 @@ import { db } from '../../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { latestClubEvents, type ClubEvent } from '../../lib/clubEvents';
 import { ClubIcon } from '../icons';
+import EventMetaChip from '../EventMetaChip';
 
 export default function EventsPreview() {
   const [eventsList, setEventsList] = useState<ClubEvent[]>([]);
@@ -111,15 +112,9 @@ export default function EventsPreview() {
                     )}
                   </div>
 
-                  <div className="pt-3 border-t border-white/20 space-y-2 text-xs font-bold text-slate-100">
-                    <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-2.5 rounded-xl border border-white/20 shadow-inner">
-                      <ClubIcon name="mapPin" size={14} />
-                      <span className="truncate">{event.location}</span>
-                    </div>
-                    <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-2.5 rounded-xl border border-white/20 shadow-inner">
-                      <ClubIcon name="calendar" size={14} />
-                      <span className="truncate">{event.date}</span>
-                    </div>
+                  <div className="pt-3 border-t border-white/20 space-y-2">
+                    <EventMetaChip icon="mapPin" value={event.location} />
+                    <EventMetaChip icon="calendar" value={event.date} />
                   </div>
                 </div>
 

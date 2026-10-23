@@ -24,6 +24,7 @@ export function isLeadershipRole(role?: string | null) {
     value.includes('رئيس النادي') ||
     value.includes('رئيسة النادي') ||
     value.includes('نائبة الرئيس') ||
+    value.includes('نائبة رئيس') ||
     value.includes('نائب رئيس')
   );
 }
@@ -31,4 +32,11 @@ export function isLeadershipRole(role?: string | null) {
 export function isPrivilegedRole(role?: string | null) {
   const value = String(role || '');
   return value === 'System Admin' || isLeadershipRole(value);
+}
+
+export const DISTINGUISHED_MEMBER_ROLE = 'عضو مميز';
+export const BASIC_MEMBER_ROLE = 'عضو أساسي';
+
+export function isDistinguishedRole(role?: string | null) {
+  return String(role || '').trim() === DISTINGUISHED_MEMBER_ROLE;
 }

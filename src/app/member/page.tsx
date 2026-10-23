@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { emailToPhone, isPrivilegedRole } from '../lib/authIdentity';
+import { emailToPhone, isDistinguishedRole, isPrivilegedRole } from '../lib/authIdentity';
 import { committeeIdFromName, findMemberContext, resolveMemberAcceptance, resolvePortalCommitteeId } from '../lib/memberAcceptance';
 import { ClubIcon, CommitteeIcon, SocialIcon } from '../components/icons';
 
@@ -140,6 +140,7 @@ export default function MemberSmartDashboard() {
 
   const isAdmin = currentUserPhone === '0553731265' || isPrivilegedRole(userRole);
   const isLeader = userRole.includes('رئيس لجنة') || userRole.includes('رئيسة لجنة') || userRole.includes('قائد') || userRole.includes('قائدة');
+  const isDistinguished = isDistinguishedRole(userRole);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
@@ -178,12 +179,16 @@ export default function MemberSmartDashboard() {
         <div className="bg-gradient-to-r from-[#630517] to-[#80071D] rounded-3xl p-5 sm:p-8 text-white shadow-xl space-y-6 overflow-hidden">
           <div className="flex justify-between items-start flex-wrap gap-4">
             <div className="space-y-2">
-              <span className="bg-[#F5D061] text-[#630517] font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider">
-                {isAdmin ? 'إدارة عليا للنادي' : isLeader ? 'قائد لجنة' : 'عضو أساسي معتمد'}
+              <span className="bg-[#F5D061] text-[#630517] font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1">
+                {isAdmin ? 'إدارة عليا للنادي' : isLeader ? 'قائد لجنة' : isDistinguished ? (
+                  <><ClubIcon name="medal" size={12} /> عضو مميز</>
+                ) : 'عضو أساسي معتمد'}
               </span>
               <h2 className="text-2xl font-black">أهلاً بك، {currentUserName || 'زميلنا العزيز'}</h2>
               <p className="text-xs text-white/80 max-w-lg leading-relaxed">
-                النظام مرتبط بالكامل: صلاحياتك معتمدة من الإدارة، ومهامك من لجنة الجودة وقائدك المباشر.
+                {isDistinguished
+                  ? 'رتبة عضو مميز تكريم لأول خمسة في دراسة الحالة، وتتجدد مع لوحة الصدارة.'
+                  : 'النظام مرتبط بالكامل: صلاحياتك معتمدة من الإدارة، ومهامك من لجنة الجودة وقائدك المباشر.'}
               </p>
             </div>
 

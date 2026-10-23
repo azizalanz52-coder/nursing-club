@@ -22,7 +22,7 @@ const normalizePhone = (phone: string) => {
 
 const leaders = [
   { name: "عبدالله محمد المطيري", position: "رئيس النادي" },
-  { name: "اريام محمد الجبو", position: "نائب رئيس النادي" },
+  { name: "اريام محمد الجبو", position: "نائبة رئيس النادي" },
 ];
 
 const initialCommittees = [
@@ -173,18 +173,31 @@ export default function TeamPage() {
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {leaders.map((leader, index) => (
-              <div
+              <article
                 key={index}
-                className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-xl text-center space-y-4 hover:border-[#630517] transition-all group"
+                className="relative overflow-hidden rounded-[2rem] p-[2px] bg-gradient-to-br from-[#FFF3C4] via-[#F5D061] to-[#C9A227] shadow-[0_18px_40px_rgba(99,5,23,0.16)] hover:-translate-y-1 transition-transform"
               >
-                <div className="w-24 h-24 mx-auto rounded-full bg-[#630517] text-[#F5D061] flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-                  <ClubIcon name="crown" size={36} />
+                <div className="leader-card-shine relative rounded-[1.9rem] bg-gradient-to-b from-[#630517] via-[#4A030F] to-[#2a0108] px-6 pt-7 pb-8 text-center overflow-hidden">
+                  <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-56 h-56 bg-[#F5D061]/15 blur-3xl pointer-events-none" />
+                  <div className="relative z-10 space-y-6">
+                    <div className="relative mx-auto w-48 h-24 grid place-items-center" dir="ltr">
+                      <div className="leader-logo-glow absolute inset-4 rounded-full bg-[#F5D061] blur-2xl" />
+                      <img
+                        src="/nurs-wordmark.png"
+                        alt="شعار نادي التمريض"
+                        className="leader-logo-mark relative h-[4.5rem] w-auto max-w-[11.5rem] object-contain"
+                      />
+                    </div>
+                    <div className="h-px w-20 mx-auto bg-gradient-to-r from-transparent via-[#F5D061] to-transparent" />
+                    <h3 className="text-2xl sm:text-[1.7rem] font-black text-white leading-snug">
+                      {leader.name}
+                    </h3>
+                    <span className="inline-block px-5 py-2 rounded-full bg-[#F5D061] text-[#630517] text-xs font-black shadow-md">
+                      {leader.position}
+                    </span>
+                  </div>
                 </div>
-                <h3 className="text-2xl font-black text-slate-900">{leader.name}</h3>
-                <span className="inline-block bg-[#F5D061]/20 text-[#630517] font-black px-4 py-1.5 rounded-full text-xs">
-                  {leader.position}
-                </span>
-              </div>
+              </article>
             ))}
           </div>
         </section>

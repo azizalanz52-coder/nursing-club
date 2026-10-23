@@ -6,6 +6,7 @@ import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { sortEventsByLatest, type ClubEvent } from '../lib/clubEvents';
 import { ClubIcon } from '../components/icons';
+import EventMetaChip from '../components/EventMetaChip';
 
 export default function EventsPage() {
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
@@ -123,14 +124,8 @@ export default function EventsPage() {
                   </div>
 
                   <div className="grid grid-cols-1 gap-2 pt-2">
-                    <div className="flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-white/20 text-xs font-bold text-slate-200 shadow-inner">
-                      <ClubIcon name="mapPin" size={14} />
-                      <span className="truncate">{ev.location}</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-white/20 shadow-inner text-xs font-bold text-slate-200">
-                      <ClubIcon name="calendar" size={14} />
-                      <span className="truncate">{ev.date}</span>
-                    </div>
+                    <EventMetaChip icon="mapPin" value={ev.location} />
+                    <EventMetaChip icon="calendar" value={ev.date} />
                   </div>
                 </div>
 

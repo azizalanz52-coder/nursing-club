@@ -10,9 +10,11 @@ import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { findCertificatesByLookup } from '../lib/certificatesLookup';
 import { readStoredUniversityId } from '../lib/memberIdentity';
 import { certDisplayUrl, resolveCertificatePreview, type CertificatePreview } from '../lib/uploadFile';
-import { emailToPhone, isAdminPhone, isPrivilegedRole } from '../lib/authIdentity';
+import { emailToPhone, isAdminPhone, isDistinguishedRole, isPrivilegedRole } from '../lib/authIdentity';
 import { logoutSession } from '../lib/sessionAuth';
 import { committeeNameFromId, findListedLeadership, findMemberContext, isCommitteeLeaderRole, resolveMemberAcceptance, resolvePortalCommitteeId } from '../lib/memberAcceptance';
+import { DISTINGUISHED_PROMOTION_NOTICE, syncCaseStudyDistinguished } from '../lib/distinguishedMembers';
+import { clubNotice } from '../lib/clubNotice';
 import { ClubIcon } from './icons';
 
 export default function Navbar() {
@@ -261,7 +263,35 @@ export default function Navbar() {
   };
 
   const isAdmin = adminAuth || isPrivilegedRole(userRole);
+  const isDistinguished = isDistinguishedRole(userRole);
   const isCommitteeLeader = listedAsLeader || isCommitteeLeaderRole(userRole) || userRole === 'General Supervisor';
+
+  useEffect(() => {
+    if (!userPhone) return;
+    if (sessionStorage.getItem('nurs_distinguished_sync') === '1') return;
+    sessionStorage.setItem('nurs_distinguished_sync', '1');
+    void syncCaseStudyDistinguished(db).catch((err) => console.error(err));
+  }, [userPhone]);
+
+  useEffect(() => {
+    if (!isDistinguished || !userPhone) return;
+    const seenKey = `nurs_distinguished_hello_${userPhone}`;
+    if (sessionStorage.getItem(seenKey) === '1') return;
+
+    let cancelled = false;
+    const reveal = () => {
+      if (cancelled || sessionStorage.getItem(seenKey) === '1') return;
+      sessionStorage.setItem(seenKey, '1');
+      void clubNotice(DISTINGUISHED_PROMOTION_NOTICE, 'success', 'مبروك الترقية');
+    };
+
+    const delay = sessionStorage.getItem('nurs_splash_seen') === '1' ? 450 : 2600;
+    const timer = window.setTimeout(reveal, delay);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [isDistinguished, userPhone]);
   const isQualityOperationsRoom = Boolean(assignedCommittee?.includes('الجودة والتطوير')) || isAdmin;
   const isCommitteeMember = Boolean(assignedCommittee);
   const showCommitteePortal = Boolean(userName && isCommitteeMember && !isAdmin);
@@ -349,9 +379,16 @@ export default function Navbar() {
                   </Link>
                 )}
 
-                <div className="flex flex-col text-right bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100 min-w-0 max-w-[10.5rem] 2xl:max-w-[13rem]">
+                <div className={`flex flex-col text-right px-3 py-1.5 rounded-xl border min-w-0 max-w-[10.5rem] 2xl:max-w-[13rem] ${
+                  isDistinguished ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-100'
+                }`}>
                   <span className="text-xs font-bold text-rose-950 truncate whitespace-nowrap">{userName}</span>
-                  <span className="text-[10px] font-black text-[#630517] truncate whitespace-nowrap">{userRole || 'عضو أساسي'}</span>
+                  <span className={`text-[10px] font-black truncate whitespace-nowrap inline-flex items-center justify-end gap-1 ${
+                    isDistinguished ? 'text-amber-800' : 'text-[#630517]'
+                  }`}>
+                    {isDistinguished ? <ClubIcon name="medal" size={11} /> : null}
+                    {userRole || 'عضو أساسي'}
+                  </span>
                 </div>
 
                 <button 
@@ -476,10 +513,17 @@ export default function Navbar() {
             <div className="space-y-3 pt-1">
               {userName ? (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between bg-rose-50 p-3 rounded-2xl border border-rose-100">
+                  <div className={`flex items-center justify-between p-3 rounded-2xl border ${
+                    isDistinguished ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-100'
+                  }`}>
                     <div>
                       <span className="text-xs font-bold text-rose-950 flex items-center gap-1.5 truncate max-w-[180px]"><ClubIcon name="user" size={13} /> {userName}</span>
-                      <span className="text-[10px] font-black text-[#630517] block">{userRole || 'عضو أساسي'}</span>
+                      <span className={`text-[10px] font-black flex items-center gap-1 ${
+                        isDistinguished ? 'text-amber-800' : 'text-[#630517]'
+                      }`}>
+                        {isDistinguished ? <ClubIcon name="medal" size={11} /> : null}
+                        {userRole || 'عضو أساسي'}
+                      </span>
                     </div>
                     <button onClick={handleLogout} className="text-xs text-red-600 hover:text-red-800 font-bold px-2 py-1 cursor-pointer">تسجيل خروج</button>
                   </div>

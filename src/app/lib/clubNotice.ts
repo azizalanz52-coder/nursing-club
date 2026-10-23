@@ -61,7 +61,8 @@ export function compactNotice(message: string, kind: ClubNoticeKind, customTitle
     if (/مرحبا|أهلا/.test(text) && welcome?.[1]) {
       return { title: customTitle || `أهلاً ${welcome[1].trim()}`, detail: '' };
     }
-    return { title: customTitle || pickActionTitle(text, false), detail: '' };
+    if (customTitle) return { title: customTitle, detail: text };
+    return { title: pickActionTitle(text, false), detail: '' };
   }
 
   if (kind === 'error') {

@@ -10,6 +10,7 @@ function isLeadershipAccount(phone: string, role?: string) {
     value.includes('رئيس النادي') ||
     value.includes('رئيسة النادي') ||
     value.includes('نائب رئيس') ||
+    value.includes('نائبة رئيس') ||
     value.includes('نائبة الرئيس')
   );
 }
