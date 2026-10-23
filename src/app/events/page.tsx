@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { sortEventsByLatest, type ClubEvent } from '../lib/clubEvents';
+import { ClubIcon } from '../components/icons';
 
 export default function EventsPage() {
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
@@ -96,14 +97,18 @@ export default function EventsPage() {
 
                 <div className="relative z-10 p-6 flex justify-between items-start">
                   <span className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-xl shadow-md">
-                    🏥
+                    <ClubIcon name="hospital" size={22} />
                   </span>
                   <span className={`px-4 py-1.5 rounded-full text-xs font-black shadow-lg flex items-center gap-1.5 ${
                     ev.status === 'upcoming' 
                       ? 'bg-[#F5D061] text-slate-950' 
                       : 'bg-slate-800 text-slate-200 border border-slate-700'
                   }`}>
-                    {ev.status === 'upcoming' ? '⏱️ قريبًا' : '✓ انتهت'}
+                    {ev.status === 'upcoming' ? (
+                      <span className="inline-flex items-center gap-1.5"><ClubIcon name="clock" size={12} /> قريبًا</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5"><ClubIcon name="check" size={12} /> انتهت</span>
+                    )}
                   </span>
                 </div>
 
@@ -119,11 +124,11 @@ export default function EventsPage() {
 
                   <div className="grid grid-cols-1 gap-2 pt-2">
                     <div className="flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-white/20 text-xs font-bold text-slate-200 shadow-inner">
-                      <span>📍</span>
+                      <ClubIcon name="mapPin" size={14} />
                       <span className="truncate">{ev.location}</span>
                     </div>
                     <div className="flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-white/20 shadow-inner text-xs font-bold text-slate-200">
-                      <span>📅</span>
+                      <ClubIcon name="calendar" size={14} />
                       <span className="truncate">{ev.date}</span>
                     </div>
                   </div>

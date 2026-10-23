@@ -7,6 +7,7 @@ import { auth, db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { emailToPhone, isPrivilegedRole } from '../lib/authIdentity';
 import { committeeIdFromName, findMemberContext, resolveMemberAcceptance, resolvePortalCommitteeId } from '../lib/memberAcceptance';
+import { ClubIcon, CommitteeIcon, SocialIcon } from '../components/icons';
 
 interface CommitteeData {
   id: string;
@@ -162,7 +163,7 @@ export default function MemberSmartDashboard() {
               href="/team"
               className="px-3 sm:px-4 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs transition-all border border-amber-300"
             >
-              👑 الرؤساء وقادة اللجان
+              <span className="inline-flex items-center gap-1.5"><ClubIcon name="crown" size={13} /> الرؤساء وقادة اللجان</span>
             </Link>
             <Link
               href="/"
@@ -180,7 +181,7 @@ export default function MemberSmartDashboard() {
               <span className="bg-[#F5D061] text-[#630517] font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider">
                 {isAdmin ? 'إدارة عليا للنادي' : isLeader ? 'قائد لجنة' : 'عضو أساسي معتمد'}
               </span>
-              <h2 className="text-2xl font-black">أهلاً بك، {currentUserName || 'زميلنا العزيز'} 👋</h2>
+              <h2 className="text-2xl font-black">أهلاً بك، {currentUserName || 'زميلنا العزيز'}</h2>
               <p className="text-xs text-white/80 max-w-lg leading-relaxed">
                 النظام مرتبط بالكامل: صلاحياتك معتمدة من الإدارة، ومهامك من لجنة الجودة وقائدك المباشر.
               </p>
@@ -202,12 +203,12 @@ export default function MemberSmartDashboard() {
 
         {/* بطاقة اللجنة المرتبطة */}
         {loading ? (
-          <div className="py-20 text-center text-slate-400 bg-white rounded-3xl border border-slate-200">جاري مزامنة بيانات النظام السحابي... ⏳</div>
+          <div className="py-20 text-center text-slate-400 bg-white rounded-3xl border border-slate-200 inline-flex items-center justify-center gap-2 w-full">جاري مزامنة بيانات النظام... <ClubIcon name="clock" size={16} /></div>
         ) : userCommitteeData ? (
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6">
             <div className="flex items-center gap-4 border-b border-slate-100 pb-6">
-              <span className="w-16 h-16 rounded-2xl bg-[#630517]/10 flex items-center justify-center text-3xl shadow-inner">
-                {userCommitteeData.icon}
+              <span className="w-16 h-16 rounded-2xl bg-[#630517]/10 flex items-center justify-center text-[#630517] shadow-inner">
+                <CommitteeIcon id={userCommitteeData.id} size={28} />
               </span>
               <div>
                 <span className="text-xs font-bold text-[#630517] bg-[#630517]/10 px-3 py-1 rounded-full">لجنتك المعتمدة سحابياً</span>
@@ -248,7 +249,7 @@ export default function MemberSmartDashboard() {
                   rel="noopener noreferrer"
                   className="py-3 px-6 rounded-2xl bg-emerald-600 text-white font-bold text-xs shadow-md hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
                 >
-                  💬 قروب واتساب اللجنة
+                  <SocialIcon name="whatsapp" size={15} title="واتساب" /> قروب واتساب اللجنة
                 </a>
               )}
             </div>

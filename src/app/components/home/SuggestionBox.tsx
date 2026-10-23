@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { ClubIcon } from '../icons';
 import { db } from '../../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
@@ -57,7 +58,8 @@ export default function SuggestionBox() {
 
             <div className="text-center max-w-xl mx-auto mb-10 space-y-3">
               <span className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#630517]/10 border border-[#630517]/30 text-[#630517] text-xs font-black tracking-widest uppercase shadow-sm">
-                <span>💡 صندوق الآراء والمقترحات</span>
+                <ClubIcon name="lightbulb" size={14} />
+                <span>صندوق الآراء والمقترحات</span>
               </span>
               <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
                 صوتك يهمنا في تطوير نادي التمريض
@@ -69,7 +71,7 @@ export default function SuggestionBox() {
 
             {successMessage && (
               <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-300 text-emerald-800 text-center text-sm font-bold animate-in fade-in shadow-md">
-                تم إرسال مقترحك بنجاح! شكراً لحرصك على تميز النادي 🌟
+                وصل مقترحك. شكراً لمشاركتك.
               </div>
             )}
 
@@ -106,7 +108,7 @@ export default function SuggestionBox() {
                   <span className="absolute inset-0 w-full h-full bg-white/15 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                   <span className="relative z-10 flex items-center justify-center gap-2">
                     <span>{isSubmitting ? 'جاري الإرسال...' : 'إرسال المقترح'}</span>
-                    <span>🚀</span>
+                    <ClubIcon name="send" size={16} />
                   </span>
                 </button>
               </div>

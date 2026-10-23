@@ -21,6 +21,7 @@ import {
   type DesignContributor,
   type DesignWork,
 } from '../lib/designWorks';
+import { ClubIcon } from './icons';
 
 type Props = {
   actorName: string;
@@ -116,7 +117,7 @@ export default function DesignWorksBoard({
     <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#F5D061]/50 shadow-sm space-y-6">
       <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
         <div>
-          <h2 className="text-xl font-black text-slate-900">🎨 تصاميم اللجنة لكل فعالية</h2>
+          <h2 className="text-xl font-black text-slate-900 inline-flex items-center gap-2"><ClubIcon name="palette" size={20} /> تصاميم اللجنة لكل فعالية</h2>
           <p className="text-xs text-slate-500 mt-1">
             {canUpload
               ? 'ارفع البوستر أو الستوري باسم الفعالية. اضغط اسم الفعالية لترى من شارك وكم رفع، ثم استعراض أعماله. النقاط ولوحة الشرف تُضاف يدوياً من لوحة القادة.'

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { loginWithPhonePassword, registerWithPhonePassword } from '../lib/sessionAuth';
 import { clubNotice } from '../lib/clubNotice';
+import { ClubIcon } from './icons';
 
 export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [phone, setPhone] = useState('');
@@ -84,7 +85,11 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
             <img src="/uhb-logo.png" alt="جامعة حفر الباطن" className="h-10 w-auto object-contain" />
           </div>
           <h3 className="text-2xl font-black text-slate-950">
-            {isRegistering ? 'إنشاء حساب جديد 📝' : 'تسجيل الدخول / حسابي'}
+            {isRegistering ? (
+              <span className="inline-flex items-center justify-center gap-2">إنشاء حساب جديد <ClubIcon name="pen" size={18} /></span>
+            ) : (
+              'تسجيل الدخول / حسابي'
+            )}
           </h3>
           <p className="text-xs text-slate-500">
             {isRegistering
@@ -117,7 +122,7 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
                   onClick={handleForgotPassword}
                   className="text-[11px] font-bold text-[#630517] hover:underline"
                 >
-                  نسيت كلمة المرور؟ 🔑
+                  <span className="inline-flex items-center gap-1">نسيت كلمة المرور؟ <ClubIcon name="key" size={12} /></span>
                 </button>
               </div>
               <input
@@ -136,7 +141,7 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
               className="w-full py-3.5 rounded-xl font-black text-white shadow-lg transition-all cursor-pointer hover:brightness-110"
               style={{ background: 'linear-gradient(135deg, #630517 0%, #3a030b 100%)' }}
             >
-              دخول 🚀
+              <span className="inline-flex items-center justify-center gap-2">دخول <ClubIcon name="rocket" size={16} /></span>
             </button>
           </form>
         ) : (
@@ -198,7 +203,7 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
               className="w-full py-3.5 rounded-xl font-black text-white shadow-lg transition-all cursor-pointer hover:brightness-110"
               style={{ background: 'linear-gradient(135deg, #630517 0%, #3a030b 100%)' }}
             >
-              إنشاء الحساب والدخول فوراً ✨
+              إنشاء الحساب والدخول
             </button>
           </form>
         )}
@@ -210,7 +215,7 @@ export default function LoginModal({ isOpen, onClose }: { isOpen: boolean; onClo
             onClick={() => setIsRegistering(!isRegistering)}
             className="text-xs font-bold text-[#630517] hover:underline block w-full"
           >
-            {isRegistering ? 'لديك حساب بالفعل؟ تسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب جديد 📝'}
+            {isRegistering ? 'لديك حساب بالفعل؟ تسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب جديد'}
           </button>
 
           <button

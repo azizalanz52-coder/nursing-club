@@ -9,6 +9,7 @@ import CaseStudyCard from "./components/home/CaseStudyCard";
 import WhatsAppCommunity from "./components/home/WhatsAppCommunity";
 import SuggestionBox from "./components/home/SuggestionBox";
 import Footer from "./components/Footer";
+import { ClubIcon } from "./components/icons";
 
 export default function Home() {
   return (
@@ -25,7 +26,7 @@ export default function Home() {
 
         <div className="max-w-4xl mx-auto text-center space-y-6 relative z-10">
           <span className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#F5D061]/15 text-[#F5D061] text-xs font-black uppercase tracking-wider border border-[#F5D061]/30 backdrop-blur-md shadow-inner">
-            <span>👑</span>
+            <ClubIcon name="crown" size={14} />
             <span>الهيكل القيادي والتنظيمي</span>
           </span>
 
@@ -34,7 +35,7 @@ export default function Home() {
           </h2>
 
           <p className="text-amber-100/90 text-sm sm:text-base max-w-xl mx-auto font-medium leading-relaxed">
-            تعرف على فريق القيادة في قمة الهرم ورؤساء اللجان السبع المسؤولين عن مسيرة النادي وإدارة كافة الأنشطة والفعاليات.
+            تعرف على رئيس النادي ونائبه وقادة اللجان السبع.
           </p>
 
           <div className="pt-3">
@@ -42,8 +43,8 @@ export default function Home() {
               href="/team"
               className="px-8 py-4 rounded-2xl bg-gradient-to-r from-[#F5D061] via-amber-300 to-[#F5D061] text-[#630517] font-black text-xs sm:text-sm shadow-[0_10px_25px_rgba(245,208,97,0.3)] hover:scale-105 hover:brightness-110 active:scale-95 transition-all inline-flex items-center gap-2.5 cursor-pointer border border-[#F5D061]"
             >
-              <span className="text-base">👑</span>
-              <span>استعراض رؤساء وقادة النادي ➔</span>
+              <ClubIcon name="crown" size={16} />
+              <span>استعراض رؤساء وقادة النادي</span>
             </Link>
           </div>
         </div>

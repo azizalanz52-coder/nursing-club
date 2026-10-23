@@ -22,6 +22,7 @@ import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../../lib/mem
 import { canAccessCommittee, findMemberContext, isAcceptedStatus, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../../lib/memberAcceptance';
 import { clubConfirm, inferNoticeKind } from '../../lib/clubNotice';
 import { ClubNoticeDialog } from '../../components/ClubNotice';
+import { ClubIcon, CommitteeIcon, IconText, SocialIcon } from '../../components/icons';
 import {
   MEDIA_CATEGORIES,
   MEDIA_STORAGE_FOLDER,
@@ -814,7 +815,7 @@ export default function CommitteeDetailPage() {
     return (
       <main className="min-h-screen bg-slate-50 text-slate-800 py-20 px-4" dir="rtl">
         <div className="max-w-md mx-auto bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center space-y-6">
-          <div className="w-16 h-16 bg-red-100 text-red-700 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold">🔍</div>
+          <div className="w-16 h-16 bg-red-100 text-red-700 rounded-2xl mx-auto flex items-center justify-center"><ClubIcon name="search" size={28} /></div>
           <div className="space-y-2">
             <h1 className="text-xl font-black text-slate-900">لم يتم تحديد اللجنة</h1>
             <p className="text-xs text-slate-500 leading-relaxed">يرجى الانتقال إلى صفحة الهيكلة التنظيمية واختيار لجنتك المعتمدة.</p>
@@ -842,7 +843,7 @@ export default function CommitteeDetailPage() {
     return (
       <main className="min-h-screen bg-slate-50 text-slate-800 py-20 px-4" dir="rtl">
         <div className="max-w-md mx-auto bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center space-y-6">
-          <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold">🔒</div>
+          <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-2xl mx-auto flex items-center justify-center"><ClubIcon name="lock" size={28} /></div>
           <div className="space-y-2">
             <h1 className="text-xl font-black text-slate-900">تسجيل الدخول مطلوب</h1>
             <p className="text-xs text-slate-500 leading-relaxed">بوابة الأعضاء واللجان مخصصة للأعضاء المقبولين فقط. يرجى تسجيل الدخول برقم الجوال.</p>
@@ -861,7 +862,7 @@ export default function CommitteeDetailPage() {
     return (
       <main className="min-h-screen bg-slate-50 text-slate-800 py-20 px-4" dir="rtl">
         <div className="max-w-md mx-auto bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center space-y-6">
-          <div className="w-16 h-16 bg-red-100 text-red-700 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold">⚠️</div>
+          <div className="w-16 h-16 bg-red-100 text-red-700 rounded-2xl mx-auto flex items-center justify-center"><ClubIcon name="alert" size={28} /></div>
           <div className="space-y-2">
             <h1 className="text-xl font-black text-slate-900">عذراً، لست من أعضاء هذه اللجنة</h1>
             <p className="text-xs text-slate-500 leading-relaxed">حسابك غير مقترن أو مقبول رسمياً في ({committee?.name}). هذه الصفحة مؤمنة تماماً.</p>
@@ -891,7 +892,7 @@ export default function CommitteeDetailPage() {
                 onClick={() => setShowExcuseModal(true)}
                 className="px-4 py-2 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow-md hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
               >
-                🙋‍♂️ أنا أعتذر عن حضور فعالية
+                <ClubIcon name="user" size={14} /> أنا أعتذر عن حضور فعالية
               </button>
             )}
             <span className="px-4 py-1 rounded-full bg-[#630517]/10 text-[#630517] text-xs font-extrabold tracking-wider uppercase border border-[#630517]/20">
@@ -904,8 +905,8 @@ export default function CommitteeDetailPage() {
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-[#630517]/10 border border-[#630517]/20 flex items-center justify-center text-3xl shadow-sm">
-                {committee?.icon}
+              <div className="w-16 h-16 rounded-2xl bg-[#630517]/10 border border-[#630517]/20 flex items-center justify-center text-[#630517] shadow-sm">
+                <CommitteeIcon id={String(id || committee?.id || '')} size={28} />
               </div>
               <div>
                 <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full">عضو معتمد في هذه اللجنة ✓</span>
@@ -921,7 +922,7 @@ export default function CommitteeDetailPage() {
                 rel="noopener noreferrer"
                 className="px-5 py-3 rounded-2xl bg-emerald-600 text-white font-black text-xs shadow hover:bg-emerald-700 transition-all flex items-center gap-2"
               >
-                <span>💬</span>
+                <SocialIcon name="whatsapp" size={15} title="واتساب" />
                 <span>قروب واتساب اللجنة</span>
               </a>
             )}
@@ -1072,7 +1073,7 @@ export default function CommitteeDetailPage() {
           <div className="bg-white rounded-3xl p-8 sm:p-10 border border-sky-200 shadow-xl space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h2 className="text-xl font-black text-slate-900">🤝 سجل الشراكات والمحلات المرئية (منع تكرار التواصل)</h2>
+                <h2 className="text-xl font-black text-slate-900"><IconText text="🤝 سجل الشراكات والمحلات المرئية" /></h2>
                 <p className="text-xs text-slate-500 mt-1">قاعدة بيانات مركزية تشاهدها اللجنة بالكامل؛ لتجنب التواصل مع أي جهة سبق وتم التواصل معها:</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-sky-100 text-sky-800 font-bold text-xs">
@@ -1170,7 +1171,7 @@ export default function CommitteeDetailPage() {
           <div className="bg-white rounded-3xl p-8 sm:p-10 border border-purple-200 shadow-xl space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h2 className="text-xl font-black text-slate-900">📸 مركز رفع وتوثيق محتوى لجنة الإعلام</h2>
+                <h2 className="text-xl font-black text-slate-900"><IconText text="📸 مركز رفع وتوثيق محتوى لجنة الإعلام" /></h2>
                 <p className="text-xs text-slate-500 mt-1">أرشيف واحد مشترك: كل رفع هنا يظهر مباشرة في لوحة قادة الإعلام وفي تبويب قسم الإعلام بلوحة الأدمن.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
@@ -1285,7 +1286,7 @@ export default function CommitteeDetailPage() {
                           onClick={() => setPreviewItem(item)}
                           className="flex-1 py-2 bg-sky-50 text-sky-700 text-center font-bold text-xs rounded-xl border border-sky-200 hover:bg-sky-100 transition-all cursor-pointer"
                         >
-                          👁️ عرض المعاينة
+                          <span className="inline-flex items-center gap-1"><ClubIcon name="eye" size={13} /> عرض المعاينة</span>
                         </button>
                         <button
                           type="button"
@@ -1293,7 +1294,7 @@ export default function CommitteeDetailPage() {
                           className="px-3 py-2 bg-red-50 text-red-600 text-center font-bold text-xs rounded-xl border border-red-200 hover:bg-red-100 transition-all cursor-pointer"
                           title="حذف المادة"
                         >
-                          🗑️ حذف
+                          <span className="inline-flex items-center gap-1"><ClubIcon name="trash" size={13} /> حذف</span>
                         </button>
                       </div>
                     </div>
@@ -1310,7 +1311,7 @@ export default function CommitteeDetailPage() {
           <div className="bg-white rounded-3xl p-8 sm:p-10 border border-emerald-200 shadow-xl space-y-6">
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
-                <h2 className="text-xl font-black text-slate-900">🔬 بنك صياغة النصوص الطبية والعبارات للبنرات والتصاميم</h2>
+                <h2 className="text-xl font-black text-slate-900"><IconText text="🔬 بنك صياغة النصوص الطبية والعبارات" /></h2>
                 <p className="text-xs text-slate-500 mt-1">
                   {isScientificCommittee
                     ? 'ارفع النص أو PDF تحت عنوان فعالية واضح، وبعد انتهائها أرشفوها للرجوع لها لاحقاً.'
@@ -1430,7 +1431,7 @@ export default function CommitteeDetailPage() {
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
             <div>
-              <h2 className="text-xl font-black text-slate-900">📌 مهام اللجنة ومهام لجنة الجودة والتطوير</h2>
+              <h2 className="text-xl font-black text-slate-900"><IconText text="📌 مهام اللجنة ومهام لجنة الجودة والتطوير" /></h2>
               <p className="text-xs text-slate-500 mt-1">تابع المهام والفعاليات المسندة للجنة وقم بتحديث إنجازها لتكسب نقاطك الفردية:</p>
             </div>
             <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-xl text-xs font-bold">
@@ -1525,8 +1526,8 @@ export default function CommitteeDetailPage() {
       {showExcuseModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <form onSubmit={handleUploadExcuseSubmit} className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 border-2 border-[#630517]/20">
-            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
-              🙋‍♂️
+            <div className="w-16 h-16 bg-[#630517] text-[#F5D061] rounded-2xl mx-auto flex items-center justify-center shadow-lg">
+              <ClubIcon name="user" size={28} />
             </div>
             <div className="space-y-1 text-center">
               <h3 className="text-xl font-black text-slate-900">أنا أعتذر عن حضور فعالية</h3>
@@ -1577,7 +1578,7 @@ export default function CommitteeDetailPage() {
                 type="submit"
                 className="w-1/2 py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow hover:brightness-110 cursor-pointer"
               >
-                إرسال الاعتذار 🚀
+                <span className="inline-flex items-center gap-2">إرسال الاعتذار <ClubIcon name="send" size={14} /></span>
               </button>
             </div>
           </form>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { db } from '../../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { latestClubEvents, type ClubEvent } from '../../lib/clubEvents';
+import { ClubIcon } from '../icons';
 
 export default function EventsPreview() {
   const [eventsList, setEventsList] = useState<ClubEvent[]>([]);
@@ -90,7 +91,11 @@ export default function EventsPreview() {
                       ? 'bg-[#F5D061] text-slate-950'
                       : 'bg-slate-800 text-slate-200 border border-slate-700'
                   }`}>
-                    {event.status === 'upcoming' || event.status === 'قريباً' ? '⏱️ قريبًا' : '✓ انتهت'}
+                    {event.status === 'upcoming' || event.status === 'قريباً' ? (
+                      <span className="inline-flex items-center gap-1.5"><ClubIcon name="clock" size={12} /> قريبًا</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5"><ClubIcon name="check" size={12} /> انتهت</span>
+                    )}
                   </span>
                 </div>
 
@@ -108,11 +113,11 @@ export default function EventsPreview() {
 
                   <div className="pt-3 border-t border-white/20 space-y-2 text-xs font-bold text-slate-100">
                     <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-2.5 rounded-xl border border-white/20 shadow-inner">
-                      <span>📍</span>
+                      <ClubIcon name="mapPin" size={14} />
                       <span className="truncate">{event.location}</span>
                     </div>
                     <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-2.5 rounded-xl border border-white/20 shadow-inner">
-                      <span>📆</span>
+                      <ClubIcon name="calendar" size={14} />
                       <span className="truncate">{event.date}</span>
                     </div>
                   </div>

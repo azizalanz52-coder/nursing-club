@@ -6,6 +6,7 @@ import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { ClubNoticeDialog } from '../components/ClubNotice';
 import { canAccessCommittee, findMemberContext, resolvePortalCommitteeId } from '../lib/memberAcceptance';
+import { ClubIcon, CommitteeIcon } from '../components/icons';
 
 const normalizePhone = (phone: string) => {
   if (!phone) return '';
@@ -25,13 +26,13 @@ const leaders = [
 ];
 
 const initialCommittees = [
-  { id: 'design', name: 'التصميم', description: 'الهوية البصرية، تصميم البوسترات، والمحتوى المرئي.', icon: '🎨', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي' },
-  { id: 'media', name: 'الاعلام', description: 'منصات التواصل، التغطيات الحية، وصناعة المحتوى.', icon: '📸', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري' },
-  { id: 'events-org', name: 'تنظيم الفعاليات', description: 'التخطيط الميداني، إدارة الحشود، والفعاليات.', icon: '📅', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري' },
-  { id: 'hr', name: 'الموارد البشرية', description: 'إدارة الأعضاء، المتابعة، والتقييم والتحفيز.', icon: '👥', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي' },
-  { id: 'pr', name: 'العلاقات العامة', description: 'بناء الشراكات، والتنسيق الخارجي.', icon: '🌐', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي' },
-  { id: 'scientific', name: 'المحتوى العلمي', description: 'المحاضرات، والدعم الأكاديمي.', icon: '🔬', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي' },
-  { id: 'quality', name: 'الجودة والتطوير', description: 'تقييم الأداء، قياس رضا الأعضاء، وتحسين العمل.', icon: '📊', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري' },
+  { id: 'design', name: 'التصميم', description: 'الهوية البصرية، تصميم البوسترات، والمحتوى المرئي.', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي' },
+  { id: 'media', name: 'الاعلام', description: 'منصات التواصل، التغطيات الحية، وصناعة المحتوى.', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري' },
+  { id: 'events-org', name: 'تنظيم الفعاليات', description: 'التخطيط الميداني، إدارة الحشود، والفعاليات.', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري' },
+  { id: 'hr', name: 'الموارد البشرية', description: 'إدارة الأعضاء، المتابعة، والتقييم والتحفيز.', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي' },
+  { id: 'pr', name: 'العلاقات العامة', description: 'بناء الشراكات، والتنسيق الخارجي.', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي' },
+  { id: 'scientific', name: 'المحتوى العلمي', description: 'المحاضرات، والدعم الأكاديمي.', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي' },
+  { id: 'quality', name: 'الجودة والتطوير', description: 'تقييم الأداء، قياس رضا الأعضاء، وتحسين العمل.', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري' },
 ];
 
 export default function TeamPage() {
@@ -148,14 +149,14 @@ export default function TeamPage() {
         </span>
         <h1 className="text-3xl sm:text-5xl font-black">رؤساء وقادة لجان نادي التمريض</h1>
         <p className="text-white/80 text-xs sm:text-sm max-w-xl mx-auto">
-          تعرف على فريق القيادة في قمة الهرم الإداري، وقادة اللجان الميدانية والأكاديمية لنادي كلية التمريض بجامعة حفر الباطن.
+          رئيس النادي ونائبه، وقادة اللجان السبع في كلية التمريض بجامعة حفر الباطن.
         </p>
         <div className="pt-2 flex justify-center gap-4">
           <Link href="/" className="text-xs text-[#F5D061] underline font-bold">
             ← العودة للرئيسية
           </Link>
           <a href="#" onClick={handleMemberPortalClick} className="text-xs text-white underline font-bold cursor-pointer">
-            🛡️ بوابة العضو
+            <span className="inline-flex items-center gap-1.5"><ClubIcon name="shield" size={13} /> بوابة العضو</span>
           </a>
         </div>
       </div>
@@ -176,8 +177,8 @@ export default function TeamPage() {
                 key={index}
                 className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-xl text-center space-y-4 hover:border-[#630517] transition-all group"
               >
-                <div className="w-24 h-24 mx-auto rounded-full bg-[#630517] text-[#F5D061] flex items-center justify-center text-3xl font-black shadow-md group-hover:scale-105 transition-transform">
-                  👑
+                <div className="w-24 h-24 mx-auto rounded-full bg-[#630517] text-[#F5D061] flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                  <ClubIcon name="crown" size={36} />
                 </div>
                 <h3 className="text-2xl font-black text-slate-900">{leader.name}</h3>
                 <span className="inline-block bg-[#F5D061]/20 text-[#630517] font-black px-4 py-1.5 rounded-full text-xs">
@@ -205,8 +206,8 @@ export default function TeamPage() {
                 className="bg-white rounded-3xl border border-slate-200 p-7 shadow-lg flex flex-col justify-between space-y-6 hover:shadow-xl hover:border-[#630517] hover:scale-[1.02] transition-all cursor-pointer group"
               >
                 <div className="space-y-4">
-                  <div className="w-12 h-12 rounded-2xl bg-[#630517]/10 flex items-center justify-center text-2xl group-hover:bg-[#630517] group-hover:text-[#F5D061] transition-all">
-                    {committee.icon}
+                  <div className="w-12 h-12 rounded-2xl bg-[#630517]/10 flex items-center justify-center text-[#630517] group-hover:bg-[#630517] group-hover:text-[#F5D061] transition-all">
+                    <CommitteeIcon id={committee.id} size={22} />
                   </div>
                   <h3 className="text-xl font-black text-slate-900 group-hover:text-[#630517] transition-colors">{committee.name}</h3>
                   <p className="text-slate-600 text-sm leading-relaxed">{committee.description}</p>

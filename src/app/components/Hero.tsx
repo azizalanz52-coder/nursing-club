@@ -5,6 +5,7 @@ import Link from "next/link";
 import { db } from './../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { DEFAULT_WELCOME_BANNER } from '../lib/welcomeBanner';
+import { ClubIcon } from './icons';
 
 interface BannerItem {
   id: string;
@@ -101,7 +102,10 @@ export default function Hero() {
             ? 'bg-white/10 border-white/40 text-pink-100'
             : 'bg-[#F5D061]/10 border-[#F5D061]/40 text-[#F5D061]'
         }`}>
-          <span>{isPink ? '🎀' : '✨'} {currentBanner.tag}</span>
+          <span className="inline-flex items-center gap-1.5">
+            <ClubIcon name={isPink ? 'heart' : 'sparkles'} size={14} />
+            {currentBanner.tag}
+          </span>
         </div>
 
         <h1 className="text-4xl sm:text-6xl font-black text-white drop-shadow-md">

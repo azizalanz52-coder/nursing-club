@@ -13,6 +13,7 @@ import { certDisplayUrl, resolveCertificatePreview, type CertificatePreview } fr
 import { emailToPhone, isAdminPhone, isPrivilegedRole } from '../lib/authIdentity';
 import { logoutSession } from '../lib/sessionAuth';
 import { committeeNameFromId, findListedLeadership, findMemberContext, isCommitteeLeaderRole, resolveMemberAcceptance, resolvePortalCommitteeId } from '../lib/memberAcceptance';
+import { ClubIcon } from './icons';
 
 export default function Navbar() {
   const [userName, setUserName] = useState<string | null>(null);
@@ -327,7 +328,7 @@ export default function Navbar() {
                     href="/admin"
                     className="bg-[#630517] text-[#F5D061] px-3 py-2 rounded-xl text-xs font-black shadow hover:brightness-110 transition-all flex items-center gap-1.5 whitespace-nowrap"
                   >
-                    <span>⚙️</span>
+                    <ClubIcon name="settings" size={14} />
                     <span>لوحة التحكم</span>
                   </Link>
                 )}
@@ -343,7 +344,7 @@ export default function Navbar() {
                           : 'bg-[#630517] text-[#F5D061] hover:brightness-110'
                     }`}
                   >
-                    <span>{isQualityOperationsRoom ? '⚡' : isCommitteeLeader ? '🛠' : '🩺'}</span>
+                    <ClubIcon name={isQualityOperationsRoom ? 'zap' : isCommitteeLeader ? 'wrench' : 'stethoscope'} size={14} />
                     <span>{committeePortalLabel}</span>
                   </Link>
                 )}
@@ -376,7 +377,7 @@ export default function Navbar() {
                 href="/join"
                 className="px-3.5 py-2 rounded-2xl bg-[#F5D061] text-[#630517] font-black text-xs shadow-md hover:brightness-105 transition-all flex items-center gap-1.5 whitespace-nowrap"
               >
-                <span>✨</span>
+                <ClubIcon name="userPlus" size={14} />
                 <span>الانضمام للنادي</span>
               </Link>
             ) : (
@@ -386,7 +387,7 @@ export default function Navbar() {
                 title="تم إغلاق فترة التقديم والانضمام للنادي"
                 className="px-3.5 py-2 rounded-2xl bg-slate-100 text-slate-400 font-bold text-xs shadow-inner cursor-not-allowed flex items-center gap-1.5 border border-slate-200 whitespace-nowrap"
               >
-                <span>🔒</span>
+                <ClubIcon name="lock" size={14} />
                 <span>الانضمام مغلق</span>
               </button>
             )}
@@ -408,13 +409,7 @@ export default function Navbar() {
               className="p-2 rounded-xl bg-slate-100 text-slate-800 focus:outline-none"
               aria-label="القائمة"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {mobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
+              <ClubIcon name={mobileMenuOpen ? 'close' : 'menu'} size={22} />
             </button>
           </div>
 
@@ -423,7 +418,7 @@ export default function Navbar() {
         {showLeaderAlertInNavbar && (
           <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white px-4 py-1.5 shadow-inner flex items-center justify-between text-xs font-black border-t border-amber-400/30" dir="rtl">
             <div className="flex items-center gap-2 mx-auto">
-              <span className="text-sm animate-pulse">🚨</span>
+              <ClubIcon name="siren" size={14} className="animate-pulse" />
               <span>[تنبيه غرفة العمليات لقادة اللجان]: {leaderAlertMsg}</span>
             </div>
             <button
@@ -453,7 +448,7 @@ export default function Navbar() {
                     onClick={() => setMobileMenuOpen(false)}
                     className="w-full text-center text-[#630517] font-black py-2.5 px-3 rounded-xl bg-[#F5D061] flex items-center justify-center gap-2 shadow"
                   >
-                    <span>✨</span> الانضمام للنادي
+                    <ClubIcon name="userPlus" size={14} /> الانضمام للنادي
                   </Link>
                 ) : (
                   <button
@@ -461,7 +456,7 @@ export default function Navbar() {
                     disabled
                     className="w-full text-right text-slate-400 font-bold py-1.5 px-3 rounded-xl bg-slate-100 flex items-center gap-2 cursor-not-allowed"
                   >
-                    <span>🔒</span> تقديم الانضمام (مغلق)
+                    <ClubIcon name="lock" size={14} /> تقديم الانضمام (مغلق)
                   </button>
                 )}
               </div>
@@ -474,7 +469,7 @@ export default function Navbar() {
                 }}
                 className="text-right text-amber-800 font-black py-1 flex items-center gap-2 cursor-pointer"
               >
-                <span>🎖️</span> استعراض الشهادات
+                <ClubIcon name="medal" size={14} /> استعراض الشهادات
               </button>
             </nav>
 
@@ -483,7 +478,7 @@ export default function Navbar() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between bg-rose-50 p-3 rounded-2xl border border-rose-100">
                     <div>
-                      <span className="text-xs font-bold text-rose-950 block truncate max-w-[180px]">👤 {userName}</span>
+                      <span className="text-xs font-bold text-rose-950 flex items-center gap-1.5 truncate max-w-[180px]"><ClubIcon name="user" size={13} /> {userName}</span>
                       <span className="text-[10px] font-black text-[#630517] block">{userRole || 'عضو أساسي'}</span>
                     </div>
                     <button onClick={handleLogout} className="text-xs text-red-600 hover:text-red-800 font-bold px-2 py-1 cursor-pointer">تسجيل خروج</button>
@@ -491,13 +486,13 @@ export default function Navbar() {
 
                   {isAdmin && (
                     <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="w-full bg-[#630517] text-[#F5D061] py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2">
-                      <span>⚙️</span><span>لوحة التحكم</span>
+                      <ClubIcon name="settings" size={14} /><span>لوحة التحكم</span>
                     </Link>
                   )}
 
                   {showCommitteePortal && (
                     <Link href="/committee-dashboard" onClick={() => setMobileMenuOpen(false)} className={`w-full py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2 ${isQualityOperationsRoom ? 'bg-rose-950 text-[#F5D061] border border-amber-400' : isCommitteeLeader ? 'bg-amber-600 text-white' : 'bg-[#630517] text-[#F5D061]'}`}>
-                      <span>{isQualityOperationsRoom ? '⚡' : isCommitteeLeader ? '🛠' : '🩺'}</span>
+                      <ClubIcon name={isQualityOperationsRoom ? 'zap' : isCommitteeLeader ? 'wrench' : 'stethoscope'} size={14} />
                       <span>{isQualityOperationsRoom ? 'غرفة العمليات المركزية' : isCommitteeLeader ? 'لوحة تحكم اللجنة' : 'بوابتي'}</span>
                     </Link>
                   )}
@@ -523,8 +518,8 @@ export default function Navbar() {
       {showCertModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
           <div className="bg-white text-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-400">
-            <div className="w-16 h-16 bg-amber-500 text-white rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg">
-              🎖️
+            <div className="w-16 h-16 bg-amber-500 text-white rounded-2xl mx-auto flex items-center justify-center shadow-lg">
+              <ClubIcon name="medal" size={28} />
             </div>
             
             <div className="space-y-1 text-center">

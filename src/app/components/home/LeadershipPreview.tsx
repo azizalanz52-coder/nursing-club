@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { ClubIcon } from '../icons';
 
 const leaders = [
   {
@@ -25,7 +26,7 @@ export default function LeadershipPreview() {
         {/* شارة العنوان */}
         <div className="text-center mb-12 space-y-3">
           <span className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/10 backdrop-blur-xl border border-[#D4AF37]/40 text-[#D4AF37] text-xs font-bold tracking-wider uppercase shadow-sm">
-            <span>👑</span>
+            <ClubIcon name="crown" size={14} />
           </span>
           <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
             رؤساء النادي
@@ -48,9 +49,7 @@ export default function LeadershipPreview() {
               <div className="relative z-10">
                 {/* أيقونة الشخصية */}
                 <div className="w-28 h-28 mx-auto mb-6 rounded-full bg-gradient-to-br from-[#630517] to-[#36020A] flex items-center justify-center border-4 border-[#D4AF37] shadow-lg group-hover:scale-105 transition-transform duration-500">
-                  <span className="text-4xl text-[#D4AF37]">
-                    👤
-                  </span>
+                  <ClubIcon name="user" size={36} className="text-[#D4AF37]" />
                 </div>
 
                 <h3 className="text-2xl font-black text-slate-900 group-hover:text-[#630517] transition-colors">

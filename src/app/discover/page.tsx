@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { CLUB_GOALS, CLUB_MISSION, CLUB_VISION } from '../lib/clubIdentity';
+import { ClubIcon } from '../components/icons';
 
 const DEFAULT_PASSION_SLIDES = [
   {
@@ -328,7 +329,7 @@ export default function DiscoverPage() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
             <Reveal className="text-center max-w-2xl mx-auto space-y-3">
               <span className="inline-block px-4 py-1.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-extrabold tracking-widest uppercase shadow-sm">
-                🏆 نبض التميز والفخر
+                <span className="inline-flex items-center gap-1.5"><ClubIcon name="trophy" size={13} /> إنجازات الطلبة</span>
               </span>
               <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
                 إنجازات طلبة كلية التمريض
@@ -634,7 +635,7 @@ export default function DiscoverPage() {
               <div className="space-y-4">
                 <Reveal>
                   <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-black shadow-sm">
-                    <span>👑</span>
+                    <ClubIcon name="crown" size={13} />
                     <span>الرعاة الذهبيون والشركاء الاستراتيجيون</span>
                   </div>
                 </Reveal>

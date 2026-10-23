@@ -16,6 +16,7 @@ import HrCertificateBatches from '../components/HrCertificateBatches';
 import { printQualityEventReport, QUALITY_EVENT_REPORTS, computedSuccessIndex, recommendationLabel, type QualityEventReport } from '../lib/qualityEventReport';
 import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
 import DesignWorksBoard from '../components/DesignWorksBoard';
+import { IconText } from '../components/icons';
 import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import CollegeAdministrationEditor from '../components/admin/CollegeAdministrationEditor';
 import { emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
@@ -2850,7 +2851,11 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 : 'bg-red-600 hover:bg-red-700 text-white'
             }`}
           >
-            {isRegistrationClosed ? '🟢 فتح نموذج الانضمام' : '🔴 إغلاق نموذج الانضمام'}
+            {isRegistrationClosed ? (
+              <span className="inline-flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-white" /> فتح نموذج الانضمام</span>
+            ) : (
+              <span className="inline-flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-white" /> إغلاق نموذج الانضمام</span>
+            )}
           </button>
 
           <Link
@@ -2913,7 +2918,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 : 'bg-[#fff6d6] text-[#630517] border border-[#F5D061]/60 hover:bg-[#F5D061]/30'
             }`}
           >
-            📘 ملف مميزات الموقع
+            <IconText text="📘 ملف مميزات الموقع" />
           </button>
 
           <button
@@ -2923,7 +2928,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'case-study' ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105' : 'bg-amber-50 text-[#630517] border border-amber-200 hover:bg-amber-100'
             }`}
           >
-            🩺 دراسة الحالة ({caseStudyParticipantCount})
+            <IconText text={`🩺 دراسة الحالة (${caseStudyParticipantCount})`} />
           </button>
 
           {isSystemAdminUser && (
@@ -2936,7 +2941,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
               }`}
             >
-              🔑 الحسابات والرتب والصلاحيات ({registeredAccountsCount})
+              <IconText text={`🔑 الحسابات والرتب والصلاحيات (${registeredAccountsCount})`} />
             </button>
           )}
 
@@ -2947,7 +2952,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'scientific-texts' ? 'bg-teal-700 text-white shadow-md scale-105' : 'bg-teal-50 text-teal-900 border border-teal-200 hover:bg-teal-100'
             }`}
           >
-            🔬 نصوص المحتوى العلمي ({pendingScientificCount > 0 ? `${pendingScientificCount} بانتظار` : scientificTexts.length})
+            <IconText text={`🔬 نصوص المحتوى العلمي (${pendingScientificCount > 0 ? `${pendingScientificCount} بانتظار` : scientificTexts.length})`} />
           </button>
 
           <button
@@ -2957,7 +2962,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'certificates' ? 'bg-sky-700 text-white shadow-md scale-105' : 'bg-sky-50 text-sky-900 border border-sky-200 hover:bg-sky-100'
             }`}
           >
-            📜 تبويب الشهادات المعتمدة ({certificates.length})
+            <IconText text={`📜 تبويب الشهادات المعتمدة (${certificates.length})`} />
           </button>
 
           <button
@@ -2967,7 +2972,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'weekly-newsletter' ? 'bg-purple-700 text-white shadow-md scale-105' : 'bg-purple-50 text-purple-900 border border-purple-200 hover:bg-purple-100'
             }`}
           >
-            📰 النشرة وجداول الاختبارات ({newsletters.length})
+            <IconText text={`📰 النشرة وجداول الاختبارات (${newsletters.length})`} />
           </button>
 
           <button
@@ -2977,7 +2982,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'student-achievements' ? 'bg-amber-600 text-white shadow-md scale-105' : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
             }`}
           >
-            🏆 إنجازات طلبة كلية التمريض
+            <IconText text="🏆 إنجازات طلبة كلية التمريض" />
           </button>
 
           <button
@@ -2987,7 +2992,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'performance-radar' ? 'bg-indigo-700 text-white shadow-md scale-105' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
             }`}
           >
-            📊 رادار أداء اللجان الشامل 🛡️
+            <IconText text="📊 رادار أداء اللجان الشامل" />
           </button>
 
           <button
@@ -2997,7 +3002,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'media-committee' ? 'bg-rose-700 text-white shadow-md scale-105' : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
             }`}
           >
-            🎥 قسم لجنة الإعلام (صور وفيديوهات)
+            <IconText text="🎥 قسم لجنة الإعلام" />
           </button>
 
           <button
@@ -3007,7 +3012,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'design-committee' ? 'bg-[#630517] text-[#F5D061] shadow-md scale-105' : 'bg-amber-50 text-[#630517] border border-amber-200 hover:bg-amber-100'
             }`}
           >
-            🎨 تصاميم لجنة التصميم
+            <IconText text="🎨 تصاميم لجنة التصميم" />
           </button>
 
           <button
@@ -3017,7 +3022,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'historical-vault' ? 'bg-amber-700 text-white shadow-md scale-105' : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
             }`}
           >
-            📦 أرشيف التقارير التاريخية ({qualityEvaluationReports.length + qualityUploadedFiles.length + qualityEventReports.length})
+            <IconText text={`📦 أرشيف التقارير التاريخية (${qualityEvaluationReports.length + qualityUploadedFiles.length + qualityEventReports.length})`} />
           </button>
 
           <button
@@ -3027,7 +3032,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               activeTab === 'escalated-reports' ? 'bg-red-600 text-white shadow-md scale-105' : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
             }`}
           >
-            🚨 تقارير وإنذارات الجودة ({escalatedReports.length})
+            <IconText text={`🚨 تقارير وإنذارات الجودة (${escalatedReports.length})`} />
           </button>
 
           {[
@@ -3051,7 +3056,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
               }`}
             >
-              {tab.label}
+              <IconText text={tab.label} />
             </button>
           ))}
         </div>

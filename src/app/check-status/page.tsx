@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { db } from '../lib/firebase';
 import { loginWithPhonePassword } from '../lib/sessionAuth';
 import { findUserDoc, resolveMemberAcceptance } from '../lib/memberAcceptance';
+import { ClubIcon, SocialIcon } from '../components/icons';
 
 export default function CheckStatusPage() {
   const [phone, setPhone] = useState('');
@@ -135,7 +136,7 @@ export default function CheckStatusPage() {
                               rel="noopener noreferrer"
                               className="block w-full py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow hover:bg-emerald-700 transition-colors mt-2"
                             >
-                              💬 الانضمام لقروب الواتساب الخاص باللجنة
+                              <span className="inline-flex items-center justify-center gap-2"><SocialIcon name="whatsapp" size={14} title="واتساب" /> الانضمام لقروب الواتساب الخاص باللجنة</span>
                             </a>
                           )}
                         </div>
@@ -170,8 +171,8 @@ export default function CheckStatusPage() {
                   {/* حالة القبول: معلق أو غير ذلك */}
                   {result.status !== 'مقبول' && result.status !== 'مرفوض' && (
                     <>
-                      <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto text-xl font-bold">
-                        ⏳
+                      <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+                        <ClubIcon name="clock" size={22} />
                       </div>
                       <div>
                         <h3 className="font-black text-slate-900 text-base">{result.fullName}</h3>

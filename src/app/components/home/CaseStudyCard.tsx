@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { ClubIcon } from '../icons';
 
 export default function CaseStudyCard() {
   return (
@@ -12,7 +13,7 @@ export default function CaseStudyCard() {
 
         <div className="space-y-3 z-10">
           <span className="bg-[#F5D061] text-[#630517] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider inline-block shadow-md">
-            ⚡ Daily Challenge (Updates every 24h)
+            <span className="inline-flex items-center gap-1.5"><ClubIcon name="zap" size={13} /> Daily Challenge</span>
           </span>
           <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
             Clinical Case Study Challenge
@@ -28,7 +29,7 @@ export default function CaseStudyCard() {
             className="inline-flex items-center justify-center gap-3 bg-[#F5D061] text-[#630517] px-8 py-4 rounded-2xl font-black text-sm shadow-lg hover:scale-105 active:scale-95 transition-all duration-300"
           >
             <span>Start Challenge</span>
-            <span className="text-lg">🩺</span>
+            <ClubIcon name="stethoscope" size={16} />
           </Link>
         </div>
       </div>

@@ -18,6 +18,7 @@ import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/i
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
 import DesignWorksBoard from '../components/DesignWorksBoard';
+import { ClubIcon, IconText } from '../components/icons';
 import QualityEventReportForm from '../components/QualityEventReport';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -1823,7 +1824,13 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-xl font-black text-slate-900">
-              {isQualityTeam ? '⚡ غرفة متابعة وتقييم أداء اللجان (لجنة الجودة والتطوير)' : isCommitteeLeader ? `لوحة تحكم رئيس لجنة (${currentActiveComm}) 🛡️` : `بوابة العضو المنضم في (${userData?.assignedCommittee || userData?.committee || 'اللجنة'}) 🩺`}
+              {isQualityTeam ? (
+                <IconText text="⚡ غرفة متابعة وتقييم أداء اللجان" />
+              ) : isCommitteeLeader ? (
+                <IconText text={`لوحة تحكم رئيس لجنة (${currentActiveComm})`} />
+              ) : (
+                <IconText text={`🩺 بوابة العضو في (${userData?.assignedCommittee || userData?.committee || 'اللجنة'})`} />
+              )}
             </h1>
             <p className="text-xs text-slate-500 mt-1">
               أهلاً بك، {userData?.fullName} • {isQualityTeam ? 'متابعة وتقييم أداء اللجان السبع وتقديم التوجيهات الإدارية' : isCommitteeLeader ? 'إدارة شؤون وأعضاء ومهام اللجنة المعينة لك' : 'متابعة المهام الخاصة بلجنتك وإرسال إفادات عدم المشاركة بخصوصية تامة'}
@@ -1834,13 +1841,13 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
             {isQualityTeam && (
               <>
                 <button type="button" onClick={handleExportQualityPDF} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black shadow hover:bg-emerald-700 flex items-center gap-1.5 cursor-pointer">
-                  <span>📄</span><span>التقرير الاستشاري (PDF)</span>
+                  <ClubIcon name="file" size={14} /><span>التقرير الاستشاري (PDF)</span>
                 </button>
                 <button type="button" onClick={() => setShowArchiveModal(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black shadow hover:bg-indigo-700 flex items-center gap-1.5 cursor-pointer">
-                  <span>📂</span><span>تقييمات اللجان المعتمدة ({qualityArchives.length})</span>
+                  <ClubIcon name="folder" size={14} /><span>تقييمات اللجان المعتمدة ({qualityArchives.length})</span>
                 </button>
                 <button type="button" onClick={() => setShowReportsModal(true)} className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black shadow hover:bg-red-700 flex items-center gap-1.5 cursor-pointer">
-                  <span>🚨</span><span>مركز الشكاوى ({escalatedReports.length})</span>
+                  <ClubIcon name="siren" size={14} /><span>مركز الشكاوى ({escalatedReports.length})</span>
                 </button>
               </>
             )}
@@ -1968,7 +1975,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                   onClick={handlePublishSmartReportToPresidents}
                   className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>🚀</span><span>رفع تقييم اللجان لأرشيف الأدمن</span>
+                  <ClubIcon name="upload" size={14} /><span>رفع تقييم اللجان لأرشيف الأدمن</span>
                 </button>
               </div>
             </div>

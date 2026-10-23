@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { ClubIcon, SocialIcon } from '../icons';
 
 export default function WhatsAppCommunity() {
   // يمكنك استبدال هذا الرابط برابط مجتمع الواتساب الخاص بكم
@@ -21,7 +22,8 @@ export default function WhatsAppCommunity() {
 
           {/* شارة علوية */}
           <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/10 backdrop-blur-md border border-[#D4AF37]/40 text-[#D4AF37] text-xs sm:text-sm font-black tracking-widest uppercase shadow-lg">
-            <span>📢 الحدث الأبرز في الكلية</span>
+            <ClubIcon name="bell" size={14} />
+            <span>مجتمع الكلية على واتساب</span>
           </div>
 
           {/* العنوان الرئيسي */}
@@ -30,7 +32,7 @@ export default function WhatsAppCommunity() {
               انضم إلى مجتمع التمريض الرسمي على الواتساب
             </h2>
             <p className="max-w-2xl mx-auto text-sm sm:text-base text-amber-50/90 leading-relaxed font-medium">
-              الوجهة الشاملة لجميع الإعلانات، التنبيهات، والمستجدات الأكاديمية لجميع الدفعات في كلية التمريض بجامعة حفر الباطن. كن قلب الحدث دائماً!
+              إعلانات الكلية والتنبيهات الأكاديمية لكل الدفعات تصل هنا.
             </p>
           </div>
 
@@ -42,13 +44,13 @@ export default function WhatsAppCommunity() {
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black px-10 py-4 rounded-full shadow-xl shadow-emerald-900/30 hover:scale-105 active:scale-95 transition-all duration-300 text-base sm:text-lg cursor-pointer"
             >
-              <span className="text-2xl">💬</span>
-              <span>انضم الآن إلى المجتمع الرسمي</span>
+              <SocialIcon name="whatsapp" size={20} title="واتساب" />
+              <span>انضم للمجتمع الرسمي</span>
             </a>
           </div>
 
           <p className="text-xs text-amber-100/70 font-semibold">
-            يضم جميع الدفعات • تَبقَى على إطلاع دائم بكل جديد
+            لكل دفعات كلية التمريض
           </p>
 
         </div>

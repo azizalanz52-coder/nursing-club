@@ -6,6 +6,7 @@ import { db } from './../lib/firebase';
 import { collection, addDoc, doc, getDoc, getDocs, query } from 'firebase/firestore';
 import { canonicalPhone, phoneVariants } from '../lib/certificatesLookup';
 import { loadCaseSubmissions, persistenceForSubmit, personPhone, riyadhParts, submissionDayKey } from '../lib/caseStudy';
+import { ClubIcon } from '../components/icons';
 
 interface CaseQuestion {
   id: number;
@@ -480,13 +481,13 @@ export default function CaseStudyPage() {
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
           <div className="space-y-3 text-center sm:text-left">
             <div className="inline-flex items-center gap-2 bg-[#F5D061] text-[#630517] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
-              <span>⚡ Daily Clinical Challenge</span>
+              <span className="inline-flex items-center gap-1.5"><ClubIcon name="zap" size={13} /> Daily Clinical Challenge</span>
             </div>
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
               Clinical Case Study Challenge
             </h1>
             <div className="bg-black/20 border border-[#F5D061]/30 px-4 py-2 rounded-2xl text-xs sm:text-sm text-amber-50 font-medium inline-block" dir="rtl">
-              ⏱️ <span>يتجدد التحدي اليومي بعد: </span>
+              <ClubIcon name="clock" size={14} className="inline-block align-middle" /> <span>يتجدد التحدي اليومي بعد: </span>
               <strong className="text-[#F5D061] font-black px-1">{timeLeft || 'جاري التحديث...'}</strong>
             </div>
             <div>
@@ -501,7 +502,7 @@ export default function CaseStudyPage() {
             onClick={() => setShowLeaderboardModal(true)}
             className="flex items-center gap-2 bg-[#F5D061] text-[#630517] px-6 py-3.5 rounded-2xl font-black text-xs shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0 border border-white/20"
           >
-            <span className="text-lg">🏆</span>
+            <ClubIcon name="trophy" size={16} />
             <span>لوحة الصدارة</span>
           </button>
         </div>
@@ -513,7 +514,7 @@ export default function CaseStudyPage() {
             <div className="flex justify-between items-center border-b border-slate-100 pb-4 gap-3">
               <div>
                 <h3 className="text-xl font-black text-[#630517] flex items-center gap-2">
-                  <span>🏆</span> لوحة صدارة دراسة الحالة
+                  <ClubIcon name="trophy" size={18} /> لوحة صدارة دراسة الحالة
                 </h3>
                 <p className="text-[11px] font-bold text-slate-500 mt-1">كل المشاركين: {leaderboard.length}</p>
               </div>
@@ -600,7 +601,7 @@ export default function CaseStudyPage() {
 
               <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-100 pb-4">
                 <span className="font-black text-[#630517] text-base flex items-center gap-2">
-                  <span>🩺</span> {item.title}
+                  <ClubIcon name="stethoscope" size={16} /> {item.title}
                 </span>
                 <span className={`text-xs font-bold px-3 py-1 rounded-full ${
                   item.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-800' :
@@ -649,7 +650,7 @@ export default function CaseStudyPage() {
 
               {showResults && (
                 <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-stone-800 space-y-1">
-                  <strong className="text-[#630517]">💡 Clinical Rationale:</strong>
+                  <strong className="text-[#630517] inline-flex items-center gap-1.5"><ClubIcon name="lightbulb" size={14} /> Clinical Rationale:</strong>
                   <p className="leading-relaxed">{item.explanation}</p>
                 </div>
               )}
@@ -668,7 +669,9 @@ export default function CaseStudyPage() {
               disabled={submitting}
               className="w-full bg-[#630517] text-[#F5D061] py-4 rounded-2xl font-black text-sm shadow-xl hover:brightness-110 active:scale-98 transition-all cursor-pointer border border-white/20"
             >
-              {submitting ? 'Submitting...' : 'Submit Answers & Save Score 🩺'}
+              {submitting ? 'Submitting...' : (
+                <span className="inline-flex items-center gap-2">Submit Answers & Save Score <ClubIcon name="stethoscope" size={16} /></span>
+              )}
             </button>
           </form>
         ) : (
@@ -688,7 +691,7 @@ export default function CaseStudyPage() {
               شكراً لمشاركتك في دراسة الحالة. تم تسجيل إجابتك وتحديث نقاطك بنجاح.
             </p>
             <div className="bg-white/80 p-3 rounded-2xl border border-[#F5D061]/50 text-xs text-slate-700 font-bold" dir="rtl">
-              ⏱️ <span>التحدي اليومي القادم متاح بعد: </span>
+              <ClubIcon name="clock" size={14} className="inline-block align-middle" /> <span>التحدي اليومي القادم متاح بعد: </span>
               <span className="text-[#630517] font-black">{timeLeft}</span>
             </div>
           </div>

@@ -4,15 +4,16 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { CommitteeIcon } from '../icons';
 
 const initialCommittees = [
-  { id: 'design', name: 'التصميم', description: 'الهوية البصرية، تصميم البوسترات، والمحتوى المرئي.', icon: '🎨', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي' },
-  { id: 'media', name: 'الاعلام', description: 'منصات التواصل، التغطيات الحية، وصناعة المحتوى.', icon: '📸', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري' },
-  { id: 'events-org', name: 'تنظيم الفعاليات', description: 'التخطيط الميداني، إدارة الحشود، والفعاليات.', icon: '📅', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري' },
-  { id: 'hr', name: 'الموارد البشرية', description: 'إدارة الأعضاء، المتابعة، والتقييم والتحفيز.', icon: '👥', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي' },
-  { id: 'pr', name: 'العلاقات العامة', description: 'بناء الشراكات، استقبال الضيوف، والتنسيق الخارجي.', icon: '🌐', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي' },
-  { id: 'scientific', name: 'المحتوى العلمي', description: 'المطويات الطبية، المحاضرات، والدعم الأكاديمي.', icon: '🔬', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي' },
-  { id: 'quality', name: 'الجودة والتطوير', description: 'تقييم الأداء، قياس رضا الأعضاء، وتحسين العمل.', icon: '📊', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري' },
+  { id: 'design', name: 'التصميم', description: 'الهوية البصرية، تصميم البوسترات، والمحتوى المرئي.', maleLeader: 'عبدالعزيز العنزي', femaleLeader: 'شجون الحربي' },
+  { id: 'media', name: 'الاعلام', description: 'منصات التواصل، التغطيات الحية، وصناعة المحتوى.', maleLeader: 'راشد السبيعي', femaleLeader: 'ريم الشمري' },
+  { id: 'events-org', name: 'تنظيم الفعاليات', description: 'التخطيط الميداني، إدارة الحشود، والفعاليات.', maleLeader: 'فيصل الدوسري', femaleLeader: 'غادة العمري' },
+  { id: 'hr', name: 'الموارد البشرية', description: 'إدارة الأعضاء، المتابعة، والتقييم والتحفيز.', maleLeader: 'تركي العنزي', femaleLeader: 'سارة الرشيدي' },
+  { id: 'pr', name: 'العلاقات العامة', description: 'بناء الشراكات، استقبال الضيوف، والتنسيق الخارجي.', maleLeader: 'خالد القحطاني', femaleLeader: 'ديمة العتيبي' },
+  { id: 'scientific', name: 'المحتوى العلمي', description: 'المطويات الطبية، المحاضرات، والدعم الأكاديمي.', maleLeader: 'فهد المطيري', femaleLeader: 'أفنان العنزي' },
+  { id: 'quality', name: 'الجودة والتطوير', description: 'تقييم الأداء، قياس رضا الأعضاء، وتحسين العمل.', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري' },
 ];
 
 export default function CommitteesPreview() {
@@ -81,8 +82,8 @@ export default function CommitteesPreview() {
               className="bg-white rounded-3xl border border-slate-200 p-7 shadow-lg shadow-slate-100 flex flex-col justify-between space-y-6 hover:shadow-xl hover:border-[#630517]/50 hover:scale-[1.02] transition-all cursor-pointer group"
             >
               <div className="space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#630517]/10 border border-[#630517]/20 flex items-center justify-center text-2xl group-hover:bg-[#630517] group-hover:text-[#F5D061] transition-all">
-                  {committee.icon}
+                <div className="w-12 h-12 rounded-2xl bg-[#630517]/10 border border-[#630517]/20 flex items-center justify-center text-[#630517] group-hover:bg-[#630517] group-hover:text-[#F5D061] transition-all">
+                  <CommitteeIcon id={committee.id} size={22} />
                 </div>
                 <h3 className="text-xl font-black text-slate-900 group-hover:text-[#630517] transition-colors">{committee.name}</h3>
                 <p className="text-slate-600 text-sm leading-relaxed">{committee.description}</p>

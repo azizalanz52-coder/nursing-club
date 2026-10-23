@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SocialIcon } from './icons';
 
 export default function Footer() {
   return (
@@ -42,11 +43,11 @@ export default function Footer() {
               href="https://x.com/Nurs_club"
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-black/40 hover:bg-black/60 border border-[#F5D061]/30 text-white px-3 py-2 rounded-xl transition-all shadow inline-flex items-center gap-1.5 whitespace-nowrap"
+              className="min-h-11 bg-black/40 hover:bg-black/60 border border-[#F5D061]/30 text-white px-3 py-2 rounded-xl transition-all inline-flex items-center gap-2 whitespace-nowrap"
               dir="ltr"
               title="حسابنا على إكس"
             >
-              <span className="font-bold">𝕏</span>
+              <SocialIcon name="x" size={15} title="إكس" />
               <span>@Nurs_club</span>
             </a>
 
@@ -54,11 +55,11 @@ export default function Footer() {
               href="https://tiktok.com/@Nurs_club"
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-black/40 hover:bg-black/60 border border-[#F5D061]/30 text-white px-3 py-2 rounded-xl transition-all shadow inline-flex items-center gap-1.5 whitespace-nowrap"
+              className="min-h-11 bg-black/40 hover:bg-black/60 border border-[#F5D061]/30 text-white px-3 py-2 rounded-xl transition-all inline-flex items-center gap-2 whitespace-nowrap"
               dir="ltr"
               title="حسابنا على تيك توك"
             >
-              <span className="font-bold">⚡</span>
+              <SocialIcon name="tiktok" size={15} title="تيك توك" />
               <span>@Nurs_club</span>
             </a>
 
@@ -66,9 +67,9 @@ export default function Footer() {
               href="https://wa.me/966553731265?text=السلام عليكم، لدي استفسار أو مشكلة بخصوص موقع نادي التمريض"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl transition-all shadow whitespace-nowrap"
+              className="min-h-11 inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl transition-all whitespace-nowrap"
             >
-              <span>💬</span>
+              <SocialIcon name="whatsapp" size={16} title="واتساب" />
               <span>تواصل معنا عبر الواتساب</span>
             </a>
           </div>
