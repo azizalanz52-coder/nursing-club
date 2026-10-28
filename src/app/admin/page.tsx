@@ -3709,8 +3709,6 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               </div>
             </div>
 
-            <CaseStudyCompetitionVotes />
-
             <div className="flex flex-wrap items-end gap-3 bg-[#630517]/5 border border-[#630517]/10 rounded-2xl p-4">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-600">عرض يوم</label>
@@ -4877,12 +4875,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">صندوق آراء ومقترحات الطلاب والزوار 💡</h3>
-                <p className="text-xs text-slate-500">هنا تظهر كافة المقترحات والأفكار التي يكتبها الزوار في الصفحة الرئيسية مباشرة.</p>
+                <p className="text-xs text-slate-500">مقترحات الصفحة الرئيسية، وأصوات تطوير منافسة دراسة الحالة.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-[#630517]/10 text-[#630517] font-bold text-xs">
                 إجمالي المقترحات: {suggestions.length}
               </span>
             </div>
+
+            <CaseStudyCompetitionVotes />
 
             {suggestions.length === 0 ? (
               <div className="py-16 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
