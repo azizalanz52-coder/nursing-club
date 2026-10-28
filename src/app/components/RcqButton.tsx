@@ -23,7 +23,7 @@ const ITEMS: Item[] = [
 ];
 
 const hrefOf = (it: Item) =>
-  `${SITE}?utm_source=nursing_club&utm_medium=button&utm_content=${it.key}${it.hash}`;
+  `${SITE}?utm_source=nursing_club&utm_medium=button&utm_content=${it.key}&coupon=NURSE${it.hash}`;
 
 const EASE = 'cubic-bezier(.2,.9,.25,1)';
 
@@ -60,7 +60,7 @@ const CSS = `
   -webkit-mask:url(${MARK}) center/contain no-repeat;mask:url(${MARK}) center/contain no-repeat;
   transition:transform .5s cubic-bezier(.3,1.5,.5,1)}
 .fab.tick .mark{transform:scale(1.12) rotate(-6deg)}
-.words{display:flex;flex-direction:column;justify-content:center;min-width:0;max-width:128px;overflow:hidden;
+.words{display:flex;flex-direction:column;justify-content:center;min-width:0;max-width:140px;overflow:hidden;
   transition:max-width .4s ${EASE},opacity .25s ease}
 .stack{display:grid;overflow:hidden}
 .p{grid-area:1/1;font-weight:900;font-size:1em;white-space:nowrap;padding-block:1px;
@@ -100,7 +100,7 @@ const CSS = `
 
 const ARROW =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 17 7 7"/><path d="M7 17V7h10"/></svg>';
-const LABEL = 'RCQ: لخص شابترك، اختبر كويز، سمّع أوسكي. يفتح موقع RCQ في نافذة جديدة';
+const LABEL = 'RCQ: استخدم كوبون NURSE لخصم 50٪. لخص شابترك، اختبر كويز، سمّع أوسكي. يفتح موقع RCQ في نافذة جديدة';
 
 type Flagged = { __rcqClubButton?: boolean };
 
@@ -120,7 +120,7 @@ function mountRcqButton(): () => void {
     `<span class="tile"><span class="mark"></span></span>` +
     `<span class="words" aria-hidden="true"><span class="stack">` +
     ITEMS.map((it, n) => `<span class="p${n ? '' : ' on'}">${it.text}</span>`).join('') +
-    `</span><span class="by">مع <b dir="ltr">RCQ</b></span></span>` +
+    `</span><span class="by">كوبون <b dir="ltr">NURSE</b> · 50٪</span></span>` +
     `<span class="go" aria-hidden="true">${ARROW}</span>` +
     `</a>`;
   document.body.appendChild(host);
