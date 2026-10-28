@@ -10,10 +10,12 @@ import WhatsAppCommunity from "./components/home/WhatsAppCommunity";
 import SuggestionBox from "./components/home/SuggestionBox";
 import Footer from "./components/Footer";
 import { ClubIcon } from "./components/icons";
+import RcqButton from "./components/RcqButton";
 
 export default function Home() {
   return (
     <main>
+      <RcqButton />
       <Hero />
       <About />
       
