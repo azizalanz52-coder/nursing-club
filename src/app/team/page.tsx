@@ -175,27 +175,27 @@ export default function TeamPage() {
             {leaders.map((leader, index) => (
               <article
                 key={index}
-                className="relative overflow-hidden rounded-[2rem] p-[2px] bg-gradient-to-br from-[#FFF3C4] via-[#F5D061] to-[#C9A227] shadow-[0_18px_40px_rgba(99,5,23,0.16)] hover:-translate-y-1 transition-transform"
+                className="relative group bg-white/95 backdrop-blur-2xl rounded-[2.55rem] p-8 sm:p-10 border-2 border-[#F5D061]/40 shadow-[0_25px_60px_rgba(0,0,0,0.12)] text-center overflow-hidden hover:-translate-y-1 transition-transform"
               >
-                <div className="leader-card-shine relative rounded-[1.9rem] bg-gradient-to-b from-[#630517] via-[#4A030F] to-[#2a0108] px-6 pt-7 pb-8 text-center overflow-hidden">
-                  <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-56 h-56 bg-[#F5D061]/15 blur-3xl pointer-events-none" />
-                  <div className="relative z-10 space-y-6">
-                    <div className="relative mx-auto w-48 h-24 grid place-items-center" dir="ltr">
-                      <div className="leader-logo-glow absolute inset-4 rounded-full bg-[#F5D061] blur-2xl" />
-                      <img
-                        src="/nurs-wordmark.png"
-                        alt="شعار نادي التمريض"
-                        className="leader-logo-mark relative h-[4.5rem] w-auto max-w-[11.5rem] object-contain"
-                      />
-                    </div>
-                    <div className="h-px w-20 mx-auto bg-gradient-to-r from-transparent via-[#F5D061] to-transparent" />
-                    <h3 className="text-2xl sm:text-[1.7rem] font-black text-white leading-snug">
-                      {leader.name}
-                    </h3>
-                    <span className="inline-block px-5 py-2 rounded-full bg-[#F5D061] text-[#630517] text-xs font-black shadow-md">
-                      {leader.position}
-                    </span>
+                <div className="absolute -inset-1 bg-gradient-to-r from-[#F5D061] via-amber-300 to-[#630517] rounded-[2.6rem] blur-sm opacity-25 group-hover:opacity-50 transition duration-1000 pointer-events-none" />
+                <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-[#630517]/10 to-transparent rounded-bl-full pointer-events-none" />
+                <div className="leader-card-shine absolute inset-0 rounded-[2.55rem] overflow-hidden pointer-events-none" />
+                <div className="relative z-10 space-y-6">
+                  <div className="relative mx-auto w-48 h-24 grid place-items-center" dir="ltr">
+                    <div className="leader-logo-glow absolute inset-4 rounded-full bg-[#F5D061] blur-2xl" />
+                    <img
+                      src="/nurs-wordmark.png"
+                      alt="شعار نادي التمريض"
+                      className="leader-logo-mark relative h-[4.5rem] w-auto max-w-[11.5rem] object-contain"
+                    />
                   </div>
+                  <div className="h-px w-20 mx-auto bg-gradient-to-r from-transparent via-[#F5D061] to-transparent" />
+                  <h3 className="text-2xl sm:text-[1.7rem] font-black text-slate-900 leading-snug">
+                    {leader.name}
+                  </h3>
+                  <span className="inline-block px-5 py-2 rounded-full bg-[#F5D061] text-[#630517] text-xs font-black shadow-md">
+                    {leader.position}
+                  </span>
                 </div>
               </article>
             ))}

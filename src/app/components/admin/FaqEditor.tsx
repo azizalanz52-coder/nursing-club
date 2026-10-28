@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { db } from '../../lib/firebase';
-import { emptyFaqPage, loadFaqPage, saveFaqPage, type FaqItem, type FaqPage } from '../../lib/faq';
+import { defaultFaqPage, loadFaqPage, saveFaqPage, type FaqItem, type FaqPage } from '../../lib/faq';
 import { ClubIcon } from '../icons';
 
 export default function FaqEditor() {
-  const [data, setData] = useState<FaqPage>(() => emptyFaqPage());
+  const [data, setData] = useState<FaqPage>(() => defaultFaqPage());
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export default function FaqEditor() {
           <div className="space-y-1">
             <h3 className="text-xl font-black text-slate-900">الأسئلة الشائعة</h3>
             <p className="text-xs text-slate-500">
-              الأسئلة المنشورة تظهر في صفحة <span className="font-mono">/faq</span> من تذييل الموقع.
+              عدّل أو أضف أو احذف من هنا. الصفحة العامة <span className="font-mono">/faq</span> تتحدث بعد الحفظ.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">

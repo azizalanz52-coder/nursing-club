@@ -112,7 +112,6 @@ html[lang="ar"] :is(header, footer) :is(a, button, span, p) {
 
 .leader-logo-mark {
   animation: leader-logo-float 3.4s ease-in-out infinite;
-  mix-blend-mode: screen;
 }
 
 .leader-logo-glow {
@@ -126,7 +125,7 @@ html[lang="ar"] :is(header, footer) :is(a, button, span, p) {
   bottom: 0;
   left: 0;
   width: 42%;
-  background: linear-gradient(90deg, transparent, rgba(255, 246, 210, 0.28), transparent);
+  background: linear-gradient(90deg, transparent, rgba(245, 208, 97, 0.42), transparent);
   animation: leader-card-shine 3.2s ease-in-out infinite;
   pointer-events: none;
   z-index: 6;

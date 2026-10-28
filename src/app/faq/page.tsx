@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
-import { emptyFaqPage, loadFaqPage, publishedFaqItems, type FaqPage } from '../lib/faq';
+import { defaultFaqPage, loadFaqPage, publishedFaqItems, type FaqPage } from '../lib/faq';
 import { ClubIcon } from '../components/icons';
 import Footer from '../components/Footer';
 
 export default function FaqPage() {
-  const [page, setPage] = useState<FaqPage>(() => emptyFaqPage());
+  const [page, setPage] = useState<FaqPage>(() => defaultFaqPage());
   const [openId, setOpenId] = useState<string | null>(null);
   const items = publishedFaqItems(page);
 
