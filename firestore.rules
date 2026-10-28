@@ -77,6 +77,12 @@ service cloud.firestore {
       allow update, delete: if signedIn();
     }
 
+    match /case_study_competition_votes/{id} {
+      allow read: if signedIn();
+      allow create: if true;
+      allow update, delete: if signedIn();
+    }
+
     match /case_study_submissions/{id} {
       allow read: if true;
       allow create: if true;

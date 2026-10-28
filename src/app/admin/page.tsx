@@ -20,6 +20,7 @@ import { IconText } from '../components/icons';
 import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import CollegeAdministrationEditor from '../components/admin/CollegeAdministrationEditor';
 import FaqEditor from '../components/admin/FaqEditor';
+import CaseStudyCompetitionVotes from '../components/admin/CaseStudyCompetitionVotes';
 import { DISTINGUISHED_MEMBER_ROLE, emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { CASE_STUDY_DISTINGUISHED_FLAG, syncCaseStudyDistinguished } from '../lib/distinguishedMembers';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
@@ -3707,6 +3708,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 </span>
               </div>
             </div>
+
+            <CaseStudyCompetitionVotes />
 
             <div className="flex flex-wrap items-end gap-3 bg-[#630517]/5 border border-[#630517]/10 rounded-2xl p-4">
               <div className="space-y-1">

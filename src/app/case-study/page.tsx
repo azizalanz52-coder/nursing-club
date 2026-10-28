@@ -16,6 +16,7 @@ import {
 } from '../lib/caseStudy';
 import { syncCaseStudyDistinguished } from '../lib/distinguishedMembers';
 import { ClubIcon } from '../components/icons';
+import CaseStudyCompetitionPoll from '../components/CaseStudyCompetitionPoll';
 
 interface CaseQuestion {
   id: number;
@@ -521,6 +522,7 @@ export default function CaseStudyPage() {
 
   return (
     <main className="min-h-screen bg-[#F6F0E8] text-slate-900 pb-20 relative" dir="ltr">
+      <CaseStudyCompetitionPoll />
       <div className="bg-gradient-to-r from-[#3a020c] via-[#630517] to-[#4A030F] text-white py-12 px-4 sm:px-6 shadow-xl border-b-4 border-[#F5D061]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
           <div className="space-y-3 text-center sm:text-left">
