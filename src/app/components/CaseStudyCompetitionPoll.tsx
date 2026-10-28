@@ -1,12 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { db } from '../lib/firebase';
 import {
+  COMPETITION_POLL_CLOSES_LABEL,
   COMPETITION_PROPOSAL,
+  formatPollCloseCountdown,
   hasExistingCompetitionVote,
   hasLocalCompetitionVote,
   hasSessionPollLater,
+  isCompetitionPollOpen,
   markSessionPollLater,
   submitCompetitionVote,
   type CompetitionVoteChoice,
@@ -19,16 +23,32 @@ export default function CaseStudyCompetitionPoll() {
   const [idea, setIdea] = useState('');
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const [closeLeft, setCloseLeft] = useState('');
 
   useEffect(() => {
+    const tick = () => {
+      if (!isCompetitionPollOpen()) {
+        setOpen(false);
+        setCloseLeft('انتهى وقت الاستبيان');
+        return;
+      }
+      setCloseLeft(formatPollCloseCountdown());
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!isCompetitionPollOpen()) return;
     if (hasLocalCompetitionVote() || hasSessionPollLater()) return;
     const phone = localStorage.getItem('userPhone') || localStorage.getItem('phone') || '';
     hasExistingCompetitionVote(db, phone)
       .then((exists) => {
-        if (!exists && !hasSessionPollLater()) setOpen(true);
+        if (!exists && !hasSessionPollLater() && isCompetitionPollOpen()) setOpen(true);
       })
       .catch(() => {
-        if (!hasLocalCompetitionVote() && !hasSessionPollLater()) setOpen(true);
+        if (!hasLocalCompetitionVote() && !hasSessionPollLater() && isCompetitionPollOpen()) setOpen(true);
       });
   }, []);
 
@@ -39,6 +59,11 @@ export default function CaseStudyCompetitionPoll() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isCompetitionPollOpen()) {
+      alert('انتهى وقت الاستبيان.');
+      setOpen(false);
+      return;
+    }
     if (!vote) {
       alert('يرجى اختيار أوافق أو لا أوافق قبل الإرسال.');
       return;
@@ -86,6 +111,10 @@ export default function CaseStudyCompetitionPoll() {
             </span>
             <h2 className="text-xl sm:text-2xl font-black text-[#630517]">{COMPETITION_PROPOSAL.title}</h2>
             <p className="text-sm text-slate-600 font-medium leading-7">{COMPETITION_PROPOSAL.intro}</p>
+            <p className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-[#F5D061]/60 rounded-2xl px-3 py-2 leading-6">
+              ينتهي {COMPETITION_POLL_CLOSES_LABEL}
+              {closeLeft ? <span> · متبقّي {closeLeft}</span> : null}
+            </p>
           </div>
 
           {done ? (
@@ -117,6 +146,10 @@ export default function CaseStudyCompetitionPoll() {
                   ))}
                 </ul>
                 <p className="text-[11px] text-slate-500 font-medium leading-6">{COMPETITION_PROPOSAL.note}</p>
+                <p className="text-[11px] font-bold text-[#630517] leading-6">افتحوا لوحة الصدارة لتجربة الشكل: تبويب الصدارة العامة، وتبويب متصدر الأسبوع مع الشارات.</p>
+                <Link href="/faq#faq-week" className="inline-flex items-center gap-1.5 text-[11px] font-black text-[#630517] hover:underline">
+                  <ClubIcon name="info" size={13} /> الأسئلة الشائعة عن الآلية
+                </Link>
               </div>
 
               <div className="grid grid-cols-2 gap-2">

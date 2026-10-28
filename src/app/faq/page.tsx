@@ -14,8 +14,15 @@ export default function FaqPage() {
   useEffect(() => {
     loadFaqPage(db).then((data) => {
       setPage(data);
-      const first = publishedFaqItems(data)[0];
-      if (first) setOpenId(first.id);
+      const hash = typeof window !== 'undefined' ? window.location.hash.replace('#', '') : '';
+      const published = publishedFaqItems(data);
+      const fromHash = published.find((item) => item.id === hash);
+      setOpenId(fromHash?.id || published[0]?.id || null);
+      if (fromHash) {
+        window.setTimeout(() => {
+          document.getElementById(fromHash.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 80);
+      }
     });
   }, []);
 
@@ -43,7 +50,7 @@ export default function FaqPage() {
           items.map((item) => {
             const open = openId === item.id;
             return (
-              <article key={item.id} className="bg-white rounded-3xl border border-[#630517]/10 shadow-sm overflow-hidden">
+              <article id={item.id} key={item.id} className="bg-white rounded-3xl border border-[#630517]/10 shadow-sm overflow-hidden scroll-mt-24">
                 <button
                   type="button"
                   onClick={() => setOpenId(open ? null : item.id)}

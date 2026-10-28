@@ -18,6 +18,8 @@ import {
 import { syncCaseStudyDistinguished } from '../lib/distinguishedMembers';
 import { ClubIcon } from '../components/icons';
 import CaseStudyCompetitionPoll from '../components/CaseStudyCompetitionPoll';
+import WeeklyRaceExample, { OverallRaceExample } from '../components/WeeklyRaceExample';
+import WeeklyMechanismNotice from '../components/WeeklyMechanismNotice';
 
 interface CaseQuestion {
   id: number;
@@ -359,6 +361,7 @@ export default function CaseStudyPage() {
 
   const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  const [boardTab, setBoardTab] = useState<'overall' | 'week'>('overall');
   const myLeaderboardRowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -618,15 +621,21 @@ export default function CaseStudyPage() {
         </div>
       </div>
 
+      <WeeklyMechanismNotice />
+
       {showLeaderboardModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl border border-slate-200 text-right" dir="rtl">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-4 gap-3">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-slate-200 text-right" dir="rtl">
+            <div className="flex justify-between items-center gap-3">
               <div>
                 <h3 className="text-xl font-black text-[#630517] flex items-center gap-2">
-                  <ClubIcon name="trophy" size={18} /> لوحة صدارة دراسة الحالة
+                  <ClubIcon name="trophy" size={18} /> لوحة الصدارة
                 </h3>
-                <p className="text-[11px] font-bold text-slate-500 mt-1">كل المشاركين: {leaderboard.length} · أول {CASE_STUDY_DISTINGUISHED_COUNT} يحملون رتبة عضو مميز</p>
+                <p className="text-[11px] font-bold text-slate-500 mt-1">
+                  {boardTab === 'overall'
+                    ? `كل المشاركين: ${leaderboard.length} · أول ${CASE_STUDY_DISTINGUISHED_COUNT} عضو مميز`
+                    : 'الأسبوع يُقفل السبت · عند التعادل يتقدم الأسرع في أكثر أيام الأسبوع'}
+                </p>
               </div>
               <button
                 type="button"
@@ -637,11 +646,41 @@ export default function CaseStudyPage() {
               </button>
             </div>
 
-            <div className="space-y-2.5 max-h-[70vh] overflow-y-auto pl-1">
-              {leaderboard.length === 0 ? (
+            <Link
+              href="/faq#faq-week"
+              className="text-[11px] font-black text-[#630517] hover:underline inline-flex items-center gap-1"
+            >
+              <ClubIcon name="info" size={13} /> آلية الإضافة في الأسئلة الشائعة
+            </Link>
+
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-100">
+              <button
+                type="button"
+                onClick={() => setBoardTab('overall')}
+                className={`py-2.5 rounded-xl text-[11px] font-black cursor-pointer ${
+                  boardTab === 'overall' ? 'bg-[#630517] text-[#F5D061]' : 'text-slate-600'
+                }`}
+              >
+                الصدارة العامة
+              </button>
+              <button
+                type="button"
+                onClick={() => setBoardTab('week')}
+                className={`py-2.5 rounded-xl text-[11px] font-black cursor-pointer ${
+                  boardTab === 'week' ? 'bg-[#630517] text-[#F5D061]' : 'text-slate-600'
+                }`}
+              >
+                متصدر الأسبوع
+              </button>
+            </div>
+
+            <div className="space-y-2.5 max-h-[62vh] overflow-y-auto pl-1">
+              {boardTab === 'week' ? <WeeklyRaceExample /> : leaderboard.length === 0 ? (
                 <p className="text-center text-xs text-slate-400 py-8 font-medium">لا توجد سجلات صدارة حتى الآن، كن أول المشاركين!</p>
               ) : (
-                leaderboard.map((item, idx) => {
+                <>
+                <OverallRaceExample />
+                {leaderboard.map((item, idx) => {
                   const myPhone = canonicalPhone(studentPhone);
                   const isMe = Boolean(
                     (myPhone && item.phone === myPhone) ||
@@ -684,7 +723,8 @@ export default function CaseStudyPage() {
                       </span>
                     </div>
                   );
-                })
+                })}
+                </>
               )}
             </div>
 

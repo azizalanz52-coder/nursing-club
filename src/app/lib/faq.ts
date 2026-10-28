@@ -37,7 +37,22 @@ export const DEFAULT_FAQ_ITEMS: FaqItem[] = [
   {
     id: 'faq-case',
     question: 'كيف أشارك في دراسة الحالة؟',
-    answer: 'من تحدي دراسة الحالة اليومي على الموقع. سجّل دخولك، جاوب الحالات الثلاث، وأرسل مرة واحدة في اليوم. النقاط تنحفظ في لوحة الصدارة وتتجدد الحالات يومياً.',
+    answer: 'من تحدي دراسة الحالة اليومي على الموقع. سجّل دخولك، جاوب الحالات الثلاث، وأرسل مرة واحدة في اليوم. النقاط تنحفظ في لوحة الصدارة وتتجدد الحالات يومياً. لوحة الصدارة فيها تبويبان: الصدارة العامة، ومتصدر الأسبوع.',
+  },
+  {
+    id: 'faq-week',
+    question: 'كيف تعمل المنافسة الأسبوعية؟',
+    answer: 'كل أحد تبدأ نقاط الأسبوع من الصفر، وكل سبت 11:59 م بتوقيت الرياض تُقفل صدارة ذلك الأسبوع مرة واحدة. المجموع العام ما يتصفّر، وتبقى رتبة عضو مميز لأول خمسة فيه. متصدر الأسبوع تظهر له شارة، وصاحب أطول سلسلة أيام متتالية تظهر له شارة، ومتصدر الأسبوع الماضي تبقى شارته ظاهرة. من يحل الحالات الثلاث صحيحة كل أيام الأسبوع تظهر له شارة أسبوع كامل.',
+  },
+  {
+    id: 'faq-week-tie',
+    question: 'إذا تعادلنا في نقاط الأسبوع، وش الفاصل؟',
+    answer: 'بعد النقاط يتقدم من كان الأسرع في أكثر أيام ذلك الأسبوع، بعدها الأكثر أيام 3/3. إذا بقي التعادل بعد هالفواصل يتشارك الاثنان صدارة ذلك الأسبوع.',
+  },
+  {
+    id: 'faq-week-cert',
+    question: 'كيف أحصل على الشهادة الخاصة بصدارة الأسبوع؟',
+    answer: 'الشهادة الخاصة تُمنح لمن يجمع 3 صدارات أسبوعية خلال الفصل الدراسي، ليست بالضرورة أسابيع متتالية. أسبوع الغياب لا يصفّر الصدارات السابقة. صدارة الأسبوع تُحتسب عند إقفال السبت، وتظهر في اللوحة العامة بجانب الاسم.',
   },
   {
     id: 'faq-distinguished',
@@ -96,12 +111,20 @@ export function publishedFaqItems(page: FaqPage) {
   return (page.items || []).filter((item) => item.question && item.answer);
 }
 
+export function mergeDefaultFaqItems(items: FaqItem[]): FaqItem[] {
+  const have = new Set(items.map((item) => item.id));
+  const extra = DEFAULT_FAQ_ITEMS.filter((item) => !have.has(item.id)).map((item) => ({ ...item }));
+  return extra.length ? [...items, ...extra] : items;
+}
+
 export async function loadFaqPage(db: Firestore): Promise<FaqPage> {
   try {
     const snap = await getDoc(doc(db, FAQ_DOC[0], FAQ_DOC[1]));
     if (!snap.exists()) return defaultFaqPage();
     const raw = Array.isArray(snap.data()?.items) ? snap.data()?.items : [];
-    const items = raw.map((item: Partial<FaqItem>, index: number) => normalizeFaqItem(item, index));
+    const items = mergeDefaultFaqItems(
+      raw.map((item: Partial<FaqItem>, index: number) => normalizeFaqItem(item, index))
+    );
     if (publishedFaqItems({ items }).length === 0) return defaultFaqPage();
     return { items };
   } catch (err) {

@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import { db } from '../../lib/firebase';
 import {
+  COMPETITION_POLL_CLOSES_LABEL,
   COMPETITION_PROPOSAL,
   deleteCompetitionVote,
+  isCompetitionPollOpen,
   loadCompetitionVotes,
   summarizeCompetitionVotes,
   type CompetitionVote,
@@ -46,6 +48,11 @@ export default function CaseStudyCompetitionVotes() {
           </h4>
           <p className="text-[11px] text-slate-500 font-medium leading-6 max-w-xl">
             {COMPETITION_PROPOSAL.intro}
+          </p>
+          <p className="text-[11px] font-bold text-amber-800">
+            {isCompetitionPollOpen()
+              ? `مفتوح حتى ${COMPETITION_POLL_CLOSES_LABEL}`
+              : 'الاستبيان مغلق. الأصوات المحفوظة تبقى هنا.'}
           </p>
         </div>
         <button

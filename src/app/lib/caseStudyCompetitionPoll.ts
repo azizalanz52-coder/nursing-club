@@ -5,6 +5,8 @@ import { canonicalPhone } from './certificatesLookup';
 export const COMPETITION_POLL_COLLECTION = 'case_study_competition_votes';
 export const COMPETITION_POLL_SEEN_KEY = 'nurs_case_comp_vote_v1';
 export const COMPETITION_POLL_LATER_KEY = 'nurs_case_comp_poll_later';
+export const COMPETITION_POLL_CLOSES_AT = Date.parse('2026-10-29T23:00:00+03:00');
+export const COMPETITION_POLL_CLOSES_LABEL = 'الخميس 29 أكتوبر، 11 مساءً بتوقيت الرياض';
 
 export const COMPETITION_PROPOSAL = {
   title: 'رأيكم في تطوير المنافسة',
@@ -21,10 +23,47 @@ export const COMPETITION_PROPOSAL = {
   points: [
     'إضافة ترتيب أسبوعي يبدأ من الصفر كل أحد، حتى يبقى التنافس متاحاً للجميع خلال الأسبوع.',
     'المجموع العام يبقى كما هو، وتبقى رتبة عضو مميز لأول خمسة فيه.',
+    'لوحة الصدارة فيها تبويبان: الصدارة العامة للمسابقة، ومتصدر الأسبوع.',
+    'متصدر الأسبوع يأخذ شارة بجانب اسمه، وصاحب أطول سلسلة أيام متتالية يأخذ شارة ثانية، وتبقى شارة متصدر الأسبوع الماضي ظاهرة.',
+    'من يحل الحالات الثلاث صحيحة كل أيام الأسبوع تظهر له شارة أسبوع كامل.',
+    'عند تعادل نقاط الأسبوع يتقدم من كان الأسرع في أكثر أيام ذلك الأسبوع، ثم الأكثر أيام 3/3.',
+    'الأسبوع يُقفل السبت 11:59 م بتوقيت الرياض، وصدارة الأسبوع تُحسب مرة واحدة لذلك الأسبوع.',
+    'الشهادة الخاصة لمن يجمع 3 صدارات أسبوعية خلال الفصل، ليست بالضرورة متتالية. إذا بقي التعادل قائماً بعد الفواصل يتشارك الاثنان صدارة ذلك الأسبوع.',
+    'يظهر بجانب الاسم عدد الصدارات: كم أسبوعاً أنهاه في المركز الأول.',
     'يظهر عدد أيام المشاركة المتتالية، ويبقى بونص الخميس لمن أكمل خمسة أيام.',
   ],
-  note: 'لن يُعتمد أي تغيير إلا بعد الاطلاع على أصواتكم ومقترحاتكم.',
+  note: 'لن يُعتمد أي تغيير إلا بعد الاطلاع على أصواتكم ومقترحاتكم. آلية المنافسة الأسبوعية والشهادة الخاصة موضّحة في تنبيه الصفحة، وتبقى في الأسئلة الشائعة لمن يرجع لها.',
 };
+
+export const WEEKLY_RACE_EXAMPLE = {
+  caption: 'مثال توضيحي فقط، ليست نتائج حقيقية',
+  weekLabel: 'أسبوع 26 أكتوبر — 1 نوفمبر',
+  weekly: [
+    { name: 'نورة', weekPoints: 18, clean: 18, perfectDays: 6, titles: 3, streak: 5, podium: 'gold' as const, perfectWeek: true, lastWeekChampion: false, longestStreak: false, fastestDays: 3, tieNote: '' },
+    { name: 'هند', weekPoints: 16, clean: 16, perfectDays: 4, titles: 2, streak: 7, podium: 'silver' as const, perfectWeek: false, lastWeekChampion: false, longestStreak: false, fastestDays: 4, tieNote: 'تعادل 16 نقطة · هند كانت الأسرع في 4 أيام هذا الأسبوع' },
+    { name: 'فيصل', weekPoints: 16, clean: 16, perfectDays: 4, titles: 5, streak: 12, podium: 'bronze' as const, perfectWeek: false, lastWeekChampion: true, longestStreak: true, fastestDays: 1, tieNote: 'تعادل 16 نقطة · فيصل كان الأسرع يوم واحد فقط' },
+    { name: 'لمى', weekPoints: 11, clean: 11, perfectDays: 3, titles: 0, streak: 4, podium: null, perfectWeek: false, lastWeekChampion: false, longestStreak: false, fastestDays: 2, tieNote: 'تعادل 11 نقطة · لمى أسرع في يومين هذا الأسبوع' },
+    { name: 'سعد', weekPoints: 11, clean: 11, perfectDays: 3, titles: 1, streak: 2, podium: null, perfectWeek: false, lastWeekChampion: false, longestStreak: false, fastestDays: 0, tieNote: 'تعادل 11 نقطة · ما تصدر سرعة أي يوم' },
+    { name: 'ماجد', weekPoints: 9, clean: 9, perfectDays: 1, titles: 0, streak: 1, podium: null, perfectWeek: false, lastWeekChampion: false, longestStreak: false, fastestDays: 0, tieNote: '' },
+  ],
+  overall: [
+    { name: 'فيصل', total: 142, titles: 5, distinguished: true, lastWeekChampion: true, specialCert: true },
+    { name: 'نورة', total: 128, titles: 3, distinguished: true, lastWeekChampion: false, specialCert: true },
+    { name: 'هند', total: 110, titles: 2, distinguished: true, lastWeekChampion: false, specialCert: false },
+  ],
+};
+
+export function isCompetitionPollOpen(ms = Date.now()) {
+  return ms < COMPETITION_POLL_CLOSES_AT;
+}
+
+export function formatPollCloseCountdown(ms = Date.now()) {
+  const left = Math.max(0, COMPETITION_POLL_CLOSES_AT - ms);
+  const hours = Math.floor(left / 3600000);
+  const mins = Math.floor((left % 3600000) / 60000);
+  if (left <= 0) return 'انتهى وقت الاستبيان';
+  return `${hours} ساعة و ${mins} دقيقة`;
+}
 
 export type CompetitionVoteChoice = 'agree' | 'disagree';
 
