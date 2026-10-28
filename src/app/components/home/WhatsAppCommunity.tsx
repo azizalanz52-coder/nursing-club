@@ -17,9 +17,6 @@ export default function WhatsAppCommunity() {
         
         <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-[#630517] via-[#850E24] to-[#630517] border-2 border-[#D4AF37]/60 shadow-2xl p-8 sm:p-12 text-center text-white space-y-6">
           
-          {/* تأثير شبكة خفيفة داخل البانر */}
-          <div className="absolute inset-0 opacity-10 bg-[url('/grid.svg')] bg-center pointer-events-none" />
-
           {/* شارة علوية */}
           <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/10 backdrop-blur-md border border-[#D4AF37]/40 text-[#D4AF37] text-xs sm:text-sm font-black tracking-widest uppercase shadow-lg">
             <ClubIcon name="bell" size={14} />

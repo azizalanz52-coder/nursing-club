@@ -11,6 +11,7 @@ import EventMetaChip from '../components/EventMetaChip';
 export default function EventsPage() {
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   const [events, setEvents] = useState<ClubEvent[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const fetchCloudEvents = async () => {
@@ -23,6 +24,8 @@ export default function EventsPage() {
         setEvents(sortEventsByLatest(eventsList));
       } catch (err) {
         console.error('Error fetching cloud events:', err);
+      } finally {
+        setLoaded(true);
       }
     };
 
@@ -74,7 +77,11 @@ export default function EventsPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredEvents.length === 0 ? (
+          {!loaded ? (
+            [0, 1, 2].map((slot) => (
+              <div key={slot} className="min-h-[400px] rounded-3xl bg-slate-200/70 border border-slate-200 animate-pulse" />
+            ))
+          ) : filteredEvents.length === 0 ? (
             <div className="col-span-full py-16 text-center text-slate-400 text-sm bg-white rounded-3xl border border-slate-200">
               لا توجد فعاليات مطابقة حالياً.
             </div>

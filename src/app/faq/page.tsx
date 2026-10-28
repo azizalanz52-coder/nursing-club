@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { defaultFaqPage, loadFaqPage, publishedFaqItems, type FaqPage } from '../lib/faq';
 import { ClubIcon } from '../components/icons';
-import Footer from '../components/Footer';
 
 export default function FaqPage() {
   const [page, setPage] = useState<FaqPage>(() => defaultFaqPage());
@@ -67,8 +66,6 @@ export default function FaqPage() {
           })
         )}
       </section>
-
-      <Footer />
     </main>
   );
 }

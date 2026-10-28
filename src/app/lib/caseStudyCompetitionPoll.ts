@@ -4,6 +4,7 @@ import { canonicalPhone } from './certificatesLookup';
 
 export const COMPETITION_POLL_COLLECTION = 'case_study_competition_votes';
 export const COMPETITION_POLL_SEEN_KEY = 'nurs_case_comp_vote_v1';
+export const COMPETITION_POLL_LATER_KEY = 'nurs_case_comp_poll_later';
 
 export const COMPETITION_PROPOSAL = {
   title: 'رأيكم في تطوير المنافسة',
@@ -58,6 +59,16 @@ export function hasLocalCompetitionVote() {
 export function markLocalCompetitionVote() {
   if (typeof window === 'undefined') return;
   localStorage.setItem(COMPETITION_POLL_SEEN_KEY, '1');
+}
+
+export function hasSessionPollLater() {
+  if (typeof window === 'undefined') return false;
+  return sessionStorage.getItem(COMPETITION_POLL_LATER_KEY) === '1';
+}
+
+export function markSessionPollLater() {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(COMPETITION_POLL_LATER_KEY, '1');
 }
 
 export async function hasExistingCompetitionVote(db: Firestore, phone: string) {

@@ -6,6 +6,8 @@ import {
   COMPETITION_PROPOSAL,
   hasExistingCompetitionVote,
   hasLocalCompetitionVote,
+  hasSessionPollLater,
+  markSessionPollLater,
   submitCompetitionVote,
   type CompetitionVoteChoice,
 } from '../lib/caseStudyCompetitionPoll';
@@ -19,16 +21,21 @@ export default function CaseStudyCompetitionPoll() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (hasLocalCompetitionVote()) return;
+    if (hasLocalCompetitionVote() || hasSessionPollLater()) return;
     const phone = localStorage.getItem('userPhone') || localStorage.getItem('phone') || '';
     hasExistingCompetitionVote(db, phone)
       .then((exists) => {
-        if (!exists) setOpen(true);
+        if (!exists && !hasSessionPollLater()) setOpen(true);
       })
       .catch(() => {
-        if (!hasLocalCompetitionVote()) setOpen(true);
+        if (!hasLocalCompetitionVote() && !hasSessionPollLater()) setOpen(true);
       });
   }, []);
+
+  const enterChallenge = () => {
+    markSessionPollLater();
+    setOpen(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +68,16 @@ export default function CaseStudyCompetitionPoll() {
       <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" />
       <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-[1.8rem] bg-white border-2 border-[#F5D061]/50 shadow-[0_25px_60px_rgba(99,5,23,0.28)]">
         <div className="h-1.5 bg-gradient-to-l from-[#F5D061] via-amber-300 to-[#630517]" />
+        {!done ? (
+          <button
+            type="button"
+            onClick={enterChallenge}
+            className="absolute top-3 left-3 w-8 h-8 rounded-full bg-slate-100 text-slate-500 font-bold hover:bg-slate-200 flex items-center justify-center cursor-pointer z-10"
+            aria-label="إغلاق والدخول للتحدي"
+          >
+            ✕
+          </button>
+        ) : null}
         <form onSubmit={handleSubmit} className="p-5 sm:p-7 space-y-5">
           <div className="space-y-2 text-center">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#630517]/10 text-[#630517] text-[11px] font-black">
@@ -145,6 +162,13 @@ export default function CaseStudyCompetitionPoll() {
               >
                 <ClubIcon name="send" size={15} />
                 {sending ? 'جاري الإرسال...' : 'إرسال الرأي'}
+              </button>
+              <button
+                type="button"
+                onClick={enterChallenge}
+                className="w-full py-2.5 rounded-2xl text-xs font-bold text-slate-500 hover:text-[#630517] cursor-pointer"
+              >
+                أدخل التحدي الآن
               </button>
             </>
           )}

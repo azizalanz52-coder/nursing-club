@@ -8,6 +8,7 @@ import { canonicalPhone, phoneVariants } from '../lib/certificatesLookup';
 import {
   CASE_STUDY_DISTINGUISHED_COUNT,
   aggregateCaseLeaderboard,
+  formatRiyadhCountdown,
   loadCaseSubmissions,
   persistenceForSubmit,
   personPhone,
@@ -66,10 +67,13 @@ function shuffleInPlace<T>(items: T[], rng: () => number) {
   return items;
 }
 
-function dailySeed(now = new Date()) {
-  const startOfYear = new Date(now.getFullYear(), 0, 0);
-  const dayOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / 86400000);
-  return now.getFullYear() * 1000 + dayOfYear;
+function dailySeed(ms = Date.now()) {
+  const { ymd } = riyadhParts(ms);
+  const [year, month, day] = ymd.split('-').map(Number);
+  const start = Date.UTC(year, 0, 0);
+  const current = Date.UTC(year, month - 1, day);
+  const dayOfYear = Math.round((current - start) / 86400000);
+  return year * 1000 + dayOfYear;
 }
 
 function hashSeed(value: string) {
@@ -269,35 +273,18 @@ const masterCasePool: CaseDraft[] = [
   },
 ];
 
-export default function CaseStudyPage() {
-  const [activeCases, setActiveCases] = useState<CaseQuestion[]>([]);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
-  const [showResults, setShowResults] = useState(false);
-  const [timeLeft, setTimeLeft] = useState('');
-  const [revealedBonus, setRevealedBonus] = useState<RevealedBonus | null>(null);
-  const [persistenceBonus, setPersistenceBonus] = useState(0);
-
-  const [studentName, setStudentName] = useState('');
-  const [studentPhone, setStudentPhone] = useState('');
-  const [hasSubmittedToday, setHasSubmittedToday] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [recordedScore, setRecordedScore] = useState<number | null>(null);
-  const [recordedMax, setRecordedMax] = useState<number | null>(null);
-
-  const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
-  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
-  const myLeaderboardRowRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const seed = dailySeed();
-    const mix = DAILY_DIFFICULTY_MIXES[seed % DAILY_DIFFICULTY_MIXES.length];
-    const usedTitles = new Set<string>();
-    const selectedDaily = mix.map((level, index) => {
+function buildDailyCases(ms = Date.now()): CaseQuestion[] {
+  const seed = dailySeed(ms);
+  const mix = DAILY_DIFFICULTY_MIXES[seed % DAILY_DIFFICULTY_MIXES.length];
+  const usedTitles = new Set<string>();
+  return mix
+    .map((level, index) => {
       const levelPool = shuffleInPlace(
         masterCasePool.filter((item) => item.difficulty === level && !usedTitles.has(item.title)),
         mulberry32(seed + hashSeed(level) + 31 + (index * 97))
       );
-      const item = levelPool[0];
+      const item = levelPool[0] || masterCasePool.find((entry) => !usedTitles.has(entry.title));
+      if (!item) return null;
       usedTitles.add(item.title);
       const optionRng = mulberry32(seed + ((index + 1) * 9176));
       const optionEntries = item.options.map((text, optionIndex) => ({
@@ -315,9 +302,67 @@ export default function CaseStudyPage() {
         correctIndex: optionEntries.findIndex((entry) => entry.isCorrect),
         explanation: item.explanation,
       };
-    });
+    })
+    .filter((item): item is CaseQuestion => Boolean(item));
+}
 
-    setActiveCases(selectedDaily);
+function answersDraftKey(ymd = riyadhParts().ymd) {
+  return `nurs_case_draft_${ymd}`;
+}
+
+function readAnswersDraft(): Record<number, number> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = sessionStorage.getItem(answersDraftKey());
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const next: Record<number, number> = {};
+    Object.entries(parsed).forEach(([key, value]) => {
+      const id = Number(key);
+      const idx = Number(value);
+      if (Number.isFinite(id) && Number.isFinite(idx)) next[id] = idx;
+    });
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function writeAnswersDraft(answers: Record<number, number>) {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(answersDraftKey(), JSON.stringify(answers));
+}
+
+function clearAnswersDraft() {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(answersDraftKey());
+}
+
+const LOGIN_NEXT_HREF = '/login?next=/case-study';
+
+export default function CaseStudyPage() {
+  const [activeCases, setActiveCases] = useState<CaseQuestion[]>([]);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
+  const [showResults, setShowResults] = useState(false);
+  const [timeLeft, setTimeLeft] = useState('');
+  const [revealedBonus, setRevealedBonus] = useState<RevealedBonus | null>(null);
+  const [persistenceBonus, setPersistenceBonus] = useState(0);
+  const [authReady, setAuthReady] = useState(false);
+
+  const [studentName, setStudentName] = useState('');
+  const [studentPhone, setStudentPhone] = useState('');
+  const [hasSubmittedToday, setHasSubmittedToday] = useState(false);
+  const [checkingToday, setCheckingToday] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [recordedScore, setRecordedScore] = useState<number | null>(null);
+  const [recordedMax, setRecordedMax] = useState<number | null>(null);
+
+  const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  const myLeaderboardRowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setActiveCases(buildDailyCases());
     fetchLeaderboard();
 
     const savedName = localStorage.getItem('userName') || localStorage.getItem('fullName');
@@ -326,15 +371,16 @@ export default function CaseStudyPage() {
     if (savedName) setStudentName(savedName);
     if (savedPhone) {
       setStudentPhone(savedPhone);
+      setCheckingToday(true);
       checkIfAlreadySubmitted(savedPhone);
+    } else {
+      setSelectedAnswers(readAnswersDraft());
     }
+    setAuthReady(true);
 
-    const timer = setInterval(() => {
-      const currentTime = new Date();
-      const hoursLeft = 23 - currentTime.getHours();
-      const minsLeft = 59 - currentTime.getMinutes();
-      setTimeLeft(`${hoursLeft} ساعة و ${minsLeft} دقيقة`);
-    }, 1000);
+    const tick = () => setTimeLeft(formatRiyadhCountdown());
+    tick();
+    const timer = setInterval(tick, 1000);
 
     return () => clearInterval(timer);
   }, []);
@@ -352,7 +398,9 @@ export default function CaseStudyPage() {
       const submissions = await loadCaseSubmissions(db);
       const rows = aggregateCaseLeaderboard(submissions);
 
-      await Promise.all(rows.map(async (row) => {
+      const myPhone = canonicalPhone(localStorage.getItem('userPhone') || localStorage.getItem('phone') || '');
+      const toResolve = rows.filter((row, idx) => idx < 20 || (myPhone && row.phone === myPhone));
+      await Promise.all(toResolve.map(async (row) => {
         if (!row.phone) return;
         for (const id of phoneVariants(row.phone)) {
           try {
@@ -389,15 +437,26 @@ export default function CaseStudyPage() {
 
   const checkIfAlreadySubmitted = async (phone: string) => {
     try {
-      const list = await loadCaseSubmissions(db);
-      const today = riyadhParts().ymd;
-      const key = canonicalPhone(phone);
-      const todayRow = list.find((row) => personPhone(row) === key && submissionDayKey(row) === today);
-      if (todayRow) {
-        applySavedSubmission(todayRow);
+      const list = await Promise.race([
+        loadCaseSubmissions(db),
+        new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8000)),
+      ]);
+      if (list) {
+        const today = riyadhParts().ymd;
+        const key = canonicalPhone(phone);
+        const todayRow = list.find((row) => personPhone(row) === key && submissionDayKey(row) === today);
+        if (todayRow) {
+          applySavedSubmission(todayRow);
+          clearAnswersDraft();
+          return;
+        }
       }
+      setSelectedAnswers((prev) => (Object.keys(prev).length ? prev : readAnswersDraft()));
     } catch (err) {
       console.error(err);
+      setSelectedAnswers((prev) => (Object.keys(prev).length ? prev : readAnswersDraft()));
+    } finally {
+      setCheckingToday(false);
     }
   };
 
@@ -424,8 +483,12 @@ export default function CaseStudyPage() {
   };
 
   const handleSelectOption = (caseId: number, optionIndex: number) => {
-    if (showResults || hasSubmittedToday) return;
-    setSelectedAnswers((prev) => ({ ...prev, [caseId]: optionIndex }));
+    if (showResults || hasSubmittedToday || checkingToday) return;
+    setSelectedAnswers((prev) => {
+      const next = { ...prev, [caseId]: optionIndex };
+      writeAnswersDraft(next);
+      return next;
+    });
   };
 
   const calculateScore = (bonus = revealedBonus, answers = selectedAnswers) => {
@@ -461,12 +524,12 @@ export default function CaseStudyPage() {
   const handleSubmitAnswers = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentName.trim() || !studentPhone.trim()) {
-      alert('الرجاء التأكد من تسجيل الدخول أولاً ليتم توثيق اسمك ورقمك تلقائياً!');
+      alert('سجّل دخولك أولاً حتى تُحفظ نقاطك.');
       return;
     }
 
     if (Object.keys(selectedAnswers).length < activeCases.length) {
-      alert('الرجاء الإجابة على جميع الحالات الإكلينيكية قبل الإرسال!');
+      alert('أجب على الحالات الثلاث قبل الإرسال.');
       return;
     }
 
@@ -481,7 +544,7 @@ export default function CaseStudyPage() {
       const already = existing.find((row) => personPhone(row) === phoneKey && submissionDayKey(row) === today);
       if (already) {
         applySavedSubmission(already);
-        alert('تم تسجيل حل اليوم مسبقاً. الانتظار حتى يتجدد التحدي.');
+        alert('تم تسجيل حل اليوم مسبقاً. التحدي يتجدد بعد منتصف الليل.');
         return;
       }
       const persistence = persistenceForSubmit(existing, phoneKey, now);
@@ -511,34 +574,35 @@ export default function CaseStudyPage() {
       setRecordedMax(activeCases.length + (bonus?.amount || 0) + persistence.amount);
       setHasSubmittedToday(true);
       setShowResults(true);
+      clearAnswersDraft();
       await fetchLeaderboard();
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء حفظ النتيجة، تأكد من الاتصال بقاعدة البيانات.');
+      alert('تعذر حفظ النتيجة. تأكد من الاتصال ثم حاول مرة أخرى.');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#F6F0E8] text-slate-900 pb-20 relative" dir="ltr">
+    <main className="min-h-screen bg-[#F6F0E8] text-slate-900 relative" dir="rtl">
       <CaseStudyCompetitionPoll />
       <div className="bg-gradient-to-r from-[#3a020c] via-[#630517] to-[#4A030F] text-white py-12 px-4 sm:px-6 shadow-xl border-b-4 border-[#F5D061]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
-          <div className="space-y-3 text-center sm:text-left">
+          <div className="space-y-3 text-center sm:text-right">
             <div className="inline-flex items-center gap-2 bg-[#F5D061] text-[#630517] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
               <span className="inline-flex items-center gap-1.5"><ClubIcon name="zap" size={13} /> Daily Clinical Challenge</span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
+            <h1 className="text-2xl sm:text-4xl font-black tracking-tight" dir="ltr">
               Clinical Case Study Challenge
             </h1>
-            <div className="bg-black/20 border border-[#F5D061]/30 px-4 py-2 rounded-2xl text-xs sm:text-sm text-amber-50 font-medium inline-block" dir="rtl">
-              <ClubIcon name="clock" size={14} className="inline-block align-middle" /> <span>يتجدد التحدي اليومي بعد: </span>
-              <strong className="text-[#F5D061] font-black px-1">{timeLeft || 'جاري التحديث...'}</strong>
+            <div className="bg-black/20 border border-[#F5D061]/30 px-4 py-2 rounded-2xl text-xs sm:text-sm text-amber-50 font-medium inline-block">
+              <ClubIcon name="clock" size={14} className="inline-block align-middle" /> <span>يتجدد التحدي بعد: </span>
+              <strong suppressHydrationWarning className="text-[#F5D061] font-black px-1">{timeLeft || 'جاري التحديث...'}</strong>
             </div>
             <div>
               <Link href="/" className="text-xs text-[#F5D061] hover:underline font-bold inline-block pt-1">
-                ← Back to Home | العودة للرئيسية
+                العودة للرئيسية
               </Link>
             </div>
           </div>
@@ -636,6 +700,25 @@ export default function CaseStudyPage() {
       )}
 
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8" dir="ltr">
+        {authReady && !studentPhone.trim() ? (
+          <div className="bg-amber-50 border-2 border-[#F5D061] rounded-3xl p-5 text-center space-y-2" dir="rtl">
+            <p className="text-sm font-black text-[#630517]">سجّل دخولك حتى تُحفظ نقاطك في الصدارة.</p>
+            <p className="text-[11px] text-slate-500 font-medium">تقدر تختار الإجابات الآن، وبعد الدخول ترجع لنفس الصفحة وإجاباتك محفوظة.</p>
+            <Link href={LOGIN_NEXT_HREF} className="inline-flex px-5 py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs">
+              تسجيل الدخول
+            </Link>
+          </div>
+        ) : null}
+        {checkingToday ? (
+          <div className="bg-white border border-[#630517]/10 rounded-3xl p-4 text-center text-xs font-bold text-slate-500" dir="rtl">
+            جاري التحقق من حل اليوم...
+          </div>
+        ) : null}
+        {activeCases.length === 0 ? (
+          [0, 1, 2].map((slot) => (
+            <div key={slot} className="bg-white rounded-3xl h-64 border border-[#630517]/10 animate-pulse" />
+          ))
+        ) : null}
         {activeCases.map((item) => {
           const surpriseBonus = showResults && revealedBonus?.questionId === item.id ? revealedBonus : null;
           const earnedBonus = Boolean(surpriseBonus && selectedAnswers[item.id] === item.correctIndex);
@@ -690,8 +773,8 @@ export default function CaseStudyPage() {
                         key={optIdx}
                         type="button"
                         onClick={() => handleSelectOption(item.id, optIdx)}
-                        disabled={showResults || hasSubmittedToday}
-                        className={`w-full text-left p-4 min-h-[4.75rem] rounded-2xl border text-xs sm:text-sm transition-all cursor-pointer flex items-center justify-between ${btnStyle}`}
+                        disabled={showResults || hasSubmittedToday || checkingToday}
+                        className={`w-full text-left p-4 min-h-[4.75rem] rounded-2xl border text-xs sm:text-sm transition-all flex items-center justify-between disabled:cursor-default ${showResults || hasSubmittedToday || checkingToday ? '' : 'cursor-pointer'} ${btnStyle}`}
                       >
                         <span className="pr-4 leading-relaxed">{opt}</span>
                         <span className="w-6 h-6 rounded-full border flex items-center justify-center text-[11px] font-bold shrink-0">
@@ -713,44 +796,58 @@ export default function CaseStudyPage() {
           );
         })}
 
-        {!showResults ? (
-          <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-[#630517]/15 shadow-sm space-y-4 text-center">
-            <div className="p-4 bg-[#630517]/5 rounded-2xl border border-[#630517]/10 text-xs text-slate-700 font-medium">
-              🔒 Connected Profile: <strong className="text-[#630517]">{studentName || 'مستخدم مسجل'}</strong> (Phone: <span dir="ltr">{studentPhone || '---'}</span>)
-              <p className="text-[10px] text-slate-400 mt-1">Your response will be recorded on the clinical case-study leaderboard.</p>
-            </div>
+        {!showResults && activeCases.length > 0 ? (
+          <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-[#630517]/15 shadow-sm space-y-4 text-center" dir="rtl">
+            <p className="text-xs font-bold text-slate-500">
+              أجبت {Object.keys(selectedAnswers).length} من {activeCases.length}
+            </p>
+            {studentPhone.trim() ? (
+              <div className="p-4 bg-[#630517]/5 rounded-2xl border border-[#630517]/10 text-xs text-slate-700 font-medium">
+                الحساب: <strong className="text-[#630517]">{studentName || 'مستخدم مسجل'}</strong>
+                <span className="text-slate-400"> · </span>
+                <span dir="ltr">{studentPhone}</span>
+                <p className="text-[10px] text-slate-400 mt-1">تُحفظ إجابتك في لوحة الصدارة مرة واحدة يومياً.</p>
+              </div>
+            ) : (
+              <div className="p-4 bg-amber-50 rounded-2xl border border-[#F5D061] text-xs text-[#630517] font-bold space-y-2">
+                <p>سجّل دخولك أولاً حتى تُحفظ نقاطك في الصدارة.</p>
+                <Link href={LOGIN_NEXT_HREF} className="inline-flex px-4 py-2 rounded-xl bg-[#630517] text-[#F5D061] font-black">
+                  تسجيل الدخول
+                </Link>
+              </div>
+            )}
             <button
               type="submit"
-              disabled={submitting}
-              className="w-full bg-[#630517] text-[#F5D061] py-4 rounded-2xl font-black text-sm shadow-xl hover:brightness-110 active:scale-98 transition-all cursor-pointer border border-white/20"
+              disabled={submitting || checkingToday || !studentPhone.trim()}
+              className="w-full bg-[#630517] text-[#F5D061] py-4 rounded-2xl font-black text-sm shadow-xl hover:brightness-110 active:scale-98 transition-all cursor-pointer border border-white/20 disabled:opacity-50 disabled:cursor-default"
             >
               {submitting ? 'Submitting...' : (
                 <span className="inline-flex items-center gap-2">Submit Answers & Save Score <ClubIcon name="stethoscope" size={16} /></span>
               )}
             </button>
           </form>
-        ) : (
-          <div className="bg-amber-50 border-2 border-[#F5D061] p-6 rounded-3xl space-y-3 text-center">
+        ) : showResults ? (
+          <div className="bg-amber-50 border-2 border-[#F5D061] p-6 rounded-3xl space-y-3 text-center" dir="rtl">
             <h3 className="text-xl font-black text-[#630517]">نتيجتك: {recordedScore ?? (calculateScore() + persistenceBonus)} / {recordedMax ?? (getMaxPossibleScore() + persistenceBonus)}</h3>
             {persistenceBonus > 0 ? (
               <p className="text-sm text-[#630517] font-black bg-white/80 border border-[#F5D061] rounded-2xl px-4 py-3">
-                🌸 شكراً لاستمراريتك معنا طول الأسبوع في الحل
+                شكراً لاستمراريتك معنا طول الأسبوع في الحل
               </p>
             ) : null}
             {revealedBonus ? (
               <p className="text-xs text-amber-800 font-bold">ظهر بونص مفاجئ بعد التسليم على الحالة {revealedBonus.questionId}.</p>
             ) : (
-              <p className="text-xs text-stone-600 font-medium">ما ظهر بونص اليوم على نتيجتك. المنافسة تشتد في التحديات القادمة.</p>
+              <p className="text-xs text-stone-600 font-medium">ما ظهر بونص إضافي اليوم. نراك في تحدي الغد.</p>
             )}
             <p className="text-xs text-stone-600 font-medium">
-              شكراً لمشاركتك في دراسة الحالة. تم تسجيل إجابتك وتحديث نقاطك بنجاح.
+              تم تسجيل إجابتك وتحديث نقاطك.
             </p>
-            <div className="bg-white/80 p-3 rounded-2xl border border-[#F5D061]/50 text-xs text-slate-700 font-bold" dir="rtl">
-              <ClubIcon name="clock" size={14} className="inline-block align-middle" /> <span>التحدي اليومي القادم متاح بعد: </span>
+            <div className="bg-white/80 p-3 rounded-2xl border border-[#F5D061]/50 text-xs text-slate-700 font-bold">
+              <ClubIcon name="clock" size={14} className="inline-block align-middle" /> <span>التحدي القادم بعد: </span>
               <span className="text-[#630517] font-black">{timeLeft}</span>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </main>
   );

@@ -16,13 +16,29 @@ export function riyadhParts(ms = Date.now()) {
     month: '2-digit',
     day: '2-digit',
     weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
   }).formatToParts(new Date(ms))) {
     if (part.type !== 'literal') bag[part.type] = part.value;
   }
   return {
     ymd: `${bag.year}-${bag.month}-${bag.day}`,
     weekday: bag.weekday || '',
+    hour: Number(bag.hour || 0),
+    minute: Number(bag.minute || 0),
+    second: Number(bag.second || 0),
   };
+}
+
+export function formatRiyadhCountdown(ms = Date.now()) {
+  const part = riyadhParts(ms);
+  const elapsed = part.hour * 3600000 + part.minute * 60000 + part.second * 1000;
+  const left = Math.max(0, 24 * 3600000 - elapsed);
+  const hours = Math.floor(left / 3600000);
+  const mins = Math.floor((left % 3600000) / 60000);
+  return `${hours} ساعة و ${mins} دقيقة`;
 }
 
 export function addDaysYmd(ymd: string, days: number) {

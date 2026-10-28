@@ -49,10 +49,15 @@ const DEFAULT_DISCOVER_EVENTS = [
   }
 ];
 
-const DEFAULT_PARTNERS = [
-  { id: '1', name: 'وبل', category: 'شريك إستراتيجي', logo: '/wabal.png', websiteUrl: '', offerType: '', offerCode: '' },
-  { id: '2', name: 'كوفي غاء', category: 'شريك إستراتيجي', logo: '/ghaa.png', websiteUrl: '', offerType: '', offerCode: '' }
-];
+const DEFAULT_PARTNERS: Array<{
+  id: string;
+  name: string;
+  category: string;
+  logo: string;
+  websiteUrl?: string;
+  offerType?: string;
+  offerCode?: string;
+}> = [];
 
 interface StudentAchievement {
   id: string;
@@ -674,9 +679,13 @@ export default function DiscoverPage() {
             )}
 
             {goldAndStrategic.length === 0 && silverPartners.length === 0 && bronzeAndOthers.length === 0 && (
-              <div className="flex flex-wrap items-stretch justify-center gap-6 sm:gap-8">
-                {sortedPartners.map((partner, index) => renderPartnerCard(partner, index * 90))}
-              </div>
+              sortedPartners.length > 0 ? (
+                <div className="flex flex-wrap items-stretch justify-center gap-6 sm:gap-8">
+                  {sortedPartners.map((partner, index) => renderPartnerCard(partner, index * 90))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 font-medium">تظهر هنا شعارات الشركاء فور إضافتها من لوحة التحكم.</p>
+              )
             )}
           </div>
         </div>

@@ -5,6 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { loginWithPhonePassword, registerWithPhonePassword } from '../lib/sessionAuth';
 
+function safeNextPath() {
+  if (typeof window === 'undefined') return '/';
+  const raw = new URLSearchParams(window.location.search).get('next') || '';
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('://')) return '/';
+  return raw;
+}
+
 export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -22,7 +29,7 @@ export default function LoginPage() {
 
     try {
       await loginWithPhonePassword(phone, password);
-      router.push('/');
+      router.push(safeNextPath());
     } catch (err: any) {
       const message = String(err?.message || '');
       if (message.includes('لم يكمل إنشاء الحساب')) {
@@ -50,7 +57,7 @@ export default function LoginPage() {
         fullName: fullName.trim(),
         universityId: universityId.trim(),
       });
-      router.push('/');
+      router.push(safeNextPath());
     } catch (err: any) {
       alert(err?.message || 'حدث خطأ أثناء إنشاء الحساب.');
     }
