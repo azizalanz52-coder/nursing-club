@@ -52,7 +52,7 @@ export default function CaseStudyCompetitionVotes() {
           <p className="text-[11px] font-bold text-amber-800">
             {isCompetitionPollOpen()
               ? `مفتوح حتى ${COMPETITION_POLL_CLOSES_LABEL}`
-              : 'الاستبيان مغلق. الأصوات المحفوظة تبقى هنا.'}
+              : 'الاستبيان مغلق. الترتيب الأسبوعي معتمد حسب رأي الأغلبية، والأصوات المحفوظة تبقى هنا.'}
           </p>
         </div>
         <button

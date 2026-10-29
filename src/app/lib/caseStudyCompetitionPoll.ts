@@ -53,8 +53,8 @@ export const WEEKLY_RACE_EXAMPLE = {
   ],
 };
 
-export function isCompetitionPollOpen(ms = Date.now()) {
-  return ms < COMPETITION_POLL_CLOSES_AT;
+export function isCompetitionPollOpen(_ms = Date.now()) {
+  return false;
 }
 
 export function formatPollCloseCountdown(ms = Date.now()) {

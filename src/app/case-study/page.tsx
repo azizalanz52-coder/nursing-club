@@ -7,8 +7,11 @@ import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { canonicalPhone, phoneVariants } from '../lib/certificatesLookup';
 import {
   CASE_STUDY_DISTINGUISHED_COUNT,
+  CASE_STUDY_SOLVE_MS,
   aggregateCaseLeaderboard,
+  caseSolveTimerKey,
   formatRiyadhCountdown,
+  formatSolveClock,
   loadCaseSubmissions,
   persistenceForSubmit,
   personPhone,
@@ -17,9 +20,14 @@ import {
 } from '../lib/caseStudy';
 import { syncCaseStudyDistinguished } from '../lib/distinguishedMembers';
 import { ClubIcon } from '../components/icons';
-import CaseStudyCompetitionPoll from '../components/CaseStudyCompetitionPoll';
-import WeeklyRaceExample, { OverallRaceExample } from '../components/WeeklyRaceExample';
+import WeeklyRaceBoard, { OverallRaceBoard } from '../components/WeeklyRaceExample';
 import WeeklyMechanismNotice from '../components/WeeklyMechanismNotice';
+import {
+  aggregateWeeklyBoard,
+  decorateOverallBoard,
+  type OverallBoardRow,
+  type WeeklyBoardRow,
+} from '../lib/caseStudyWeekly';
 
 interface CaseQuestion {
   id: number;
@@ -38,12 +46,6 @@ interface CaseDraft {
   options: [string, string, string, string];
   correctIndex: 0 | 1 | 2 | 3;
   explanation: string;
-}
-
-interface LeaderboardItem {
-  studentName: string;
-  totalScore: number;
-  phone: string;
 }
 
 interface RevealedBonus {
@@ -358,8 +360,17 @@ export default function CaseStudyPage() {
   const [submitting, setSubmitting] = useState(false);
   const [recordedScore, setRecordedScore] = useState<number | null>(null);
   const [recordedMax, setRecordedMax] = useState<number | null>(null);
+  const [solveLeftMs, setSolveLeftMs] = useState(CASE_STUDY_SOLVE_MS);
+  const [solveExpired, setSolveExpired] = useState(false);
+  const [weekNoticeBlocking, setWeekNoticeBlocking] = useState(true);
 
-  const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
+  const [leaderboard, setLeaderboard] = useState<OverallBoardRow[]>([]);
+  const [weeklyBoard, setWeeklyBoard] = useState<{ weekLabel: string; locked: boolean; live: boolean; rows: WeeklyBoardRow[] }>({
+    weekLabel: '',
+    locked: false,
+    live: false,
+    rows: [],
+  });
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [boardTab, setBoardTab] = useState<'overall' | 'week'>('overall');
   const myLeaderboardRowRef = useRef<HTMLDivElement>(null);
@@ -387,6 +398,23 @@ export default function CaseStudyPage() {
 
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (weekNoticeBlocking || hasSubmittedToday || showResults || activeCases.length === 0) return;
+    if (typeof window === 'undefined') return;
+    const key = caseSolveTimerKey();
+    const existing = Number(localStorage.getItem(key) || 0);
+    const start = Number.isFinite(existing) && existing > 1_000_000_000_000 ? existing : Date.now();
+    if (start !== existing) localStorage.setItem(key, String(start));
+    const tick = () => {
+      const left = Math.max(0, start + CASE_STUDY_SOLVE_MS - Date.now());
+      setSolveLeftMs(left);
+      setSolveExpired(left <= 0);
+    };
+    tick();
+    const timer = window.setInterval(tick, 250);
+    return () => window.clearInterval(timer);
+  }, [weekNoticeBlocking, hasSubmittedToday, showResults, activeCases.length]);
 
   useEffect(() => {
     if (!showLeaderboardModal) return;
@@ -419,11 +447,18 @@ export default function CaseStudyPage() {
         }
       }));
 
-      setLeaderboard(rows.map((row) => ({
-        studentName: row.studentName,
-        totalScore: row.totalScore,
-        phone: row.phone,
-      })));
+      const names = new Map(rows.map((row) => [row.phone || `name:${row.studentName}`, row.studentName]));
+      const weekly = aggregateWeeklyBoard(submissions);
+      setWeeklyBoard({
+        weekLabel: weekly.weekLabel,
+        locked: weekly.locked,
+        live: weekly.live,
+        rows: weekly.rows.map((row) => ({
+          ...row,
+          studentName: names.get(row.phone || row.key) || row.studentName,
+        })),
+      });
+      setLeaderboard(decorateOverallBoard(rows, submissions));
 
       const signedIn = Boolean(localStorage.getItem('userPhone') || localStorage.getItem('phone'));
       if (signedIn) {
@@ -486,7 +521,7 @@ export default function CaseStudyPage() {
   };
 
   const handleSelectOption = (caseId: number, optionIndex: number) => {
-    if (showResults || hasSubmittedToday || checkingToday) return;
+    if (showResults || hasSubmittedToday || solveExpired) return;
     setSelectedAnswers((prev) => {
       const next = { ...prev, [caseId]: optionIndex };
       writeAnswersDraft(next);
@@ -531,8 +566,12 @@ export default function CaseStudyPage() {
       return;
     }
 
-    if (Object.keys(selectedAnswers).length < activeCases.length) {
+    if (!solveExpired && Object.keys(selectedAnswers).length < activeCases.length) {
       alert('أجب على الحالات الثلاث قبل الإرسال.');
+      return;
+    }
+    if (solveExpired && Object.keys(selectedAnswers).length === 0) {
+      alert('انتهى وقت الحل ولم تختر إجابات.');
       return;
     }
 
@@ -589,7 +628,6 @@ export default function CaseStudyPage() {
 
   return (
     <main className="min-h-screen bg-[#F6F0E8] text-slate-900 relative" dir="rtl">
-      <CaseStudyCompetitionPoll />
       <div className="bg-gradient-to-r from-[#3a020c] via-[#630517] to-[#4A030F] text-white py-12 px-4 sm:px-6 shadow-xl border-b-4 border-[#F5D061]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
           <div className="space-y-3 text-center sm:text-right">
@@ -621,7 +659,31 @@ export default function CaseStudyPage() {
         </div>
       </div>
 
-      <WeeklyMechanismNotice />
+      <WeeklyMechanismNotice onBlockingChange={setWeekNoticeBlocking} />
+
+      {!showResults && !hasSubmittedToday && activeCases.length > 0 && !weekNoticeBlocking ? (
+        <div
+          className="sticky top-16 z-40 mx-auto max-w-3xl px-4 pt-4"
+          dir="rtl"
+        >
+          <div className={`rounded-2xl px-4 py-3 flex items-center justify-between gap-3 border-2 shadow-sm ${
+            solveExpired
+              ? 'bg-rose-700 text-white border-rose-800'
+              : solveLeftMs <= 10000
+                ? 'bg-amber-600 text-white border-amber-700'
+                : 'bg-white text-[#630517] border-[#F5D061]'
+          }`}>
+            <p className="text-xs sm:text-sm font-black">
+              {solveExpired
+                ? 'انتهى وقت الحل. أرسل ما اخترته.'
+                : 'وقت الحل: 45 ثانية للحالات الثلاث'}
+            </p>
+            <strong className="font-mono text-lg font-black tabular-nums" suppressHydrationWarning>
+              {formatSolveClock(solveLeftMs)}
+            </strong>
+          </div>
+        </div>
+      ) : null}
 
       {showLeaderboardModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -634,7 +696,7 @@ export default function CaseStudyPage() {
                 <p className="text-[11px] font-bold text-slate-500 mt-1">
                   {boardTab === 'overall'
                     ? `كل المشاركين: ${leaderboard.length} · أول ${CASE_STUDY_DISTINGUISHED_COUNT} عضو مميز`
-                    : 'الأسبوع يُقفل السبت · عند التعادل يتقدم الأسرع في أكثر أيام الأسبوع'}
+                    : `${weeklyBoard.weekLabel} · إجابات صحيحة فقط · البونص في الصدارة العامة`}
                 </p>
               </div>
               <button
@@ -675,56 +737,22 @@ export default function CaseStudyPage() {
             </div>
 
             <div className="space-y-2.5 max-h-[62vh] overflow-y-auto pl-1">
-              {boardTab === 'week' ? <WeeklyRaceExample /> : leaderboard.length === 0 ? (
-                <p className="text-center text-xs text-slate-400 py-8 font-medium">لا توجد سجلات صدارة حتى الآن، كن أول المشاركين!</p>
+              {boardTab === 'week' ? (
+                <WeeklyRaceBoard
+                  rows={weeklyBoard.rows}
+                  weekLabel={weeklyBoard.weekLabel}
+                  locked={weeklyBoard.locked}
+                  live={weeklyBoard.live}
+                  myPhone={canonicalPhone(studentPhone)}
+                  myName={studentName.trim()}
+                />
               ) : (
-                <>
-                <OverallRaceExample />
-                {leaderboard.map((item, idx) => {
-                  const myPhone = canonicalPhone(studentPhone);
-                  const isMe = Boolean(
-                    (myPhone && item.phone === myPhone) ||
-                    (!myPhone && studentName.trim() && item.studentName === studentName.trim())
-                  );
-                  return (
-                    <div
-                      key={item.phone || `${item.studentName}-${idx}`}
-                      ref={isMe ? myLeaderboardRowRef : undefined}
-                      className={`flex items-center justify-between p-3 rounded-2xl text-xs font-bold ${
-                        isMe
-                          ? 'bg-[#630517] text-white border-2 border-[#F5D061] shadow-md'
-                          : 'bg-[#630517]/5 border border-[#630517]/10'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${
-                          isMe ? 'bg-[#F5D061] text-[#630517]' :
-                          idx === 0 ? 'bg-amber-400 text-slate-900 shadow-sm' :
-                          idx === 1 ? 'bg-slate-300 text-slate-800' :
-                          idx === 2 ? 'bg-amber-700 text-white' : 'bg-[#F5D061]/40 text-[#630517]'
-                        }`}>
-                          {idx + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <span className={`block truncate ${isMe ? 'text-white' : 'text-slate-800'}`}>{item.studentName}</span>
-                          {idx < CASE_STUDY_DISTINGUISHED_COUNT ? (
-                            <span className={`mt-0.5 inline-flex items-center gap-1 text-[10px] font-black ${
-                              isMe ? 'text-[#F5D061]' : 'text-amber-700'
-                            }`}>
-                              <ClubIcon name="medal" size={11} /> عضو مميز
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold shrink-0 ${
-                        isMe ? 'bg-[#F5D061] text-[#630517]' : 'bg-[#630517] text-[#F5D061]'
-                      }`}>
-                        ⭐ {item.totalScore} نقطة
-                      </span>
-                    </div>
-                  );
-                })}
-                </>
+                <OverallRaceBoard
+                  rows={leaderboard}
+                  myPhone={canonicalPhone(studentPhone)}
+                  myName={studentName.trim()}
+                  myRef={myLeaderboardRowRef}
+                />
               )}
             </div>
 
@@ -802,7 +830,7 @@ export default function CaseStudyPage() {
 
                     let btnStyle = 'bg-white border-slate-200 hover:bg-amber-50 text-slate-800';
                     if (showResults) {
-                      if (isCorrect) btnStyle = 'bg-[#630517] text-[#F5D061] border-[#4A030F] font-bold';
+                      if (isCorrect) btnStyle = 'bg-emerald-600 text-white border-emerald-800 font-bold';
                       else if (isSelected && !isCorrect) btnStyle = 'bg-rose-700 text-white border-rose-800 font-bold';
                     } else if (isSelected) {
                       btnStyle = 'bg-[#630517] text-white border-[#630517] font-bold shadow-md';
@@ -813,8 +841,8 @@ export default function CaseStudyPage() {
                         key={optIdx}
                         type="button"
                         onClick={() => handleSelectOption(item.id, optIdx)}
-                        disabled={showResults || hasSubmittedToday || checkingToday}
-                        className={`w-full text-left p-4 min-h-[4.75rem] rounded-2xl border text-xs sm:text-sm transition-all flex items-center justify-between disabled:cursor-default ${showResults || hasSubmittedToday || checkingToday ? '' : 'cursor-pointer'} ${btnStyle}`}
+                        disabled={showResults || hasSubmittedToday || solveExpired}
+                        className={`w-full text-left p-4 min-h-[4.75rem] rounded-2xl border text-xs sm:text-sm transition-all flex items-center justify-between disabled:cursor-default ${showResults || hasSubmittedToday || solveExpired ? '' : 'cursor-pointer'} ${btnStyle}`}
                       >
                         <span className="pr-4 leading-relaxed">{opt}</span>
                         <span className="w-6 h-6 rounded-full border flex items-center justify-center text-[11px] font-bold shrink-0">
@@ -840,6 +868,7 @@ export default function CaseStudyPage() {
           <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-[#630517]/15 shadow-sm space-y-4 text-center" dir="rtl">
             <p className="text-xs font-bold text-slate-500">
               أجبت {Object.keys(selectedAnswers).length} من {activeCases.length}
+              {solveExpired ? ' · انتهى الوقت' : ''}
             </p>
             {studentPhone.trim() ? (
               <div className="p-4 bg-[#630517]/5 rounded-2xl border border-[#630517]/10 text-xs text-slate-700 font-medium">

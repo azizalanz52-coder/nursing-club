@@ -32,6 +32,19 @@ export function riyadhParts(ms = Date.now()) {
   };
 }
 
+export const CASE_STUDY_SOLVE_MS = 45 * 1000;
+
+export function caseSolveTimerKey(ymd = riyadhParts().ymd) {
+  return `nurs_case_solve_v3_${ymd}`;
+}
+
+export function formatSolveClock(leftMs: number) {
+  const left = Math.max(0, leftMs);
+  const minutes = Math.floor(left / 60000);
+  const seconds = Math.floor((left % 60000) / 1000);
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
 export function formatRiyadhCountdown(ms = Date.now()) {
   const part = riyadhParts(ms);
   const elapsed = part.hour * 3600000 + part.minute * 60000 + part.second * 1000;
