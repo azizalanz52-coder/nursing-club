@@ -21,6 +21,7 @@ import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import CollegeAdministrationEditor from '../components/admin/CollegeAdministrationEditor';
 import FaqEditor from '../components/admin/FaqEditor';
 import CaseStudyCompetitionVotes from '../components/admin/CaseStudyCompetitionVotes';
+import CaseStudyTrialVotes from '../components/admin/CaseStudyTrialVotes';
 import { DISTINGUISHED_MEMBER_ROLE, emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
 import { CASE_STUDY_DISTINGUISHED_FLAG, syncCaseStudyDistinguished } from '../lib/distinguishedMembers';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
@@ -4875,13 +4876,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
             <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
               <div>
                 <h3 className="text-xl font-black text-slate-900">صندوق آراء ومقترحات الطلاب والزوار 💡</h3>
-                <p className="text-xs text-slate-500">مقترحات الصفحة الرئيسية، وأصوات تطوير منافسة دراسة الحالة.</p>
+                <p className="text-xs text-slate-500">مقترحات الصفحة الرئيسية، واستبيان تجربة التايمر وصدارة الأسبوع.</p>
               </div>
               <span className="px-3 py-1 rounded-full bg-[#630517]/10 text-[#630517] font-bold text-xs">
                 إجمالي المقترحات: {suggestions.length}
               </span>
             </div>
 
+            <CaseStudyTrialVotes />
             <CaseStudyCompetitionVotes />
 
             {suggestions.length === 0 ? (

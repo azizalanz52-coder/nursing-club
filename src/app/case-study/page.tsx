@@ -22,6 +22,7 @@ import { syncCaseStudyDistinguished } from '../lib/distinguishedMembers';
 import { ClubIcon } from '../components/icons';
 import WeeklyRaceBoard, { OverallRaceBoard } from '../components/WeeklyRaceExample';
 import WeeklyMechanismNotice from '../components/WeeklyMechanismNotice';
+import CaseStudyTrialPoll from '../components/CaseStudyTrialPoll';
 import {
   aggregateWeeklyBoard,
   decorateOverallBoard,
@@ -363,6 +364,7 @@ export default function CaseStudyPage() {
   const [solveLeftMs, setSolveLeftMs] = useState(CASE_STUDY_SOLVE_MS);
   const [solveExpired, setSolveExpired] = useState(false);
   const [weekNoticeBlocking, setWeekNoticeBlocking] = useState(true);
+  const [trialPollBlocking, setTrialPollBlocking] = useState(true);
 
   const [leaderboard, setLeaderboard] = useState<OverallBoardRow[]>([]);
   const [weeklyBoard, setWeeklyBoard] = useState<{ weekLabel: string; locked: boolean; live: boolean; rows: WeeklyBoardRow[] }>({
@@ -400,7 +402,7 @@ export default function CaseStudyPage() {
   }, []);
 
   useEffect(() => {
-    if (weekNoticeBlocking || hasSubmittedToday || showResults || activeCases.length === 0) return;
+    if (trialPollBlocking || weekNoticeBlocking || hasSubmittedToday || showResults || activeCases.length === 0) return;
     if (typeof window === 'undefined') return;
     const key = caseSolveTimerKey();
     const existing = Number(localStorage.getItem(key) || 0);
@@ -414,7 +416,7 @@ export default function CaseStudyPage() {
     tick();
     const timer = window.setInterval(tick, 250);
     return () => window.clearInterval(timer);
-  }, [weekNoticeBlocking, hasSubmittedToday, showResults, activeCases.length]);
+  }, [trialPollBlocking, weekNoticeBlocking, hasSubmittedToday, showResults, activeCases.length]);
 
   useEffect(() => {
     if (!showLeaderboardModal) return;
@@ -659,9 +661,10 @@ export default function CaseStudyPage() {
         </div>
       </div>
 
-      <WeeklyMechanismNotice onBlockingChange={setWeekNoticeBlocking} />
+      <CaseStudyTrialPoll onBlockingChange={setTrialPollBlocking} />
+      <WeeklyMechanismNotice paused={trialPollBlocking} onBlockingChange={setWeekNoticeBlocking} />
 
-      {!showResults && !hasSubmittedToday && activeCases.length > 0 && !weekNoticeBlocking ? (
+      {!showResults && !hasSubmittedToday && activeCases.length > 0 && !trialPollBlocking && !weekNoticeBlocking ? (
         <div
           className="sticky top-16 z-40 mx-auto max-w-3xl px-4 pt-4"
           dir="rtl"

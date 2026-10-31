@@ -8,8 +8,10 @@ import { WEEKLY_COPY } from '../lib/caseStudyWeekly';
 const DISMISS_KEY = 'nurs_week_live_notice_v6';
 
 export default function WeeklyMechanismNotice({
+  paused,
   onBlockingChange,
 }: {
+  paused?: boolean;
   onBlockingChange?: (blocking: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -28,7 +30,7 @@ export default function WeeklyMechanismNotice({
     onBlockingChange?.(false);
   };
 
-  if (!ready) return null;
+  if (!ready || paused) return null;
 
   if (!open) {
     return (
