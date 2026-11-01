@@ -24,6 +24,7 @@ export default function HrCertificateBatches({
   actorName,
   formAnchorId,
   onIssue,
+  canRepair = false,
 }: {
   certificates: Array<{
     id?: string;
@@ -37,6 +38,7 @@ export default function HrCertificateBatches({
   actorName: string;
   formAnchorId: string;
   onIssue: (person: CertEligiblePerson, certTitle: string) => void;
+  canRepair?: boolean;
 }) {
   const [eventTitle, setEventTitle] = useState('');
   const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -49,26 +51,36 @@ export default function HrCertificateBatches({
   const restoredRef = React.useRef(false);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'hr_certificate_batches'), (snap) => {
+    const applySnap = (snap: { docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => {
       const list = snap.docs
         .map((item) => ({ id: item.id, ...item.data() } as CertEventBatch))
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setBatches(list);
       setBatchesReady(true);
       setOpenId((current) => current || list[0]?.id || null);
-    });
+    };
+
+    const unsub = onSnapshot(
+      collection(db, 'hr_certificate_batches'),
+      applySnap,
+      () => {
+        getDocs(collection(db, 'hr_certificate_batches'))
+          .then(applySnap)
+          .catch(() => setBatchesReady(true));
+      }
+    );
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    if (!batchesReady || repairedRef.current || certificates.length === 0) return;
+    if (!canRepair || !batchesReady || repairedRef.current || certificates.length === 0) return;
     repairedRef.current = true;
     const people = batches.flatMap((batch) => batch.recipients || []);
     void repairCertificateIdentities(db, certificates, people);
-  }, [batchesReady, batches, certificates]);
+  }, [canRepair, batchesReady, batches, certificates]);
 
   useEffect(() => {
-    if (!batchesReady || restoredRef.current || certificates.length === 0) return;
+    if (!canRepair || !batchesReady || restoredRef.current || certificates.length === 0) return;
     restoredRef.current = true;
 
     const restore = async () => {
@@ -102,7 +114,7 @@ export default function HrCertificateBatches({
     };
 
     void restore().catch((err) => console.error(err));
-  }, [actorName, batches, batchesReady, certificates]);
+  }, [actorName, batches, batchesReady, canRepair, certificates]);
 
   const handleImport = async () => {
     if (!eventTitle.trim()) {

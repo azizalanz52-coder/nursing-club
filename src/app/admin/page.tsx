@@ -3850,6 +3850,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 }))}
                 actorName="لوحة الأدمن"
                 formAnchorId="admin-cert-form"
+                canRepair={true}
                 onIssue={(person, certTitle) => {
                   setCertRecipientInput(person.fullName);
                   setCertPhoneInput(person.phone);

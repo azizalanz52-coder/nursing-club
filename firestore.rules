@@ -170,7 +170,8 @@ service cloud.firestore {
     }
 
     match /hr_certificate_batches/{id} {
-      allow read, write: if signedIn();
+      allow read: if true;
+      allow write: if signedIn();
     }
 
     match /admin_documents/{id} {

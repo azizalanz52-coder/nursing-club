@@ -246,6 +246,9 @@ export async function resolvePortalCommitteeId(
   phone: string,
   userData?: Record<string, unknown> | null
 ) {
+  const fromAssigned = committeeIdFromName(String(userData?.assignedCommittee || userData?.committee || ''));
+  if (fromAssigned) return fromAssigned;
+
   const acceptance = await resolveMemberAcceptance(db, phone, userData);
   const fromAcceptance = committeeIdFromName(acceptance?.acceptedCommittee || '');
   if (fromAcceptance) return fromAcceptance;

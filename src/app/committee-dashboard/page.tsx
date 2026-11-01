@@ -190,7 +190,6 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [isUploadingQualityFile, setIsUploadingQualityFile] = useState(false);
 
   useEffect(() => {
-    let unsubScientific: (() => void) | undefined;
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       const phone = user ? emailToPhone(user.email) : (localStorage.getItem('userPhone') || '');
       if (!phone) {
@@ -201,26 +200,8 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       localStorage.setItem('userPhone', phone);
       setUserPhone(phone);
       fetchLeaderData(phone);
-      fetchEscalatedReports();
-      fetchCommitteeTasks();
-      fetchAllUsers();
-      fetchQualityArchives();
-      fetchEventExcuses();
-      fetchPublicPartners();
       fetchCommitteeWhatsappLinks();
-      fetchHonorBoard();
-      fetchQualityUploadedFiles();
-
-      unsubScientific = onSnapshot(
-        collection(db, 'scientific_committee_texts'),
-        (snap) => {
-          const texts = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-          setScientificTextsList(texts);
-        },
-        (err) => {
-          console.error('Error listening to scientific texts:', err);
-        }
-      );
+      fetchCommitteeTasks();
 
       const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
       if (isHiddenLocally === 'true') {
@@ -230,7 +211,6 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
     return () => {
       unsubAuth();
-      if (unsubScientific) unsubScientific();
     };
   }, [router]);
 
@@ -290,12 +270,15 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
   const fetchIssuedHrCertificates = async () => {
     try {
-      const [hrSnap, siteSnap] = await Promise.all([
+      const settled = await Promise.allSettled([
         getDocs(collection(db, 'certificates')),
         getDocs(collection(db, 'site_certificates')),
       ]);
       const mapped = new Map<string, any>();
-      [...hrSnap.docs, ...siteSnap.docs].forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
+      settled.forEach((row) => {
+        if (row.status !== 'fulfilled') return;
+        row.value.docs.forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
+      });
       const list = Array.from(mapped.values())
         .map((cert) => omitHeavyCertMedia(cert))
         .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -543,9 +526,15 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       const assigned = String(uData.assignedCommittee || uData.committee || '');
       const roleStr = String(uData.role || '');
       const fullName = String(uData.fullName || storedName);
-      const resolvedId = await resolvePortalCommitteeId(db, context.phone || phone, uData);
-      const listed = await findListedLeadership(db, fullName);
-      const leaderCommId = listed?.id || committeeIdFromName(assigned) || resolvedId;
+      const assignedId = committeeIdFromName(assigned) || committeeIdFromName(roleStr);
+      if (assignedId === 'hr' || assigned.includes('موارد') || roleStr.includes('موارد')) {
+        void fetchIssuedHrCertificates();
+      }
+      const resolvedId = assignedId || await resolvePortalCommitteeId(db, context.phone || phone, uData);
+      const listed = isCommitteeLeaderRole(roleStr) || !assignedId
+        ? await findListedLeadership(db, fullName)
+        : null;
+      const leaderCommId = listed?.id || assignedId || resolvedId;
       const isListedLeader = Boolean(listed);
       const qualityMember = roleStr.includes('جودة') || assigned.includes('جودة') || assigned.includes('الجودة') || resolvedId === 'quality';
 
@@ -585,16 +574,35 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
       setLoading(false);
 
-      const [linkSnap, reqSnap] = await Promise.all([
-        getDoc(doc(db, 'committee_whatsapp_links', resolvedComm)),
-        getDocs(collection(db, 'applications')),
-      ]);
-      if (linkSnap.exists()) {
-        const savedLink = linkSnap.data().link || '';
-        setWhatsappLink(savedLink);
-        setCurrentCommitteeWhatsappInput(savedLink);
+      if (qualityMember || isCommitteeLeaderRole(roleStr) || isListedLeader) {
+        fetchEscalatedReports();
+        fetchAllUsers();
+        fetchQualityArchives();
+        fetchEventExcuses();
+        fetchPublicPartners();
+        fetchHonorBoard();
+        fetchQualityUploadedFiles();
       }
-      setRequests(reqSnap.docs.map(d => ({ ...d.data(), id: d.id })));
+
+      try {
+        const linkSnap = await getDoc(doc(db, 'committee_whatsapp_links', resolvedComm));
+        if (linkSnap.exists()) {
+          const savedLink = linkSnap.data().link || '';
+          setWhatsappLink(savedLink);
+          setCurrentCommitteeWhatsappInput(savedLink);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+
+      if (qualityMember || isCommitteeLeaderRole(roleStr) || isListedLeader) {
+        try {
+          const reqSnap = await getDocs(collection(db, 'applications'));
+          setRequests(reqSnap.docs.map(d => ({ ...d.data(), id: d.id })));
+        } catch (err) {
+          console.error(err);
+        }
+      }
     } catch (err) {
       console.error(err);
       setLoading(false);
@@ -989,6 +997,9 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const currentActiveComm = isQualityTeam ? selectedMonitoredCommittee : selectedManagedCommittee;
   const userAssignedComm = userData?.assignedCommittee || userData?.committee || selectedManagedCommittee || '';
   const isHrTeam =
+    managedCommitteeId === 'hr' ||
+    committeeIdFromName(userAssignedComm) === 'hr' ||
+    committeeIdFromName(String(userData?.role || '')) === 'hr' ||
     matchesTargetCommittee(userAssignedComm, 'لجنة الموارد البشرية') ||
     isSameCommittee(userAssignedComm, 'لجنة الموارد البشرية') ||
     String(userData?.role || '').includes('موارد');
@@ -2394,6 +2405,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
               certificates={issuedHrCertificates}
               actorName={userData?.fullName || 'لجنة الموارد البشرية'}
               formAnchorId="hr-cert-form"
+              canRepair={isCommitteeLeader}
               onIssue={(person, certTitle) => {
                 setCertStudentName(person.fullName);
                 setCertStudentPhone(person.phone);

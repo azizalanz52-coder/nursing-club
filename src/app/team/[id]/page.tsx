@@ -321,23 +321,40 @@ export default function CommitteeDetailPage() {
 
         const needsHr = id === 'hr' || normalizeArabic(baseDetails.name).includes('موارد');
         const emptySnap = { empty: true, docs: [] as { id: string; data: () => Record<string, unknown> }[] };
-        const [
-          appsSnap,
-          eventsSnap,
-          tasksSnap,
-          partnersSnap,
-          scientificSnap,
-          hrSnap,
-          siteSnap,
-        ] = await Promise.all([
+        if (needsHr) {
+          const certSettled = await Promise.allSettled([
+            getDocs(collection(db, 'certificates')),
+            getDocs(collection(db, 'site_certificates')),
+          ]);
+          if (!cancelled) {
+            const mapped = new Map<string, any>();
+            certSettled.forEach((row) => {
+              if (row.status !== 'fulfilled') return;
+              row.value.docs.forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
+            });
+            setIssuedHrCertificates(
+              Array.from(mapped.values())
+                .map((cert) => omitHeavyCertMedia(cert))
+                .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
+            );
+          }
+        }
+        const settled = await Promise.allSettled([
           getDocs(collection(db, 'applications')),
           getDocs(collection(db, 'site_events')),
           getDocs(collection(db, 'committee_tasks')),
           getDocs(collection(db, 'public_partners_relations')),
           getDocs(collection(db, 'scientific_committee_texts')),
-          needsHr ? getDocs(collection(db, 'certificates')) : Promise.resolve(emptySnap),
-          needsHr ? getDocs(collection(db, 'site_certificates')) : Promise.resolve(emptySnap),
         ]);
+        const takeSnap = (index: number) => {
+          const row = settled[index];
+          return row.status === 'fulfilled' ? row.value : emptySnap;
+        };
+        const appsSnap = takeSnap(0);
+        const eventsSnap = takeSnap(1);
+        const tasksSnap = takeSnap(2);
+        const partnersSnap = takeSnap(3);
+        const scientificSnap = takeSnap(4);
 
         if (cancelled) return;
 
@@ -367,15 +384,6 @@ export default function CommitteeDetailPage() {
             const uniqueNew = acceptedFromApps.filter(m => !existingPhones.has(normalizePhone(m.phone)));
             mergedMembers = [...mergedMembers, ...uniqueNew];
           }
-        }
-
-        if (needsHr) {
-          const mapped = new Map<string, any>();
-          [...hrSnap.docs, ...siteSnap.docs].forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
-          const certList = Array.from(mapped.values())
-            .map((cert) => omitHeavyCertMedia(cert))
-            .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
-          setIssuedHrCertificates(certList);
         }
 
         setIsAuthorizedMember(userAuthorized);
@@ -963,6 +971,7 @@ export default function CommitteeDetailPage() {
               certificates={issuedHrCertificates}
               actorName={currentUserName || 'لجنة الموارد البشرية'}
               formAnchorId="hr-cert-form"
+              canRepair={false}
               onIssue={(person, certTitle) => {
                 setCertStudentName(person.fullName);
                 setCertStudentPhone(person.phone);
