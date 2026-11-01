@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import OpeningSplash from './components/OpeningSplash';
 import ClubNoticeHost from './components/ClubNotice';
+import { warmPublicCloud } from './lib/cloudCache';
 
 const SPLASH_KEY = 'nurs_splash_seen';
 
@@ -15,14 +16,21 @@ export default function AppShell({
   const [showSplash, setShowSplash] = useState(false);
 
   useEffect(() => {
-    if (sessionStorage.getItem(SPLASH_KEY) === '1') return;
+    const warm = window.setTimeout(() => warmPublicCloud(), 350);
+
+    if (sessionStorage.getItem(SPLASH_KEY) === '1') {
+      return () => window.clearTimeout(warm);
+    }
 
     setShowSplash(true);
     const timer = setTimeout(() => {
       sessionStorage.setItem(SPLASH_KEY, '1');
       setShowSplash(false);
     }, 2400);
-    return () => clearTimeout(timer);
+    return () => {
+      window.clearTimeout(warm);
+      window.clearTimeout(timer);
+    };
   }, []);
 
   return (

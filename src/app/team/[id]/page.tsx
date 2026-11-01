@@ -4,7 +4,8 @@ import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { db } from '../../lib/firebase';
-import { doc, getDoc, updateDoc, setDoc, collection, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, collection, addDoc, deleteDoc } from 'firebase/firestore';
+import { invalidateCloudCollection, loadCloudCollection, mergeCachedCollections, peekCloudCollection, writeCloudCollection } from '../../lib/cloudCache';
 import { storage } from '../../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import HrCertificatesRegistry from '../../components/HrCertificatesRegistry';
@@ -271,6 +272,24 @@ export default function CommitteeDetailPage() {
 
     let cancelled = false;
 
+    const cachedEvents = peekCloudCollection('site_events') || [];
+    if (cachedEvents.length) {
+      setEventsList(cachedEvents);
+      setSelectedEventTitle((current) => current || String(cachedEvents[0].title || ''));
+    }
+    const cachedTasks = peekCloudCollection('committee_tasks');
+    if (cachedTasks?.length) setCommitteeTasks(cachedTasks);
+    const cachedPartners = peekCloudCollection('public_partners_relations');
+    if (cachedPartners?.length) setPublicPartnersList(cachedPartners);
+    const cachedTexts = peekCloudCollection('scientific_committee_texts');
+    if (cachedTexts?.length) setScientificTextsList(cachedTexts);
+    const cachedCerts = mergeCachedCollections('certificates', 'site_certificates');
+    if (cachedCerts.length) {
+      setIssuedHrCertificates(
+        cachedCerts.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
+      );
+    }
+
     const fetchCloudData = async () => {
       try {
         const [docSnap, context] = await Promise.all([
@@ -320,90 +339,71 @@ export default function CommitteeDetailPage() {
         }
 
         const needsHr = id === 'hr' || normalizeArabic(baseDetails.name).includes('موارد');
-        const emptySnap = { empty: true, docs: [] as { id: string; data: () => Record<string, unknown> }[] };
-        if (needsHr) {
-          const certSettled = await Promise.allSettled([
-            getDocs(collection(db, 'certificates')),
-            getDocs(collection(db, 'site_certificates')),
-          ]);
-          if (!cancelled) {
-            const mapped = new Map<string, any>();
-            certSettled.forEach((row) => {
-              if (row.status !== 'fulfilled') return;
-              row.value.docs.forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
-            });
-            setIssuedHrCertificates(
-              Array.from(mapped.values())
-                .map((cert) => omitHeavyCertMedia(cert))
-                .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
-            );
-          }
-        }
-        const settled = await Promise.allSettled([
-          getDocs(collection(db, 'applications')),
-          getDocs(collection(db, 'site_events')),
-          getDocs(collection(db, 'committee_tasks')),
-          getDocs(collection(db, 'public_partners_relations')),
-          getDocs(collection(db, 'scientific_committee_texts')),
-        ]);
-        const takeSnap = (index: number) => {
-          const row = settled[index];
-          return row.status === 'fulfilled' ? row.value : emptySnap;
-        };
-        const appsSnap = takeSnap(0);
-        const eventsSnap = takeSnap(1);
-        const tasksSnap = takeSnap(2);
-        const partnersSnap = takeSnap(3);
-        const scientificSnap = takeSnap(4);
 
+        const hydrateLists = async () => {
+          const [events, tasks, partners, texts] = await Promise.all([
+            loadCloudCollection(db, 'site_events'),
+            loadCloudCollection(db, 'committee_tasks'),
+            loadCloudCollection(db, 'public_partners_relations'),
+            loadCloudCollection(db, 'scientific_committee_texts'),
+          ]);
+          if (cancelled) return;
+          if (events.length > 0) {
+            setEventsList(events);
+            setSelectedEventTitle((current) => current || String(events[0].title || ''));
+          }
+          setCommitteeTasks(tasks);
+          setPublicPartnersList(partners);
+          setScientificTextsList(texts);
+        };
+
+        const hydrateCerts = async () => {
+          if (!needsHr) return;
+          const [issued, siteIssued] = await Promise.all([
+            loadCloudCollection(db, 'certificates'),
+            loadCloudCollection(db, 'site_certificates'),
+          ]);
+          if (cancelled) return;
+          const mapped = new Map<string, any>();
+          [...issued, ...siteIssued].forEach((row) => mapped.set(row.id, omitHeavyCertMedia(row)));
+          setIssuedHrCertificates(
+            Array.from(mapped.values()).sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
+          );
+        };
+
+        void hydrateLists();
+        void hydrateCerts();
+
+        const apps = await loadCloudCollection(db, 'applications');
         if (cancelled) return;
 
-        if (!appsSnap.empty) {
-          const acceptedFromApps: any[] = [];
-          appsSnap.forEach((d) => {
-            const data = d.data();
-            const acceptedComm = data.acceptedCommittee || data.committee || data.assignedCommittee || '';
-            const statusStr = String(data.status || '');
-            const isAccepted = isAcceptedStatus(statusStr) || Boolean(String(acceptedComm || '').trim());
-            if (isAccepted && matchesThisCommittee(acceptedComm)) {
-              acceptedFromApps.push({
-                name: data.fullName || data.name || '',
-                phone: data.phone ? String(data.phone).trim() : '',
-                role: 'عضو أساسي',
-                status: 'نشط ✓',
-                universityId: data.universityId || ''
-              });
-              if (sameMemberPhone(data.phone, trimmedPhone)) {
-                userAuthorized = true;
-              }
+        const acceptedFromApps: any[] = [];
+        apps.forEach((data: any) => {
+          const acceptedComm = data.acceptedCommittee || data.committee || data.assignedCommittee || '';
+          const statusStr = String(data.status || '');
+          const isAccepted = isAcceptedStatus(statusStr) || Boolean(String(acceptedComm || '').trim());
+          if (isAccepted && matchesThisCommittee(acceptedComm)) {
+            acceptedFromApps.push({
+              name: data.fullName || data.name || '',
+              phone: data.phone ? String(data.phone).trim() : '',
+              role: 'عضو أساسي',
+              status: 'نشط ✓',
+              universityId: data.universityId || ''
+            });
+            if (sameMemberPhone(data.phone, trimmedPhone)) {
+              userAuthorized = true;
             }
-          });
-
-          if (acceptedFromApps.length > 0) {
-            const existingPhones = new Set(mergedMembers.map((m: any) => normalizePhone(m.phone)));
-            const uniqueNew = acceptedFromApps.filter(m => !existingPhones.has(normalizePhone(m.phone)));
-            mergedMembers = [...mergedMembers, ...uniqueNew];
           }
+        });
+
+        if (acceptedFromApps.length > 0) {
+          const existingPhones = new Set(mergedMembers.map((m: any) => normalizePhone(m.phone)));
+          const uniqueNew = acceptedFromApps.filter(m => !existingPhones.has(normalizePhone(m.phone)));
+          mergedMembers = [...mergedMembers, ...uniqueNew];
         }
 
         setIsAuthorizedMember(userAuthorized);
         setCommittee((prev: any) => ({ ...prev, members: mergedMembers }));
-
-        if (!eventsSnap.empty) {
-          const evs: any[] = [];
-          eventsSnap.forEach((d) => { evs.push({ id: d.id, ...d.data() }); });
-          setEventsList(evs);
-          if (evs.length > 0) setSelectedEventTitle(evs[0].title);
-        }
-
-        if (!tasksSnap.empty) {
-          const tasks: any[] = [];
-          tasksSnap.forEach((d) => { tasks.push({ id: d.id, ...d.data() }); });
-          setCommitteeTasks(tasks);
-        }
-
-        setPublicPartnersList(partnersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setScientificTextsList(scientificSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
         console.error('Error fetching cloud data:', err);
       } finally {
@@ -508,7 +508,9 @@ export default function CommitteeDetailPage() {
     try {
       await requireAuthUser();
       const docRef = await addDoc(collection(db, 'public_partners_relations'), newPartnerObj);
-      setPublicPartnersList([{ id: docRef.id, ...newPartnerObj }, ...publicPartnersList]);
+      const nextPartners = [{ id: docRef.id, ...newPartnerObj }, ...publicPartnersList];
+      setPublicPartnersList(nextPartners);
+      writeCloudCollection('public_partners_relations', nextPartners);
       setPartnerName('');
       setPartnerContactPerson('');
       setPartnerPhone('');
@@ -526,7 +528,9 @@ export default function CommitteeDetailPage() {
     try {
       await requireAuthUser();
       await deleteDoc(doc(db, 'public_partners_relations', partnerId));
-      setPublicPartnersList(publicPartnersList.filter((item) => item.id !== partnerId));
+      const nextPartners = publicPartnersList.filter((item) => item.id !== partnerId);
+      setPublicPartnersList(nextPartners);
+      writeCloudCollection('public_partners_relations', nextPartners);
       alert('تم حذف السجل من الشراكات.');
     } catch (err: any) {
       console.error(err);
@@ -634,7 +638,9 @@ export default function CommitteeDetailPage() {
         createdAtMs: Date.now(),
       };
       const docRef = await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
-      setScientificTextsList([{ id: docRef.id, ...newTextObj }, ...scientificTextsList]);
+      const nextTexts = [{ id: docRef.id, ...newTextObj }, ...scientificTextsList];
+      setScientificTextsList(nextTexts);
+      writeCloudCollection('scientific_committee_texts', nextTexts);
       try {
         await notifyLeadership(db, `🔬 [نص جديد للتقييم]: "${newTextObj.title}" من ${newTextObj.author}. قيّموه من تبويب نصوص المحتوى العلمي.`);
       } catch (notifyErr) {
@@ -710,6 +716,8 @@ export default function CommitteeDetailPage() {
         deleteDoc(doc(db, 'site_certificates', certId)).catch(() => undefined),
       ]);
       setIssuedHrCertificates((prev) => prev.filter((cert) => cert.id !== certId));
+      invalidateCloudCollection('certificates');
+      invalidateCloudCollection('site_certificates');
       alert('تم حذف الشهادة بنجاح.');
     } catch (err) {
       console.error(err);
@@ -795,6 +803,8 @@ export default function CommitteeDetailPage() {
         { id: saved.id, ...omitHeavyCertMedia(newCertObj), hasFile: true },
         ...prev.filter((cert) => cert.id !== saved.id),
       ]);
+      invalidateCloudCollection('certificates');
+      invalidateCloudCollection('site_certificates');
       setCertStudentName('');
       setCertStudentPhone('');
       setCertStudentUniversityId('');

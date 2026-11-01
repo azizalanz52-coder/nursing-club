@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'rea
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
+import { writeCloudCollection } from '../lib/cloudCache';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot, increment, deleteField } from 'firebase/firestore';
 import { isIncompleteUserAccount, notifyCommitteeByKeyword, omitPassword, purgeAllStoredPasswords, setUserPasswordOnPhone } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
@@ -466,6 +467,7 @@ export default function AdminDashboard() {
       const snap = await getDocs(collection(db, 'student_achievements'));
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as StudentAchievement[];
       setStudentAchievements(list);
+      writeCloudCollection('student_achievements', list);
     } catch (e) {
       console.error(e);
     }
@@ -491,6 +493,7 @@ export default function AdminDashboard() {
       const snap = await getDocs(collection(db, 'site_newsletters'));
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() })) as NewsletterItem[];
       setNewsletters(list);
+      writeCloudCollection('site_newsletters', list);
     } catch (e) {
       console.error(e);
     }
@@ -754,11 +757,14 @@ export default function AdminDashboard() {
 
     try {
       await setDoc(doc(db, 'site_newsletters', newsId), updatedNews);
+      const nextNews = editingNewsletterId
+        ? newsletters.map(n => n.id === newsId ? updatedNews : n)
+        : [updatedNews, ...newsletters];
+      setNewsletters(nextNews);
+      writeCloudCollection('site_newsletters', nextNews);
       if (editingNewsletterId) {
-        setNewsletters(newsletters.map(n => n.id === newsId ? updatedNews : n));
         setModalMessage(isExam ? 'تم تحديث جدول الاختبارات، ويظهر الآن في صفحة النشرة.' : 'تم تحديث النشرة الأسبوعية بنجاح.');
       } else {
-        setNewsletters([updatedNews, ...newsletters]);
         setModalMessage(isExam ? 'تم نشر جدول الاختبارات في النشرة الأكاديمية.' : 'تم إصدار النشرة وظهرت في صفحة الموقع.');
       }
       resetNewsletterForm();
@@ -1005,11 +1011,14 @@ const handleSaveStudentAchievement = async (e: FormEvent) => {
 
   try {
     await setDoc(doc(db, 'student_achievements', achId), updatedAch);
+    const nextAchievements = editingAchievementId
+      ? studentAchievements.map(a => a.id === achId ? updatedAch : a)
+      : [updatedAch, ...studentAchievements];
+    setStudentAchievements(nextAchievements);
+    writeCloudCollection('student_achievements', nextAchievements);
     if (editingAchievementId) {
-      setStudentAchievements(studentAchievements.map(a => a.id === achId ? updatedAch : a));
       setModalMessage('تم تعديل وتحديث الإنجاز بنجاح سحابياً! ✏️✨');
     } else {
-      setStudentAchievements([updatedAch, ...studentAchievements]);
       setModalMessage('تم إضافة الإنجاز الجماعي بنجاح ونشره سحابياً للموقع! 🏆✨');
     }
     setEditingAchievementId(null);
@@ -1040,7 +1049,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     triggerConfirmModal('هل أنت متأكد من حذف هذا الإنجاز من السحابة؟', async () => {
       try {
         await deleteDoc(doc(db, 'student_achievements', id));
-        setStudentAchievements(studentAchievements.filter(a => a.id !== id));
+        const nextAchievements = studentAchievements.filter(a => a.id !== id);
+        setStudentAchievements(nextAchievements);
+        writeCloudCollection('student_achievements', nextAchievements);
         setModalMessage('تم حذف الإنجاز بنجاح.');
         setModalType('success');
       } catch (err) {
@@ -1480,6 +1491,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           const eventsList: EventItem[] = [];
           eventsSnap.forEach((d) => { eventsList.push({ id: d.id, ...d.data() } as EventItem); });
           setEvents(eventsList);
+          writeCloudCollection('site_events', eventsList);
         }
 
         const welcomeRef = doc(db, 'site_banners', WELCOME_BANNER_ID);
@@ -1496,12 +1508,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           return Number(b.id) - Number(a.id);
         });
         setBanners(bannersList);
+        writeCloudCollection('site_banners', bannersList);
 
         const partnersSnap = await getDocs(collection(db, 'site_partners'));
         if (!partnersSnap.empty) {
           const partnersList: PartnerItem[] = [];
           partnersSnap.forEach((d) => { partnersList.push({ id: d.id, ...d.data() } as PartnerItem); });
           setPartners(partnersList);
+          writeCloudCollection('site_partners', partnersList);
         }
 
         const suggestionsSnap = await getDocs(collection(db, 'suggestions'));
@@ -1516,6 +1530,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           const slides: PassionSlide[] = [];
           passionSnap.forEach((d) => { slides.push({ id: d.id, ...d.data() } as PassionSlide); });
           setPassionSlides(slides);
+          writeCloudCollection('site_passion_slides', slides);
         }
 
         const discoverSnap = await getDocs(collection(db, 'site_discover_events'));
@@ -1523,6 +1538,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           const eventsList: DiscoverEvent[] = [];
           discoverSnap.forEach((d) => { eventsList.push({ id: d.id, ...d.data() } as DiscoverEvent); });
           setDiscoverEvents(eventsList);
+          writeCloudCollection('site_discover_events', eventsList);
           setSelectedEventId(eventsList[0]?.id || '');
         }
 
@@ -1545,6 +1561,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         if (!commSnapshot.empty) {
           const cloudMap: Record<string, Partial<Committee>> = {};
           commSnapshot.forEach((d) => { cloudMap[d.id] = d.data() as Partial<Committee>; });
+          const cloudRows = commSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+          writeCloudCollection('committees', cloudRows);
           setCommittees((prev) => prev.map((c) => cloudMap[c.id] ? { ...c, ...cloudMap[c.id] } : c));
         }
       } catch (err) {
@@ -2084,7 +2102,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
     try {
       await setDoc(doc(db, 'site_passion_slides', slideId), newSlide);
-      setPassionSlides([...passionSlides, newSlide]);
+      const nextSlides = [...passionSlides, newSlide];
+      setPassionSlides(nextSlides);
+      writeCloudCollection('site_passion_slides', nextSlides);
       setNewPassionQuote('');
       setNewPassionImage('/header-banner.png');
       setModalMessage('تم إضافة الشريحة وحفظها سحابياً بنجاح! ✨');
@@ -2097,7 +2117,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const handleDeletePassionSlide = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'site_passion_slides', id));
-      setPassionSlides(passionSlides.filter((s) => s.id !== id));
+      const nextSlides = passionSlides.filter((s) => s.id !== id);
+      setPassionSlides(nextSlides);
+      writeCloudCollection('site_passion_slides', nextSlides);
       setModalMessage('تم حذف الشريحة بنجاح.');
       setModalType('success');
     } catch (err) {
@@ -2136,7 +2158,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         images: uploadedUrls.length > 0 ? uploadedUrls : ['/logo.png']
       };
       await setDoc(doc(db, 'site_discover_events', eventId), newEventObj);
-      setDiscoverEvents([newEventObj, ...discoverEvents]);
+      const nextDiscover = [newEventObj, ...discoverEvents];
+      setDiscoverEvents(nextDiscover);
+      writeCloudCollection('site_discover_events', nextDiscover);
       setSelectedEventId(eventId);
       setNewDiscTitle('');
       setNewDiscDesc('');
@@ -2236,7 +2260,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       const updatedImages = [...(targetEvent.images || []), ...uploadedUrls];
       const updatedEventObj = { ...targetEvent, images: updatedImages };
       await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
-      setDiscoverEvents(discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev)));
+      const nextDiscover = discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev));
+      setDiscoverEvents(nextDiscover);
+      writeCloudCollection('site_discover_events', nextDiscover);
       setModalMessage('تم رفع وإضافة الصور سحابياً بنجاح! 🚀');
       setModalType('success');
     } catch (err: any) {
@@ -2259,7 +2285,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
     try {
       await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
-      setDiscoverEvents(discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev)));
+      const nextDiscover = discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev));
+      setDiscoverEvents(nextDiscover);
+      writeCloudCollection('site_discover_events', nextDiscover);
     } catch (err) {
       console.error(err);
     }
@@ -2271,6 +2299,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         await deleteDoc(doc(db, 'site_discover_events', id));
         const updated = discoverEvents.filter((ev) => ev.id !== id);
         setDiscoverEvents(updated);
+        writeCloudCollection('site_discover_events', updated);
         if (updated.length > 0) setSelectedEventId(updated[0].id);
         setModalMessage('تم الحذف بنجاح.');
         setModalType('success');
@@ -2300,12 +2329,15 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
     try {
       await setDoc(doc(db, 'site_events', eventId), eventObj);
+      const nextEvents = editingEventId
+        ? events.map((ev) => ev.id === eventId ? eventObj : ev)
+        : [eventObj, ...events];
+      setEvents(nextEvents);
+      writeCloudCollection('site_events', nextEvents);
       if (editingEventId) {
-        setEvents(events.map((ev) => ev.id === eventId ? eventObj : ev));
         setModalMessage('تم تعديل الفعالية بنجاح! 📅');
         setModalType('success');
       } else {
-        setEvents([eventObj, ...events]);
         setModalMessage('تم نشر الفعالية بنجاح سحابياً! 📅');
         setModalType('success');
       }
@@ -2335,7 +2367,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     triggerConfirmModal('هل أنت متأكد من حذف هذه الفعالية؟', async () => {
       try {
         await deleteDoc(doc(db, 'site_events', id));
-        setEvents(events.filter((ev) => ev.id !== id));
+        const nextEvents = events.filter((ev) => ev.id !== id);
+        setEvents(nextEvents);
+        writeCloudCollection('site_events', nextEvents);
         setModalMessage('تم الحذف بنجاح.');
         setModalType('success');
       } catch (err) {
@@ -2355,7 +2389,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     try {
       const image = await uploadClubFile(file, 'banners', setWelcomeReplaceProgress);
       await setDoc(doc(db, 'site_banners', bannerId), { image }, { merge: true });
-      setBanners(banners.map((b) => (b.id === bannerId ? { ...b, image } : b)));
+      const nextBanners = banners.map((b) => (b.id === bannerId ? { ...b, image } : b));
+      setBanners(nextBanners);
+      writeCloudCollection('site_banners', nextBanners);
       setModalMessage('تم تغيير صورة البنر. حدّث الرئيسية لتشوفها.');
       setModalType('success');
     } catch (err: any) {
@@ -2405,7 +2441,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       };
 
       await setDoc(doc(db, 'site_banners', bannerId), newBanner);
-      setBanners([newBanner, ...banners]);
+      const nextBanners = [newBanner, ...banners];
+      setBanners(nextBanners);
+      writeCloudCollection('site_banners', nextBanners);
       setBannerTag('');
       setBannerTitle('');
       setBannerDescription('');
@@ -2430,7 +2468,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     triggerConfirmModal('هل أنت متأكد من حذف هذا البانر؟', async () => {
       try {
         await deleteDoc(doc(db, 'site_banners', id));
-        setBanners(banners.filter((b) => b.id !== id));
+        const nextBanners = banners.filter((b) => b.id !== id);
+        setBanners(nextBanners);
+        writeCloudCollection('site_banners', nextBanners);
         setModalMessage('تم الحذف بنجاح.');
         setModalType('success');
       } catch (err) {
@@ -2455,11 +2495,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
     try {
       await setDoc(doc(db, 'site_partners', partnerId), updatedPartner);
+      const nextPartners = editingPartnerId
+        ? partners.map((p) => p.id === partnerId ? updatedPartner : p)
+        : [updatedPartner, ...partners];
+      setPartners(nextPartners);
+      writeCloudCollection('site_partners', nextPartners);
       if (editingPartnerId) {
-        setPartners(partners.map((p) => p.id === partnerId ? updatedPartner : p));
         setModalMessage('تم تحديث وتعديل بيانات الشريك/الراعي بنجاح سحابياً! ✏️🤝');
       } else {
-        setPartners([updatedPartner, ...partners]);
         setModalMessage('تم إضافة شريك النجاح بنجاح سحابياً! 🤝');
       }
       setEditingPartnerId(null);
@@ -2492,7 +2535,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     triggerConfirmModal('هل أنت متأكد من حذف هذا الشريك؟', async () => {
       try {
         await deleteDoc(doc(db, 'site_partners', id));
-        setPartners(partners.filter((p) => p.id !== id));
+        const nextPartners = partners.filter((p) => p.id !== id);
+        setPartners(nextPartners);
+        writeCloudCollection('site_partners', nextPartners);
         setModalMessage('تم الحذف بنجاح.');
         setModalType('success');
       } catch (err) {

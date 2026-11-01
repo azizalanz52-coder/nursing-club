@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { loadCloudCollection, peekCloudCollection } from '../../lib/cloudCache';
 import { latestClubEvents, type ClubEvent } from '../../lib/clubEvents';
 import { ClubIcon } from '../icons';
 import EventMetaChip from '../EventMetaChip';
@@ -13,22 +13,23 @@ export default function EventsPreview() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const fetchCloudEvents = async () => {
-      try {
-        const eventsSnap = await getDocs(collection(db, 'site_events'));
-        const list: ClubEvent[] = [];
-        eventsSnap.forEach((d) => {
-          list.push({ id: d.id, ...d.data() } as ClubEvent);
-        });
-        setEventsList(latestClubEvents(list, 3));
-      } catch (err) {
-        console.error('Error fetching cloud events preview:', err);
-      } finally {
-        setLoaded(true);
-      }
+    let cancelled = false;
+    const cached = peekCloudCollection<ClubEvent>('site_events');
+    if (cached) {
+      setEventsList(latestClubEvents(cached, 3));
+      setLoaded(true);
+    }
+    void loadCloudCollection<ClubEvent>(db, 'site_events')
+      .then((list) => {
+        if (!cancelled) setEventsList(latestClubEvents(list, 3));
+      })
+      .catch((err) => console.error('Error fetching cloud events preview:', err))
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
     };
-
-    fetchCloudEvents();
   }, []);
 
   return (

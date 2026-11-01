@@ -4,7 +4,8 @@ import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db, storage } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, getDoc, addDoc, deleteDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, updateDoc, getDoc, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { invalidateCloudCollection, loadCloudCollection, mergeCachedCollections, peekCloudCollection, writeCloudCollection } from '../lib/cloudCache';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as XLSX from 'xlsx';
 import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
@@ -36,6 +37,27 @@ import {
   subscribeMediaGallery,
 } from '../lib/mediaGallery';
 
+const DASH_CACHE_PREFIX = 'nurs_dash_portal_v1_';
+
+function readDashCache(phone: string) {
+  if (typeof window === 'undefined' || !phone) return null;
+  try {
+    const raw = localStorage.getItem(`${DASH_CACHE_PREFIX}${canonicalPhone(phone) || phone}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDashCache(phone: string, snap: Record<string, unknown>) {
+  if (typeof window === 'undefined' || !phone) return;
+  try {
+    localStorage.setItem(`${DASH_CACHE_PREFIX}${canonicalPhone(phone) || phone}`, JSON.stringify(snap));
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function CommitteeDashboard() {
   const router = useRouter();
   const [userPhone, setUserPhone] = useState<string | null>(null);
@@ -49,8 +71,7 @@ const [qualityUploadedFiles, setQualityUploadedFiles] = useState<any[]>([]);
 // 2. دالة جلب الملفات الخارجية المرفوعة
 const fetchQualityUploadedFiles = async () => {
   try {
-    const snap = await getDocs(collection(db, 'quality_uploaded_files'));
-    setQualityUploadedFiles(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+    setQualityUploadedFiles(await loadCloudCollection(db, 'quality_uploaded_files'));
   } catch (e) {
     console.error(e);
   }
@@ -199,9 +220,23 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       }
       localStorage.setItem('userPhone', phone);
       setUserPhone(phone);
+      const cachedDash = readDashCache(phone);
+      if (cachedDash) {
+        if (cachedDash.userData) setUserData(cachedDash.userData);
+        if (cachedDash.managedCommitteeId) setManagedCommitteeId(String(cachedDash.managedCommitteeId));
+        setIsCommitteeLeader(Boolean(cachedDash.isCommitteeLeader));
+        setIsQualityTeam(Boolean(cachedDash.isQualityTeam));
+        if (cachedDash.resolvedComm) {
+          setSelectedManagedCommittee(String(cachedDash.resolvedComm));
+          setSelectedMonitoredCommittee(String(cachedDash.resolvedComm));
+          setTargetCommitteeForTask(String(cachedDash.resolvedComm));
+        }
+        setLoading(false);
+      }
       fetchLeaderData(phone);
       fetchCommitteeWhatsappLinks();
       fetchCommitteeTasks();
+      fetchScientificTexts();
 
       const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
       if (isHiddenLocally === 'true') {
@@ -220,10 +255,18 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
   const fetchCommitteeWhatsappLinks = async () => {
     try {
-      const snap = await getDocs(collection(db, 'committee_whatsapp_links'));
+      const cached = peekCloudCollection('committee_whatsapp_links') || [];
+      if (cached.length > 0) {
+        const linksMap: { [key: string]: string } = {};
+        cached.forEach((d) => {
+          linksMap[d.id] = String(d.link || '');
+        });
+        setCommitteeWhatsappLinks(linksMap);
+      }
+      const rows = await loadCloudCollection(db, 'committee_whatsapp_links');
       const linksMap: { [key: string]: string } = {};
-      snap.docs.forEach(d => {
-        linksMap[d.id] = d.data().link || '';
+      rows.forEach((d) => {
+        linksMap[d.id] = String(d.link || '');
       });
       setCommitteeWhatsappLinks(linksMap);
     } catch (e) {
@@ -233,8 +276,9 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
   const fetchHonorBoard = async () => {
     try {
-      const snap = await getDocs(collection(db, 'committee_honor_board'));
-      const items = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      const cached = peekCloudCollection('committee_honor_board');
+      if (cached?.length) setHonorBoardList(cached);
+      const items = await loadCloudCollection(db, 'committee_honor_board');
       setHonorBoardList(items);
     } catch (e) {
       console.error(e);
@@ -258,7 +302,9 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
     try {
       const docRef = await addDoc(collection(db, 'committee_honor_board'), newEntry);
-      setHonorBoardList([{ ...newEntry, id: docRef.id }, ...honorBoardList]);
+      const nextHonor = [{ ...newEntry, id: docRef.id }, ...honorBoardList];
+      setHonorBoardList(nextHonor);
+      writeCloudCollection('committee_honor_board', nextHonor);
       setNewHonorMemberName('');
       setNewHonorScore('');
       alert('تم إضافة العضو ونقاطه بنجاح إلى لوحة الشرف! 🏆');
@@ -270,18 +316,21 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
   const fetchIssuedHrCertificates = async () => {
     try {
-      const settled = await Promise.allSettled([
-        getDocs(collection(db, 'certificates')),
-        getDocs(collection(db, 'site_certificates')),
+      const cached = mergeCachedCollections('certificates', 'site_certificates');
+      if (cached.length > 0) {
+        setIssuedHrCertificates(
+          cached
+            .map((cert) => omitHeavyCertMedia(cert))
+            .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
+        );
+      }
+      const [issued, siteIssued] = await Promise.all([
+        loadCloudCollection(db, 'certificates'),
+        loadCloudCollection(db, 'site_certificates'),
       ]);
       const mapped = new Map<string, any>();
-      settled.forEach((row) => {
-        if (row.status !== 'fulfilled') return;
-        row.value.docs.forEach((d) => mapped.set(d.id, { id: d.id, ...d.data() }));
-      });
-      const list = Array.from(mapped.values())
-        .map((cert) => omitHeavyCertMedia(cert))
-        .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+      [...issued, ...siteIssued].forEach((row) => mapped.set(row.id, omitHeavyCertMedia(row)));
+      const list = Array.from(mapped.values()).sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
       setIssuedHrCertificates(list);
     } catch (e) {
       console.error(e);
@@ -296,6 +345,8 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
         deleteDoc(doc(db, 'site_certificates', id)).catch(() => undefined),
       ]);
       setIssuedHrCertificates((prev) => prev.filter((cert) => cert.id !== id));
+      invalidateCloudCollection('certificates');
+      invalidateCloudCollection('site_certificates');
       alert('تم حذف الشهادة بنجاح.');
     } catch (e) {
       console.error(e);
@@ -382,6 +433,8 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
         { id: saved.id, ...omitHeavyCertMedia(newCertObj), hasFile: true },
         ...prev.filter((cert) => cert.id !== saved.id),
       ]);
+      invalidateCloudCollection('certificates');
+      invalidateCloudCollection('site_certificates');
       setCertStudentName('');
       setCertStudentPhone('');
       setCertStudentUniversityId('');
@@ -471,7 +524,9 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     if (await clubConfirm('هل أنت متأكد من حذف هذا العضو من لوحة الشرف؟')) {
       try {
         await deleteDoc(doc(db, 'committee_honor_board', id));
-        setHonorBoardList(honorBoardList.filter(item => item.id !== id));
+        const nextHonor = honorBoardList.filter(item => item.id !== id);
+        setHonorBoardList(nextHonor);
+        writeCloudCollection('committee_honor_board', nextHonor);
       } catch (e) {
         console.error(e);
       }
@@ -489,7 +544,14 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
         updatedAt: Date.now(),
         updatedBy: userData?.fullName || 'قائد اللجنة'
       });
-      setCommitteeWhatsappLinks(prev => ({ ...prev, [commName]: currentCommitteeWhatsappInput.trim() }));
+      setCommitteeWhatsappLinks(prev => {
+        const next = { ...prev, [commName]: currentCommitteeWhatsappInput.trim() };
+        writeCloudCollection(
+          'committee_whatsapp_links',
+          Object.entries(next).map(([id, link]) => ({ id, link }))
+        );
+        return next;
+      });
       setWhatsappLink(currentCommitteeWhatsappInput.trim());
       alert(`تم حفظ وتحديث رابط قروب (${commName}) بنجاح ليرتبط تلقائياً بالمقبولين! 🔗✅`);
     } catch (err) {
@@ -573,6 +635,13 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       }
 
       setLoading(false);
+      writeDashCache(phone, {
+        userData: uData,
+        managedCommitteeId: leaderCommId || '',
+        isCommitteeLeader: isCommitteeLeaderRole(roleStr) || isListedLeader || qualityMember,
+        isQualityTeam: qualityMember,
+        resolvedComm,
+      });
 
       if (qualityMember || isCommitteeLeaderRole(roleStr) || isListedLeader) {
         fetchEscalatedReports();
@@ -597,8 +666,9 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
       if (qualityMember || isCommitteeLeaderRole(roleStr) || isListedLeader) {
         try {
-          const reqSnap = await getDocs(collection(db, 'applications'));
-          setRequests(reqSnap.docs.map(d => ({ ...d.data(), id: d.id })));
+          const cachedApps = peekCloudCollection('applications');
+          if (cachedApps?.length) setRequests(cachedApps);
+          setRequests(await loadCloudCollection(db, 'applications'));
         } catch (err) {
           console.error(err);
         }
@@ -611,47 +681,50 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
   const fetchAllUsers = async () => {
     try {
-      const snap = await getDocs(collection(db, 'users'));
-      const users = snap.docs.map((d) => {
-        const { password: _password, ...safe } = d.data() as Record<string, any>;
-        return { ...safe, id: d.id };
-      });
+      const users = await loadCloudCollection(db, 'users');
       setAllUsersList(users);
     } catch (e) { console.error(e); }
   };
 
   const fetchEscalatedReports = async () => {
     try {
-      const snap = await getDocs(collection(db, 'escalated_reports'));
-      setEscalatedReports(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+      setEscalatedReports(await loadCloudCollection(db, 'escalated_reports'));
     } catch (e) { console.error(e); }
   };
 
   const fetchCommitteeTasks = async () => {
     try {
-      const snap = await getDocs(collection(db, 'committee_tasks'));
-      setCommitteeTasks(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+      const cached = peekCloudCollection('committee_tasks');
+      if (cached?.length) setCommitteeTasks(cached);
+      setCommitteeTasks(await loadCloudCollection(db, 'committee_tasks'));
     } catch (e) { console.error(e); }
   };
 
   const fetchQualityArchives = async () => {
     try {
-      const snap = await getDocs(collection(db, 'quality_reports_archive'));
-      setQualityArchives(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+      setQualityArchives(await loadCloudCollection(db, 'quality_reports_archive'));
     } catch (e) { console.error(e); }
   };
 
   const fetchEventExcuses = async () => {
     try {
-      const snap = await getDocs(collection(db, 'event_excuses'));
-      setEventExcuses(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+      setEventExcuses(await loadCloudCollection(db, 'event_excuses'));
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchScientificTexts = async () => {
+    try {
+      const cached = peekCloudCollection('scientific_committee_texts');
+      if (cached?.length) setScientificTextsList(cached);
+      setScientificTextsList(await loadCloudCollection(db, 'scientific_committee_texts'));
     } catch (e) { console.error(e); }
   };
 
   const fetchPublicPartners = async () => {
     try {
-      const snap = await getDocs(collection(db, 'public_partners_relations'));
-      setPublicPartnersList(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+      const cached = peekCloudCollection('public_partners_relations');
+      if (cached?.length) setPublicPartnersList(cached);
+      setPublicPartnersList(await loadCloudCollection(db, 'public_partners_relations'));
     } catch (e) { console.error(e); }
   };
 
@@ -673,7 +746,9 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     try {
       await requireAuthUser();
       const docRef = await addDoc(collection(db, 'public_partners_relations'), newPartnerObj);
-      setPublicPartnersList([{ ...newPartnerObj, id: docRef.id }, ...publicPartnersList]);
+      const nextPartners = [{ ...newPartnerObj, id: docRef.id }, ...publicPartnersList];
+      setPublicPartnersList(nextPartners);
+      writeCloudCollection('public_partners_relations', nextPartners);
 
       if (partnerStatus === 'وافقوا') {
         for (const usr of allUsersList) {
@@ -867,7 +942,10 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
         createdAt: new Date().toLocaleDateString('ar-SA'),
         createdAtMs: Date.now(),
       };
-      await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
+      const textRef = await addDoc(collection(db, 'scientific_committee_texts'), newTextObj);
+      const nextTexts = [{ id: textRef.id, ...newTextObj }, ...scientificTextsList];
+      setScientificTextsList(nextTexts);
+      writeCloudCollection('scientific_committee_texts', nextTexts);
       try {
         await notifyLeadership(db, `🔬 [نص جديد للتقييم]: "${textBannerTitle.trim()}" من ${newTextObj.author}. قيّموه من تبويب نصوص المحتوى العلمي.`);
       } catch (notifyErr) {
@@ -1225,7 +1303,9 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       };
 
       const docRef = await addDoc(collection(db, 'committee_tasks'), newTaskObj);
-      setCommitteeTasks([{ ...newTaskObj, id: docRef.id }, ...committeeTasks]);
+      const nextTasks = [{ ...newTaskObj, id: docRef.id }, ...committeeTasks];
+      setCommitteeTasks(nextTasks);
+      writeCloudCollection('committee_tasks', nextTasks);
 
       const acceptedList = requests.filter(r => isSameCommittee(r.acceptedCommittee, targetComm));
       for (const mem of acceptedList) {

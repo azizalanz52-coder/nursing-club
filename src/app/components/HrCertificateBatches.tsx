@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { peekCloudCollection, writeCloudCollection } from '../lib/cloudCache';
 import { clubConfirm, clubNotice } from '../lib/clubNotice';
 import {
   certEventLabel,
@@ -11,6 +12,8 @@ import {
   mergeRecipients,
   parseEligibleExcel,
   peopleFromEventCertificates,
+  certificateIssuerName,
+  findPersonCertificate,
   personHasCertificate,
   stableBatchId,
   suggestedCertTitle,
@@ -34,6 +37,8 @@ export default function HrCertificateBatches({
     universityId?: string;
     title?: string;
     certTitle?: string;
+    issuedBy?: string;
+    description?: string;
   }>;
   actorName: string;
   formAnchorId: string;
@@ -51,11 +56,18 @@ export default function HrCertificateBatches({
   const restoredRef = React.useRef(false);
 
   useEffect(() => {
+    const cached = peekCloudCollection<CertEventBatch>('hr_certificate_batches');
+    if (cached?.length) {
+      setBatches(cached);
+      setBatchesReady(true);
+    }
+
     const applySnap = (snap: { docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => {
       const list = snap.docs
         .map((item) => ({ id: item.id, ...item.data() } as CertEventBatch))
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setBatches(list);
+      writeCloudCollection('hr_certificate_batches', list);
       setBatchesReady(true);
       setOpenId((current) => current || list[0]?.id || null);
     };
@@ -290,7 +302,8 @@ export default function HrCertificateBatches({
 
                     <div className="space-y-2 max-h-80 overflow-auto">
                       {visible.map((person, index) => {
-                        const issued = personHasCertificate(person, certificates, batch.eventTitle);
+                        const issuedCert = findPersonCertificate(person, certificates, batch.eventTitle);
+                        const issuer = certificateIssuerName(issuedCert);
                         return (
                           <div
                             key={`${person.phone}-${person.universityId}-${index}`}
@@ -302,8 +315,15 @@ export default function HrCertificateBatches({
                                 {[person.phone, person.universityId].filter(Boolean).join('  ')}
                               </p>
                             </div>
-                            {issued ? (
-                              <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full">صدرت</span>
+                            {issuedCert ? (
+                              <span className="text-left shrink-0">
+                                <span className="block text-[11px] font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full text-center">صدرت</span>
+                                {issuer ? (
+                                  <span className="block mt-1 text-[10px] font-bold text-slate-500 text-center">
+                                    صدرت بواسطة {issuer}
+                                  </span>
+                                ) : null}
+                              </span>
                             ) : (
                               <button
                                 type="button"

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
+import { peekCloudCollection, writeCloudCollection } from '../lib/cloudCache';
 import {
   NEWS_CAT,
   WEEKDAY_LABEL,
@@ -99,6 +100,11 @@ export default function NewsletterPage() {
   const [queryText, setQueryText] = useState('');
 
   useEffect(() => {
+    const cached = peekCloudCollection<NewsletterItem>('site_newsletters');
+    if (cached?.length) {
+      setItems(cached);
+      setLoading(false);
+    }
     const unsub = onSnapshot(
       collection(db, 'site_newsletters'),
       (snap) => {
@@ -125,6 +131,7 @@ export default function NewsletterPage() {
           } as NewsletterItem;
         });
         list.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+        writeCloudCollection('site_newsletters', list);
         setItems(list);
         setLoading(false);
       },

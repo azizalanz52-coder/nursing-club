@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { loadCloudCollection, peekCloudCollection } from '../../lib/cloudCache';
 import { CommitteeIcon } from '../icons';
 
 const initialCommittees = [
@@ -16,37 +16,36 @@ const initialCommittees = [
   { id: 'quality', name: 'الجودة والتطوير', description: 'تقييم الأداء، قياس رضا الأعضاء، وتحسين العمل.', maleLeader: 'سلطان الحربي', femaleLeader: 'نورة الدوسري' },
 ];
 
+function mergeCommittees(
+  seed: typeof initialCommittees,
+  cloud: Array<{ id: string; maleLeader?: string; femaleLeader?: string }>
+) {
+  const cloudDataMap: Record<string, { maleLeader?: string; femaleLeader?: string }> = {};
+  cloud.forEach((row) => {
+    cloudDataMap[row.id] = row;
+  });
+  return seed.map((comm) => {
+    const cloudRow = cloudDataMap[comm.id];
+    if (!cloudRow) return comm;
+    return {
+      ...comm,
+      maleLeader: cloudRow.maleLeader || comm.maleLeader,
+      femaleLeader: cloudRow.femaleLeader || comm.femaleLeader,
+    };
+  });
+}
+
 export default function CommitteesPreview() {
   const [committees, setCommittees] = useState(initialCommittees);
 
   useEffect(() => {
-    const fetchCloudCommittees = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'committees'));
-        if (!querySnapshot.empty) {
-          const cloudDataMap: Record<string, any> = {};
-          querySnapshot.forEach((docSnap) => {
-            cloudDataMap[docSnap.id] = docSnap.data();
-          });
-
-          const merged = initialCommittees.map((comm) => {
-            if (cloudDataMap[comm.id]) {
-              return {
-                ...comm,
-                maleLeader: cloudDataMap[comm.id].maleLeader || comm.maleLeader,
-                femaleLeader: cloudDataMap[comm.id].femaleLeader || comm.femaleLeader,
-              };
-            }
-            return comm;
-          });
-          setCommittees(merged);
-        }
-      } catch (err) {
-        console.error('Error fetching cloud committees:', err);
-      }
-    };
-
-    fetchCloudCommittees();
+    const cached = peekCloudCollection<{ id: string; maleLeader?: string; femaleLeader?: string }>('committees');
+    if (cached?.length) setCommittees(mergeCommittees(initialCommittees, cached));
+    void loadCloudCollection<{ id: string; maleLeader?: string; femaleLeader?: string }>(db, 'committees')
+      .then((cloud) => {
+        if (cloud.length > 0) setCommittees(mergeCommittees(initialCommittees, cloud));
+      })
+      .catch((err) => console.error('Error fetching cloud committees:', err));
   }, []);
 
   return (

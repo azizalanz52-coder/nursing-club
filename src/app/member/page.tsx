@@ -6,6 +6,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { emailToPhone, isDistinguishedRole, isPrivilegedRole } from '../lib/authIdentity';
+import { canonicalPhone } from '../lib/certificatesLookup';
+import { loadCloudCollection, peekCloudCollection } from '../lib/cloudCache';
 import { committeeIdFromName, findMemberContext, resolveMemberAcceptance, resolvePortalCommitteeId } from '../lib/memberAcceptance';
 import { ClubIcon, CommitteeIcon, SocialIcon } from '../components/icons';
 
@@ -18,6 +20,40 @@ interface CommitteeData {
   femaleLeader: string;
   whatsappLink?: string;
   members: any[];
+}
+
+const PORTAL_CACHE_PREFIX = 'nurs_member_portal_v1_';
+
+type PortalCache = {
+  name: string;
+  role: string;
+  committee: string;
+  notification: string;
+  committeeData: CommitteeData | null;
+};
+
+function portalCacheKey(phone: string) {
+  return `${PORTAL_CACHE_PREFIX}${canonicalPhone(phone) || phone}`;
+}
+
+function readPortalCache(phone: string): PortalCache | null {
+  if (typeof window === 'undefined' || !phone) return null;
+  try {
+    const raw = localStorage.getItem(portalCacheKey(phone));
+    if (!raw) return null;
+    return JSON.parse(raw) as PortalCache;
+  } catch {
+    return null;
+  }
+}
+
+function writePortalCache(phone: string, snap: PortalCache) {
+  if (typeof window === 'undefined' || !phone) return;
+  try {
+    localStorage.setItem(portalCacheKey(phone), JSON.stringify(snap));
+  } catch {
+    /* ignore */
+  }
 }
 
 const committeesMeta: Record<string, { id: string; name: string; description: string; icon: string }> = {
@@ -46,6 +82,15 @@ export default function MemberSmartDashboard() {
       const name = localStorage.getItem('userName') || '';
       setCurrentUserPhone(phone);
       setCurrentUserName(name);
+      const cached = readPortalCache(phone);
+      if (cached) {
+        setCurrentUserName(cached.name || name);
+        setUserRole(cached.role || 'عضو أساسي');
+        setAssignedCommittee(cached.committee || '');
+        setUserNotification(cached.notification || '');
+        setUserCommitteeData(cached.committeeData);
+        setLoading(false);
+      }
       void fetchLinkedData(phone, name);
     });
     return () => unsub();
@@ -87,6 +132,13 @@ export default function MemberSmartDashboard() {
 
       if (!activeComm) {
         setUserCommitteeData(null);
+        writePortalCache(phone, {
+          name: finalName,
+          role: activeRole,
+          committee: '',
+          notification,
+          committeeData: null,
+        });
         return;
       }
 
@@ -101,27 +153,43 @@ export default function MemberSmartDashboard() {
       }
       if (!targetKey) {
         setUserCommitteeData(null);
+        writePortalCache(phone, {
+          name: finalName,
+          role: activeRole,
+          committee: activeComm,
+          notification,
+          committeeData: null,
+        });
         return;
       }
 
-      const commDocRef = doc(db, 'committees', targetKey);
-      const commSnap = await getDoc(commDocRef);
       const meta = committeesMeta[targetKey];
+      const cachedCommittees = peekCloudCollection('committees') || [];
+      const cachedRow = cachedCommittees.find((row) => row.id === targetKey);
+      let members = Array.isArray(cachedRow?.members) ? cachedRow.members : [];
+      let maleLeader = String(cachedRow?.maleLeader || 'قائد الطلاب');
+      let femaleLeader = String(cachedRow?.femaleLeader || 'قائدة الطالبات');
+      let whatsappLink = String(cachedRow?.whatsappLink || '');
 
-      let members = [];
-      let maleLeader = 'قائد الطلاب';
-      let femaleLeader = 'قائدة الطالبات';
-      let whatsappLink = '';
-
+      const commSnap = await getDoc(doc(db, 'committees', targetKey));
       if (commSnap.exists()) {
         const dat = commSnap.data();
-        members = dat.members || [];
+        members = dat.members || members;
         maleLeader = dat.maleLeader || maleLeader;
         femaleLeader = dat.femaleLeader || femaleLeader;
-        whatsappLink = dat.whatsappLink || '';
+        whatsappLink = dat.whatsappLink || whatsappLink;
+      } else {
+        const cloud = await loadCloudCollection(db, 'committees').catch(() => []);
+        const row = cloud.find((item) => item.id === targetKey);
+        if (row) {
+          members = Array.isArray(row.members) ? row.members : members;
+          maleLeader = String(row.maleLeader || maleLeader);
+          femaleLeader = String(row.femaleLeader || femaleLeader);
+          whatsappLink = String(row.whatsappLink || whatsappLink);
+        }
       }
 
-      setUserCommitteeData({
+      const committeeData = {
         id: targetKey,
         name: meta.name,
         description: meta.description,
@@ -130,6 +198,14 @@ export default function MemberSmartDashboard() {
         femaleLeader,
         whatsappLink,
         members
+      };
+      setUserCommitteeData(committeeData);
+      writePortalCache(phone, {
+        name: finalName,
+        role: activeRole,
+        committee: activeComm,
+        notification,
+        committeeData,
       });
     } catch (err) {
       console.error('Error fetching linked system data:', err);

@@ -1,5 +1,6 @@
-import { Firestore, collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
+import { Firestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { canonicalPhone, normalizeUniversityId, phoneVariants, universityIdVariants } from './certificatesLookup';
+import { loadCloudCollection, peekCloudCollection } from './cloudCache';
 
 export const COMMITTEE_NAMES: Record<string, string> = {
   design: 'لجنة التصميم',
@@ -52,17 +53,17 @@ export async function findListedLeadership(
   const name = String(fullName || '').trim();
   if (!name) return null;
   try {
-    const snap = await getDocs(collection(db, 'committees'));
-    for (const row of snap.docs) {
-      const data = row.data();
+    const cached = peekCloudCollection('committees');
+    const list = cached?.length ? cached : await loadCloudCollection(db, 'committees');
+    for (const row of list) {
       if (
-        sameMemberName(String(data.maleLeader || ''), name) ||
-        sameMemberName(String(data.femaleLeader || ''), name)
+        sameMemberName(String(row.maleLeader || ''), name) ||
+        sameMemberName(String(row.femaleLeader || ''), name)
       ) {
         return {
           id: row.id,
-          name: committeeNameFromId(row.id) || String(data.name || ''),
-          data,
+          name: committeeNameFromId(row.id) || String(row.name || ''),
+          data: row,
         };
       }
     }
@@ -130,9 +131,8 @@ export async function findMemberContext(db: Firestore, phone: string, storedName
 
   if (!found && name) {
     try {
-      const snap = await getDocs(collection(db, 'applications'));
-      for (const row of snap.docs) {
-        const data = row.data();
+      const rows = peekCloudCollection('applications') || await loadCloudCollection(db, 'applications');
+      for (const data of rows) {
         if (!sameMemberName(String(data.fullName || data.name || ''), name)) continue;
         const appPhone = String(data.phone || '');
         if (appPhone) found = await findUserDoc(db, appPhone);
@@ -156,9 +156,9 @@ export async function findUserDoc(db: Firestore, phone: string) {
   const variants = phoneVariants(phone);
   const canonical = canonicalPhone(phone) || String(phone || '').trim();
   const ordered = Array.from(new Set([canonical, ...variants].filter(Boolean)));
+  const snaps = await Promise.all(ordered.map((id) => getDoc(doc(db, 'users', id))));
   let fallback: { id: string; data: Record<string, unknown> } | null = null;
-  for (const id of ordered) {
-    const snap = await getDoc(doc(db, 'users', id));
+  for (const snap of snaps) {
     if (!snap.exists()) continue;
     const data = snap.data();
     const hasProfile = Boolean(data.assignedCommittee || data.committee || data.role || data.fullName);
@@ -194,15 +194,14 @@ export async function resolveMemberAcceptance(
   const userName = String(userData?.fullName || '');
 
   try {
-    const snap = await getDocs(collection(db, 'applications'));
-    snap.forEach((row) => {
-      const data = row.data();
+    const rows = peekCloudCollection('applications') || await loadCloudCollection(db, 'applications');
+    rows.forEach((data) => {
       const phoneMatch = sameMemberPhone(String(data.phone || ''), lookupPhone);
       const appUniv = normalizeUniversityId(String(data.universityId || ''));
       const univMatch = Boolean(appUniv && univSet.has(appUniv));
       const nameMatch = sameMemberName(String(data.fullName || data.name || ''), userName);
       if (phoneMatch || univMatch || nameMatch) {
-        apps.push({ id: row.id, ...data });
+        apps.push(data);
       }
     });
   } catch (err) {
@@ -257,10 +256,11 @@ export async function resolvePortalCommitteeId(
   if (fromRole) return fromRole;
 
   try {
-    const snap = await getDocs(collection(db, 'committees'));
+    const cached = peekCloudCollection('committees');
+    const list = cached?.length ? cached : await loadCloudCollection(db, 'committees');
     const fullName = String(userData?.fullName || '');
-    for (const row of snap.docs) {
-      if (memberListedInCommittee(row.data(), phone, fullName)) return row.id;
+    for (const row of list) {
+      if (memberListedInCommittee(row, phone, fullName)) return row.id;
     }
   } catch (err) {
     console.error(err);

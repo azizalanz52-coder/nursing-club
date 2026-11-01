@@ -247,13 +247,22 @@ export function parseEligibleExcel(buffer: ArrayBuffer): ExcelParseResult {
   return { people, skippedDuplicates, namedRows };
 }
 
-export function personHasCertificate(
+export type IssuedCertRef = {
+  phone?: string;
+  universityId?: string;
+  title?: string;
+  certTitle?: string;
+  issuedBy?: string;
+  description?: string;
+};
+
+export function findPersonCertificate(
   person: CertEligiblePerson,
-  certificates: Array<{ phone?: string; universityId?: string; title?: string; certTitle?: string }>,
+  certificates: IssuedCertRef[],
   eventTitle: string
 ) {
   const event = norm(eventTitle);
-  return certificates.some((cert) => {
+  return certificates.find((cert) => {
     const samePerson = isSameEligiblePerson(person, {
       fullName: '',
       phone: String(cert.phone || ''),
@@ -263,7 +272,23 @@ export function personHasCertificate(
     const title = `${norm(cert.title)} ${norm(cert.certTitle)}`;
     if (!event) return true;
     return title.includes(event) || event.includes(norm(cert.certTitle || cert.title));
-  });
+  }) || null;
+}
+
+export function personHasCertificate(
+  person: CertEligiblePerson,
+  certificates: IssuedCertRef[],
+  eventTitle: string
+) {
+  return Boolean(findPersonCertificate(person, certificates, eventTitle));
+}
+
+export function certificateIssuerName(cert?: IssuedCertRef | null) {
+  const direct = String(cert?.issuedBy || '').trim();
+  if (direct) return direct;
+  const desc = String(cert?.description || '');
+  const fromDesc = desc.includes('•') ? desc.split('•').pop()?.trim() || '' : '';
+  return fromDesc;
 }
 
 export function certEventLabel(cert: { title?: string; certTitle?: string }) {

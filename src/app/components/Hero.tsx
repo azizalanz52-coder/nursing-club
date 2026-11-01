@@ -5,6 +5,7 @@ import Link from "next/link";
 import { db } from './../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { DEFAULT_WELCOME_BANNER } from '../lib/welcomeBanner';
+import { peekCloudCollection, writeCloudCollection } from '../lib/cloudCache';
 import { ClubIcon } from './icons';
 
 interface BannerItem {
@@ -19,6 +20,14 @@ interface BannerItem {
   cinematic?: boolean;
 }
 
+function sortBanners(list: BannerItem[]) {
+  return [...list].sort((a, b) => {
+    if (a.id === 'welcome-default') return -1;
+    if (b.id === 'welcome-default') return 1;
+    return Number(b.id) - Number(a.id);
+  });
+}
+
 export default function Hero() {
   const [banners, setBanners] = useState<BannerItem[]>([DEFAULT_WELCOME_BANNER]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -30,6 +39,8 @@ export default function Hero() {
 
   useEffect(() => {
     if (!live) return;
+    const cached = peekCloudCollection<BannerItem>('site_banners');
+    if (cached?.length) setBanners(sortBanners(cached));
     localStorage.removeItem('UHB_BANNERS');
     const unsub = onSnapshot(
       collection(db, 'site_banners'),
@@ -54,12 +65,9 @@ export default function Hero() {
             cinematic: Boolean(dat.cinematic),
           });
         });
-        cloudList.sort((a, b) => {
-          if (a.id === 'welcome-default') return -1;
-          if (b.id === 'welcome-default') return 1;
-          return Number(b.id) - Number(a.id);
-        });
-        setBanners(cloudList);
+        const sorted = sortBanners(cloudList);
+        writeCloudCollection('site_banners', sorted);
+        setBanners(sorted);
         setCurrentIndex(0);
       },
       (err) => {

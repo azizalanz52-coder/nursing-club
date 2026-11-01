@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { loadCloudCollection, peekCloudCollection } from '../lib/cloudCache';
 import { CLUB_GOALS, CLUB_MISSION, CLUB_VISION } from '../lib/clubIdentity';
 import { ClubIcon } from '../components/icons';
 
@@ -138,55 +138,52 @@ export default function DiscoverPage() {
   }, [passionSlides.length]);
 
   useEffect(() => {
-    const fetchCloudContent = async () => {
-      try {
-        const [passionSnap, discoverSnap, partnersSnap, achievementsSnap] = await Promise.all([
-          getDocs(collection(db, 'site_passion_slides')),
-          getDocs(collection(db, 'site_discover_events')),
-          getDocs(collection(db, 'site_partners')),
-          getDocs(collection(db, 'student_achievements')),
-        ]);
+    let cancelled = false;
 
-        if (!passionSnap.empty) {
-          const slides = passionSnap.docs.map((d) => {
-            const data = d.data() as Partial<(typeof DEFAULT_PASSION_SLIDES)[number]>;
-            return {
-              id: d.id,
-              image: data.image || '/header-banner.png',
-              quote: data.quote || '',
-            };
-          });
-          if (slides.length > 0) setPassionSlides(slides);
-        }
+    const cachedPassion = peekCloudCollection<(typeof DEFAULT_PASSION_SLIDES)[number]>('site_passion_slides');
+    const cachedDiscover = peekCloudCollection<(typeof DEFAULT_DISCOVER_EVENTS)[number]>('site_discover_events');
+    const cachedPartners = peekCloudCollection<PartnerItem>('site_partners');
+    const cachedAchievements = peekCloudCollection<StudentAchievement>('student_achievements');
+    if (cachedPassion?.length) setPassionSlides(cachedPassion);
+    if (cachedDiscover?.length) setDiscoverEvents(cachedDiscover);
+    if (cachedPartners?.length) setPartners(cachedPartners);
+    if (cachedAchievements) setStudentAchievements(cachedAchievements);
 
-        if (!discoverSnap.empty) {
-          const eventsList = discoverSnap.docs.map((d) => {
-            const data = d.data() as Partial<(typeof DEFAULT_DISCOVER_EVENTS)[number]>;
-            return {
-              id: d.id,
-              title: data.title || 'فعالية',
-              category: data.category || '',
-              description: data.description || '',
-              images: Array.isArray(data.images) && data.images.length ? data.images : ['/header-banner.png'],
-            };
-          });
-          if (eventsList.length > 0) setDiscoverEvents(eventsList);
-        }
-
-        if (!partnersSnap.empty) {
-          const partnersList = partnersSnap.docs.map((d) => ({ id: d.id, ...d.data() } as PartnerItem));
-          if (partnersList.length > 0) setPartners(partnersList);
-        }
-
-        if (!achievementsSnap.empty) {
-          setStudentAchievements(achievementsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as StudentAchievement)));
-        }
-      } catch (err) {
-        console.error('Error fetching cloud data:', err);
-      }
+    const applyIfReady = <T,>(rows: T[], setRows: (next: T[]) => void) => {
+      if (!cancelled && rows.length > 0) setRows(rows);
     };
 
-    fetchCloudContent();
+    void loadCloudCollection<(typeof DEFAULT_PASSION_SLIDES)[number]>(db, 'site_passion_slides', {
+      mapDoc: (id, data) => ({
+        id,
+        image: String(data.image || '/header-banner.png'),
+        quote: String(data.quote || ''),
+      }),
+    }).then((rows) => applyIfReady(rows, setPassionSlides)).catch((err) => console.error(err));
+
+    void loadCloudCollection<(typeof DEFAULT_DISCOVER_EVENTS)[number]>(db, 'site_discover_events', {
+      mapDoc: (id, data) => ({
+        id,
+        title: String(data.title || 'فعالية'),
+        category: String(data.category || ''),
+        description: String(data.description || ''),
+        images: Array.isArray(data.images) && data.images.length ? (data.images as string[]) : ['/header-banner.png'],
+      }),
+    }).then((rows) => applyIfReady(rows, setDiscoverEvents)).catch((err) => console.error(err));
+
+    void loadCloudCollection<PartnerItem>(db, 'site_partners')
+      .then((rows) => applyIfReady(rows, setPartners))
+      .catch((err) => console.error(err));
+
+    void loadCloudCollection<StudentAchievement>(db, 'student_achievements')
+      .then((rows) => {
+        if (!cancelled) setStudentAchievements(rows);
+      })
+      .catch((err) => console.error(err));
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const activeSlide = passionSlides[currentSlide] || passionSlides[0];
