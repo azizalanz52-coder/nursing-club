@@ -4,12 +4,12 @@ import {
   personPhone,
   riyadhParts,
   submissionDayKey,
+  solveDurationMs,
   submissionMs,
   weekStartSunday,
   type CaseLeaderboardRow,
 } from './caseStudy';
 
-/** الفترة التجريبية: الأربعاء 28 أكتوبر 2026 الساعة 11:59 مساءً حتى السبت 31 أكتوبر الساعة 11:59 مساءً. */
 export const WEEKLY_COMPETITION_START_MS = Date.parse('2026-10-28T23:59:00+03:00');
 export const WEEKLY_TITLES_START = '2026-10-29';
 export const WEEKLY_DAY_CAP = 3;
@@ -17,20 +17,20 @@ export const WEEKLY_SPECIAL_CERT_TITLES = 3;
 export const WEEKLY_COMPETITION_START_LABEL = 'الأربعاء 28 أكتوبر الساعة 11:59 مساءً بتوقيت الرياض';
 
 export const WEEKLY_COPY = {
-  noticeIntro: 'انتهت الفترة التجريبية لمتصدر الأسبوع. هذه آلية العمل من الآن:',
+  noticeIntro: 'اعتُمدت آلية المنافسة الأسبوعية رسمياً. هذه طريقة العمل:',
   noticePoints: [
     'لوحة الصدارة فيها خياران: الصدارة العامة، ومتصدر الأسبوع.',
-    'كانت الفترة التجريبية من يوم الأربعاء 28 أكتوبر الساعة 11:59 مساءً إلى يوم السبت 31 أكتوبر الساعة 11:59 مساءً بتوقيت الرياض.',
+    'وقت الحل دقيقة ونص للحالات الثلاث.',
     'تُحتسب في متصدر الأسبوع الإجابات الصحيحة فقط. البونص المفاجئ وبونص الاستمرارية يُضافان للصدارة العامة ولا يدخلان سباق الأسبوع.',
     'كل يوم أحد تبدأ نقاط الأسبوع من الصفر، وتُقفل الصدارة يوم السبت الساعة 11:59 مساءً.',
-    'تظهر بجانب الاسم شارات: متصدر الأسبوع، متصدر الأسبوع الماضي، أطول سلسلة، وأسبوع كامل عند حل الحالات الثلاث كل يوم.',
-    'عند تساوي النقاط يتقدم من كان الأسرع في أكبر عدد من أيام الأسبوع، ثم من حقق 3 من 3 في أيام أكثر. وإذا بقي التساوي يتشاركان الصدارة.',
+    'تظهر بجانب الاسم شارات: متصدر الأسبوع، ومتصدر الأسبوع الماضي، وأطول سلسلة، وأسبوع كامل عند حل الحالات الثلاث كل يوم.',
+    'عند تساوي النقاط يتقدم من أنهى الحل أسرع خلال الدقيقة ونص في أكبر عدد من أيام الأسبوع، ثم من حقق 3 من 3 في أيام أكثر. وإذا بقي التساوي يتشاركان الصدارة.',
     'الشهادة الخاصة لمن يحقق ثلاث صدارات أسبوعية خلال الفصل، وليست بالضرورة في أسابيع متتالية.',
   ],
   boardLive: 'نقاط الأسبوع من الإجابات الصحيحة فقط، والبونص يُضاف للصدارة العامة.',
-  boardBefore: 'تبدأ الفترة التجريبية يوم الأربعاء الساعة 11:59 مساءً.',
-  emptyBefore: 'لم تبدأ الفترة التجريبية بعد.',
-  emptyLive: 'لا توجد مشاركات في هذه الفترة بعد.',
+  boardBefore: 'تبدأ المنافسة الأسبوعية قريباً.',
+  emptyBefore: 'لم تبدأ المنافسة الأسبوعية بعد.',
+  emptyLive: 'لا توجد مشاركات في هذا الأسبوع بعد.',
   lockNote: 'تُقفل صدارة الأسبوع يوم السبت الساعة 11:59 مساءً بتوقيت الرياض.',
 };
 
@@ -186,11 +186,11 @@ function fastestDaysByKey(subs: Array<Record<string, any>>, weekStart: string) {
     if (!inWeek(sub, weekStart)) continue;
     const day = submissionDayKey(sub);
     const key = personKey(sub);
-    const ms = submissionMs(sub);
-    if (!day || !key || !ms) continue;
+    const used = solveDurationMs(sub);
+    if (!day || !key || used == null) continue;
     const people = byDay.get(day) || new Map<string, number>();
     const prev = people.get(key);
-    if (prev === undefined || ms < prev) people.set(key, ms);
+    if (prev === undefined || used < prev) people.set(key, used);
     byDay.set(day, people);
   }
 
@@ -356,7 +356,7 @@ export function aggregateWeeklyBoard(
     let tieNote = '';
     if (tiedNeighbors.length) {
       if (tiedNeighbors.some((other) => other.fastestDays !== row.fastestDays)) {
-        tieNote = `تعادل ${row.weekPoints} نقطة · الأسرع في ${row.fastestDays} ${row.fastestDays === 1 ? 'يوم' : 'أيام'}`;
+        tieNote = `تعادل ${row.weekPoints} نقطة · الأسرع حلاً في ${row.fastestDays} ${row.fastestDays === 1 ? 'يوم' : 'أيام'}`;
       } else if (tiedNeighbors.some((other) => other.perfectDays !== row.perfectDays)) {
         tieNote = `تعادل ${row.weekPoints} نقطة · ${row.perfectDays} أيام 3/3`;
       } else {

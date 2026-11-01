@@ -594,12 +594,16 @@ export default function CaseStudyPage() {
       const persistence = persistenceForSubmit(existing, phoneKey, now);
       const score = solveScore + persistence.amount;
       const when = new Date(now);
+      const solveMs = solveExpired
+        ? CASE_STUDY_SOLVE_MS
+        : Math.min(CASE_STUDY_SOLVE_MS, Math.max(1, CASE_STUDY_SOLVE_MS - solveLeftMs));
 
       await addDoc(collection(db, 'case_study_submissions'), {
         studentName: studentName.trim(),
         phone: canonicalPhone(studentPhone) || studentPhone.trim(),
         score,
         solveScore,
+        solveMs,
         total: activeCases.length,
         bonusQuestionId: bonus?.questionId || null,
         bonusAmount: bonus?.amount || 0,
@@ -679,7 +683,7 @@ export default function CaseStudyPage() {
             <p className="text-xs sm:text-sm font-black">
               {solveExpired
                 ? 'انتهى وقت الحل. أرسل ما اخترته.'
-                : 'وقت الحل: 45 ثانية للحالات الثلاث'}
+                : 'وقت الحل: دقيقة ونص للحالات الثلاث'}
             </p>
             <strong className="font-mono text-lg font-black tabular-nums" suppressHydrationWarning>
               {formatSolveClock(solveLeftMs)}

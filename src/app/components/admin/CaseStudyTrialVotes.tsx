@@ -51,7 +51,9 @@ export default function CaseStudyTrialVotes() {
             {TRIAL_POLL_COPY.intro}
           </p>
           <p className="text-[11px] font-bold text-amber-800">
-            {isTrialPollOpen() ? 'الاستبيان مفتوح الآن في صفحة دراسة الحالة.' : 'الاستبيان مغلق.'}
+            {isTrialPollOpen()
+              ? 'الاستبيان مفتوح الآن في صفحة دراسة الحالة.'
+              : 'الاستبيان مغلق. اعتُمد الوقت دقيقة ونص حسب رأي الأغلبية، وآلية المنافسة الأسبوعية معتمدة رسمياً.'}
           </p>
         </div>
         <button

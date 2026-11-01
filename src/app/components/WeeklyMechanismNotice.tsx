@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ClubIcon } from './icons';
 import { WEEKLY_COPY } from '../lib/caseStudyWeekly';
 
-const DISMISS_KEY = 'nurs_week_live_notice_v6';
+const DISMISS_KEY = 'nurs_week_official_notice_v2';
 
 export default function WeeklyMechanismNotice({
   paused,
@@ -54,7 +54,7 @@ export default function WeeklyMechanismNotice({
         <div className="p-5 sm:p-7 space-y-5 text-right">
           <div className="space-y-2 text-center">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#630517]/10 text-[#630517] text-[11px] font-black">
-              <ClubIcon name="bell" size={13} /> إضافة جديدة
+              <ClubIcon name="bell" size={13} /> معتمدة رسمياً
             </span>
             <h2 className="text-xl sm:text-2xl font-black text-[#630517]">آلية المنافسة الأسبوعية</h2>
             <p className="text-sm text-slate-600 font-medium leading-7">{WEEKLY_COPY.noticeIntro}</p>

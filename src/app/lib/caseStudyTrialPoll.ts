@@ -39,7 +39,7 @@ export const SATISFIED_LABEL: Record<YesNo, string> = {
 };
 
 export function isTrialPollOpen() {
-  return true;
+  return false;
 }
 
 export function summarizeTrialVotes(rows: TrialVote[]) {

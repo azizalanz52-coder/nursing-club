@@ -32,10 +32,16 @@ export function riyadhParts(ms = Date.now()) {
   };
 }
 
-export const CASE_STUDY_SOLVE_MS = 45 * 1000;
+export const CASE_STUDY_SOLVE_MS = 90 * 1000;
 
 export function caseSolveTimerKey(ymd = riyadhParts().ymd) {
-  return `nurs_case_solve_v3_${ymd}`;
+  return `nurs_case_solve_v4_${ymd}`;
+}
+
+export function solveDurationMs(sub: Record<string, any> | null | undefined) {
+  const used = Number(sub?.solveMs);
+  if (!Number.isFinite(used) || used <= 0) return null;
+  return Math.min(CASE_STUDY_SOLVE_MS, Math.max(1, Math.round(used)));
 }
 
 export function formatSolveClock(leftMs: number) {
