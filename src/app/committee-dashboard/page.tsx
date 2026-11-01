@@ -4,7 +4,7 @@ import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db, storage } from '../lib/firebase';
-import { collection, doc, updateDoc, getDoc, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, getDoc, addDoc, deleteDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { invalidateCloudCollection, loadCloudCollection, mergeCachedCollections, peekCloudCollection, writeCloudCollection } from '../lib/cloudCache';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as XLSX from 'xlsx';
@@ -15,6 +15,7 @@ import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup
 import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { committeeIdFromName, committeeNameFromId, findListedLeadership, findMemberContext, findUserDoc, isCommitteeLeaderRole, resolvePortalCommitteeId, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
 import { filterMediaFilesWithinLimit, isOverUploadLimit, mediaUploadLimitMessage, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
+import { certificateIssuerName, issuerMatchesMember } from '../lib/hrCertificateBatches';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/issueCertificate';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
@@ -97,6 +98,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [isCommitteeLeader, setIsCommitteeLeader] = useState(false);
   const [managedCommitteeId, setManagedCommitteeId] = useState('');
   const [committeeRoster, setCommitteeRoster] = useState<any[]>([]);
+  const [committeeLeaders, setCommitteeLeaders] = useState({ maleLeader: '', femaleLeader: '' });
 
   const [showLeaderAcceptedMembersTable, setShowLeaderAcceptedMembersTable] = useState(false);
 
@@ -251,6 +253,24 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
   useEffect(() => {
     return subscribeMediaGallery(db, setMediaGallery);
+  }, []);
+
+  useEffect(() => {
+    const cached = peekCloudCollection('committee_honor_board');
+    if (cached?.length) setHonorBoardList(cached);
+
+    const unsub = onSnapshot(
+      collection(db, 'committee_honor_board'),
+      (snap) => {
+        const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setHonorBoardList(items);
+        writeCloudCollection('committee_honor_board', items);
+      },
+      () => {
+        void fetchHonorBoard();
+      }
+    );
+    return () => unsub();
   }, []);
 
   const fetchCommitteeWhatsappLinks = async () => {
@@ -615,10 +635,19 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       if (leaderCommId) setManagedCommitteeId(leaderCommId);
       if (listed?.data && Array.isArray(listed.data.members)) {
         setCommitteeRoster(listed.data.members);
+        setCommitteeLeaders({
+          maleLeader: String(listed.data.maleLeader || ''),
+          femaleLeader: String(listed.data.femaleLeader || ''),
+        });
       } else if (leaderCommId) {
         try {
           const rosterSnap = await getDoc(doc(db, 'committees', leaderCommId));
-          setCommitteeRoster(Array.isArray(rosterSnap.data()?.members) ? rosterSnap.data()?.members : []);
+          const rosterData = rosterSnap.data() || {};
+          setCommitteeRoster(Array.isArray(rosterData.members) ? rosterData.members : []);
+          setCommitteeLeaders({
+            maleLeader: String(rosterData.maleLeader || ''),
+            femaleLeader: String(rosterData.femaleLeader || ''),
+          });
         } catch (err) {
           console.error(err);
         }
@@ -649,7 +678,6 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
         fetchQualityArchives();
         fetchEventExcuses();
         fetchPublicPartners();
-        fetchHonorBoard();
         fetchQualityUploadedFiles();
       }
 
@@ -1087,6 +1115,22 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     fetchIssuedHrCertificates();
   }, [isHrTeam]);
 
+  useEffect(() => {
+    const commId = committeeIdFromName(currentActiveComm) || managedCommitteeId;
+    if (!commId) return;
+    const applyLeaders = (row?: Record<string, unknown>) => {
+      if (!row) return;
+      setCommitteeLeaders({
+        maleLeader: String(row.maleLeader || ''),
+        femaleLeader: String(row.femaleLeader || ''),
+      });
+    };
+    applyLeaders((peekCloudCollection('committees') || []).find((row) => row.id === commId));
+    void loadCloudCollection(db, 'committees').then((list) => {
+      applyLeaders(list.find((row) => row.id === commId));
+    });
+  }, [currentActiveComm, managedCommitteeId]);
+
   const filteredRequests = (requests || []).filter(req => {
     if (req.acceptedCommittee && !isSameCommittee(req.acceptedCommittee, currentActiveComm)) {
       return false;
@@ -1100,13 +1144,33 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const transferredRequestsList = (requests || []).filter(req => req.transferredToHR === true || req.status === 'محول للموارد البشرية');
 
   const totalApplicantsCount = requests.filter(r => matchesTargetCommittee(r.firstChoice, currentActiveComm) && (!r.acceptedCommittee || isSameCommittee(r.acceptedCommittee, currentActiveComm))).length;
-  const acceptedFromApps = requests.filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm));
-  const rosterOnlyMembers = committeeRoster.filter((member) =>
-    !acceptedFromApps.some((req) =>
-      sameMemberPhone(req.phone, member.phone) || sameMemberName(req.fullName, member.name || member.fullName)
-    )
+  const isListedCommitteeLeader = (name?: string) => {
+    const value = String(name || '').trim();
+    if (!value) return false;
+    return (
+      sameMemberName(value, committeeLeaders.maleLeader) ||
+      sameMemberName(value, committeeLeaders.femaleLeader)
+    );
+  };
+  const acceptedFromApps = requests.filter((r) =>
+    isSameCommittee(r.acceptedCommittee, currentActiveComm) && !isListedCommitteeLeader(r.fullName)
   );
+  const rosterOnlyMembers = committeeRoster.filter((member) => {
+    const name = member.name || member.fullName;
+    if (isListedCommitteeLeader(name)) return false;
+    return !acceptedFromApps.some((req) =>
+      sameMemberPhone(req.phone, member.phone) || sameMemberName(req.fullName, name)
+    );
+  });
   const acceptedMembersCount = acceptedFromApps.length + rosterOnlyMembers.length;
+
+  const certificatesIssuedByMember = (name?: string) => {
+    const memberName = String(name || '').trim();
+    if (!memberName) return 0;
+    return issuedHrCertificates.filter((cert) =>
+      issuerMatchesMember(certificateIssuerName(cert), memberName)
+    ).length;
+  };
 
   const handleAcceptSubmit = async () => {
     if (!selectedReqId) return;
@@ -1877,7 +1941,18 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const displayedTasks = committeeTasks.filter(t => isSameCommittee(t.committee, currentActiveComm));
   const committeeExcusesFiltered = eventExcuses.filter(ex => matchesTargetCommittee(ex.committee, currentActiveComm));
 
-  const currentCommitteeHonorMembers = honorBoardList.filter(h => isSameCommittee(h.committee, currentActiveComm));
+  const honorScoreValue = (score: unknown) => {
+    const digits = String(score || '').replace(/[^\d.]/g, '');
+    const num = Number(digits);
+    return Number.isFinite(num) && digits ? num : -1;
+  };
+  const currentCommitteeHonorMembers = honorBoardList
+    .filter((h) => isSameCommittee(h.committee, currentActiveComm))
+    .sort((a, b) => {
+      const scoreDiff = honorScoreValue(b.score) - honorScoreValue(a.score);
+      if (scoreDiff !== 0) return scoreDiff;
+      return Number(b.createdAt || 0) - Number(a.createdAt || 0);
+    });
 
   const committeeReports = Array.from(
     new Map(
@@ -2983,7 +3058,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                     <p className="text-xs text-slate-500">هنا يتم عرض كافة أعضاء هذه اللجنة المقبولين للتدقيق والمتابعة المباشرة:</p>
                   </div>
                   <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs">
-                    الإجمالي: {requests.filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm)).length} عضو
+                    الإجمالي: {acceptedFromApps.length} عضو
                   </span>
                 </div>
 
@@ -2999,14 +3074,12 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {requests.filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm)).length === 0 ? (
+                      {acceptedFromApps.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">لا توجد أعضاء مقبولين مسجلين في هذه اللجنة حالياً.</td>
                         </tr>
                       ) : (
-                        requests
-                          .filter(r => isSameCommittee(r.acceptedCommittee, currentActiveComm))
-                          .map((member, mIdx) => (
+                        acceptedFromApps.map((member, mIdx) => (
                             <tr key={mIdx} className="hover:bg-slate-50">
                               <td className="py-3 pr-2 font-bold text-slate-900">{member.fullName}</td>
                               <td className="py-3 font-mono text-slate-700" dir="ltr">{member.phone}</td>
@@ -3110,7 +3183,14 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                     <>
                     {acceptedFromApps.map((member) => (
                         <tr key={member.id} className="hover:bg-slate-50">
-                          <td className="py-3 pr-2 font-bold text-slate-900">{member.fullName}</td>
+                          <td className="py-3 pr-2 font-bold text-slate-900">
+                            <span>{member.fullName}</span>
+                            {isHrTeam ? (
+                              <span className="mr-2 inline-block text-[10px] font-black text-sky-800 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
+                                {certificatesIssuedByMember(member.fullName)} شهادة
+                              </span>
+                            ) : null}
+                          </td>
                           <td className="py-3 font-mono text-slate-700" dir="ltr">{member.phone}</td>
                           <td className="py-3 text-slate-600 font-mono">{member.universityId || '-'}</td>
                           <td className="py-3">
@@ -3141,7 +3221,14 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                     ))}
                     {rosterOnlyMembers.map((member, mIdx) => (
                         <tr key={`roster-${mIdx}`} className="hover:bg-slate-50">
-                          <td className="py-3 pr-2 font-bold text-slate-900">{member.name || member.fullName}</td>
+                          <td className="py-3 pr-2 font-bold text-slate-900">
+                            <span>{member.name || member.fullName}</span>
+                            {isHrTeam ? (
+                              <span className="mr-2 inline-block text-[10px] font-black text-sky-800 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
+                                {certificatesIssuedByMember(member.name || member.fullName)} شهادة
+                              </span>
+                            ) : null}
+                          </td>
                           <td className="py-3 font-mono text-slate-700" dir="ltr">{member.phone || '-'}</td>
                           <td className="py-3 text-slate-600 font-mono">{member.universityId || '-'}</td>
                           <td className="py-3">
@@ -3341,7 +3428,9 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
             <div className="space-y-1">
               <h3 className="text-sm font-black text-slate-900">🏆 لوحة الشرف ونقاط العضو الفردي</h3>
-              <p className="text-[11px] text-slate-500">إضافة وإدارة أسماء الأعضاء ونقاط التميز يدوياً في ({currentActiveComm}):</p>
+              {isCommitteeLeader ? (
+                <p className="text-[11px] text-slate-500">إضافة وإدارة أسماء الأعضاء ونقاط التميز يدوياً في ({currentActiveComm}):</p>
+              ) : null}
             </div>
 
             {isCommitteeLeader && (
@@ -3371,8 +3460,12 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
               {currentCommitteeHonorMembers.length === 0 ? (
                 <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لم يتم إضافة أعضاء يدوياً للوحة الشرف بعد.</p>
               ) : (
-                currentCommitteeHonorMembers.map((member, idx) => (
-                  <div key={member.id} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                currentCommitteeHonorMembers.map((member, idx) => {
+                  const isMe = sameMemberName(member.name, userData?.fullName);
+                  return (
+                  <div key={member.id} className={`flex items-center justify-between p-3 rounded-2xl border text-xs ${
+                    isMe ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-slate-200'
+                  }`}>
                     <div className="flex items-center gap-2.5">
                       <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${
                         idx === 0 ? 'bg-amber-400 text-slate-900 shadow' : idx === 1 ? 'bg-slate-300 text-slate-900' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'
@@ -3380,7 +3473,10 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                         {idx + 1}
                       </span>
                       <div>
-                        <span className="font-bold text-slate-800 block">{member.name}</span>
+                        <span className="font-bold text-slate-800 block">
+                          {member.name}
+                          {isMe ? <span className="mr-1 text-[10px] font-black text-amber-800">أنت</span> : null}
+                        </span>
                         <span className="font-black text-[#630517] text-[11px]">{member.score}</span>
                       </div>
                     </div>
@@ -3388,10 +3484,13 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                       <button type="button" onClick={() => handleDeleteHonorMember(member.id)} className="text-red-600 font-bold text-xs hover:underline px-2">حذف ✕</button>
                     )}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center">* التحكم كامل للقائد/ة بإضافة وتحديث الأسماء والتقييمات يدوياً.</div>
+            {isCommitteeLeader ? (
+              <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center">* التحكم كامل للقائد/ة بإضافة وتحديث الأسماء والتقييمات يدوياً.</div>
+            ) : null}
           </div>
         </div>
 

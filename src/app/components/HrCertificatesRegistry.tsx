@@ -35,6 +35,7 @@ export default function HrCertificatesRegistry({
 }) {
   const [queryText, setQueryText] = useState('');
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [listOpen, setListOpen] = useState(false);
 
   const groups = useMemo(() => {
     const parent = new Map<string, string>();
@@ -83,17 +84,28 @@ export default function HrCertificatesRegistry({
 
   return (
     <div className="space-y-4 border-t border-slate-100 pt-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h4 className="font-black text-sm text-slate-900">سجل المستفيدين الصادر لهم شهادات</h4>
-          <p className="text-[11px] text-slate-500">عدد الشهادات لكل شخص، تصنيفاتها، وإمكانية حذف أي شهادة.</p>
+      <button
+        type="button"
+        onClick={() => setListOpen((open) => !open)}
+        className="w-full flex flex-wrap items-center justify-between gap-3 text-right cursor-pointer"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`inline-flex w-8 h-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-black transition-transform ${listOpen ? 'rotate-180' : ''}`}>
+            ▼
+          </span>
+          <div>
+            <h4 className="font-black text-sm text-slate-900">سجل المستفيدين الصادر لهم شهادات</h4>
+            <p className="text-[11px] text-slate-500">عدد الشهادات لكل شخص، تصنيفاتها، وإمكانية حذف أي شهادة.</p>
+          </div>
         </div>
         <div className="flex items-center gap-2 text-[11px] font-black">
           <span className="bg-[#630517] text-[#F5D061] px-3 py-1.5 rounded-full">{groups.length} مستفيد</span>
           <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full">{certificates.length} شهادة</span>
         </div>
-      </div>
+      </button>
 
+      {listOpen ? (
+      <>
       <input
         value={queryText}
         onChange={(e) => setQueryText(e.target.value)}
@@ -159,6 +171,8 @@ export default function HrCertificatesRegistry({
           })}
         </div>
       )}
+      </>
+      ) : null}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { db } from '../../lib/firebase';
-import { doc, getDoc, updateDoc, setDoc, collection, addDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, collection, addDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { invalidateCloudCollection, loadCloudCollection, mergeCachedCollections, peekCloudCollection, writeCloudCollection } from '../../lib/cloudCache';
 import { storage } from '../../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -227,6 +227,7 @@ export default function CommitteeDetailPage() {
   const [isUploadingCert, setIsUploadingCert] = useState(false);
   const [certUploadProgress, setCertUploadProgress] = useState(0);
   const [issuedHrCertificates, setIssuedHrCertificates] = useState<any[]>([]);
+  const [honorBoardList, setHonorBoardList] = useState<any[]>([]);
 
   useEffect(() => {
     const phone = localStorage.getItem('userPhone') || '';
@@ -421,7 +422,40 @@ export default function CommitteeDetailPage() {
     return subscribeMediaGallery(db, setMediaGallery);
   }, []);
 
+  useEffect(() => {
+    const cached = peekCloudCollection('committee_honor_board');
+    if (cached?.length) setHonorBoardList(cached);
+    const unsub = onSnapshot(
+      collection(db, 'committee_honor_board'),
+      (snap) => {
+        const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setHonorBoardList(items);
+        writeCloudCollection('committee_honor_board', items);
+      },
+      () => undefined
+    );
+    return () => unsub();
+  }, []);
+
   const isAdmin = currentUserPhone === '0553731265';
+
+  const honorScoreValue = (score: unknown) => {
+    const digits = String(score || '').replace(/[^\d.]/g, '');
+    const num = Number(digits);
+    return Number.isFinite(num) && digits ? num : -1;
+  };
+  const currentCommitteeHonorMembers = honorBoardList
+    .filter((row) => {
+      const a = normalizeArabic(String(row.committee || ''));
+      const b = normalizeArabic(String(committee?.name || ''));
+      const idn = normalizeArabic(String(id || ''));
+      return Boolean(a && b && (a.includes(b) || b.includes(a) || a.includes(idn)));
+    })
+    .sort((a, b) => {
+      const scoreDiff = honorScoreValue(b.score) - honorScoreValue(a.score);
+      if (scoreDiff !== 0) return scoreDiff;
+      return Number(b.createdAt || 0) - Number(a.createdAt || 0);
+    });
 
   const handleUploadExcuseSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -959,6 +993,47 @@ export default function CommitteeDetailPage() {
               <span className="font-extrabold text-slate-900 text-sm">{committee?.femaleLeader}</span>
             </div>
           </div>
+        </div>
+
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-amber-200 shadow-sm space-y-4">
+          <div className="space-y-1">
+            <h2 className="text-lg font-black text-slate-900">🏆 لوحة الشرف</h2>
+          </div>
+
+          {currentCommitteeHonorMembers.length === 0 ? (
+            <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">
+              لا توجد أسماء في لوحة الشرف بعد.
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              {currentCommitteeHonorMembers.map((member, idx) => {
+                const isMe = sameMemberName(member.name, currentUserName);
+                return (
+                  <div
+                    key={member.id}
+                    className={`flex items-center justify-between p-3 rounded-2xl border text-xs ${
+                      isMe ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${
+                        idx === 0 ? 'bg-amber-400 text-slate-900 shadow' : idx === 1 ? 'bg-slate-300 text-slate-900' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {idx + 1}
+                      </span>
+                      <div>
+                        <span className="font-bold text-slate-800 block">
+                          {member.name}
+                          {isMe ? <span className="mr-1 text-[10px] font-black text-amber-800">أنت</span> : null}
+                        </span>
+                        <span className="font-black text-[#630517] text-[11px]">{member.score}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {canWriteQualityEventReport && (

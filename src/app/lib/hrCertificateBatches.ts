@@ -291,6 +291,60 @@ export function certificateIssuerName(cert?: IssuedCertRef | null) {
   return fromDesc;
 }
 
+function issuerNameTokens(name: string) {
+  return normalizePersonName(name)
+    .replace(/[^\u0600-\u06FFa-zA-Z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .map((token) => token.replace(/^ال/, ''))
+    .filter((token) => token && token !== 'بن' && token !== 'بنت');
+}
+
+function issuerFirstNamesClose(left: string, right: string) {
+  if (!left || !right) return false;
+  if (left === right) return true;
+  if (left.length >= 3 && right.length >= 3 && (left.startsWith(right) || right.startsWith(left))) return true;
+  const strippedLeft = left.replace(/^ا/, '');
+  const strippedRight = right.replace(/^ا/, '');
+  return strippedLeft.length >= 3 && strippedLeft === strippedRight;
+}
+
+function issuerAliasKey(name: string) {
+  const tokens = issuerNameTokens(name);
+  if (!tokens.length) return '';
+  const first = tokens[0];
+  const last = tokens[tokens.length - 1];
+  if (issuerFirstNamesClose(first, 'هاجر') && (last === 'بلوي' || last === 'حمري')) return 'hajar-balawi';
+  return '';
+}
+
+export function issuerMatchesMember(issuer?: string | null, memberName?: string | null) {
+  const issued = String(issuer || '').trim();
+  const member = String(memberName || '').trim();
+  if (!issued || !member) return false;
+
+  const issuedAlias = issuerAliasKey(issued);
+  const memberAlias = issuerAliasKey(member);
+  if (issuedAlias && issuedAlias === memberAlias) return true;
+
+  const compact = (value: string) => normalizePersonName(value).replace(/\s+/g, '');
+  const left = compact(issued);
+  const right = compact(member);
+  if (left.length >= 4 && right.length >= 4 && (left === right || left.includes(right) || right.includes(left))) {
+    return true;
+  }
+
+  const issuedTokens = issuerNameTokens(issued);
+  const memberTokens = issuerNameTokens(member);
+  if (!issuedTokens.length || !memberTokens.length) return false;
+  const family = issuedTokens[issuedTokens.length - 1];
+  return Boolean(
+    family &&
+    family.length >= 3 &&
+    issuerFirstNamesClose(issuedTokens[0], memberTokens[0]) &&
+    family === memberTokens[memberTokens.length - 1]
+  );
+}
+
 export function certEventLabel(cert: { title?: string; certTitle?: string }) {
   return norm(cert.certTitle || cert.title);
 }
