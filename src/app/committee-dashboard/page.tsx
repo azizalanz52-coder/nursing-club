@@ -405,7 +405,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       setCertTitle('');
       setCertUploadFile(null);
       setCertUploadProgress(100);
-      alert(saved.created)
+      alert(saved.created
         ? 'تم رفع الشهادة. المستفيد يستعلم بالجوال أو الرقم الجامعي.'
         : 'تم تحديث ملف الشهادة على نفس السجل. الشهادة السابقة لم تُحذف.');
     } catch (err: any) {
