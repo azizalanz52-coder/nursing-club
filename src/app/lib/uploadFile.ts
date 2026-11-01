@@ -15,6 +15,15 @@ function isImageFile(file: File) {
   return file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name);
 }
 
+function isPdfFile(file: File) {
+  return file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+}
+
+function uploadTimeoutMs(file: File) {
+  if (isVideoFile(file) || isPdfFile(file)) return 90000;
+  return 45000;
+}
+
 export function isOverUploadLimit(file: File) {
   return file.size > MAX_UPLOAD_BYTES;
 }
@@ -53,6 +62,7 @@ export function filterFilesWithinLimit(files: File[]) {
 export function uploadingLabel(isUploading: boolean, progress: number, idleText: string) {
   if (!isUploading) return idleText;
   if (progress <= 0) return 'جاري بدء الرفع...';
+  if (progress >= 90) return `جاري حفظ الملف... ${progress}%`;
   return `جاري الرفع... ${progress}%`;
 }
 
@@ -281,12 +291,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label = 'STORAGE_TIMEOU
 
 function startProgressTicker(file: File, onProgress?: (percent: number) => void) {
   const megaBytes = Math.max(0.4, file.size / (1024 * 1024));
-  const expectedMs = Math.max(3500, megaBytes * 2200);
+  const expectedMs = Math.max(8000, megaBytes * 4000);
   const started = Date.now();
-  onProgress?.(18);
+  onProgress?.(20);
   const tick = setInterval(() => {
-    const ratio = Math.min(0.88, (Date.now() - started) / expectedMs);
-    onProgress?.(Math.round(18 + ratio * 70));
+    const elapsed = Date.now() - started;
+    const ratio = elapsed / expectedMs;
+    if (ratio < 1) {
+      onProgress?.(Math.round(20 + ratio * 65));
+      return;
+    }
+    onProgress?.(Math.min(90, 85 + Math.floor((elapsed - expectedMs) / 1500)));
   }, 180);
   return () => clearInterval(tick);
 }
@@ -349,7 +364,7 @@ async function uploadToStorage(
   const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`;
   const storageRef = ref(storage, `${folderPath}/${safeFileName}`);
   const video = isVideoFile(file);
-  const limit = timeoutMs ?? (video ? 25000 : 12000);
+  const limit = timeoutMs ?? uploadTimeoutMs(file);
   const useResumable = Boolean(video);
   onProgress?.(12);
 
@@ -385,7 +400,7 @@ export async function uploadMediaFile(
   }
 
   try {
-    return await uploadToStorage(payload, folderPath, onProgress, isVideoFile(payload) ? 25000 : 12000);
+    return await uploadToStorage(payload, folderPath, onProgress, uploadTimeoutMs(payload));
   } catch (error) {
     if (isImageFile(file)) {
       onProgress?.(62);
@@ -434,12 +449,19 @@ export async function uploadClubFile(
 ): Promise<string> {
   assertUploadSize(file);
 
+  let payload = file;
+  if (isImageFile(file)) {
+    onProgress?.(8);
+    payload = await compressImageForUpload(file);
+    onProgress?.(18);
+  }
+
   try {
-    return await uploadToStorage(file, folderPath, onProgress, isVideoFile(file) ? 25000 : 12000);
+    return await uploadToStorage(payload, folderPath, onProgress, uploadTimeoutMs(payload));
   } catch (error) {
     if (isImageFile(file)) {
       onProgress?.(55);
-      const dataUrl = await compressImageToDataUrl(file);
+      const dataUrl = await compressImageToDataUrl(payload);
       onProgress?.(100);
       return dataUrl;
     }

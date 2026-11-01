@@ -343,6 +343,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     try {
       await requireAuthUser();
       const fileUrl = await uploadClubFile(certUploadFile, 'certificates', setCertUploadProgress);
+      setCertUploadProgress(92);
       const linked = await resolveLinkedIdentity(db, certStudentPhone, certStudentUniversityId);
       const phone = linked.phone || canonicalPhone(certStudentPhone) || certStudentPhone.trim();
       const universityId = linked.universityId || normalizeUniversityId(certStudentUniversityId);
@@ -372,6 +373,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
         record: newCertObj,
         fileUrl,
       });
+      setCertUploadProgress(96);
       if (phone && universityId) {
         try {
           await linkCertificatesToIdentity(db, phone, universityId);
@@ -402,7 +404,8 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       setCertStudentUniversityId('');
       setCertTitle('');
       setCertUploadFile(null);
-      alert(saved.created
+      setCertUploadProgress(100);
+      alert(saved.created)
         ? 'تم رفع الشهادة. المستفيد يستعلم بالجوال أو الرقم الجامعي.'
         : 'تم تحديث ملف الشهادة على نفس السجل. الشهادة السابقة لم تُحذف.');
     } catch (err: any) {

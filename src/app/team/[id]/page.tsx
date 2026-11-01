@@ -731,6 +731,7 @@ export default function CommitteeDetailPage() {
     try {
       await requireAuthUser();
       const fileUrl = await uploadClubFile(certUploadFile, 'certificates', setCertUploadProgress);
+      setCertUploadProgress(92);
       const linked = await resolveLinkedIdentity(db, certStudentPhone, certStudentUniversityId);
       const phone = linked.phone || canonicalPhone(certStudentPhone) || certStudentPhone.trim();
       const universityId = linked.universityId || normalizeUniversityId(certStudentUniversityId);
@@ -760,6 +761,7 @@ export default function CommitteeDetailPage() {
         record: newCertObj,
         fileUrl,
       });
+      setCertUploadProgress(96);
       if (phone && universityId) {
         try {
           await linkCertificatesToIdentity(db, phone, universityId);
@@ -790,6 +792,7 @@ export default function CommitteeDetailPage() {
       setCertStudentUniversityId('');
       setCertTitle('');
       setCertUploadFile(null);
+      setCertUploadProgress(100);
       alert(saved.created
         ? 'تم رفع الشهادة. المستفيد يستعلم بالجوال أو الرقم الجامعي.'
         : 'تم تحديث ملف الشهادة على نفس السجل. الشهادة السابقة لم تُحذف.');
