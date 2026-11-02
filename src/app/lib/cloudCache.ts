@@ -18,13 +18,29 @@ const MAX_LS_CHARS = 1_800_000;
 const MEMORY_ONLY = new Set([
   'applications',
   'users',
-  'certificates',
-  'site_certificates',
   'escalated_reports',
   'quality_reports_archive',
   'quality_uploaded_files',
   'event_excuses',
 ]);
+
+const SLIM_REST_COLLECTIONS = new Set(['certificates', 'site_certificates']);
+const CERT_INDEX_FIELDS = [
+  'issuedBy',
+  'description',
+  'fullName',
+  'recipientName',
+  'phone',
+  'universityId',
+  'title',
+  'certTitle',
+  'category',
+  'createdAt',
+  'dateStr',
+  'issueDate',
+];
+const FIRESTORE_PROJECT =
+  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'nursing-club-62994';
 
 export const PUBLIC_CLOUD_COLLECTIONS = [
   'site_partners',
@@ -36,6 +52,8 @@ export const PUBLIC_CLOUD_COLLECTIONS = [
   'site_newsletters',
   'committees',
 ] as const;
+
+export const HR_INDEX_COLLECTIONS = ['site_certificates', 'hr_certificate_batches', 'committee_tasks'] as const;
 
 function isHeavyBlob(value: string) {
   if (value.startsWith('data:') || value.startsWith('blob:')) return true;
@@ -68,6 +86,49 @@ function defaultMapDoc(name: string, id: string, data: Record<string, unknown>):
   }
   const { password: _password, ...rest } = data;
   return { id, ...rest };
+}
+
+function restFieldValue(field: Record<string, unknown> | undefined) {
+  if (!field) return '';
+  if (field.stringValue != null) return String(field.stringValue);
+  if (field.integerValue != null) return Number(field.integerValue);
+  if (field.doubleValue != null) return Number(field.doubleValue);
+  if (field.booleanValue != null) return Boolean(field.booleanValue);
+  if (field.timestampValue) return Date.parse(String(field.timestampValue)) || String(field.timestampValue);
+  return '';
+}
+
+async function fetchSlimRestCollection(name: string): Promise<CloudRow[]> {
+  const rows: CloudRow[] = [];
+  let token = '';
+  const mask = CERT_INDEX_FIELDS.map((field) => `mask.fieldPaths=${encodeURIComponent(field)}`).join('&');
+  for (let page = 0; page < 20; page += 1) {
+    const url = `https://firestore.googleapis.com/v1/projects/${FIRESTORE_PROJECT}/databases/(default)/documents/${name}?pageSize=300&${mask}${
+      token ? `&pageToken=${encodeURIComponent(token)}` : ''
+    }`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`slim ${name} ${res.status}`);
+    const data = (await res.json()) as {
+      documents?: Array<{ name?: string; fields?: Record<string, Record<string, unknown>> }>;
+      nextPageToken?: string;
+    };
+    for (const doc of data.documents || []) {
+      const id = String(doc.name || '').split('/').pop() || '';
+      if (!id) continue;
+      const fields = doc.fields || {};
+      const row: CloudRow = { id, hasFile: true };
+      CERT_INDEX_FIELDS.forEach((key) => {
+        if (fields[key]) row[key] = restFieldValue(fields[key]);
+      });
+      if (typeof row.description === 'string' && row.description.length > 180) {
+        row.description = row.description.slice(0, 180);
+      }
+      rows.push(row);
+    }
+    if (!data.nextPageToken) break;
+    token = data.nextPageToken;
+  }
+  return rows;
 }
 
 function persist(name: string, rows: CloudRow[]) {
@@ -132,7 +193,7 @@ export async function loadCloudCollection<T extends { id: string } = CloudRow>(
     mapDoc?: (id: string, data: Record<string, unknown>) => T;
   }
 ): Promise<T[]> {
-  const maxAge = options?.maxAgeMs ?? FRESH_MS;
+  const maxAge = options?.maxAgeMs ?? (SLIM_REST_COLLECTIONS.has(name) ? 120_000 : FRESH_MS);
   const cached = memory.get(name);
   if (!options?.force && cached && Date.now() - cached.at < maxAge && cached.at > 0) {
     return cached.rows as T[];
@@ -143,12 +204,22 @@ export async function loadCloudCollection<T extends { id: string } = CloudRow>(
 
   const request = (async () => {
     try {
-      const snap = await getDocs(collection(firestore, name));
-      const mapDoc = options?.mapDoc || ((id, data) => defaultMapDoc(name, id, data) as T);
-      const rows = snap.docs.map((docSnap) => mapDoc(docSnap.id, docSnap.data() as Record<string, unknown>));
-      memory.set(name, { at: Date.now(), rows: rows as CloudRow[] });
-      if (options?.persist !== false) persist(name, rows as CloudRow[]);
-      return rows as CloudRow[];
+      let rows: CloudRow[] = [];
+      if (SLIM_REST_COLLECTIONS.has(name) && !options?.mapDoc) {
+        try {
+          rows = await fetchSlimRestCollection(name);
+        } catch {
+          const snap = await getDocs(collection(firestore, name));
+          rows = snap.docs.map((docSnap) => defaultMapDoc(name, docSnap.id, docSnap.data() as Record<string, unknown>));
+        }
+      } else {
+        const snap = await getDocs(collection(firestore, name));
+        const mapDoc = options?.mapDoc || ((id, data) => defaultMapDoc(name, id, data) as T);
+        rows = snap.docs.map((docSnap) => mapDoc(docSnap.id, docSnap.data() as Record<string, unknown>)) as CloudRow[];
+      }
+      memory.set(name, { at: Date.now(), rows });
+      if (options?.persist !== false) persist(name, rows);
+      return rows;
     } catch (err) {
       if (cached?.rows) return cached.rows;
       const disk = readDisk(name);
@@ -174,6 +245,9 @@ export function mergeCachedCollections<T extends { id: string } = CloudRow>(...n
 export function warmPublicCloud(firestore: Firestore = db) {
   if (typeof window === 'undefined') return;
   PUBLIC_CLOUD_COLLECTIONS.forEach((name) => {
+    void loadCloudCollection(firestore, name).catch(() => undefined);
+  });
+  HR_INDEX_COLLECTIONS.forEach((name) => {
     void loadCloudCollection(firestore, name).catch(() => undefined);
   });
 }

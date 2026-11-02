@@ -28,6 +28,7 @@ export default function HrCertificateBatches({
   formAnchorId,
   onIssue,
   canRepair = false,
+  certsLoading = false,
 }: {
   certificates: Array<{
     id?: string;
@@ -44,6 +45,7 @@ export default function HrCertificateBatches({
   formAnchorId: string;
   onIssue: (person: CertEligiblePerson, certTitle: string) => void;
   canRepair?: boolean;
+  certsLoading?: boolean;
 }) {
   const [eventTitle, setEventTitle] = useState('');
   const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -278,7 +280,9 @@ export default function HrCertificateBatches({
                 >
                   <span className="font-black text-xs text-slate-900">{batch.eventTitle}</span>
                   <span className="text-[11px] font-bold text-sky-800">
-                    {issuedCount}/{batch.recipients?.length || 0} صدرت
+                    {certsLoading && certificates.length === 0
+                      ? 'جاري المطابقة...'
+                      : `${issuedCount}/${batch.recipients?.length || 0} صدرت`}
                   </span>
                 </button>
 

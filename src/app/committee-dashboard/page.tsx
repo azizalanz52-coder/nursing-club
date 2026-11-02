@@ -205,6 +205,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [isUploadingCert, setIsUploadingCert] = useState(false);
   const [certUploadProgress, setCertUploadProgress] = useState(0);
   const [issuedHrCertificates, setIssuedHrCertificates] = useState<any[]>([]);
+  const [certsLoading, setCertsLoading] = useState(true);
 
   // حقول رفع ملفات الجودة (Word, Excel, PDF) — مسار مستقل عن تقييم اللجان
   const [qualityFileTitle, setQualityFileTitle] = useState('');
@@ -343,17 +344,23 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
             .map((cert) => omitHeavyCertMedia(cert))
             .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
         );
+        setCertsLoading(false);
       }
-      const [issued, siteIssued] = await Promise.all([
-        loadCloudCollection(db, 'certificates'),
-        loadCloudCollection(db, 'site_certificates'),
-      ]);
-      const mapped = new Map<string, any>();
-      [...issued, ...siteIssued].forEach((row) => mapped.set(row.id, omitHeavyCertMedia(row)));
-      const list = Array.from(mapped.values()).sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
-      setIssuedHrCertificates(list);
+      const apply = (issued: any[], siteIssued: any[]) => {
+        const mapped = new Map<string, any>();
+        [...issued, ...siteIssued].forEach((row) => mapped.set(row.id, omitHeavyCertMedia(row)));
+        setIssuedHrCertificates(
+          Array.from(mapped.values()).sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
+        );
+        setCertsLoading(false);
+      };
+      const siteIssued = await loadCloudCollection(db, 'site_certificates');
+      apply([], siteIssued);
+      const issued = await loadCloudCollection(db, 'certificates');
+      apply(issued, siteIssued);
     } catch (e) {
       console.error(e);
+      setCertsLoading(false);
     }
   };
 
@@ -2568,6 +2575,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
               actorName={userData?.fullName || 'لجنة الموارد البشرية'}
               formAnchorId="hr-cert-form"
               canRepair={isCommitteeLeader}
+              certsLoading={certsLoading}
               onIssue={(person, certTitle) => {
                 setCertStudentName(person.fullName);
                 setCertStudentPhone(person.phone);
@@ -2671,7 +2679,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
               </button>
             </form>
 
-            <HrCertificatesRegistry certificates={issuedHrCertificates} onDelete={handleDeleteHrCertificate} />
+            <HrCertificatesRegistry certificates={issuedHrCertificates} onDelete={handleDeleteHrCertificate} loading={certsLoading} />
           </div>
         )}
 

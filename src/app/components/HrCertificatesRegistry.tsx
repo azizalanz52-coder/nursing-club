@@ -29,9 +29,11 @@ function categoryCount(certs: CertRecord[]) {
 export default function HrCertificatesRegistry({
   certificates,
   onDelete,
+  loading = false,
 }: {
   certificates: CertRecord[];
   onDelete: (id: string) => void;
+  loading?: boolean;
 }) {
   const [queryText, setQueryText] = useState('');
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -99,8 +101,12 @@ export default function HrCertificatesRegistry({
           </div>
         </div>
         <div className="flex items-center gap-2 text-[11px] font-black">
-          <span className="bg-[#630517] text-[#F5D061] px-3 py-1.5 rounded-full">{groups.length} مستفيد</span>
-          <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full">{certificates.length} شهادة</span>
+          <span className="bg-[#630517] text-[#F5D061] px-3 py-1.5 rounded-full">
+            {loading && certificates.length === 0 ? 'جاري التحميل' : `${groups.length} مستفيد`}
+          </span>
+          <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full">
+            {loading && certificates.length === 0 ? '...' : `${certificates.length} شهادة`}
+          </span>
         </div>
       </button>
 
@@ -114,7 +120,9 @@ export default function HrCertificatesRegistry({
       />
 
       {groups.length === 0 ? (
-        <p className="text-center text-xs text-slate-400 font-bold py-8 bg-slate-50 rounded-2xl">لا توجد شهادات صادرة بعد.</p>
+        <p className="text-center text-xs text-slate-400 font-bold py-8 bg-slate-50 rounded-2xl">
+          {loading ? 'جاري تحميل سجل الشهادات...' : 'لا توجد شهادات صادرة بعد.'}
+        </p>
       ) : (
         <div className="space-y-3">
           {groups.map((group) => {

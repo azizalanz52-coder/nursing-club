@@ -227,6 +227,7 @@ export default function CommitteeDetailPage() {
   const [isUploadingCert, setIsUploadingCert] = useState(false);
   const [certUploadProgress, setCertUploadProgress] = useState(0);
   const [issuedHrCertificates, setIssuedHrCertificates] = useState<any[]>([]);
+  const [certsLoading, setCertsLoading] = useState(true);
   const [honorBoardList, setHonorBoardList] = useState<any[]>([]);
 
   useEffect(() => {
@@ -289,6 +290,7 @@ export default function CommitteeDetailPage() {
       setIssuedHrCertificates(
         cachedCerts.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
       );
+      setCertsLoading(false);
     }
 
     const fetchCloudData = async () => {
@@ -359,52 +361,70 @@ export default function CommitteeDetailPage() {
         };
 
         const hydrateCerts = async () => {
-          if (!needsHr) return;
-          const [issued, siteIssued] = await Promise.all([
-            loadCloudCollection(db, 'certificates'),
-            loadCloudCollection(db, 'site_certificates'),
-          ]);
+          if (!needsHr) {
+            setCertsLoading(false);
+            return;
+          }
+          const applyCerts = (issued: any[], siteIssued: any[]) => {
+            const mapped = new Map<string, any>();
+            [...issued, ...siteIssued].forEach((row) => mapped.set(row.id, omitHeavyCertMedia(row)));
+            setIssuedHrCertificates(
+              Array.from(mapped.values()).sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
+            );
+            setCertsLoading(false);
+          };
+          const siteIssued = await loadCloudCollection(db, 'site_certificates');
           if (cancelled) return;
-          const mapped = new Map<string, any>();
-          [...issued, ...siteIssued].forEach((row) => mapped.set(row.id, omitHeavyCertMedia(row)));
-          setIssuedHrCertificates(
-            Array.from(mapped.values()).sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
-          );
+          applyCerts([], siteIssued);
+          const issued = await loadCloudCollection(db, 'certificates');
+          if (cancelled) return;
+          applyCerts(issued, siteIssued);
         };
 
-        void hydrateLists();
-        void hydrateCerts();
-
-        const apps = await loadCloudCollection(db, 'applications');
-        if (cancelled) return;
-
-        const acceptedFromApps: any[] = [];
-        apps.forEach((data: any) => {
-          const acceptedComm = data.acceptedCommittee || data.committee || data.assignedCommittee || '';
-          const statusStr = String(data.status || '');
-          const isAccepted = isAcceptedStatus(statusStr) || Boolean(String(acceptedComm || '').trim());
-          if (isAccepted && matchesThisCommittee(acceptedComm)) {
-            acceptedFromApps.push({
-              name: data.fullName || data.name || '',
-              phone: data.phone ? String(data.phone).trim() : '',
-              role: 'عضو أساسي',
-              status: 'نشط ✓',
-              universityId: data.universityId || ''
-            });
-            if (sameMemberPhone(data.phone, trimmedPhone)) {
-              userAuthorized = true;
-            }
-          }
-        });
-
-        if (acceptedFromApps.length > 0) {
-          const existingPhones = new Set(mergedMembers.map((m: any) => normalizePhone(m.phone)));
-          const uniqueNew = acceptedFromApps.filter(m => !existingPhones.has(normalizePhone(m.phone)));
-          mergedMembers = [...mergedMembers, ...uniqueNew];
+        if (needsHr) {
+          await hydrateCerts();
+        } else {
+          setCertsLoading(false);
         }
+        if (cancelled) return;
+        void hydrateLists();
 
-        setIsAuthorizedMember(userAuthorized);
-        setCommittee((prev: any) => ({ ...prev, members: mergedMembers }));
+        const finishMembers = async () => {
+          const apps = await loadCloudCollection(db, 'applications');
+          if (cancelled) return;
+
+          const acceptedFromApps: any[] = [];
+          apps.forEach((data: any) => {
+            const acceptedComm = data.acceptedCommittee || data.committee || data.assignedCommittee || '';
+            const statusStr = String(data.status || '');
+            const isAccepted = isAcceptedStatus(statusStr) || Boolean(String(acceptedComm || '').trim());
+            if (isAccepted && matchesThisCommittee(acceptedComm)) {
+              acceptedFromApps.push({
+                name: data.fullName || data.name || '',
+                phone: data.phone ? String(data.phone).trim() : '',
+                role: 'عضو أساسي',
+                status: 'نشط ✓',
+                universityId: data.universityId || ''
+              });
+              if (sameMemberPhone(data.phone, trimmedPhone)) {
+                userAuthorized = true;
+              }
+            }
+          });
+
+          if (acceptedFromApps.length > 0) {
+            const existingPhones = new Set(mergedMembers.map((m: any) => normalizePhone(m.phone)));
+            const uniqueNew = acceptedFromApps.filter(m => !existingPhones.has(normalizePhone(m.phone)));
+            mergedMembers = [...mergedMembers, ...uniqueNew];
+          }
+
+          setIsAuthorizedMember(userAuthorized);
+          setCommittee((prev: any) => ({ ...prev, members: mergedMembers }));
+        };
+
+        if (!userAuthorized) {
+          await finishMembers();
+        }
       } catch (err) {
         console.error('Error fetching cloud data:', err);
       } finally {
@@ -419,8 +439,9 @@ export default function CommitteeDetailPage() {
   }, [id, baseDetails]);
 
   useEffect(() => {
+    if (id === 'hr' && certsLoading) return;
     return subscribeMediaGallery(db, setMediaGallery);
-  }, []);
+  }, [id, certsLoading]);
 
   useEffect(() => {
     const cached = peekCloudCollection('committee_honor_board');
@@ -1055,7 +1076,9 @@ export default function CommitteeDetailPage() {
                 <p className="text-xs text-slate-500 mt-1">ارفع بالاسم مع الجوال أو الرقم الجامعي. الطالب يستعلم بأي واحد منهما.</p>
               </div>
               <span className="px-3.5 py-1.5 rounded-xl bg-sky-100 text-sky-800 font-bold text-xs">
-                صادرة: {issuedHrCertificates.length}
+                {certsLoading && issuedHrCertificates.length === 0
+                  ? 'جاري تحميل الشهادات...'
+                  : `صادرة: ${issuedHrCertificates.length}`}
               </span>
             </div>
 
@@ -1064,6 +1087,7 @@ export default function CommitteeDetailPage() {
               actorName={currentUserName || 'لجنة الموارد البشرية'}
               formAnchorId="hr-cert-form"
               canRepair={false}
+              certsLoading={certsLoading}
               onIssue={(person, certTitle) => {
                 setCertStudentName(person.fullName);
                 setCertStudentPhone(person.phone);
@@ -1164,7 +1188,7 @@ export default function CommitteeDetailPage() {
               </div>
             </form>
 
-            <HrCertificatesRegistry certificates={issuedHrCertificates} onDelete={handleDeleteHrCertificate} />
+            <HrCertificatesRegistry certificates={issuedHrCertificates} onDelete={handleDeleteHrCertificate} loading={certsLoading} />
           </div>
         )}
 
