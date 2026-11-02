@@ -65,6 +65,14 @@ export function riyadhMonthKey(ms = Date.now()) {
   return riyadhParts(ms).ymd.slice(0, 7);
 }
 
+export function previousMonthKey(monthKey: string) {
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) return monthKey;
+  const [yearRaw, monthRaw] = monthKey.split('-').map(Number);
+  const month = monthRaw === 1 ? 12 : monthRaw - 1;
+  const year = monthRaw === 1 ? yearRaw - 1 : yearRaw;
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
 export function formatMonthKey(monthKey: string) {
   if (!/^\d{4}-\d{2}$/.test(monthKey)) return monthKey;
   return new Date(`${monthKey}-01T12:00:00+03:00`).toLocaleDateString('ar-EG', {
@@ -357,9 +365,9 @@ export const DEFAULT_NEWSLETTER_ITEMS: NewsletterItem[] = [
     cadence: 'monthly',
     monthKey: '2026-10',
     featured: true,
-    date: '2026-10-22',
+    date: '2026-11-01',
     content:
-      'في أكتوبر دشّن نادي التمريض بجامعة حفر الباطن منصته الإلكترونية، ليجتمع عند الطالب الجداول والأخبار والخدمات في مكان واحد. وخلال الشهر نُفّذت أربع فعاليات: ثلاث داخل الجامعة وواحدة خارجها؛ يوم الصحة النفسية العالمي، وفعالية الوعي الغذائي، وفعالية المهارات السريرية للممرض داخل الجامعة، وأكتوبر الوردي للتوعية بسرطان الثدي في العثيم مول. وقد حضر عميد عمادة شؤون الطلاب، وعميد عمادة الاتصال المؤسسي، وعميد كلية التمريض، ووكلاء العمادات.',
+      'حقّق نادي التمريض بجامعة حفر الباطن مستهدفات أكتوبر: 5 فعاليات، 72 منظماً، 530 زائراً، 203 شهادات صادرة، ونسبة رضا بلغت 97٪. في 11 أكتوبر دشّن النادي منصته الإلكترونية مع فعالية يوم الصحة النفسية العالمي لتعزيز التجربة الرقمية للطالب والتوعية بإدارة الضغوط. وفي 4 و13 أكتوبر نظّم فعاليتين توعويتين عن التغذية والعادات الصحية بعروض علمية وأنشطة تفاعلية. وفي 19 أكتوبر أقام فعالية «دقائق لصحتك» في العثيم مول بحضور عميد كلية التمريض د. جلال بن نعيم الحنيبي ومدير إدارة التمريض بتجمع حفر الباطن الصحي. واختتم الشهر في 30 أكتوبر بفعالية الإسعافات الأولية في القرية التراثية بحفر الباطن لنشر ثقافة السلامة والتعامل مع الطوارئ في المجتمع.',
   }),
 ];
 
@@ -377,6 +385,30 @@ export function itemMonthKey(item: NewsletterItem) {
   const parsed = Date.parse(stamp);
   if (Number.isFinite(parsed)) return riyadhMonthKey(parsed);
   return '';
+}
+
+export function hydrateNewsletterItem(item: NewsletterItem): NewsletterItem {
+  const seed = DEFAULT_NEWSLETTER_ITEMS.find((row) => row.id === item.id);
+  if (!seed) return item;
+  if (seed.id !== 'club-2026-10-summary') return item;
+  const text = `${item.title || ''} ${item.content || ''}`;
+  const stale =
+    !String(item.content || '').includes('97٪') ||
+    /أكتوبر الوردي/.test(text) ||
+    /المهارات السريرية للممرض/.test(text) ||
+    item.title !== seed.title ||
+    item.monthKey !== seed.monthKey;
+  if (!stale) return item;
+  return {
+    ...item,
+    title: seed.title,
+    content: seed.content,
+    monthKey: seed.monthKey,
+    featured: true,
+    cadence: 'monthly',
+    date: seed.date,
+    image: isPlaceholderImage(item.image) ? seed.image : item.image,
+  };
 }
 
 export function todaysStudyTips(items: NewsletterItem[], now = Date.now()) {
@@ -397,12 +429,17 @@ export function todaysStudyTips(items: NewsletterItem[], now = Date.now()) {
 }
 
 export function monthlyClubNews(items: NewsletterItem[], now = Date.now()) {
-  const month = riyadhMonthKey(now);
-  const list = items
-    .filter((item) => item.category === NEWS_CAT.club && item.type !== 'exam-schedule')
-    .filter((item) => itemMonthKey(item) === month)
-    .sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)) || String(b.date).localeCompare(String(a.date)));
-  return list.slice(0, 1);
+  const current = riyadhMonthKey(now);
+  const previous = previousMonthKey(current);
+  const club = items.filter((item) => item.category === NEWS_CAT.club && item.type !== 'exam-schedule');
+  const forMonth = (month: string) =>
+    club
+      .filter((item) => itemMonthKey(item) === month)
+      .sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)) || String(b.date).localeCompare(String(a.date)));
+  // الملخص الشهري يُنشر عن الشهر السابق (نوفمبر يعرض أكتوبر) إلى أن يُضاف ملخص الشهر الحالي.
+  const list = forMonth(current);
+  if (list.length) return list.slice(0, 1);
+  return forMonth(previous).slice(0, 1);
 }
 
 export function examSources(items: NewsletterItem[]) {
@@ -431,7 +468,13 @@ export async function seedDefaultNewsletters(db: Firestore) {
     const staleCopy =
       /أضف من لوحة التحكم/.test(prevText) ||
       /فعالية النادي في أكتوبر/.test(prevText) ||
-      (item.id === 'club-2026-10-summary' && prev.title !== item.title);
+      /أكتوبر الوردي/.test(prevText) ||
+      /المهارات السريرية للممرض/.test(prevText) ||
+      (item.id === 'club-2026-10-summary' &&
+        (prev.title !== item.title ||
+          prev.content !== item.content ||
+          prev.monthKey !== item.monthKey ||
+          !String(prev.content || '').includes('97٪')));
     const nextImage = isPlaceholderImage(prev.image) ? item.image : prev.image;
     if (staleCopy) {
       await setDoc(doc(db, NEWSLETTERS_COL, item.id), { ...item, image: nextImage }, { merge: true });

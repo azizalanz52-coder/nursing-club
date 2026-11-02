@@ -10,6 +10,7 @@ import {
   WEEKDAY_LABEL,
   examSources,
   formatMonthKey,
+  hydrateNewsletterItem,
   isPlaceholderImage,
   monthlyClubNews,
   newsCoverSrc,
@@ -102,35 +103,36 @@ export default function NewsletterPage() {
   useEffect(() => {
     const cached = peekCloudCollection<NewsletterItem>('site_newsletters');
     if (cached?.length) {
-      setItems(cached);
+      setItems(cached.map(hydrateNewsletterItem));
       setLoading(false);
     }
     const unsub = onSnapshot(
       collection(db, 'site_newsletters'),
       (snap) => {
-        const list = snap.docs.map((docSnap) => {
-          const data = docSnap.data() as Partial<NewsletterItem>;
-          const exams = Array.isArray(data.exams) ? data.exams : [];
-          return {
-            id: docSnap.id,
-            title: data.title || 'إصدار النشرة',
-            category: data.category || NEWS_CAT.club,
-            content: data.content || '',
-            link: data.link || '',
-            date: data.date || '',
-            image: data.image || '/logo.png',
-            type: data.type || (exams.length ? 'exam-schedule' : 'article'),
-            featured: Boolean(data.featured),
-            examCohort: data.examCohort || 'جميع الدفعات',
-            examSemester: data.examSemester || '',
-            exams,
-            cadence: data.cadence,
-            weekday: data.weekday,
-            monthKey: data.monthKey,
-            slot: data.slot,
-          } as NewsletterItem;
-        });
-        list.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+        const list = snap.docs
+          .map((docSnap) => {
+            const data = docSnap.data() as Partial<NewsletterItem>;
+            const exams = Array.isArray(data.exams) ? data.exams : [];
+            return hydrateNewsletterItem({
+              id: docSnap.id,
+              title: data.title || 'إصدار النشرة',
+              category: data.category || NEWS_CAT.club,
+              content: data.content || '',
+              link: data.link || '',
+              date: data.date || '',
+              image: data.image || '/logo.png',
+              type: data.type || (exams.length ? 'exam-schedule' : 'article'),
+              featured: Boolean(data.featured),
+              examCohort: data.examCohort || 'جميع الدفعات',
+              examSemester: data.examSemester || '',
+              exams,
+              cadence: data.cadence,
+              weekday: data.weekday,
+              monthKey: data.monthKey,
+              slot: data.slot,
+            } as NewsletterItem);
+          })
+          .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
         writeCloudCollection('site_newsletters', list);
         setItems(list);
         setLoading(false);
@@ -191,7 +193,8 @@ export default function NewsletterPage() {
   const monthNews = useMemo(() => monthlyClubNews(articles), [articles]);
   const scfhsItems = useMemo(() => examSources(articles), [articles]);
   const todayWeekday = WEEKDAY_LABEL[riyadhParts().weekday as keyof typeof WEEKDAY_LABEL] || '';
-  const thisMonthLabel = formatMonthKey(riyadhMonthKey());
+  const summaryMonthKey = monthNews[0]?.monthKey || monthNews[0]?.date?.slice(0, 7) || '';
+  const summaryMonthLabel = formatMonthKey(summaryMonthKey || riyadhMonthKey());
 
   const visibleArticles = useMemo(() => {
     if (filter === 'exams') return [];
@@ -323,7 +326,7 @@ export default function NewsletterPage() {
                 <section className="space-y-4">
                   <div>
                     <p className="text-[11px] font-black text-[#630517]">أخبار النادي</p>
-                    <h2 className="text-2xl font-black">ملخص {thisMonthLabel}</h2>
+                    <h2 className="text-2xl font-black">ملخص {summaryMonthLabel}</h2>
                   </div>
                   <article className="rounded-3xl overflow-hidden bg-white border border-stone-200 shadow-sm grid md:grid-cols-[0.9fr_1.1fr]">
                     <NewsCover image={summary.image} tall />
