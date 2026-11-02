@@ -20,8 +20,9 @@ function isPdfFile(file: File) {
 }
 
 function uploadTimeoutMs(file: File) {
-  if (isVideoFile(file) || isPdfFile(file)) return 90000;
-  return 45000;
+  const megaBytes = Math.max(0.2, file.size / (1024 * 1024));
+  if (isVideoFile(file) || isPdfFile(file)) return Math.min(90000, 20000 + megaBytes * 12000);
+  return Math.min(35000, 12000 + megaBytes * 8000);
 }
 
 export function isOverUploadLimit(file: File) {
@@ -62,8 +63,9 @@ export function filterFilesWithinLimit(files: File[]) {
 export function uploadingLabel(isUploading: boolean, progress: number, idleText: string) {
   if (!isUploading) return idleText;
   if (progress <= 0) return 'جاري بدء الرفع...';
-  if (progress >= 90) return `جاري حفظ الملف... ${progress}%`;
-  return `جاري الرفع... ${progress}%`;
+  if (progress < 18) return `جاري تجهيز الملف... ${progress}%`;
+  if (progress >= 95) return `جاري حفظ السجل... ${progress}%`;
+  return `جاري رفع الملف... ${progress}%`;
 }
 
 const STORAGE_PLAN_MESSAGE =
@@ -123,8 +125,27 @@ function safeExtension(file: File) {
 
 export async function requireAuthUser() {
   const user = await waitForAuthUser(12000);
-  await user.getIdToken();
+  await user.getIdToken(true);
   return user;
+}
+
+export async function cloneUploadFile(file: File): Promise<File> {
+  const type = file.type || (isImageFile(file) ? 'image/jpeg' : 'application/octet-stream');
+  const name = file.name || (isImageFile(file) ? 'certificate.jpg' : 'upload.bin');
+  const buf = await new Promise<ArrayBuffer>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('تعذر قراءة الملف. أعد اختيار الصورة ثم أعد المحاولة.')), 12000);
+    file.arrayBuffer().then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+  return new File([buf], name, { type, lastModified: Date.now() });
 }
 
 function waitForAuthUser(timeoutMs = 15000) {
@@ -206,14 +227,14 @@ async function compressImageToDataUrl(file: File, maxBytes = FIRESTORE_SAFE_BYTE
 }
 
 async function compressImageForUpload(file: File): Promise<File> {
-  if (!isImageFile(file) || file.size < 380 * 1024) return file;
+  if (!isImageFile(file) || file.size < 180 * 1024) return file;
   if (/\.(gif)$/i.test(file.name) || file.type === 'image/gif') return file;
 
   const objectUrl = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
-      const timer = setTimeout(() => reject(new Error('تعذر قراءة الصورة.')), 12000);
+      const timer = setTimeout(() => reject(new Error('تعذر قراءة الصورة.')), 8000);
       image.onload = () => {
         clearTimeout(timer);
         resolve(image);
@@ -242,18 +263,23 @@ async function compressImageForUpload(file: File): Promise<File> {
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
       return new Promise<Blob>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('تعذر ضغط الصورة.')), 8000);
         canvas.toBlob(
-          (blob) => (blob ? resolve(blob) : reject(new Error('تعذر ضغط الصورة.'))),
+          (blob) => {
+            clearTimeout(timer);
+            blob ? resolve(blob) : reject(new Error('تعذر ضغط الصورة.'));
+          },
           'image/jpeg',
           quality
         );
       });
     };
 
-    let blob = await paint(1600, 0.82);
-    if (blob.size > 1.15 * 1024 * 1024) blob = await paint(1280, 0.72);
-    if (blob.size >= file.size * 0.92) return file;
-    const base = file.name.replace(/\.[^.]+$/, '') || 'cover';
+    let blob = await paint(1280, 0.74);
+    if (blob.size > 420 * 1024) blob = await paint(1080, 0.64);
+    if (blob.size > 420 * 1024) blob = await paint(960, 0.58);
+    if (blob.size >= file.size * 0.95) return file;
+    const base = file.name.replace(/\.[^.]+$/, '') || 'certificate';
     return new File([blob], `${base}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
   } catch {
     return file;
@@ -265,7 +291,8 @@ async function compressImageForUpload(file: File): Promise<File> {
 function isRetryableUploadError(error: unknown) {
   const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: string }).code) : '';
   const message = error instanceof Error ? error.message : String(error || '');
-  if (message.includes('STORAGE_TIMEOUT')) return true;
+  if (message.includes('STORAGE_TIMEOUT') || message.includes('FILE_READ_TIMEOUT')) return true;
+  if (code.includes('canceled') || message.includes('canceled')) return true;
   if (code.includes('unauthorized') || message.includes('unauthorized')) return false;
   if (code.includes('unauthenticated') || message.includes('unauthenticated')) return false;
   if (code.includes('quota') || code.includes('invalid-checksum')) return false;
@@ -291,17 +318,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label = 'STORAGE_TIMEOU
 
 function startProgressTicker(file: File, onProgress?: (percent: number) => void) {
   const megaBytes = Math.max(0.4, file.size / (1024 * 1024));
-  const expectedMs = Math.max(8000, megaBytes * 4000);
+  const expectedMs = Math.max(6000, megaBytes * 3500);
   const started = Date.now();
   onProgress?.(20);
   const tick = setInterval(() => {
     const elapsed = Date.now() - started;
     const ratio = elapsed / expectedMs;
     if (ratio < 1) {
-      onProgress?.(Math.round(20 + ratio * 65));
+      onProgress?.(Math.round(20 + ratio * 70));
       return;
     }
-    onProgress?.(Math.min(90, 85 + Math.floor((elapsed - expectedMs) / 1500)));
+    onProgress?.(Math.min(93, 88 + Math.floor((elapsed - expectedMs) / 2000)));
   }, 180);
   return () => clearInterval(tick);
 }
@@ -315,27 +342,50 @@ async function uploadDirect(file: File, storageRef: ReturnType<typeof ref>, onPr
   const stop = startProgressTicker(file, onProgress);
   try {
     const result = await uploadBytes(storageRef, file, fileMetadata(file));
-    onProgress?.(92);
-    return await getDownloadURL(result.ref);
+    onProgress?.(94);
+    return await withTimeout(getDownloadURL(result.ref), 10000, 'STORAGE_TIMEOUT');
   } finally {
     stop();
   }
 }
 
-async function uploadResumable(file: File, storageRef: ReturnType<typeof ref>, onProgress?: (percent: number) => void) {
+async function uploadResumable(
+  file: File,
+  storageRef: ReturnType<typeof ref>,
+  onProgress?: (percent: number) => void,
+  timeoutMs?: number
+) {
   const task = uploadBytesResumable(storageRef, file, fileMetadata(file));
+  let lastBytes = 0;
+  let lastChange = Date.now();
+  const cancelTask = () => {
+    try {
+      task.cancel();
+    } catch {
+      // ignore cancel errors
+    }
+  };
+  const stall = setInterval(() => {
+    if (Date.now() - lastChange > 16000) cancelTask();
+  }, 2000);
+  const killer = timeoutMs ? setTimeout(cancelTask, timeoutMs) : null;
   try {
     return await new Promise<string>((resolve, reject) => {
       task.on(
         'state_changed',
         (snap) => {
+          if (snap.bytesTransferred !== lastBytes) {
+            lastBytes = snap.bytesTransferred;
+            lastChange = Date.now();
+          }
           const ratio = snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0;
-          onProgress?.(Math.min(90, Math.round(15 + ratio * 75)));
+          onProgress?.(Math.min(94, Math.max(18, Math.round(18 + ratio * 76))));
         },
         reject,
         async () => {
           try {
-            resolve(await getDownloadURL(task.snapshot.ref));
+            onProgress?.(95);
+            resolve(await withTimeout(getDownloadURL(task.snapshot.ref), 10000, 'STORAGE_TIMEOUT'));
           } catch (error) {
             reject(error);
           }
@@ -343,12 +393,11 @@ async function uploadResumable(file: File, storageRef: ReturnType<typeof ref>, o
       );
     });
   } catch (error) {
-    try {
-      task.cancel();
-    } catch {
-      // ignore cancel errors
-    }
+    cancelTask();
     throw error;
+  } finally {
+    clearInterval(stall);
+    if (killer) clearTimeout(killer);
   }
 }
 
@@ -359,27 +408,30 @@ async function uploadToStorage(
   timeoutMs?: number
 ) {
   const user = await waitForAuthUser(12000);
-  await user.getIdToken();
+  await user.getIdToken(true);
 
   const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`;
   const storageRef = ref(storage, `${folderPath}/${safeFileName}`);
-  const video = isVideoFile(file);
   const limit = timeoutMs ?? uploadTimeoutMs(file);
-  const useResumable = Boolean(video);
-  onProgress?.(12);
+  onProgress?.(18);
 
   try {
-    const url = await withTimeout(
-      useResumable ? uploadResumable(file, storageRef, onProgress) : uploadDirect(file, storageRef, onProgress),
-      limit
-    );
-    onProgress?.(100);
+    const url = await withTimeout(uploadResumable(file, storageRef, onProgress, limit), limit);
+    onProgress?.(96);
     return url;
   } catch (error) {
-    if (useResumable || !isRetryableUploadError(error)) throw error;
-    const url = await withTimeout(uploadResumable(file, storageRef, onProgress), limit);
-    onProgress?.(100);
-    return url;
+    if (!isRetryableUploadError(error)) throw error;
+    await user.getIdToken(true);
+    const retryRef = ref(storage, `${folderPath}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`);
+    try {
+      const url = await withTimeout(uploadResumable(file, retryRef, onProgress, Math.min(limit, 22000)), Math.min(limit, 22000));
+      onProgress?.(96);
+      return url;
+    } catch {
+      const url = await withTimeout(uploadDirect(file, retryRef, onProgress), Math.min(limit, 18000));
+      onProgress?.(96);
+      return url;
+    }
   }
 }
 
@@ -448,26 +500,32 @@ export async function uploadClubFile(
   onProgress?: (percent: number) => void
 ): Promise<string> {
   assertUploadSize(file);
+  onProgress?.(6);
+  let payload = await cloneUploadFile(file);
+  assertUploadSize(payload);
 
-  let payload = file;
-  if (isImageFile(file)) {
-    onProgress?.(8);
-    payload = await compressImageForUpload(file);
-    onProgress?.(18);
+  if (isImageFile(payload)) {
+    onProgress?.(10);
+    payload = await compressImageForUpload(payload);
+    onProgress?.(16);
   }
 
   try {
     return await uploadToStorage(payload, folderPath, onProgress, uploadTimeoutMs(payload));
   } catch (error) {
-    if (isImageFile(file)) {
-      onProgress?.(55);
-      const dataUrl = await compressImageToDataUrl(payload);
-      onProgress?.(100);
-      return dataUrl;
+    if (isImageFile(payload)) {
+      onProgress?.(70);
+      try {
+        const dataUrl = await withTimeout(compressImageToDataUrl(payload), 15000, 'STORAGE_TIMEOUT');
+        onProgress?.(100);
+        return dataUrl;
+      } catch {
+        throw new Error('تعذر رفع صورة الشهادة. أعد اختيار الملف وجرّب على واي فاي.');
+      }
     }
 
     const mapped = storageErrorMessage(error);
-    const timedOut = mapped.includes('STORAGE_TIMEOUT') || String(error).includes('STORAGE_TIMEOUT');
+    const timedOut = mapped.includes('STORAGE_TIMEOUT') || String(error).includes('STORAGE_TIMEOUT') || mapped.includes('FILE_READ_TIMEOUT');
     const isVideo = isVideoFile(file);
     const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
 

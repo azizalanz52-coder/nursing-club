@@ -14,7 +14,7 @@ import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { committeeIdFromName, committeeNameFromId, findListedLeadership, findMemberContext, findUserDoc, isCommitteeLeaderRole, resolvePortalCommitteeId, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
-import { filterMediaFilesWithinLimit, isOverUploadLimit, mediaUploadLimitMessage, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
+import { cloneUploadFile, filterMediaFilesWithinLimit, isOverUploadLimit, mediaUploadLimitMessage, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
 import { certificateIssuerName, issuerMatchesMember } from '../lib/hrCertificateBatches';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/issueCertificate';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
@@ -393,10 +393,17 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     }
 
     setIsUploadingCert(true);
-    setCertUploadProgress(8);
+    setCertUploadProgress(4);
     try {
+      const localFile = await cloneUploadFile(certUploadFile);
+      setCertUploadProgress(8);
       await requireAuthUser();
-      const fileUrl = await uploadClubFile(certUploadFile, 'certificates', setCertUploadProgress);
+      const fileUrl = await Promise.race([
+        uploadClubFile(localFile, 'certificates', setCertUploadProgress),
+        new Promise<string>((_, reject) => {
+          setTimeout(() => reject(new Error('انتهى وقت رفع الشهادة. أعد اختيار الملف وجرّب على واي فاي.')), 70000);
+        }),
+      ]);
       setCertUploadProgress(92);
       const linked = await resolveLinkedIdentity(db, certStudentPhone, certStudentUniversityId);
       const phone = linked.phone || canonicalPhone(certStudentPhone) || certStudentPhone.trim();
@@ -2637,8 +2644,17 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                 <input
                   type="file"
                   accept="image/*,application/pdf"
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    setCertUploadFile(e.target.files && e.target.files[0] ? e.target.files[0] : null);
+                  onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                    const picked = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                    if (!picked) {
+                      setCertUploadFile(null);
+                      return;
+                    }
+                    try {
+                      setCertUploadFile(await cloneUploadFile(picked));
+                    } catch {
+                      setCertUploadFile(picked);
+                    }
                   }}
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-white cursor-pointer"
                   required
