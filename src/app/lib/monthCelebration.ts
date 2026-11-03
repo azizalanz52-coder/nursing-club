@@ -4,6 +4,11 @@ export type MonthHonoree = {
   id: string;
   fullName: string;
   shortName: string;
+  rank: 'gold' | 'silver';
+  rankLabel: string;
+  points: number;
+  days: number;
+  blurb: string;
 };
 
 /** تكريم عضوين أكملا شهراً من التفاعل اليومي في دراسة الحالة — يظهر للجميع 24 ساعة، وتهنئة خاصة لأول دخول لكل واحدة منهما. */
@@ -12,13 +17,30 @@ export const MONTH_CELEBRATION = {
   startsAtMs: Date.parse('2026-11-03T17:00:00+03:00'),
   endsAtMs: Date.parse('2026-11-04T17:00:00+03:00'),
   headline: 'شهر كامل من التفاعل اليومي',
-  badgeLabel: 'أكملت شهراً في دراسة الحالة',
   personalTitle: 'مبروك إكمال الشهر',
   personalBody:
     'مبروك إكمالك شهراً من التفاعل اليومي في دراسة الحالة. التزامك اليومي يصنع فرقاً، وهذا التكريم اليوم من أجلكِ.',
   honorees: [
-    { id: 'jouri', fullName: 'جوري مبارك الشمري', shortName: 'جوري' },
-    { id: 'ghala', fullName: 'غلا مشعل الدوسري', shortName: 'غلا' },
+    {
+      id: 'ghala',
+      fullName: 'غلا مشعل الدوسري',
+      shortName: 'غلا',
+      rank: 'gold',
+      rankLabel: 'المتصدرة',
+      points: 104,
+      days: 30,
+      blurb: 'تصدّرت دراسة الحالة بعد شهر يومي بلا انقطاع، وبنت حضوراً ثابتاً في كل تحدٍ.',
+    },
+    {
+      id: 'jouri',
+      fullName: 'جوري مبارك الشمري',
+      shortName: 'جوري',
+      rank: 'silver',
+      rankLabel: 'الوصيفة',
+      points: 102,
+      days: 30,
+      blurb: 'واصلت التفاعل يومياً حتى أكملت الشهر، وبفارق نقاط بسيط أثبتت مثابرة وحضوراً لافتاً.',
+    },
   ] as MonthHonoree[],
 };
 
