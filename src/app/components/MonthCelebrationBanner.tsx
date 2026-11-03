@@ -60,7 +60,7 @@ export default function MonthCelebrationBanner() {
       <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-12 text-center space-y-6">
         <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#F5D061]/15 text-[#F5D061] text-[11px] font-black border border-[#F5D061]/30">
           <ClubIcon name="medal" size={13} />
-          تكريم دراسة الحالة
+          شكر وتقدير
         </span>
 
         <h2 className="text-2xl sm:text-4xl font-black leading-tight tracking-tight">
