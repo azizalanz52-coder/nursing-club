@@ -15,7 +15,7 @@ export type MonthHonoree = {
 export const MONTH_CELEBRATION = {
   id: 'month-complete-jouri-ghala-2026-11-03',
   startsAtMs: Date.parse('2026-11-03T17:00:00+03:00'),
-  endsAtMs: Date.parse('2026-11-04T17:00:00+03:00'),
+  endsAtMs: Date.parse('2026-11-06T00:00:00+03:00'),
   headline: 'شهر كامل من التفاعل اليومي',
   personalTitle: 'مبروك إكمال الشهر',
   personalBody: 'مبروك إكمالك شهراً من التفاعل اليومي في دراسة الحالة.',
