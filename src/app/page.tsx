@@ -9,6 +9,7 @@ import CaseStudyCard from "./components/home/CaseStudyCard";
 import WhatsAppCommunity from "./components/home/WhatsAppCommunity";
 import SuggestionBox from "./components/home/SuggestionBox";
 import Footer from "./components/Footer";
+import MonthCelebrationBanner from "./components/MonthCelebrationBanner";
 import { ClubIcon } from "./components/icons";
 import RcqButton from "./components/RcqButton";
 
@@ -17,6 +18,7 @@ export default function Home() {
     <main>
       <RcqButton />
       <Hero />
+      <MonthCelebrationBanner />
       <About />
       
       {/* قسم الوصول السريع لصفحة الرؤساء والقادة - بتصميم عنابي وذهبي ملوكي متدرج */}

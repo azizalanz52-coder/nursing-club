@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import OpeningSplash from './components/OpeningSplash';
 import ClubNoticeHost from './components/ClubNotice';
+import MonthCelebrationNotice from './components/MonthCelebrationNotice';
 import { warmPublicCloud } from './lib/cloudCache';
 
 const SPLASH_KEY = 'nurs_splash_seen';
@@ -38,6 +39,7 @@ export default function AppShell({
       <Navbar />
       {children}
       {showSplash ? <OpeningSplash /> : null}
+      <MonthCelebrationNotice />
       <ClubNoticeHost />
     </>
   );
