@@ -103,9 +103,6 @@ export default function MonthCelebrationNotice() {
             <p className={`text-sm font-medium leading-7 ${gold ? 'text-amber-50/90' : 'text-slate-100/90'}`}>
               {honoree.shortName}، {MONTH_CELEBRATION.personalBody}
             </p>
-            <p className={`text-[12px] font-bold leading-relaxed ${gold ? 'text-[#F5D061]/90' : 'text-slate-200/90'}`}>
-              {honoree.blurb}
-            </p>
           </div>
 
           <button
