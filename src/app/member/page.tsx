@@ -145,17 +145,18 @@ export default function MemberSmartDashboard() {
       setAssignedCommittee(activeComm);
       setUserNotification(notification);
       if (universityId) setProfileUniversityId(universityId);
+      // افتح الواجهة فوراً بعد التعرف — الملف الشخصي يتكمل بالخلفية
+      setLoading(false);
 
-      try {
-        const profile = await loadOwnProfileFields(db, phone);
-        if (profile.fullName) {
-          setProfileName(profile.fullName);
-          setCurrentUserName(profile.fullName);
-        }
-        if (profile.universityId) setProfileUniversityId(profile.universityId);
-      } catch (profileErr) {
-        console.error(profileErr);
-      }
+      void loadOwnProfileFields(db, phone)
+        .then((profile) => {
+          if (profile.fullName) {
+            setProfileName(profile.fullName);
+            setCurrentUserName(profile.fullName);
+          }
+          if (profile.universityId) setProfileUniversityId(profile.universityId);
+        })
+        .catch((profileErr) => console.error(profileErr));
 
       if (!activeComm) {
         setUserCommitteeData(null);

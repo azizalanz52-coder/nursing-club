@@ -1,4 +1,4 @@
-import { Firestore, doc, getDoc, setDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, getDoc, getDocs, limit, query, setDoc, where } from 'firebase/firestore';
 import { canonicalPhone, normalizeUniversityId, phoneVariants, universityIdVariants } from './certificatesLookup';
 import { loadCloudCollection, peekCloudCollection } from './cloudCache';
 
@@ -125,25 +125,75 @@ export function mergeIdentity(
   } as Record<string, unknown>;
 }
 
-export async function findMemberContext(db: Firestore, phone: string, storedName?: string | null) {
-  let found = await findUserDoc(db, phone);
-  const name = String(storedName || found?.data?.fullName || '').trim();
+async function findApplicationsForMember(
+  db: Firestore,
+  phone: string,
+  universityId?: string
+) {
+  const apps: Array<Record<string, unknown> & { id?: string }> = [];
+  const seen = new Set<string>();
+  const pushSnap = (snap: Awaited<ReturnType<typeof getDocs>>) => {
+    snap.forEach((row) => {
+      if (seen.has(row.id)) return;
+      seen.add(row.id);
+      apps.push({ id: row.id, ...row.data() });
+    });
+  };
 
-  if (!found && name) {
-    try {
-      const rows = peekCloudCollection('applications') || await loadCloudCollection(db, 'applications');
-      for (const data of rows) {
-        if (!sameMemberName(String(data.fullName || data.name || ''), name)) continue;
-        const appPhone = String(data.phone || '');
-        if (appPhone) found = await findUserDoc(db, appPhone);
-        if (found) break;
-        found = { id: appPhone || phone, data: { ...data, fullName: data.fullName || name } };
-        break;
+  const phoneKeys = Array.from(
+    new Set(
+      [canonicalPhone(phone), ...phoneVariants(phone), String(phone || '').trim()]
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+    )
+  ).slice(0, 4);
+
+  await Promise.all(
+    phoneKeys.map(async (value) => {
+      try {
+        const snap = await getDocs(query(collection(db, 'applications'), where('phone', '==', value), limit(8)));
+        pushSnap(snap);
+      } catch (err) {
+        console.error(err);
       }
-    } catch (err) {
-      console.error(err);
+    })
+  );
+
+  const univKeys = universityId
+    ? Array.from(new Set(universityIdVariants(universityId))).filter(Boolean).slice(0, 3)
+    : [];
+  if (!apps.length && univKeys.length) {
+    await Promise.all(
+      univKeys.map(async (value) => {
+        try {
+          const snap = await getDocs(
+            query(collection(db, 'applications'), where('universityId', '==', value), limit(8))
+          );
+          pushSnap(snap);
+        } catch (err) {
+          console.error(err);
+        }
+      })
+    );
+  }
+
+  // كاش الذاكرة فقط إن وُجد — بدون تحميل كل الطلبات من الشبكة
+  if (!apps.length) {
+    const cached = peekCloudCollection('applications') || [];
+    for (const data of cached) {
+      const phoneMatch = sameMemberPhone(String(data.phone || ''), phone);
+      const appUniv = normalizeUniversityId(String(data.universityId || ''));
+      const univMatch = Boolean(universityId && appUniv && universityIdVariants(universityId).includes(appUniv));
+      if (phoneMatch || univMatch) apps.push(data);
     }
   }
+
+  return apps;
+}
+
+export async function findMemberContext(db: Firestore, phone: string, storedName?: string | null) {
+  const found = await findUserDoc(db, phone);
+  const name = String(storedName || found?.data?.fullName || '').trim();
 
   return {
     id: found?.id || phone,
@@ -187,33 +237,31 @@ export async function resolveMemberAcceptance(
   const lookupPhone = canonicalPhone(phone) || String(phone || '').trim();
   if (!lookupPhone && !userData) return null;
 
+  const assigned = String(userData?.assignedCommittee || userData?.committee || '').trim();
+  const fromRole = committeeNameFromId(committeeIdFromName(String(userData?.role || '')));
+  if (assigned || fromRole) {
+    return {
+      fullName: String(userData?.fullName || ''),
+      universityId: String(userData?.universityId || ''),
+      phone: lookupPhone,
+      status: 'مقبول',
+      acceptedCommittee: assigned || fromRole,
+      whatsappLink: String(userData?.whatsappLink || ''),
+    };
+  }
+
   const universityId = normalizeUniversityId(String(userData?.universityId || ''));
-  const univSet = new Set(universityId ? universityIdVariants(universityId) : []);
-  const apps: Record<string, unknown>[] = [];
-
-  const userName = String(userData?.fullName || '');
-
+  let apps: Record<string, unknown>[] = [];
   try {
-    const rows = peekCloudCollection('applications') || await loadCloudCollection(db, 'applications');
-    rows.forEach((data) => {
-      const phoneMatch = sameMemberPhone(String(data.phone || ''), lookupPhone);
-      const appUniv = normalizeUniversityId(String(data.universityId || ''));
-      const univMatch = Boolean(appUniv && univSet.has(appUniv));
-      const nameMatch = sameMemberName(String(data.fullName || data.name || ''), userName);
-      if (phoneMatch || univMatch || nameMatch) {
-        apps.push(data);
-      }
-    });
+    apps = await findApplicationsForMember(db, lookupPhone, universityId);
   } catch (err) {
     console.error(err);
   }
 
   apps.sort((a, b) => rankApp(b) - rankApp(a));
   const best = apps[0] || null;
-  const assigned = String(userData?.assignedCommittee || userData?.committee || '').trim();
   const appCommittee = String(best?.acceptedCommittee || best?.committee || '').trim();
-  const fromRole = committeeNameFromId(committeeIdFromName(String(userData?.role || '')));
-  const committee = assigned || appCommittee || fromRole;
+  const committee = appCommittee;
   const appStatus = String(best?.status || '');
 
   let status: MemberAcceptance['status'] = 'معلق';

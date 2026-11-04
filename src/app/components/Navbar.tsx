@@ -126,20 +126,29 @@ export default function Navbar() {
       };
 
       if (userDoc) applyUser(userDoc.data);
-      const acceptance = await resolveMemberAcceptance(db, userPhone, userDoc?.data || null);
-      if (!cancelled && acceptance?.acceptedCommittee) {
-        setAssignedCommittee(acceptance.acceptedCommittee);
-      }
-      const listed = await findListedLeadership(db, String(userDoc?.data?.fullName || storedName));
-      if (!cancelled) {
-        setListedAsLeader(Boolean(listed));
-        if (listed?.name && !userDoc?.data?.assignedCommittee && !userDoc?.data?.committee && !acceptance?.acceptedCommittee) {
-          setAssignedCommittee(listed.name);
+      const hasCommittee = Boolean(userDoc?.data?.assignedCommittee || userDoc?.data?.committee);
+      let acceptanceCommittee = '';
+      if (!hasCommittee) {
+        const acceptance = await resolveMemberAcceptance(db, userPhone, userDoc?.data || null);
+        if (!cancelled && acceptance?.acceptedCommittee) {
+          acceptanceCommittee = acceptance.acceptedCommittee;
+          setAssignedCommittee(acceptance.acceptedCommittee);
         }
       }
-      if (!cancelled && !acceptance?.acceptedCommittee && !userDoc?.data?.assignedCommittee && !userDoc?.data?.committee && !listed?.name) {
-        const portalId = await resolvePortalCommitteeId(db, userPhone, userDoc?.data || null);
-        if (portalId) setAssignedCommittee(committeeNameFromId(portalId) || portalId);
+      const needsLeadershipLookup = !hasCommittee && !acceptanceCommittee;
+      if (needsLeadershipLookup) {
+        const listed = await findListedLeadership(db, String(userDoc?.data?.fullName || storedName));
+        if (!cancelled) {
+          setListedAsLeader(Boolean(listed));
+          if (listed?.name) setAssignedCommittee(listed.name);
+        }
+        if (!cancelled && !listed?.name) {
+          const portalId = await resolvePortalCommitteeId(db, userPhone, userDoc?.data || null);
+          if (portalId) setAssignedCommittee(committeeNameFromId(portalId) || portalId);
+        }
+      } else {
+        const roleStr = String(userDoc?.data?.role || '');
+        if (isCommitteeLeaderRole(roleStr)) setListedAsLeader(true);
       }
 
       const userRef = doc(db, 'users', userDoc?.id || userPhone);

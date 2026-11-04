@@ -628,6 +628,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       if (assignedId === 'hr' || assigned.includes('موارد') || roleStr.includes('موارد')) {
         void fetchIssuedHrCertificates();
       }
+      // إذا اللجنة معروفة من الحساب نتخطى مسح كل الطلبات
       const resolvedId = assignedId || await resolvePortalCommitteeId(db, context.phone || phone, uData);
       const listed = isCommitteeLeaderRole(roleStr) || !assignedId
         ? await findListedLeadership(db, fullName)
