@@ -100,7 +100,12 @@ export default function DesignWorksBoard({
       alert('تم رفع التصميم. ظهر في أرشيف اللجنة ولوحة الأدمن، ويُحتسب في رادار الأداء.');
     } catch (err: any) {
       console.error(err);
-      alert(err?.message || 'تعذر رفع التصميم. أعد المحاولة.');
+      const raw = String(err?.message || '');
+      const friendly =
+        /canceled|cancelled|firebase storage|storage\//i.test(raw)
+          ? 'الرفع انقطع بسبب ضعف الشبكة. أعد المحاولة على واي فاي أو صغّر الصورة.'
+          : raw || 'تعذر رفع التصميم. أعد المحاولة.';
+      alert(friendly);
     } finally {
       setIsUploading(false);
       setProgress(0);

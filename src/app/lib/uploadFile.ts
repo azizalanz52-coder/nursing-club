@@ -102,6 +102,15 @@ function storageErrorMessage(error: unknown) {
   if (code.includes('retry-limit') || code.includes('network') || message.includes('network')) {
     return 'ضعف في الاتصال أثناء الرفع. أعد المحاولة.';
   }
+  if (
+    code.includes('canceled') ||
+    message.toLowerCase().includes('canceled') ||
+    message.toLowerCase().includes('cancelled') ||
+    message.includes('STORAGE_TIMEOUT') ||
+    message.includes('FILE_READ_TIMEOUT')
+  ) {
+    return 'الرفع تأخر أو انقطع الاتصال. أعد المحاولة على واي فاي، أو اختر صورة أصغر.';
+  }
   return message || 'تعذر رفع الملف. حاول مرة أخرى.';
 }
 
@@ -370,7 +379,7 @@ async function uploadResumable(
     }
   };
   const stall = setInterval(() => {
-    if (Date.now() - lastChange > 16000) cancelTask();
+    if (Date.now() - lastChange > 45000) cancelTask();
   }, 2000);
   const killer = timeoutMs ? setTimeout(cancelTask, timeoutMs) : null;
   try {
@@ -404,6 +413,10 @@ async function uploadResumable(
     });
   } catch (error) {
     cancelTask();
+    const mapped = storageErrorMessage(error);
+    if (mapped.includes('تأخر') || mapped.includes('STORAGE_TIMEOUT') || String(error).toLowerCase().includes('canceled')) {
+      throw new Error('STORAGE_TIMEOUT');
+    }
     throw error;
   } finally {
     stopTicker();
@@ -424,14 +437,20 @@ async function uploadToStorage(
   const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`;
   const storageRef = ref(storage, `${folderPath}/${safeFileName}`);
   const limit = timeoutMs ?? uploadTimeoutMs(file);
+  const designUpload = folderPath.includes('design');
   onProgress?.(18);
 
-  // الملفات الصغيرة أسرع بالمسار المباشر بدل resumable اللي يعلق عند 18٪
-  const preferDirect = file.size <= 2.5 * 1024 * 1024 || folderPath.includes('design');
+  // التصاميم: مسار مباشر قصير فقط — بدون resumable اللي يلغي الرفع ويطلع "canceled"
+  if (designUpload) {
+    const url = await withTimeout(uploadDirect(file, storageRef, onProgress), Math.min(limit, 22000));
+    onProgress?.(96);
+    return url;
+  }
 
-  if (preferDirect) {
+  // الملفات الصغيرة أسرع بالمسار المباشر
+  if (file.size <= 2.5 * 1024 * 1024) {
     try {
-      const url = await withTimeout(uploadDirect(file, storageRef, onProgress), Math.min(limit, 25000));
+      const url = await withTimeout(uploadDirect(file, storageRef, onProgress), Math.min(limit, 30000));
       onProgress?.(96);
       return url;
     } catch (error) {
@@ -447,15 +466,9 @@ async function uploadToStorage(
     if (!isRetryableUploadError(error)) throw error;
     await user.getIdToken(true);
     const retryRef = ref(storage, `${folderPath}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`);
-    try {
-      const url = await withTimeout(uploadDirect(file, retryRef, onProgress), Math.min(limit, 20000));
-      onProgress?.(96);
-      return url;
-    } catch {
-      const url = await withTimeout(uploadResumable(file, retryRef, onProgress, Math.min(limit, 22000)), Math.min(limit, 22000));
-      onProgress?.(96);
-      return url;
-    }
+    const url = await withTimeout(uploadDirect(file, retryRef, onProgress), Math.min(limit, 22000));
+    onProgress?.(96);
+    return url;
   }
 }
 
@@ -531,11 +544,29 @@ export async function uploadClubFile(
   const designUpload = folderPath.includes('design');
   if (isImageFile(payload)) {
     onProgress?.(10);
-    // تصاميم PNG الكبيرة تتأخر على الضغط الثقيل — نضغط فقط لو الملف ثقيل
-    if (!designUpload || payload.size > 900 * 1024) {
+    // ضغط سريع دائماً للتصاميم عشان الجوال ما يعلق دقائق على ملف كبير
+    if (designUpload || payload.size > 180 * 1024) {
       payload = await compressImageForUpload(payload);
     }
-    onProgress?.(16);
+    onProgress?.(22);
+  }
+
+  // صور التصاميم: محاولة رفع قصيرة ثم حفظ مضغوط فوراً بدون رسائل Firebase الإنجليزية
+  if (designUpload && isImageFile(payload)) {
+    try {
+      const url = await uploadToStorage(payload, folderPath, onProgress, 20000);
+      onProgress?.(100);
+      return url;
+    } catch {
+      onProgress?.(78);
+      try {
+        const dataUrl = await withTimeout(compressImageToDataUrl(payload), 12000, 'STORAGE_TIMEOUT');
+        onProgress?.(100);
+        return dataUrl;
+      } catch {
+        throw new Error('تعذر رفع التصميم من الجوال. صغّر الصورة أو استخدم واي فاي ثم أعد المحاولة.');
+      }
+    }
   }
 
   try {
@@ -548,16 +579,16 @@ export async function uploadClubFile(
         onProgress?.(100);
         return dataUrl;
       } catch {
-        throw new Error(
-          designUpload
-            ? 'تعذر رفع صورة التصميم. أعد اختيار الملف وجرّب على واي فاي.'
-            : 'تعذر رفع صورة الشهادة. أعد اختيار الملف وجرّب على واي فاي.'
-        );
+        throw new Error('تعذر رفع صورة الشهادة. أعد اختيار الملف وجرّب على واي فاي.');
       }
     }
 
     const mapped = storageErrorMessage(error);
-    const timedOut = mapped.includes('STORAGE_TIMEOUT') || String(error).includes('STORAGE_TIMEOUT') || mapped.includes('FILE_READ_TIMEOUT');
+    const timedOut =
+      mapped.includes('STORAGE_TIMEOUT')
+      || mapped.includes('تأخر')
+      || String(error).includes('STORAGE_TIMEOUT')
+      || mapped.includes('FILE_READ_TIMEOUT');
     const isVideo = isVideoFile(file);
     const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
 
