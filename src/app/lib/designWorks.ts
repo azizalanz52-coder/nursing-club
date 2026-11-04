@@ -1,4 +1,6 @@
-import { Firestore, addDoc, collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { Firestore, addDoc, collection, deleteDoc, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { deleteObject, ref } from 'firebase/storage';
+import { storage } from './firebase';
 import { canonicalPhone } from './certificatesLookup';
 
 export const DESIGN_WORKS_COL = 'design_committee_works';
@@ -129,8 +131,34 @@ export async function saveDesignWork(
   });
 }
 
+function storagePathFromUrl(url: string) {
+  const value = String(url || '');
+  if (!value.includes('firebasestorage.googleapis.com') && !value.includes('firebasestorage.app')) return '';
+  const match = value.match(/\/o\/([^?]+)/);
+  if (!match?.[1]) return '';
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
 export async function deleteDesignWork(db: Firestore, id: string) {
-  await deleteDoc(doc(db, DESIGN_WORKS_COL, id));
+  const refDoc = doc(db, DESIGN_WORKS_COL, id);
+  const snap = await getDoc(refDoc);
+  const files = snap.exists() ? designFileUrls({ id, ...snap.data() }) : [];
+  await deleteDoc(refDoc);
+  await Promise.all(
+    files.map(async (url) => {
+      const path = storagePathFromUrl(url);
+      if (!path) return;
+      try {
+        await deleteObject(ref(storage, path));
+      } catch (err) {
+        console.error(err);
+      }
+    })
+  );
 }
 
 export function subscribeDesignWorks(db: Firestore, onData: (items: DesignWork[]) => void) {

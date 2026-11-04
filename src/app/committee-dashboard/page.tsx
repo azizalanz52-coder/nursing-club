@@ -159,6 +159,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [isUploadingScientific, setIsUploadingScientific] = useState(false);
   const [textBannerContent, setTextBannerContent] = useState('');
   const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
+  const [designEventSuggestions, setDesignEventSuggestions] = useState<string[]>([]);
 
   const [eventExcuses, setEventExcuses] = useState<any[]>([]);
   const [showExcuseForm, setShowExcuseForm] = useState(false);
@@ -240,6 +241,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       fetchCommitteeWhatsappLinks();
       fetchCommitteeTasks();
       fetchScientificTexts();
+      fetchDesignEventSuggestions();
 
       const isHiddenLocally = localStorage.getItem(`warning_hidden_${phone}`);
       if (isHiddenLocally === 'true') {
@@ -760,6 +762,19 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       if (cached?.length) setScientificTextsList(cached);
       setScientificTextsList(await loadCloudCollection(db, 'scientific_committee_texts'));
     } catch (e) { console.error(e); }
+  };
+
+  const fetchDesignEventSuggestions = async () => {
+    try {
+      const cached = peekCloudCollection('site_events') || [];
+      const fromCache = cached.map((item) => String(item.title || '').trim()).filter(Boolean);
+      if (fromCache.length) setDesignEventSuggestions(fromCache);
+      const events = await loadCloudCollection(db, 'site_events');
+      const titles = events.map((item) => String(item.title || '').trim()).filter(Boolean);
+      if (titles.length) setDesignEventSuggestions(titles);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const fetchPublicPartners = async () => {
@@ -1979,16 +1994,15 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const belongsToScientificContent =
     matchesTargetCommittee(userAssignedComm, 'لجنة المحتوى العلمي') ||
     requests.some((r) => {
-      const samePhone = String(r.phone || '').trim() === String(userPhone || '').trim();
       const status = String(r.status || '');
-      return samePhone && status.includes('مقبول') && matchesTargetCommittee(r.acceptedCommittee, 'لجنة المحتوى العلمي');
+      return sameMemberPhone(r.phone, userPhone) && status.includes('مقبول') && matchesTargetCommittee(r.acceptedCommittee, 'لجنة المحتوى العلمي');
     });
   const belongsToDesignCommittee =
     matchesTargetCommittee(userAssignedComm, 'لجنة التصميم') ||
+    String(userData?.role || '').includes('تصميم') ||
     requests.some((r) => {
-      const samePhone = String(r.phone || '').trim() === String(userPhone || '').trim();
       const status = String(r.status || '');
-      return samePhone && status.includes('مقبول') && matchesTargetCommittee(r.acceptedCommittee, 'لجنة التصميم');
+      return sameMemberPhone(r.phone, userPhone) && status.includes('مقبول') && matchesTargetCommittee(r.acceptedCommittee, 'لجنة التصميم');
     });
   const scientificArchiveOptions = existingArchiveTitles(scientificTextsList);
 
@@ -2972,7 +2986,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
             actorPhone={userPhone || ''}
             source="لوحة قادة التصميم"
             uploaderRole={isCommitteeLeader ? 'قائد اللجنة' : 'عضو لجنة'}
-            eventSuggestions={scientificArchiveOptions}
+            eventSuggestions={designEventSuggestions}
             canUpload
             canDelete
           />

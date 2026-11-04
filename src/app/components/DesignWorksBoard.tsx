@@ -4,7 +4,7 @@ import React, { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'rea
 import { db } from '../lib/firebase';
 import { notifyLeadership } from '../lib/userAccounts';
 import { clubConfirm } from '../lib/clubNotice';
-import { filterFilesWithinLimit, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
+import { filterFilesWithinLimit, requireAuthUser, uploadClubFiles, uploadLimitMessage, uploadingLabel } from '../lib/uploadFile';
 import {
   DESIGN_KINDS,
   DESIGN_STORAGE_FOLDER,
@@ -77,6 +77,10 @@ export default function DesignWorksBoard({
     try {
       setIsUploading(true);
       setProgress(0);
+      await requireAuthUser();
+      if (!String(actorPhone || '').trim()) {
+        throw new Error('سجّل الدخول برقم جوالك ثم أعد رفع التصميم.');
+      }
       const urls = await uploadClubFiles(files, DESIGN_STORAGE_FOLDER, setProgress);
       await saveDesignWork(db, {
         eventTitle,
@@ -91,6 +95,8 @@ export default function DesignWorksBoard({
       notifyLeadership(db, `🎨 رفع ${actorName || 'عضو التصميم'} تصميماً لفعالية: ${eventTitle.trim()}`).catch(() => undefined);
       setTitle('');
       setFiles([]);
+      setEventCustom('');
+      if (suggestionList.length > 0) setEventPick('');
       alert('تم رفع التصميم. ظهر في أرشيف اللجنة ولوحة الأدمن، ويُحتسب في رادار الأداء.');
     } catch (err: any) {
       console.error(err);
@@ -282,49 +288,54 @@ export default function DesignWorksBoard({
             <div className="flex-1 overflow-auto p-4 grid sm:grid-cols-2 gap-3">
               {reviewing.contributor.works.map((item) => {
                 const sources = designFileUrls(item);
-                const primary = sources[0] || item.fileUrl;
                 return (
-                  <article key={item.id} className="rounded-2xl bg-slate-50 border border-slate-200 p-3 space-y-2">
-                    <span className="text-[10px] font-black bg-[#630517]/10 text-[#630517] px-2 py-0.5 rounded-full">{item.kind}</span>
+                  <article key={item.id} className="rounded-2xl bg-slate-50 border border-slate-200 p-3 space-y-2 sm:col-span-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[10px] font-black bg-[#630517]/10 text-[#630517] px-2 py-0.5 rounded-full">{item.kind}</span>
+                      <p className="text-[10px] text-slate-500">{item.createdAt || ''}</p>
+                    </div>
                     {item.title && item.title !== item.eventTitle ? (
                       <p className="text-xs font-extrabold text-slate-900">{item.title}</p>
                     ) : null}
-                    <p className="text-[10px] text-slate-500">{item.createdAt || ''}</p>
-                    <div className="rounded-xl overflow-hidden border border-slate-200 bg-white min-h-[120px] grid place-items-center">
-                      {!primary ? (
-                        <p className="text-[11px] text-slate-400 font-bold">لا يوجد ملف</p>
-                      ) : isDesignPdf(primary) ? (
-                        <a href={primary} target="_blank" rel="noreferrer" className="text-xs font-black text-[#630517] py-8">فتح ملف PDF</a>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {sources.length === 0 ? (
+                        <div className="rounded-xl border border-slate-200 bg-white min-h-[120px] grid place-items-center sm:col-span-2">
+                          <p className="text-[11px] text-slate-400 font-bold">لا يوجد ملف</p>
+                        </div>
                       ) : (
-                        <img src={primary} alt={item.title} className="w-full h-auto max-h-56 object-contain" />
+                        sources.map((src) => (
+                          <div key={src} className="rounded-xl overflow-hidden border border-slate-200 bg-white min-h-[120px] grid place-items-center">
+                            {isDesignPdf(src) ? (
+                              <a href={src} target="_blank" rel="noreferrer" className="text-xs font-black text-[#630517] py-8">فتح ملف PDF</a>
+                            ) : (
+                              <img src={src} alt={item.title} className="w-full h-auto max-h-56 object-contain" />
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setPreview({ src, title: item.title || reviewing.eventName, pdf: isDesignPdf(src) })}
+                              className="w-full py-2 border-t border-slate-100 bg-white text-[11px] font-bold"
+                            >
+                              تكبير
+                            </button>
+                          </div>
+                        ))
                       )}
                     </div>
-                    <div className="flex gap-2">
-                      {primary ? (
-                        <button
-                          type="button"
-                          onClick={() => setPreview({ src: primary, title: item.title || reviewing.eventName, pdf: isDesignPdf(primary) })}
-                          className="flex-1 py-2 rounded-xl bg-white border border-slate-200 text-[11px] font-bold"
-                        >
-                          تكبير
-                        </button>
-                      ) : null}
-                      {canDelete ? (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const removed = await handleDelete(item.id);
-                            if (!removed) return;
-                            const nextWorks = reviewing.contributor.works.filter((row) => row.id !== item.id);
-                            if (nextWorks.length === 0) setReviewing(null);
-                            else setReviewing({ ...reviewing, contributor: { ...reviewing.contributor, works: nextWorks } });
-                          }}
-                          className="px-3 py-2 rounded-xl bg-red-50 text-red-600 text-[11px] font-bold"
-                        >
-                          حذف
-                        </button>
-                      ) : null}
-                    </div>
+                    {canDelete ? (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const removed = await handleDelete(item.id);
+                          if (!removed) return;
+                          const nextWorks = reviewing.contributor.works.filter((row) => row.id !== item.id);
+                          if (nextWorks.length === 0) setReviewing(null);
+                          else setReviewing({ ...reviewing, contributor: { ...reviewing.contributor, works: nextWorks } });
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-red-50 text-red-600 text-[11px] font-bold"
+                      >
+                        حذف
+                      </button>
+                    ) : null}
                   </article>
                 );
               })}

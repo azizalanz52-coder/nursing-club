@@ -9,6 +9,13 @@ import { emailToPhone, isDistinguishedRole, isPrivilegedRole } from '../lib/auth
 import { canonicalPhone } from '../lib/certificatesLookup';
 import { loadCloudCollection, peekCloudCollection } from '../lib/cloudCache';
 import { committeeIdFromName, findMemberContext, resolveMemberAcceptance, resolvePortalCommitteeId } from '../lib/memberAcceptance';
+import { normalizeUniversityId } from '../lib/certificatesLookup';
+import {
+  loadOwnProfileFields,
+  persistProfileName,
+  updateOwnName,
+  updateOwnUniversityId,
+} from '../lib/memberProfile';
 import { ClubIcon, CommitteeIcon, SocialIcon } from '../components/icons';
 
 interface CommitteeData {
@@ -75,6 +82,11 @@ export default function MemberSmartDashboard() {
   
   const [userCommitteeData, setUserCommitteeData] = useState<CommitteeData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [profileName, setProfileName] = useState('');
+  const [profileUniversityId, setProfileUniversityId] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState('');
+  const [profileError, setProfileError] = useState('');
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -102,6 +114,7 @@ export default function MemberSmartDashboard() {
       let activeComm = '';
       let notification = '';
       let finalName = name;
+      let universityId = '';
 
       if (phone) {
         const context = await findMemberContext(db, phone, name);
@@ -111,6 +124,7 @@ export default function MemberSmartDashboard() {
           if (uData.role) activeRole = String(uData.role);
           if (uData.assignedCommittee || uData.committee) activeComm = String(uData.assignedCommittee || uData.committee);
           if (uData.latestNotification) notification = String(uData.latestNotification);
+          if (uData.universityId) universityId = normalizeUniversityId(uData.universityId);
         }
 
         if (!activeComm) {
@@ -126,9 +140,22 @@ export default function MemberSmartDashboard() {
       }
 
       setCurrentUserName(finalName);
+      setProfileName(finalName);
       setUserRole(activeRole);
       setAssignedCommittee(activeComm);
       setUserNotification(notification);
+      if (universityId) setProfileUniversityId(universityId);
+
+      try {
+        const profile = await loadOwnProfileFields(db, phone);
+        if (profile.fullName) {
+          setProfileName(profile.fullName);
+          setCurrentUserName(profile.fullName);
+        }
+        if (profile.universityId) setProfileUniversityId(profile.universityId);
+      } catch (profileErr) {
+        console.error(profileErr);
+      }
 
       if (!activeComm) {
         setUserCommitteeData(null);
@@ -218,6 +245,47 @@ export default function MemberSmartDashboard() {
   const isLeader = userRole.includes('رئيس لجنة') || userRole.includes('رئيسة لجنة') || userRole.includes('قائد') || userRole.includes('قائدة');
   const isDistinguished = isDistinguishedRole(userRole);
 
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUserPhone) {
+      setProfileError('سجّل الدخول أولاً لتعديل بياناتك.');
+      return;
+    }
+    setProfileSaving(true);
+    setProfileError('');
+    setProfileMessage('');
+    try {
+      const nextName = profileName.trim();
+      const nextUni = normalizeUniversityId(profileUniversityId);
+      const nameChanged = Boolean(nextName && nextName !== currentUserName.trim());
+      let didSave = false;
+      if (nameChanged) {
+        const saved = await updateOwnName(db, nextName);
+        setCurrentUserName(saved.fullName);
+        setProfileName(saved.fullName);
+        persistProfileName(saved.fullName);
+        const cached = readPortalCache(currentUserPhone);
+        if (cached) writePortalCache(currentUserPhone, { ...cached, name: saved.fullName });
+        didSave = true;
+      }
+      if (nextUni) {
+        await updateOwnUniversityId(db, nextUni, currentUserPhone);
+        setProfileUniversityId(nextUni);
+        didSave = true;
+      }
+      if (!didSave) {
+        setProfileError('لا توجد تغييرات للحفظ. أدخل الاسم أو الرقم الجامعي.');
+        return;
+      }
+      setProfileMessage('تم حفظ بياناتك بنجاح.');
+    } catch (err: any) {
+      console.error(err);
+      setProfileError(err?.message || 'تعذر حفظ البيانات. حاول مرة أخرى.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 selection:bg-[#630517] selection:text-[#F5D061] py-12" dir="rtl">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -281,6 +349,72 @@ export default function MemberSmartDashboard() {
             </div>
           )}
         </div>
+
+        {currentUserPhone ? (
+          <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-5">
+            <div className="space-y-1">
+              <h3 className="text-lg font-black text-slate-900">بياناتي</h3>
+              <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                عدّل اسمك ورقمك الجامعي بنفسك. رقم الجوال للعرض فقط ويُغيَّر عبر الإدارة عند الحاجة.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="block space-y-1.5 sm:col-span-2">
+                  <span className="text-[11px] font-black text-slate-600">الاسم الكامل</span>
+                  <input
+                    type="text"
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    placeholder="الاسم الثلاثي أو الرباعي"
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#630517]"
+                    required
+                  />
+                </label>
+
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-black text-slate-600">الرقم الجامعي</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    dir="ltr"
+                    value={profileUniversityId}
+                    onChange={(e) => setProfileUniversityId(e.target.value)}
+                    placeholder="مثال: 2230005939"
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-mono font-bold text-slate-900 focus:outline-none focus:border-[#630517]"
+                  />
+                </label>
+
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-black text-slate-600">رقم الجوال</span>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={currentUserPhone}
+                    readOnly
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-100 text-sm font-mono font-bold text-slate-500 cursor-not-allowed"
+                  />
+                </label>
+              </div>
+
+              {profileError ? (
+                <p className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-2xl px-4 py-3">{profileError}</p>
+              ) : null}
+              {profileMessage ? (
+                <p className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3">{profileMessage}</p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={profileSaving}
+                className="px-6 py-3 rounded-2xl bg-[#630517] text-[#F5D061] font-black text-xs shadow-md hover:brightness-110 disabled:opacity-60 cursor-pointer"
+              >
+                {profileSaving ? 'جاري الحفظ...' : 'حفظ البيانات'}
+              </button>
+            </form>
+          </section>
+        ) : null}
 
         {/* بطاقة اللجنة المرتبطة */}
         {loading ? (

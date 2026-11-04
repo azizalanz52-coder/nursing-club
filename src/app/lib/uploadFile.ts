@@ -520,7 +520,11 @@ export async function uploadClubFile(
         onProgress?.(100);
         return dataUrl;
       } catch {
-        throw new Error('تعذر رفع صورة الشهادة. أعد اختيار الملف وجرّب على واي فاي.');
+        throw new Error(
+          folderPath.includes('design')
+            ? 'تعذر رفع صورة التصميم. أعد اختيار الملف وجرّب على واي فاي.'
+            : 'تعذر رفع صورة الشهادة. أعد اختيار الملف وجرّب على واي فاي.'
+        );
       }
     }
 

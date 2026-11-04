@@ -363,6 +363,14 @@ export default function Navbar() {
                   </Link>
                 )}
 
+                <Link
+                  href="/member"
+                  className="px-3 py-2 rounded-xl bg-slate-100 text-slate-800 border border-slate-200 hover:bg-slate-200 transition-all text-xs font-black flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <ClubIcon name="user" size={14} />
+                  <span>بياناتي</span>
+                </Link>
+
                 {showCommitteePortal && (
                   <Link 
                     href="/committee-dashboard"
@@ -533,6 +541,15 @@ export default function Navbar() {
                       <ClubIcon name="settings" size={14} /><span>لوحة التحكم</span>
                     </Link>
                   )}
+
+                  <Link
+                    href="/member"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full py-3 rounded-2xl bg-slate-100 text-slate-800 border border-slate-200 text-xs font-black flex items-center justify-center gap-2"
+                  >
+                    <ClubIcon name="user" size={14} />
+                    <span>بياناتي</span>
+                  </Link>
 
                   {showCommitteePortal && (
                     <Link href="/committee-dashboard" onClick={() => setMobileMenuOpen(false)} className={`w-full py-3 rounded-2xl text-xs font-black shadow flex items-center justify-center gap-2 ${isQualityOperationsRoom ? 'bg-rose-950 text-[#F5D061] border border-amber-400' : isCommitteeLeader ? 'bg-amber-600 text-white' : 'bg-[#630517] text-[#F5D061]'}`}>
