@@ -358,6 +358,10 @@ async function uploadResumable(
   const task = uploadBytesResumable(storageRef, file, fileMetadata(file));
   let lastBytes = 0;
   let lastChange = Date.now();
+  let gotBytes = false;
+  const stopTicker = startProgressTicker(file, (percent) => {
+    if (!gotBytes) onProgress?.(percent);
+  });
   const cancelTask = () => {
     try {
       task.cancel();
@@ -377,6 +381,10 @@ async function uploadResumable(
           if (snap.bytesTransferred !== lastBytes) {
             lastBytes = snap.bytesTransferred;
             lastChange = Date.now();
+            if (snap.bytesTransferred > 0) {
+              gotBytes = true;
+              stopTicker();
+            }
           }
           const ratio = snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0;
           onProgress?.(Math.min(94, Math.max(18, Math.round(18 + ratio * 76))));
@@ -384,6 +392,8 @@ async function uploadResumable(
         reject,
         async () => {
           try {
+            gotBytes = true;
+            stopTicker();
             onProgress?.(95);
             resolve(await withTimeout(getDownloadURL(task.snapshot.ref), 10000, 'STORAGE_TIMEOUT'));
           } catch (error) {
@@ -396,6 +406,7 @@ async function uploadResumable(
     cancelTask();
     throw error;
   } finally {
+    stopTicker();
     clearInterval(stall);
     if (killer) clearTimeout(killer);
   }
@@ -415,6 +426,19 @@ async function uploadToStorage(
   const limit = timeoutMs ?? uploadTimeoutMs(file);
   onProgress?.(18);
 
+  // الملفات الصغيرة أسرع بالمسار المباشر بدل resumable اللي يعلق عند 18٪
+  const preferDirect = file.size <= 2.5 * 1024 * 1024 || folderPath.includes('design');
+
+  if (preferDirect) {
+    try {
+      const url = await withTimeout(uploadDirect(file, storageRef, onProgress), Math.min(limit, 25000));
+      onProgress?.(96);
+      return url;
+    } catch (error) {
+      if (!isRetryableUploadError(error)) throw error;
+    }
+  }
+
   try {
     const url = await withTimeout(uploadResumable(file, storageRef, onProgress, limit), limit);
     onProgress?.(96);
@@ -424,11 +448,11 @@ async function uploadToStorage(
     await user.getIdToken(true);
     const retryRef = ref(storage, `${folderPath}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}${safeExtension(file)}`);
     try {
-      const url = await withTimeout(uploadResumable(file, retryRef, onProgress, Math.min(limit, 22000)), Math.min(limit, 22000));
+      const url = await withTimeout(uploadDirect(file, retryRef, onProgress), Math.min(limit, 20000));
       onProgress?.(96);
       return url;
     } catch {
-      const url = await withTimeout(uploadDirect(file, retryRef, onProgress), Math.min(limit, 18000));
+      const url = await withTimeout(uploadResumable(file, retryRef, onProgress, Math.min(limit, 22000)), Math.min(limit, 22000));
       onProgress?.(96);
       return url;
     }
@@ -504,9 +528,13 @@ export async function uploadClubFile(
   let payload = await cloneUploadFile(file);
   assertUploadSize(payload);
 
+  const designUpload = folderPath.includes('design');
   if (isImageFile(payload)) {
     onProgress?.(10);
-    payload = await compressImageForUpload(payload);
+    // تصاميم PNG الكبيرة تتأخر على الضغط الثقيل — نضغط فقط لو الملف ثقيل
+    if (!designUpload || payload.size > 900 * 1024) {
+      payload = await compressImageForUpload(payload);
+    }
     onProgress?.(16);
   }
 
@@ -521,7 +549,7 @@ export async function uploadClubFile(
         return dataUrl;
       } catch {
         throw new Error(
-          folderPath.includes('design')
+          designUpload
             ? 'تعذر رفع صورة التصميم. أعد اختيار الملف وجرّب على واي فاي.'
             : 'تعذر رفع صورة الشهادة. أعد اختيار الملف وجرّب على واي فاي.'
         );
