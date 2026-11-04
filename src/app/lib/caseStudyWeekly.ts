@@ -1,10 +1,11 @@
 import {
   addDaysYmd,
   adjustmentSum,
+  isCaseStudyStaffPhone,
   personPhone,
   riyadhParts,
   submissionDayKey,
-  solveDurationMs,
+  solveDurationMsForRace,
   submissionMs,
   weekStartSunday,
   type CaseLeaderboardRow,
@@ -141,6 +142,7 @@ function consecutiveStreak(days: string[], today: string) {
 }
 
 function inWeek(sub: Record<string, any>, weekStart: string) {
+  if (isCaseStudyStaffPhone(personPhone(sub))) return false;
   const day = submissionDayKey(sub);
   const start = weeklyCountFrom(weekStart);
   const end = weekEndSaturday(weekStart);
@@ -186,7 +188,7 @@ function fastestDaysByKey(subs: Array<Record<string, any>>, weekStart: string) {
     if (!inWeek(sub, weekStart)) continue;
     const day = submissionDayKey(sub);
     const key = personKey(sub);
-    const used = solveDurationMs(sub);
+    const used = solveDurationMsForRace(sub);
     if (!day || !key || used == null) continue;
     const people = byDay.get(day) || new Map<string, number>();
     const prev = people.get(key);

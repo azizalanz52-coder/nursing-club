@@ -95,6 +95,14 @@ service cloud.firestore {
       allow update, delete: if signedIn();
     }
 
+    // بداية وقت الحل لليوم — تُنشأ مرة واحدة ولا تُعدَّل من العميل
+    match /case_study_attempts/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if false;
+      allow delete: if isStaff();
+    }
+
     match /site_settings/{id} {
       allow read: if true;
       allow write: if isStaff();

@@ -1,4 +1,5 @@
-import { Firestore, collection, doc, getDocs, increment, updateDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, getDocs, increment, runTransaction, updateDoc } from 'firebase/firestore';
+import { ADMIN_PHONE } from './authIdentity';
 import { canonicalPhone } from './certificatesLookup';
 
 export type ScoreAdjustment = {
@@ -33,15 +34,68 @@ export function riyadhParts(ms = Date.now()) {
 }
 
 export const CASE_STUDY_SOLVE_MS = 90 * 1000;
+/** أقل وقت معقول لاحتساب «الأسرع حلاً» — يمنع إرسال فوري/ثغرة التايمر */
+export const CASE_STUDY_MIN_RACE_SOLVE_MS = 3000;
+export const CASE_STUDY_ATTEMPTS_COL = 'case_study_attempts';
 
 export function caseSolveTimerKey(ymd = riyadhParts().ymd) {
   return `nurs_case_solve_v4_${ymd}`;
+}
+
+export function caseSolveAttemptId(phone: string, ymd = riyadhParts().ymd) {
+  const key = canonicalPhone(phone) || String(phone || '').trim();
+  return `${key}_${ymd}`;
+}
+
+export function isCaseStudyStaffPhone(phone?: string | null) {
+  return canonicalPhone(phone || '') === canonicalPhone(ADMIN_PHONE);
 }
 
 export function solveDurationMs(sub: Record<string, any> | null | undefined) {
   const used = Number(sub?.solveMs);
   if (!Number.isFinite(used) || used <= 0) return null;
   return Math.min(CASE_STUDY_SOLVE_MS, Math.max(1, Math.round(used)));
+}
+
+/** وقت الحل المعتمد لسباق الأسرع — يستبعد الأوقات المستحيلة وطاقم الموقع */
+export function solveDurationMsForRace(sub: Record<string, any> | null | undefined) {
+  if (isCaseStudyStaffPhone(personPhone(sub))) return null;
+  const used = solveDurationMs(sub);
+  if (used == null || used < CASE_STUDY_MIN_RACE_SOLVE_MS) return null;
+  return used;
+}
+
+export type CaseSolveAttempt = {
+  id: string;
+  phone: string;
+  day: string;
+  startedAt: number;
+};
+
+export async function ensureCaseSolveAttempt(db: Firestore, phone: string, now = Date.now()): Promise<CaseSolveAttempt> {
+  const key = canonicalPhone(phone) || String(phone || '').trim();
+  if (!key) throw new Error('رقم الجوال مطلوب لبدء وقت الحل.');
+  const day = riyadhParts(now).ymd;
+  const id = caseSolveAttemptId(key, day);
+  const ref = doc(db, CASE_STUDY_ATTEMPTS_COL, id);
+
+  const startedAt = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (snap.exists()) {
+      const prev = Number(snap.data()?.startedAt);
+      if (Number.isFinite(prev) && prev > 1_000_000_000_000) return prev;
+    }
+    const next = now;
+    tx.set(ref, {
+      phone: key,
+      day,
+      startedAt: next,
+      createdAt: new Date(next).toISOString(),
+    });
+    return next;
+  });
+
+  return { id, phone: key, day, startedAt };
 }
 
 export function formatSolveClock(leftMs: number) {

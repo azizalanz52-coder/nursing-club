@@ -10,6 +10,7 @@ import {
   CASE_STUDY_SOLVE_MS,
   aggregateCaseLeaderboard,
   caseSolveTimerKey,
+  ensureCaseSolveAttempt,
   formatRiyadhCountdown,
   formatSolveClock,
   loadCaseSubmissions,
@@ -363,6 +364,7 @@ export default function CaseStudyPage() {
   const [recordedMax, setRecordedMax] = useState<number | null>(null);
   const [solveLeftMs, setSolveLeftMs] = useState(CASE_STUDY_SOLVE_MS);
   const [solveExpired, setSolveExpired] = useState(false);
+  const [solveStartedAt, setSolveStartedAt] = useState<number | null>(null);
   const [weekNoticeBlocking, setWeekNoticeBlocking] = useState(true);
   const [trialPollBlocking, setTrialPollBlocking] = useState(true);
 
@@ -404,19 +406,50 @@ export default function CaseStudyPage() {
   useEffect(() => {
     if (trialPollBlocking || weekNoticeBlocking || hasSubmittedToday || showResults || activeCases.length === 0) return;
     if (typeof window === 'undefined') return;
-    const key = caseSolveTimerKey();
-    const existing = Number(localStorage.getItem(key) || 0);
-    const start = Number.isFinite(existing) && existing > 1_000_000_000_000 ? existing : Date.now();
-    if (start !== existing) localStorage.setItem(key, String(start));
-    const tick = () => {
-      const left = Math.max(0, start + CASE_STUDY_SOLVE_MS - Date.now());
-      setSolveLeftMs(left);
-      setSolveExpired(left <= 0);
+    const phone = canonicalPhone(studentPhone) || studentPhone.trim();
+    if (!phone) return;
+
+    let cancelled = false;
+    let timer = 0;
+
+    (async () => {
+      try {
+        const attempt = await ensureCaseSolveAttempt(db, phone);
+        if (cancelled) return;
+        const start = attempt.startedAt;
+        setSolveStartedAt(start);
+        localStorage.setItem(caseSolveTimerKey(), String(start));
+        const tick = () => {
+          const left = Math.max(0, start + CASE_STUDY_SOLVE_MS - Date.now());
+          setSolveLeftMs(left);
+          setSolveExpired(left <= 0);
+        };
+        tick();
+        timer = window.setInterval(tick, 250);
+      } catch (err) {
+        console.error(err);
+        // احتياطي محلي فقط إذا تعذر السيرفر — لا يعيد الوقت بعد نجاح السيرفر
+        const key = caseSolveTimerKey();
+        const existing = Number(localStorage.getItem(key) || 0);
+        const start = Number.isFinite(existing) && existing > 1_000_000_000_000 ? existing : Date.now();
+        if (start !== existing) localStorage.setItem(key, String(start));
+        if (cancelled) return;
+        setSolveStartedAt(start);
+        const tick = () => {
+          const left = Math.max(0, start + CASE_STUDY_SOLVE_MS - Date.now());
+          setSolveLeftMs(left);
+          setSolveExpired(left <= 0);
+        };
+        tick();
+        timer = window.setInterval(tick, 250);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (timer) window.clearInterval(timer);
     };
-    tick();
-    const timer = window.setInterval(tick, 250);
-    return () => window.clearInterval(timer);
-  }, [trialPollBlocking, weekNoticeBlocking, hasSubmittedToday, showResults, activeCases.length]);
+  }, [trialPollBlocking, weekNoticeBlocking, hasSubmittedToday, showResults, activeCases.length, studentPhone]);
 
   useEffect(() => {
     if (!showLeaderboardModal) return;
@@ -594,9 +627,13 @@ export default function CaseStudyPage() {
       const persistence = persistenceForSubmit(existing, phoneKey, now);
       const score = solveScore + persistence.amount;
       const when = new Date(now);
+      const startedAt =
+        solveStartedAt
+        || Number(localStorage.getItem(caseSolveTimerKey()) || 0)
+        || Date.now();
       const solveMs = solveExpired
         ? CASE_STUDY_SOLVE_MS
-        : Math.min(CASE_STUDY_SOLVE_MS, Math.max(1, CASE_STUDY_SOLVE_MS - solveLeftMs));
+        : Math.min(CASE_STUDY_SOLVE_MS, Math.max(1, Date.now() - startedAt));
 
       await addDoc(collection(db, 'case_study_submissions'), {
         studentName: studentName.trim(),
