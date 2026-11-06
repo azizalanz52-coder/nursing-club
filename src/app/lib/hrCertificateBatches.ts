@@ -248,30 +248,52 @@ export function parseEligibleExcel(buffer: ArrayBuffer): ExcelParseResult {
 }
 
 export type IssuedCertRef = {
+  id?: string;
   phone?: string;
   universityId?: string;
+  fullName?: string;
+  recipientName?: string;
   title?: string;
   certTitle?: string;
   issuedBy?: string;
   description?: string;
 };
 
+function certificateMatchesEvent(cert: IssuedCertRef, eventTitle: string) {
+  const event = norm(eventTitle);
+  if (!event) return true;
+  const label = certEventLabel(cert);
+  const blob = `${norm(cert.title)} ${norm(cert.certTitle)}`;
+  return (
+    blob.includes(event)
+    || event.includes(norm(cert.certTitle || cert.title))
+    || eventsRelated(label, event)
+    || eventsRelated(eventTitleFromCertLabel(label), event)
+  );
+}
+
 export function findPersonCertificate(
   person: CertEligiblePerson,
   certificates: IssuedCertRef[],
   eventTitle: string
 ) {
-  const event = norm(eventTitle);
-  return certificates.find((cert) => {
+  const byIdentity = certificates.find((cert) => {
     const samePerson = isSameEligiblePerson(person, {
       fullName: '',
       phone: String(cert.phone || ''),
       universityId: String(cert.universityId || ''),
     });
-    if (!samePerson) return false;
-    const title = `${norm(cert.title)} ${norm(cert.certTitle)}`;
-    if (!event) return true;
-    return title.includes(event) || event.includes(norm(cert.certTitle || cert.title));
+    return samePerson && certificateMatchesEvent(cert, eventTitle);
+  });
+  if (byIdentity) return byIdentity;
+
+  // صف الإكسل أحياناً بدون جوال/جامعي — نطابق بالاسم داخل نفس الفعالية
+  const personName = normalizePersonName(person.fullName);
+  if (!personName) return null;
+  return certificates.find((cert) => {
+    if (!certificateMatchesEvent(cert, eventTitle)) return false;
+    const certName = normalizePersonName(String(cert.fullName || cert.recipientName || ''));
+    return Boolean(certName) && certName === personName;
   }) || null;
 }
 

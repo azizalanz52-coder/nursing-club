@@ -454,9 +454,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
       if (phone) {
         try {
-          if (universityId) {
-            await stampMemberAcceptance(db, phone, { phone, universityId });
-          }
+          // لا ننشئ حساباً جديداً — الشهادة تصدر لغير المسجّلين أيضاً
           await notifyExistingUser(db, phone, {
             latestNotification: saved.created
               ? `🎓 تم إصدار شهادة جديدة لك بعنوان: (${title}). يمكنك الاستعلام عنها وتحميلها الآن.`
@@ -2591,6 +2589,11 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
               formAnchorId="hr-cert-form"
               canRepair={isCommitteeLeader}
               certsLoading={certsLoading}
+              onCertificateRemoved={(id) => {
+                setIssuedHrCertificates((prev) => prev.filter((cert) => cert.id !== id));
+                invalidateCloudCollection('certificates');
+                invalidateCloudCollection('site_certificates');
+              }}
               onIssue={(person, certTitle) => {
                 setCertStudentName(person.fullName);
                 setCertStudentPhone(person.phone);

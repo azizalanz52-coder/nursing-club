@@ -894,7 +894,7 @@ export default function AdminDashboard() {
 
       if (phone && universityId) {
         try {
-          await stampMemberAcceptance(db, phone, { phone, universityId });
+          // ربط الهوية فقط إن وُجد حساب — الشهادة تصدر بدون تسجيل إجبارياً
           await linkCertificatesToIdentity(db, phone, universityId);
         } catch (err) {
           console.error(err);
@@ -3888,6 +3888,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
               <HrCertificateBatches
                 certificates={certificates.map((cert) => ({
+                  id: cert.id,
+                  fullName: cert.recipientName,
+                  recipientName: cert.recipientName,
                   phone: cert.phone,
                   universityId: cert.universityId,
                   title: cert.certTitle,
@@ -3896,6 +3899,9 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 actorName="لوحة الأدمن"
                 formAnchorId="admin-cert-form"
                 canRepair={true}
+                onCertificateRemoved={(id) => {
+                  setCertificates((prev) => prev.filter((cert) => cert.id !== id));
+                }}
                 onIssue={(person, certTitle) => {
                   setCertRecipientInput(person.fullName);
                   setCertPhoneInput(person.phone);

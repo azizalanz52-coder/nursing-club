@@ -20,6 +20,7 @@ import {
   type CertEligiblePerson,
   type CertEventBatch,
 } from '../lib/hrCertificateBatches';
+import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { repairCertificateIdentities } from '../lib/memberIdentity';
 
 export default function HrCertificateBatches({
@@ -27,6 +28,7 @@ export default function HrCertificateBatches({
   actorName,
   formAnchorId,
   onIssue,
+  onCertificateRemoved,
   canRepair = false,
   certsLoading = false,
 }: {
@@ -44,6 +46,7 @@ export default function HrCertificateBatches({
   actorName: string;
   formAnchorId: string;
   onIssue: (person: CertEligiblePerson, certTitle: string) => void;
+  onCertificateRemoved?: (id: string) => void;
   canRepair?: boolean;
   certsLoading?: boolean;
 }) {
@@ -191,11 +194,67 @@ export default function HrCertificateBatches({
     alert('تم الحذف');
   };
 
+  const handleRemoveRecipient = async (batch: CertEventBatch, person: CertEligiblePerson, index: number) => {
+    const issuedCert = findPersonCertificate(person, certificates, batch.eventTitle);
+    const ok = await clubConfirm(
+      issuedCert
+        ? `حذف «${person.fullName}» من القائمة؟ سيتم حذف الشهادة الصادرة أيضاً.`
+        : `حذف «${person.fullName}» من قائمة المستحقين؟`
+    );
+    if (!ok) return;
+
+    try {
+      const recipients = (batch.recipients || []).filter((_, i) => i !== index);
+      await updateDoc(doc(db, 'hr_certificate_batches', batch.id), { recipients });
+
+      if (issuedCert?.id) {
+        await Promise.all([
+          deleteDoc(doc(db, 'certificates', issuedCert.id)).catch(() => undefined),
+          deleteDoc(doc(db, 'site_certificates', issuedCert.id)).catch(() => undefined),
+        ]);
+        onCertificateRemoved?.(issuedCert.id);
+      }
+      await clubNotice('تم الحذف من القائمة.', 'success');
+    } catch (err) {
+      console.error(err);
+      await clubNotice('تعذر حذف الاسم. حاول مرة أخرى.', 'error');
+    }
+  };
+
+  // بعد الإصدار: انسخ الجوال/الجامعي من الشهادة لصف القائمة حتى تظهر «صدرت» فوراً
+  useEffect(() => {
+    if (!batchesReady || certificates.length === 0 || batches.length === 0) return;
+
+    const sync = async () => {
+      for (const batch of batches) {
+        let changed = false;
+        const recipients = (batch.recipients || []).map((person) => {
+          const cert = findPersonCertificate(person, certificates, batch.eventTitle);
+          if (!cert) return person;
+          const phone = canonicalPhone(String(cert.phone || '')) || person.phone;
+          const universityId = normalizeUniversityId(cert.universityId) || person.universityId;
+          if (phone === person.phone && universityId === person.universityId) return person;
+          changed = true;
+          return { ...person, phone, universityId };
+        });
+        if (!changed) continue;
+        try {
+          await updateDoc(doc(db, 'hr_certificate_batches', batch.id), { recipients });
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    };
+
+    void sync();
+  }, [batches, batchesReady, certificates]);
+
   return (
     <div className="space-y-4 bg-sky-50/50 p-6 rounded-2xl border border-sky-200">
       <div>
         <h4 className="font-extrabold text-sm text-[#630517]">قوائم المستحقين من الإكسل</h4>
         <p className="text-[11px] text-slate-500">كل فعالية قائمة لحاله. اكتب اسم الفعالية ثم ارفع إكسلها. الملف الثاني ما يندمج مع الأولى.</p>
+        <p className="text-[11px] text-slate-500">المستفيد ما يشترط يكون مسجّل في الموقع — يكفي الاسم مع الجوال أو الرقم الجامعي للإصدار والاستعلام.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -262,14 +321,6 @@ export default function HrCertificateBatches({
               personHasCertificate(person, certificates, batch.eventTitle)
             ).length;
             const open = openId === batch.id;
-            const q = queryText.trim();
-            const visible = (batch.recipients || []).filter(
-              (person) =>
-                !q ||
-                person.fullName.includes(q) ||
-                person.phone.includes(q) ||
-                person.universityId.includes(q)
-            );
 
             return (
               <div key={batch.id} className="bg-white rounded-2xl border border-sky-100 overflow-hidden">
@@ -305,7 +356,16 @@ export default function HrCertificateBatches({
                     </div>
 
                     <div className="space-y-2 max-h-80 overflow-auto">
-                      {visible.map((person, index) => {
+                      {(batch.recipients || []).map((person, index) => {
+                        const q = queryText.trim();
+                        if (
+                          q
+                          && !person.fullName.includes(q)
+                          && !person.phone.includes(q)
+                          && !person.universityId.includes(q)
+                        ) {
+                          return null;
+                        }
                         const issuedCert = findPersonCertificate(person, certificates, batch.eventTitle);
                         const issuer = certificateIssuerName(issuedCert);
                         return (
@@ -316,30 +376,39 @@ export default function HrCertificateBatches({
                             <div className="min-w-0">
                               <p className="font-black text-xs text-slate-900">{person.fullName}</p>
                               <p className="text-[11px] text-slate-500 font-mono" dir="ltr">
-                                {[person.phone, person.universityId].filter(Boolean).join('  ')}
+                                {[person.phone, person.universityId].filter(Boolean).join('  ') || 'بدون جوال أو رقم جامعي في الإكسل'}
                               </p>
                             </div>
-                            {issuedCert ? (
-                              <span className="text-left shrink-0">
-                                <span className="block text-[11px] font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full text-center">صدرت</span>
-                                {issuer ? (
-                                  <span className="block mt-1 text-[10px] font-bold text-slate-500 text-center">
-                                    صدرت بواسطة {issuer}
-                                  </span>
-                                ) : null}
-                              </span>
-                            ) : (
+                            <div className="flex items-center gap-2 shrink-0">
+                              {issuedCert ? (
+                                <span className="text-left">
+                                  <span className="block text-[11px] font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full text-center">صدرت</span>
+                                  {issuer ? (
+                                    <span className="block mt-1 text-[10px] font-bold text-slate-500 text-center">
+                                      صدرت بواسطة {issuer}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onIssue(person, suggestedCertTitle(batch.eventTitle));
+                                    document.getElementById(formAnchorId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                  }}
+                                  className="text-[11px] font-black bg-[#630517] text-[#F5D061] px-3 py-1.5 rounded-full hover:brightness-110 cursor-pointer"
+                                >
+                                  إضافة شهادة
+                                </button>
+                              )}
                               <button
                                 type="button"
-                                onClick={() => {
-                                  onIssue(person, suggestedCertTitle(batch.eventTitle));
-                                  document.getElementById(formAnchorId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                }}
-                                className="text-[11px] font-black bg-[#630517] text-[#F5D061] px-3 py-1.5 rounded-full hover:brightness-110 cursor-pointer"
+                                onClick={() => handleRemoveRecipient(batch, person, index)}
+                                className="text-[11px] font-black text-red-600 bg-red-50 px-3 py-1.5 rounded-full hover:bg-red-100 cursor-pointer"
                               >
-                                إضافة شهادة
+                                حذف
                               </button>
-                            )}
+                            </div>
                           </div>
                         );
                       })}
