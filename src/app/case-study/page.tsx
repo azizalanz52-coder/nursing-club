@@ -110,16 +110,6 @@ const DIFFICULTY_LABEL: Record<CaseQuestion['difficulty'], string> = {
   Hard: 'صعب جداً',
 };
 
-const DAILY_DIFFICULTY_MIXES: Array<[CaseQuestion['difficulty'], CaseQuestion['difficulty'], CaseQuestion['difficulty']]> = [
-  ['Hard', 'Hard', 'Easy'],
-  ['Easy', 'Easy', 'Hard'],
-  ['Hard', 'Moderate', 'Easy'],
-  ['Hard', 'Hard', 'Moderate'],
-  ['Easy', 'Hard', 'Moderate'],
-  ['Moderate', 'Hard', 'Hard'],
-  ['Hard', 'Easy', 'Hard'],
-];
-
 const masterCasePool: CaseDraft[] = [
   {
     difficulty: 'Easy',
@@ -277,39 +267,498 @@ const masterCasePool: CaseDraft[] = [
     correctIndex: 1,
     explanation: 'Drowsiness, a new unequal pupil, and projectile vomiting warn of rising ICP. Elevate the head, reduce stimulation, and escalate now. Flat position, clustering, or hypotonic fluid worsen injury.',
   },
+  {
+    difficulty: 'Easy',
+    title: 'Conscious Adult Choking',
+    scenario: 'A visitor clutches his throat, cannot speak or cough, and is turning dusky. What is the immediate action?',
+    options: [
+      'Give abdominal thrusts until the object comes out or he becomes unresponsive',
+      'Offer water and encourage a gentle cough while you call for a physician',
+      'Finger-sweep the mouth first, then start back blows if you cannot see the object',
+      'Sit him down, give oxygen, and wait to see if a strong cough returns',
+    ],
+    correctIndex: 0,
+    explanation: 'Complete obstruction with no cough or voice needs abdominal thrusts. Water, a blind sweep, or waiting lets the airway stay blocked.',
+  },
+  {
+    difficulty: 'Easy',
+    title: 'Two Patient Identifiers',
+    scenario: 'You are about to give morning medicines. The wristband name matches, but the date of birth the patient says does not. What do you do?',
+    options: [
+      'Give the medicines because the name matches and confirm the birth date later',
+      'Stop, do not give the medicines, and recheck identity with the record and a second identifier',
+      'Ask the roommate to confirm the name, then give the medicines if he agrees',
+      'Give only the oral tablets now and hold the injection until the next round',
+    ],
+    correctIndex: 1,
+    explanation: 'Two identifiers must match before a medicine is given. A mismatch means stop and verify. A roommate or a partial dose is not a safe check.',
+  },
+  {
+    difficulty: 'Easy',
+    title: 'Seizure at the Bedside',
+    scenario: 'A patient suddenly has a generalized seizure in bed. What is the priority nursing action?',
+    options: [
+      'Protect the head, turn him to the side when you can, time the seizure, and do not restrain his limbs',
+      'Place a padded tongue blade between the teeth, then restrain the arms to stop injury',
+      'Sit him upright, give oral glucose, and call only if a second seizure starts',
+      'Hold him flat on his back and start chest compressions until the shaking stops',
+    ],
+    correctIndex: 0,
+    explanation: 'Protect the head, keep the airway clear after the convulsion, and time it. Do not force the mouth open, restrain, or start compressions for a seizure with a pulse.',
+  },
+  {
+    difficulty: 'Easy',
+    title: 'New Hypoxia',
+    scenario: 'A patient on room air is suddenly short of breath. Oxygen saturation is 86% and he can sit up. What should the nurse do first?',
+    options: [
+      'Sit him upright, apply oxygen as ordered, stay with him, and call for review now',
+      'Lay him flat, encourage deep breaths, and recheck saturation at the next routine round',
+      'Give a sedative for anxiety, then apply oxygen if the saturation is still low in an hour',
+      'Walk him to the window for fresh air and recheck after he returns to bed',
+    ],
+    correctIndex: 0,
+    explanation: 'Upright position, oxygen, and an immediate review treat hypoxia. Flat posture, sedation, or walking delay oxygen.',
+  },
+  {
+    difficulty: 'Easy',
+    title: 'Pressure Injury Prevention',
+    scenario: 'An older patient is immobile after a stroke and the sacrum is still intact. Which plan best prevents a pressure injury?',
+    options: [
+      'Turn and offload pressure on a schedule, keep skin clean and dry, and use a support surface',
+      'Massage reddened skin each shift and keep him on his back to simplify care',
+      'Limit turns to once a shift so sleep is not interrupted',
+      'Raise the head of the bed high all day so he can watch television',
+    ],
+    correctIndex: 0,
+    explanation: 'Scheduled turning, offloading, dry skin, and a support surface prevent injury. Massage, rare turns, and constant high sitting increase shear and pressure.',
+  },
+  {
+    difficulty: 'Easy',
+    title: 'Fire on the Ward',
+    scenario: 'The fire alarm sounds and smoke is coming from a room down the corridor. What is the first nursing priority?',
+    options: [
+      'Rescue people in immediate danger, then alarm, contain, and extinguish if safe',
+      'Find the extinguisher first and leave patients until the fire is out',
+      'Close all doors and wait at the nurses’ station for the fire team',
+      'Open windows in the smoky room and finish the current medicine round',
+    ],
+    correctIndex: 0,
+    explanation: 'Rescue comes first, then alarm, contain, and extinguish only if it is safe. Fighting the fire before moving patients puts them at risk.',
+  },
+  {
+    difficulty: 'Easy',
+    title: 'Standing a Dizzy Patient',
+    scenario: 'A patient says he feels dizzy when he stands and nearly fell yesterday. How should the nurse help him to the chair?',
+    options: [
+      'Let him sit on the edge of the bed, check how he feels, then stand with support',
+      'Pull him straight from lying to standing so the move is quick',
+      'Ask him to stand alone while you fetch the chair from the corridor',
+      'Give an extra blood-pressure tablet first, then walk him immediately',
+    ],
+    correctIndex: 0,
+    explanation: 'Dangle and check symptoms before standing, and stay with him. A sudden stand, walking alone, or an extra dose can cause a fall.',
+  },
+  {
+    difficulty: 'Easy',
+    title: 'Low Urine Output',
+    scenario: 'A postoperative patient has passed only 20 mL of urine in four hours. The catheter is not kinked. What is the priority?',
+    options: [
+      'Report the low output now and keep assessing circulation and the catheter',
+      'Flush the catheter with 100 mL of tap water and wait until the next shift',
+      'Remove the catheter and ask him to walk to the toilet',
+      'Encourage a large jug of water and reassess tomorrow morning',
+    ],
+    correctIndex: 0,
+    explanation: 'Very low urine output after surgery needs prompt review. Unsterile flushing, removing the catheter, or waiting until tomorrow misses oliguria.',
+  },
+  {
+    difficulty: 'Easy',
+    title: 'Hand Hygiene Before a Wound',
+    scenario: 'You are about to change a clean surgical dressing. Which step comes first?',
+    options: [
+      'Perform hand hygiene and prepare a clean field before touching the wound',
+      'Open the old dressing with bare hands, then wash after the change is finished',
+      'Set the supplies on the bed linen and start so the patient is not kept waiting',
+      'Clean the wound with the same gauze you used on the surrounding skin',
+    ],
+    correctIndex: 0,
+    explanation: 'Hand hygiene and a clean field come before the wound is touched. Dirty hands, the bed as a field, or reused gauze contaminate the site.',
+  },
+  {
+    difficulty: 'Easy',
+    title: 'NPO Before Surgery',
+    scenario: 'A patient scheduled for surgery this morning asks for breakfast. The order says nil by mouth. What do you do?',
+    options: [
+      'Explain he must stay nil by mouth and tell the team if he already ate',
+      'Give tea only, because clear fluids never delay anesthesia',
+      'Give a light breakfast if he says he is hungry and document that he insisted',
+      'Let the family bring food as long as it is eaten quickly',
+    ],
+    correctIndex: 0,
+    explanation: 'Nil by mouth protects the airway under anesthesia. Tea, breakfast, or family food can delay or endanger the operation.',
+  },
+  {
+    difficulty: 'Easy',
+    title: 'Call Bell Within Reach',
+    scenario: 'You settle a patient who needs help to walk. Before you leave the room, what must be true?',
+    options: [
+      'The call bell is in reach, the bed is low, and he knows how to call',
+      'The bell is on the windowsill so the bedside table stays clear',
+      'Side rails are all up and the bell is outside the rail where staff can see it',
+      'The room light is off and he is told to shout if he needs anything',
+    ],
+    correctIndex: 0,
+    explanation: 'A reachable bell and a low bed let him call instead of climbing out. A distant bell, trapped rails, or shouting is not a safe plan.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'Disconnected Chest Tube',
+    scenario: 'A chest tube pulls apart from the drainage tubing and the patient becomes short of breath. What should the nurse do first?',
+    options: [
+      'Place the open end in sterile water to make a temporary seal and call for help',
+      'Clamp the tube and leave the room to find a new drainage set',
+      'Reconnect the dirty ends quickly and lower the drainage bottle below the bed later',
+      'Pull the tube out and cover the site with a dry dressing only',
+    ],
+    correctIndex: 0,
+    explanation: 'An open chest tube needs a water seal so air does not enter the pleura. Clamping, dirty reconnection, or pulling the tube is not the first safe step.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'Abdominal Wound Evisceration',
+    scenario: 'A patient coughs and bowel protrudes through the abdominal incision. What is the immediate action?',
+    options: [
+      'Call for help, lay him with knees bent, and cover the bowel with sterile saline gauze',
+      'Push the bowel back with clean gloves and apply a tight dry binder',
+      'Sit him upright, give water, and photograph the wound for the surgeon',
+      'Leave the bowel open to air so it does not become soggy',
+    ],
+    correctIndex: 0,
+    explanation: 'Cover exposed bowel with moist sterile gauze, flex the knees, and get surgical help. Do not push it back, sit him up, or leave it dry.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'Suspected Deep Vein Thrombosis',
+    scenario: 'A postoperative patient has a newly swollen, warm, painful calf. What should the nurse avoid and what should be done?',
+    options: [
+      'Do not massage the calf; keep him in bed and notify the physician now',
+      'Massage the calf toward the heart, then walk him to improve flow',
+      'Apply hot packs and encourage ankle pumps until the swelling fades',
+      'Raise the leg and give aspirin from the ward cupboard without a review',
+    ],
+    correctIndex: 0,
+    explanation: 'A swollen painful calf may be a clot. Massage or walking can move it. Report and keep him resting until he is assessed.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'Asthma Getting Worse',
+    scenario: 'A patient with asthma is sitting forward, speaking in short words, and using neck muscles to breathe. What is the priority?',
+    options: [
+      'Sit him upright, give the prescribed bronchodilator and oxygen, and call for urgent review',
+      'Lay him flat, give a sedative for panic, and reassess after a nap',
+      'Encourage fluids first and delay the inhaler until the wheeze is louder',
+      'Ask him to walk the corridor to prove the breathlessness is mild',
+    ],
+    correctIndex: 0,
+    explanation: 'This is severe asthma. Upright posture, bronchodilator, oxygen, and urgent help come first. Sedation, delay, or walking can worsen failure.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'PCA Safety',
+    scenario: 'A relative wants to press the patient-controlled analgesia button because the patient is asleep. What do you say?',
+    options: [
+      'Only the patient may press it; assess breathing and sedation, and do not let others press',
+      'The relative may press it once an hour if the patient looks comfortable',
+      'Press it yourself now so he does not wake in pain',
+      'Increase the dose on the pump, then let the family continue',
+    ],
+    correctIndex: 0,
+    explanation: 'Only the patient presses a PCA, because an asleep patient should not get another dose. Family or staff dosing can cause respiratory depression.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'Digoxin and a Slow Pulse',
+    scenario: 'Before the morning digoxin, the apical pulse is 48 beats per minute and the patient reports yellow vision. What do you do?',
+    options: [
+      'Hold the dose, check the pulse yourself, and notify the physician about possible toxicity',
+      'Give the dose with food so nausea is less likely',
+      'Give half the tablet and recheck the pulse at the next meal',
+      'Ask the patient to walk until the pulse rises above 60, then give the dose',
+    ],
+    correctIndex: 0,
+    explanation: 'A slow pulse plus visual change suggests digoxin toxicity. Hold the dose and report. Do not give it or exercise the pulse up.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'NG Feed Before Placement Check',
+    scenario: 'A new nasogastric tube is in place and the feed is due. There is no x-ray confirmation yet. What is safe?',
+    options: [
+      'Do not start the feed until correct placement is confirmed by the ordered method',
+      'Start a slow feed if you hear air over the stomach',
+      'Start the feed if the tube aspirate looks cloudy',
+      'Give the feed by mouth instead and leave the tube unclamped',
+    ],
+    correctIndex: 0,
+    explanation: 'A feed into a lung is dangerous. Wait for the confirmed placement method. Air sounds or cloudy fluid alone are not enough.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'High INR and Bleeding',
+    scenario: 'A patient on warfarin has an INR of 6 and new nosebleed and bruising. What is the nursing priority?',
+    options: [
+      'Hold the warfarin, control the bleeding, and notify the physician now',
+      'Give the usual warfarin dose so the level stays stable',
+      'Give an extra warfarin tablet because bleeding means the dose is low',
+      'Send him for a walk and repeat the INR next week',
+    ],
+    correctIndex: 0,
+    explanation: 'Bleeding with a high INR means hold the anticoagulant, manage bleeding, and get urgent review. More warfarin or delay makes bleeding worse.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'After Thyroid Surgery',
+    scenario: 'Six hours after thyroidectomy the patient has noisy breathing and tingling around the mouth. What do you do?',
+    options: [
+      'Stay with him, support the airway, call the surgeon, and prepare for calcium and airway equipment',
+      'Offer a straw and ice chips, then reassess the voice in the morning',
+      'Sit him bolt upright and ask him to cough hard to clear the noise',
+      'Loosen the dressing only if the neck looks wet, and wait for routine rounds',
+    ],
+    correctIndex: 0,
+    explanation: 'Stridor can be hematoma or laryngeal edema, and tingling can be low calcium. This is an airway emergency. Do not wait or force coughing.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'Contact Precautions',
+    scenario: 'A patient is on contact precautions for a resistant organism. Which practice is correct?',
+    options: [
+      'Wear gown and gloves for care, and clean hands before leaving the room',
+      'Use only a surgical mask and keep the door shut as for airborne disease',
+      'Gloves are enough if you do not touch the bed linen',
+      'Precautions can stop once the patient has had one dose of antibiotic',
+    ],
+    correctIndex: 0,
+    explanation: 'Contact precautions mean gown and gloves plus hand hygiene. A mask alone, skipping linen, or stopping after one dose spreads the organism.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'Sudden Confusion and Low Sodium',
+    scenario: 'A patient on a fluid restriction becomes confused and the latest sodium is 118 mEq/L. What is the safest nursing action?',
+    options: [
+      'Keep the fluid restriction, start seizure precautions, and report the change now',
+      'Give free water because confusion means he is dry',
+      'Encourage a salt tablet from home and recheck sodium next week',
+      'Lay him flat and give a hypotonic IV fluid bolus',
+    ],
+    correctIndex: 0,
+    explanation: 'Severe hyponatremia can cause seizures. Restrict free water as ordered, protect him, and escalate. Extra water or hypotonic fluid drops sodium further.',
+  },
+  {
+    difficulty: 'Moderate',
+    title: 'Infiltration of an IV',
+    scenario: 'An IV site is cool, swollen, and pale, and the infusion has slowed. The fluid is normal saline. What should the nurse do?',
+    options: [
+      'Stop the infusion, remove the cannula, elevate the limb, and restart elsewhere if still needed',
+      'Slow the rate and apply a warm pack while the same cannula stays in',
+      'Flush hard with saline to push the swelling away',
+      'Raise the bag higher so gravity overcomes the swelling',
+    ],
+    correctIndex: 0,
+    explanation: 'Cool swelling means the fluid is in the tissue. Stop and remove the cannula. Flushing or forcing the rate worsens infiltration.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Autonomic Dysreflexia',
+    scenario: 'A patient with a high spinal cord injury suddenly has a pounding headache, blood pressure 190/110, and a flushed face. What is the first action?',
+    options: [
+      'Sit him upright, loosen tight clothing, find and empty a blocked bladder or bowel stimulus, and call for help',
+      'Lay him flat and give a fluid bolus to treat presumed shock',
+      'Cover him with blankets and wait for the headache to pass',
+      'Lower the head of the bed and start chest compressions because the pressure is high',
+    ],
+    correctIndex: 0,
+    explanation: 'This is autonomic dysreflexia. Sit upright, remove the trigger, and get help. Lying flat or fluids raise the pressure further.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Suspected Tension Pneumothorax',
+    scenario: 'After central line insertion the patient has sudden shortness of breath, tracheal shift, and falling blood pressure. What is the nursing priority?',
+    options: [
+      'Call for emergency help, give high-flow oxygen, and stay with him for immediate decompression',
+      'Lay him on the affected side and give a sedative so he breathes slower',
+      'Start a large fluid bolus and reassess the trachea in thirty minutes',
+      'Ask him to cough deeply and walk to the x-ray department',
+    ],
+    correctIndex: 0,
+    explanation: 'Tracheal shift with shock and sudden dyspnea after a line suggests tension pneumothorax. Oxygen and immediate expert help come first. Sedation or walking delays decompression.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Compartment Syndrome',
+    scenario: 'A patient in a new leg cast has pain out of proportion, pain on passive toe stretch, and a cold pale foot. What should the nurse do?',
+    options: [
+      'Notify the surgeon now, loosen tight dressings or the cast if allowed, and keep the limb at heart level',
+      'Elevate the leg high on pillows and give more opioid until the pain score falls',
+      'Apply ice tightly around the cast and reassess at the next medication round',
+      'Encourage him to walk on the cast so swelling moves out of the muscle',
+    ],
+    correctIndex: 0,
+    explanation: 'Pain out of proportion and pain on stretch suggest compartment syndrome. Escalate and relieve constriction. High elevation, tight ice, or walking can worsen ischemia.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Air Embolism from a Line',
+    scenario: 'While a central line is open, the patient gasps, becomes cyanosed, and clutches his chest. What is the immediate position and action?',
+    options: [
+      'Clamp the line, give oxygen, and place him on the left side with the head down while calling for help',
+      'Sit him upright and flush the line with saline to clear the air',
+      'Lay him flat on his right side and remove the line at once',
+      'Ask him to stand and cough so the bubble moves to the lung',
+    ],
+    correctIndex: 0,
+    explanation: 'Clamp the source, give oxygen, and use left Trendelenburg so air stays away from the pulmonary outflow. Flushing, the right side, or standing can move the embolus.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Cardiac Tamponade',
+    scenario: 'After cardiac surgery the patient has muffled heart sounds, distended neck veins, and falling blood pressure. What should the nurse do?',
+    options: [
+      'Call the surgical team now, give oxygen, and prepare for urgent drainage; do not give a diuretic',
+      'Give a loop diuretic to reduce the neck-vein pressure',
+      'Lay him flat and start chest compressions because the sounds are quiet',
+      'Encourage deep breathing and reassess the blood pressure after lunch',
+    ],
+    correctIndex: 0,
+    explanation: 'Muffled sounds, distended veins, and hypotension suggest tamponade. He needs urgent surgical review. A diuretic or delay removes the filling the heart still has.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Malignant Hyperthermia Clue',
+    scenario: 'In recovery after anesthesia the patient has rigid muscles, a rapidly rising temperature, and high end-tidal carbon dioxide was reported. What is the priority?',
+    options: [
+      'Call for help, give oxygen, stop triggering agents, and prepare dantrolene and cooling as directed',
+      'Give an antipyretic and a warm blanket until the temperature peaks',
+      'Treat it as ordinary shivering and reassess in an hour',
+      'Start insulin because a high temperature always means sepsis',
+    ],
+    correctIndex: 0,
+    explanation: 'Muscle rigidity, rising carbon dioxide, and fever after anesthesia suggest malignant hyperthermia. Oxygen, stopping triggers, dantrolene, and cooling are urgent. A blanket or delay is harmful.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Addisonian Crisis',
+    scenario: 'A patient with known Addison disease has vomiting, profound weakness, and blood pressure 78/46 after a missed steroid dose. What is the priority?',
+    options: [
+      'Lay him flat with legs raised if tolerated, call for help, and prepare IV hydrocortisone and fluids as ordered',
+      'Give insulin because weakness after vomiting is usually high glucose',
+      'Sit him upright and restrict fluids until the blood pressure is measured again',
+      'Give a diuretic to treat presumed fluid overload',
+    ],
+    correctIndex: 0,
+    explanation: 'This is adrenal crisis: shock after missed steroid. He needs steroids and fluids. Insulin, upright fluid restriction, or a diuretic worsen shock.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Silent Chest in Asthma',
+    scenario: 'A patient in a severe asthma attack now has almost no wheeze, is exhausted, and the oxygen saturation is falling. What does this mean?',
+    options: [
+      'This can mean airflow has nearly stopped; call for emergency airway help now',
+      'The attack is over because the wheeze has gone, so stop the oxygen',
+      'Give a sedative so he can rest and the wheeze can return quietly',
+      'Send him for a walk to open the lungs',
+    ],
+    correctIndex: 0,
+    explanation: 'A silent chest with exhaustion is near respiratory arrest, not recovery. Escalate for airway support. Sedation or stopping oxygen is dangerous.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Diabetes Insipidus After Head Injury',
+    scenario: 'After a head injury the patient passes large volumes of dilute urine and the sodium is rising. What is the nursing priority?',
+    options: [
+      'Report it now, monitor fluid balance closely, and prepare ordered fluid replacement or desmopressin',
+      'Restrict all fluids because the urine output is high',
+      'Give a diuretic to protect the kidneys from the extra urine',
+      'Ignore the output until the next day if the blood pressure is normal',
+    ],
+    correctIndex: 0,
+    explanation: 'Large dilute urine and rising sodium after head injury suggest diabetes insipidus. He needs fluids and urgent review, not restriction or a diuretic.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Transfusion and Wrong Blood Suspicion',
+    scenario: 'Minutes into a transfusion the patient has flank pain, dark urine, and a sense of doom. The unit label and wristband do not match. What now?',
+    options: [
+      'Stop the transfusion, keep saline access with new tubing, and notify the physician and blood bank at once',
+      'Slow the unit and give an antihistamine because dark urine can wait',
+      'Continue the unit since most of it has already infused',
+      'Remove the IV completely and discard the blood bag without telling the laboratory',
+    ],
+    correctIndex: 0,
+    explanation: 'Flank pain, dark urine, and a label mismatch suggest acute hemolysis. Stop the blood, keep venous access, and alert the team and blood bank. Do not finish or hide the unit.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Neuroleptic Malignant Syndrome',
+    scenario: 'A patient on an antipsychotic develops high fever, rigid muscles, confusion, and a fast heart rate. What should the nurse do?',
+    options: [
+      'Hold the antipsychotic, call for urgent review, support cooling and hydration, and monitor the airway',
+      'Give the next antipsychotic dose with an antipyretic so the schedule is not missed',
+      'Wrap him in blankets and encourage exercise to loosen the muscles',
+      'Treat it as simple flu and wait for the fever to break',
+    ],
+    correctIndex: 0,
+    explanation: 'Fever, rigidity, and autonomic change on an antipsychotic suggest neuroleptic malignant syndrome. Stop the drug and get urgent care. Another dose or heavy wrapping is harmful.',
+  },
+  {
+    difficulty: 'Hard',
+    title: 'Postpartum Hemorrhage',
+    scenario: 'An hour after birth the uterus is boggy, the pad is soaked, and the pulse is 120. What is the first nursing action?',
+    options: [
+      'Rub the uterus until firm, call for help, and prepare oxytocin or other ordered treatment',
+      'Give the mother water and recheck the pad at the next postnatal round',
+      'Raise the head of the bed and ask her to walk to the toilet',
+      'Apply a warm pack and wait to see if the bleeding slows on its own',
+    ],
+    correctIndex: 0,
+    explanation: 'A boggy uterus with heavy bleeding is hemorrhage. Fundal massage and urgent uterotonic treatment come first. Waiting or walking loses blood.',
+  },
 ];
 
-function buildDailyCases(ms = Date.now()): CaseQuestion[] {
-  const seed = dailySeed(ms);
-  const mix = DAILY_DIFFICULTY_MIXES[seed % DAILY_DIFFICULTY_MIXES.length];
-  const usedTitles = new Set<string>();
-  return mix
-    .map((level, index) => {
-      const levelPool = shuffleInPlace(
-        masterCasePool.filter((item) => item.difficulty === level && !usedTitles.has(item.title)),
-        mulberry32(seed + hashSeed(level) + 31 + (index * 97))
-      );
-      const item = levelPool[0] || masterCasePool.find((entry) => !usedTitles.has(entry.title));
-      if (!item) return null;
-      usedTitles.add(item.title);
-      const optionRng = mulberry32(seed + ((index + 1) * 9176));
-      const optionEntries = item.options.map((text, optionIndex) => ({
-        text,
-        isCorrect: optionIndex === item.correctIndex,
-      }));
-      shuffleInPlace(optionEntries, optionRng);
+function buildDailyCases(phone: string, ms = Date.now()): CaseQuestion[] {
+  const key = canonicalPhone(phone);
+  if (!key) return [];
+  const daySeed = dailySeed(ms);
+  const seed = (daySeed ^ hashSeed(key)) >>> 0;
+  const byLevel: Record<CaseQuestion['difficulty'], CaseDraft[]> = {
+    Easy: [],
+    Moderate: [],
+    Hard: [],
+  };
+  for (const item of masterCasePool) byLevel[item.difficulty].push(item);
 
-      return {
-        id: index + 1,
-        difficulty: item.difficulty,
-        title: `Case ${index + 1}: ${item.title}`,
-        scenario: item.scenario,
-        options: optionEntries.map((entry) => entry.text),
-        correctIndex: optionEntries.findIndex((entry) => entry.isCorrect),
-        explanation: item.explanation,
-      };
-    })
-    .filter((item): item is CaseQuestion => Boolean(item));
+  const picked: CaseDraft[] = (['Easy', 'Moderate', 'Hard'] as const).map((level) => {
+    const pool = shuffleInPlace([...byLevel[level]], mulberry32(seed ^ hashSeed(level)));
+    return pool[0];
+  });
+  shuffleInPlace(picked, mulberry32(seed ^ 0x9e3779b9));
+
+  return picked.map((item, index) => {
+    const optionRng = mulberry32(seed ^ hashSeed(item.title) ^ ((index + 1) * 9176));
+    const optionEntries = item.options.map((text, optionIndex) => ({
+      text,
+      isCorrect: optionIndex === item.correctIndex,
+    }));
+    shuffleInPlace(optionEntries, optionRng);
+    return {
+      id: index + 1,
+      difficulty: item.difficulty,
+      title: `Case ${index + 1}: ${item.title}`,
+      scenario: item.scenario,
+      options: optionEntries.map((entry) => entry.text),
+      correctIndex: optionEntries.findIndex((entry) => entry.isCorrect),
+      explanation: item.explanation,
+    };
+  });
 }
 
 function answersDraftKey(ymd = riyadhParts().ymd) {
@@ -380,7 +829,6 @@ export default function CaseStudyPage() {
   const myLeaderboardRowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setActiveCases(buildDailyCases());
     fetchLeaderboard();
 
     const savedName = localStorage.getItem('userName') || localStorage.getItem('fullName');
@@ -402,6 +850,10 @@ export default function CaseStudyPage() {
 
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    setActiveCases(buildDailyCases(studentPhone));
+  }, [studentPhone]);
 
   useEffect(() => {
     if (trialPollBlocking || weekNoticeBlocking || hasSubmittedToday || showResults || activeCases.length === 0) return;
@@ -814,8 +1266,8 @@ export default function CaseStudyPage() {
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-8" dir="ltr">
         {authReady && !studentPhone.trim() ? (
           <div className="bg-amber-50 border-2 border-[#F5D061] rounded-3xl p-5 text-center space-y-2" dir="rtl">
-            <p className="text-sm font-black text-[#630517]">سجّل دخولك حتى تُحفظ نقاطك في الصدارة.</p>
-            <p className="text-[11px] text-slate-500 font-medium">تقدر تختار الإجابات الآن، وبعد الدخول ترجع لنفس الصفحة وإجاباتك محفوظة.</p>
+            <p className="text-sm font-black text-[#630517]">سجّل دخولك حتى تظهر حالاتك وتُحفظ نقاطك.</p>
+            <p className="text-[11px] text-slate-500 font-medium">كل حساب له حالات مختلفة، وما تظهر قبل الدخول.</p>
             <Link href={LOGIN_NEXT_HREF} className="inline-flex px-5 py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs">
               تسجيل الدخول
             </Link>
@@ -826,7 +1278,7 @@ export default function CaseStudyPage() {
             جاري التحقق من حل اليوم...
           </div>
         ) : null}
-        {activeCases.length === 0 ? (
+        {studentPhone.trim() && activeCases.length === 0 ? (
           [0, 1, 2].map((slot) => (
             <div key={slot} className="bg-white rounded-3xl h-64 border border-[#630517]/10 animate-pulse" />
           ))
@@ -870,8 +1322,8 @@ export default function CaseStudyPage() {
                 <div className="grid grid-cols-1 gap-2.5">
                   {item.options.map((opt, optIdx) => {
                     const isSelected = selectedAnswers[item.id] === optIdx;
-                    const isCorrect = optIdx === item.correctIndex;
 
+                    const isCorrect = optIdx === item.correctIndex;
                     let btnStyle = 'bg-white border-slate-200 hover:bg-amber-50 text-slate-800';
                     if (showResults) {
                       if (isCorrect) btnStyle = 'bg-emerald-600 text-white border-emerald-800 font-bold';
