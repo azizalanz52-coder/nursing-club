@@ -105,7 +105,7 @@ function bonusAmountForRank(rank: number, rng: () => number) {
 }
 
 const DIFFICULTY_LABEL: Record<CaseQuestion['difficulty'], string> = {
-  Easy: 'أساسي',
+  Easy: 'سهل',
   Moderate: 'متوسط',
   Hard: 'صعب جداً',
 };
