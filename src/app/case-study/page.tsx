@@ -736,9 +736,30 @@ function buildDailyCases(phone: string, ms = Date.now()): CaseQuestion[] {
   };
   for (const item of masterCasePool) byLevel[item.difficulty].push(item);
 
-  const picked: CaseDraft[] = (['Easy', 'Moderate', 'Hard'] as const).map((level) => {
-    const pool = shuffleInPlace([...byLevel[level]], mulberry32(seed ^ hashSeed(level)));
-    return pool[0];
+  const mixes: Array<[CaseQuestion['difficulty'], CaseQuestion['difficulty'], CaseQuestion['difficulty']]> = [
+    ['Hard', 'Hard', 'Easy'],
+    ['Easy', 'Easy', 'Hard'],
+    ['Hard', 'Moderate', 'Easy'],
+    ['Hard', 'Hard', 'Moderate'],
+    ['Easy', 'Hard', 'Moderate'],
+    ['Moderate', 'Hard', 'Hard'],
+    ['Hard', 'Easy', 'Hard'],
+    ['Easy', 'Moderate', 'Moderate'],
+    ['Moderate', 'Moderate', 'Hard'],
+    ['Easy', 'Easy', 'Moderate'],
+    ['Moderate', 'Easy', 'Hard'],
+    ['Hard', 'Moderate', 'Moderate'],
+  ];
+  const mix = mixes[seed % mixes.length];
+  const usedTitles = new Set<string>();
+  const picked: CaseDraft[] = mix.map((level, index) => {
+    const pool = shuffleInPlace(
+      byLevel[level].filter((item) => !usedTitles.has(item.title)),
+      mulberry32((seed ^ hashSeed(`${level}:${index}`)) >>> 0)
+    );
+    const item = pool[0];
+    usedTitles.add(item.title);
+    return item;
   });
   shuffleInPlace(picked, mulberry32(seed ^ 0x9e3779b9));
 
