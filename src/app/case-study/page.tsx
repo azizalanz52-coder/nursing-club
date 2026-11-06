@@ -835,6 +835,7 @@ export default function CaseStudyPage() {
   const [solveLeftMs, setSolveLeftMs] = useState(CASE_STUDY_SOLVE_MS);
   const [solveExpired, setSolveExpired] = useState(false);
   const [solveStartedAt, setSolveStartedAt] = useState<number | null>(null);
+  const [timerArmed, setTimerArmed] = useState(false);
   const [weekNoticeBlocking, setWeekNoticeBlocking] = useState(true);
   const [trialPollBlocking, setTrialPollBlocking] = useState(true);
 
@@ -884,37 +885,32 @@ export default function CaseStudyPage() {
 
     let cancelled = false;
     let timer = 0;
+    setTimerArmed(false);
+
+    const arm = (start: number) => {
+      if (cancelled) return;
+      setSolveStartedAt(start);
+      localStorage.setItem(caseSolveTimerKey(), String(start));
+      const tick = () => {
+        const left = Math.max(0, start + CASE_STUDY_SOLVE_MS - Date.now());
+        setSolveLeftMs(left);
+        setSolveExpired(left <= 0);
+      };
+      tick();
+      timer = window.setInterval(tick, 250);
+      setTimerArmed(true);
+    };
 
     (async () => {
       try {
         const attempt = await ensureCaseSolveAttempt(db, phone);
-        if (cancelled) return;
-        const start = attempt.startedAt;
-        setSolveStartedAt(start);
-        localStorage.setItem(caseSolveTimerKey(), String(start));
-        const tick = () => {
-          const left = Math.max(0, start + CASE_STUDY_SOLVE_MS - Date.now());
-          setSolveLeftMs(left);
-          setSolveExpired(left <= 0);
-        };
-        tick();
-        timer = window.setInterval(tick, 250);
+        arm(attempt.startedAt);
       } catch (err) {
         console.error(err);
-        // احتياطي محلي فقط إذا تعذر السيرفر — لا يعيد الوقت بعد نجاح السيرفر
         const key = caseSolveTimerKey();
         const existing = Number(localStorage.getItem(key) || 0);
         const start = Number.isFinite(existing) && existing > 1_000_000_000_000 ? existing : Date.now();
-        if (start !== existing) localStorage.setItem(key, String(start));
-        if (cancelled) return;
-        setSolveStartedAt(start);
-        const tick = () => {
-          const left = Math.max(0, start + CASE_STUDY_SOLVE_MS - Date.now());
-          setSolveLeftMs(left);
-          setSolveExpired(left <= 0);
-        };
-        tick();
-        timer = window.setInterval(tick, 250);
+        arm(start);
       }
     })();
 
@@ -1178,7 +1174,7 @@ export default function CaseStudyPage() {
       <CaseStudyTrialPoll onBlockingChange={setTrialPollBlocking} />
       <WeeklyMechanismNotice paused={trialPollBlocking} onBlockingChange={setWeekNoticeBlocking} />
 
-      {!showResults && !hasSubmittedToday && activeCases.length > 0 && !trialPollBlocking && !weekNoticeBlocking ? (
+      {!showResults && !hasSubmittedToday && activeCases.length > 0 && !trialPollBlocking && !weekNoticeBlocking && timerArmed ? (
         <div
           className="sticky top-16 z-40 mx-auto max-w-3xl px-4 pt-4"
           dir="rtl"
@@ -1304,12 +1300,18 @@ export default function CaseStudyPage() {
             <div key={slot} className="bg-white rounded-3xl h-64 border border-[#630517]/10 animate-pulse" />
           ))
         ) : null}
-        {activeCases.map((item) => {
+        {studentPhone.trim() && !showResults && !hasSubmittedToday && !trialPollBlocking && !weekNoticeBlocking && !timerArmed ? (
+          <div className="bg-white border border-[#630517]/10 rounded-3xl p-8 text-center space-y-2" dir="rtl">
+            <p className="text-sm font-black text-[#630517]">جاري بدء وقت الحل</p>
+            <p className="text-[11px] text-slate-500 font-medium">الحالات تظهر مع العدّاد، وما تقدر تشوفها قبل ما يبدأ.</p>
+          </div>
+        ) : null}
+        {(showResults || hasSubmittedToday || timerArmed) && activeCases.map((item) => {
           const surpriseBonus = showResults && revealedBonus?.questionId === item.id ? revealedBonus : null;
           const earnedBonus = Boolean(surpriseBonus && selectedAnswers[item.id] === item.correctIndex);
 
           return (
-            <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-[#630517]/15 shadow-sm space-y-6 relative overflow-hidden">
+            <div key={item.id} className="bg-white rounded-3xl p-6 sm:p-8 border border-[#630517]/15 shadow-sm space-y-6 relative overflow-hidden select-none">
               {earnedBonus ? (
                 <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white p-3 rounded-2xl shadow-md flex items-center justify-between font-extrabold text-xs" dir="rtl">
                   <div className="flex items-center gap-2">
@@ -1381,7 +1383,7 @@ export default function CaseStudyPage() {
           );
         })}
 
-        {!showResults && activeCases.length > 0 ? (
+        {!showResults && timerArmed && activeCases.length > 0 ? (
           <form onSubmit={handleSubmitAnswers} className="bg-white p-6 rounded-3xl border border-[#630517]/15 shadow-sm space-y-4 text-center" dir="rtl">
             <p className="text-xs font-bold text-slate-500">
               أجبت {Object.keys(selectedAnswers).length} من {activeCases.length}
