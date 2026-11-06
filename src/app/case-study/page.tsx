@@ -1303,7 +1303,6 @@ export default function CaseStudyPage() {
         {studentPhone.trim() && !showResults && !hasSubmittedToday && !trialPollBlocking && !weekNoticeBlocking && !timerArmed ? (
           <div className="bg-white border border-[#630517]/10 rounded-3xl p-8 text-center space-y-2" dir="rtl">
             <p className="text-sm font-black text-[#630517]">جاري بدء وقت الحل</p>
-            <p className="text-[11px] text-slate-500 font-medium">الحالات تظهر مع العدّاد، وما تقدر تشوفها قبل ما يبدأ.</p>
           </div>
         ) : null}
         {(showResults || hasSubmittedToday || timerArmed) && activeCases.map((item) => {
