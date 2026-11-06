@@ -1301,8 +1301,33 @@ export default function CaseStudyPage() {
           ))
         ) : null}
         {studentPhone.trim() && !showResults && !hasSubmittedToday && !trialPollBlocking && !weekNoticeBlocking && !timerArmed ? (
-          <div className="bg-white border border-[#630517]/10 rounded-3xl p-8 text-center space-y-2" dir="rtl">
+          <div className="bg-white border border-[#F5D061]/60 rounded-3xl p-8 text-center space-y-5 shadow-sm" dir="rtl">
+            <style>{`
+              @keyframes caseTimerSlide {
+                0% { transform: translateX(130%); }
+                100% { transform: translateX(-130%); }
+              }
+              @keyframes caseTimerDot {
+                0%, 80%, 100% { transform: scale(0.55); opacity: 0.3; }
+                40% { transform: scale(1); opacity: 1; }
+              }
+            `}</style>
             <p className="text-sm font-black text-[#630517]">جاري بدء وقت الحل</p>
+            <div className="mx-auto max-w-xs h-2.5 rounded-full bg-[#630517]/10 overflow-hidden" dir="ltr">
+              <div
+                className="h-full w-2/5 rounded-full bg-gradient-to-r from-[#630517] via-[#F5D061] to-[#630517]"
+                style={{ animation: 'caseTimerSlide 1.15s ease-in-out infinite' }}
+              />
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              {[0, 1, 2].map((dot) => (
+                <span
+                  key={dot}
+                  className="h-2.5 w-2.5 rounded-full bg-[#630517]"
+                  style={{ animation: `caseTimerDot 1s ease-in-out ${dot * 0.16}s infinite` }}
+                />
+              ))}
+            </div>
           </div>
         ) : null}
         {(showResults || hasSubmittedToday || timerArmed) && activeCases.map((item) => {
