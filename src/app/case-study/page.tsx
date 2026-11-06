@@ -1303,28 +1303,43 @@ export default function CaseStudyPage() {
         {studentPhone.trim() && !showResults && !hasSubmittedToday && !trialPollBlocking && !weekNoticeBlocking && !timerArmed ? (
           <div className="bg-white border border-[#F5D061]/60 rounded-3xl p-8 text-center space-y-5 shadow-sm" dir="rtl">
             <style>{`
-              @keyframes caseTimerSlide {
-                0% { transform: translateX(130%); }
-                100% { transform: translateX(-130%); }
+              @keyframes caseGoldFlow {
+                0% { background-position: 0% 50%; }
+                100% { background-position: 200% 50%; }
               }
-              @keyframes caseTimerDot {
-                0%, 80%, 100% { transform: scale(0.55); opacity: 0.3; }
-                40% { transform: scale(1); opacity: 1; }
+              @keyframes caseGoldSheen {
+                0% { transform: translateX(-160%); }
+                100% { transform: translateX(380%); }
+              }
+              @keyframes caseGoldDot {
+                0%, 70%, 100% { transform: translateY(0) scale(0.75); opacity: 0.4; }
+                35% { transform: translateY(-5px) scale(1); opacity: 1; }
               }
             `}</style>
             <p className="text-sm font-black text-[#630517]">جاري بدء وقت الحل</p>
-            <div className="mx-auto max-w-xs h-2.5 rounded-full bg-[#630517]/10 overflow-hidden" dir="ltr">
+            <div
+              className="relative mx-auto max-w-xs h-3 rounded-full overflow-hidden shadow-[0_0_16px_rgba(245,208,97,0.55)]"
+              dir="ltr"
+              style={{
+                backgroundImage: 'linear-gradient(90deg, #C9962A, #F5D061, #FFF6C8, #F5D061, #C9962A)',
+                backgroundSize: '200% 100%',
+                animation: 'caseGoldFlow 1.8s linear infinite',
+              }}
+            >
               <div
-                className="h-full w-2/5 rounded-full bg-gradient-to-r from-[#630517] via-[#F5D061] to-[#630517]"
-                style={{ animation: 'caseTimerSlide 1.15s ease-in-out infinite' }}
+                className="absolute inset-y-0 w-1/3"
+                style={{
+                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent)',
+                  animation: 'caseGoldSheen 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+                }}
               />
             </div>
             <div className="flex items-center justify-center gap-2">
               {[0, 1, 2].map((dot) => (
                 <span
                   key={dot}
-                  className="h-2.5 w-2.5 rounded-full bg-[#630517]"
-                  style={{ animation: `caseTimerDot 1s ease-in-out ${dot * 0.16}s infinite` }}
+                  className="h-2.5 w-2.5 rounded-full bg-[#F5D061] shadow-[0_0_8px_rgba(245,208,97,0.8)]"
+                  style={{ animation: `caseGoldDot 1.1s ease-in-out ${dot * 0.16}s infinite` }}
                 />
               ))}
             </div>
