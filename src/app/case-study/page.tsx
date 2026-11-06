@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { db } from './../lib/firebase';
-import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { canonicalPhone, phoneVariants } from '../lib/certificatesLookup';
 import {
   CASE_STUDY_DISTINGUISHED_COUNT,
   CASE_STUDY_SOLVE_MS,
   aggregateCaseLeaderboard,
+  caseAttemptSubmitDeadline,
   caseSolveTimerKey,
   ensureCaseSolveAttempt,
   formatRiyadhCountdown,
@@ -16,8 +17,11 @@ import {
   loadCaseSubmissions,
   persistenceForSubmit,
   personPhone,
+  readCaseSolveAttempt,
   riyadhParts,
+  sealExpiredCaseAttempt,
   submissionDayKey,
+  submitCaseStudyLocked,
 } from '../lib/caseStudy';
 import { syncCaseStudyDistinguished } from '../lib/distinguishedMembers';
 import { ClubIcon } from '../components/icons';
@@ -885,16 +889,39 @@ export default function CaseStudyPage() {
 
     let cancelled = false;
     let timer = 0;
+    let sealing = false;
     setTimerArmed(false);
+
+    const applyLockedDay = (score = 0) => {
+      if (cancelled) return;
+      setHasSubmittedToday(true);
+      setShowResults(true);
+      setRecordedScore(score);
+      setRecordedMax(3);
+      setSolveExpired(true);
+      setSolveLeftMs(0);
+      setTimerArmed(false);
+      clearAnswersDraft();
+    };
 
     const arm = (start: number) => {
       if (cancelled) return;
       setSolveStartedAt(start);
       localStorage.setItem(caseSolveTimerKey(), String(start));
       const tick = () => {
-        const left = Math.max(0, start + CASE_STUDY_SOLVE_MS - Date.now());
+        const now = Date.now();
+        const left = Math.max(0, start + CASE_STUDY_SOLVE_MS - now);
         setSolveLeftMs(left);
         setSolveExpired(left <= 0);
+        if (now > caseAttemptSubmitDeadline(start) && !sealing) {
+          sealing = true;
+          sealExpiredCaseAttempt(db, phone, studentName)
+            .then((result) => {
+              if (cancelled) return;
+              if (result.sealed) applyLockedDay(result.score ?? 0);
+            })
+            .catch((err) => console.error(err));
+        }
       };
       tick();
       timer = window.setInterval(tick, 250);
@@ -904,13 +931,26 @@ export default function CaseStudyPage() {
     (async () => {
       try {
         const attempt = await ensureCaseSolveAttempt(db, phone);
+        if (cancelled) return;
+        if (attempt.submittedAt) {
+          applyLockedDay(typeof attempt.score === 'number' ? attempt.score : 0);
+          return;
+        }
+        if (Date.now() > caseAttemptSubmitDeadline(attempt.startedAt)) {
+          const sealed = await sealExpiredCaseAttempt(db, phone, studentName);
+          if (cancelled) return;
+          if (sealed.sealed) {
+            applyLockedDay(sealed.score ?? 0);
+            return;
+          }
+        }
         arm(attempt.startedAt);
       } catch (err) {
         console.error(err);
-        const key = caseSolveTimerKey();
-        const existing = Number(localStorage.getItem(key) || 0);
-        const start = Number.isFinite(existing) && existing > 1_000_000_000_000 ? existing : Date.now();
-        arm(start);
+        if (!cancelled) {
+          setTimerArmed(false);
+          alert('تعذر مزامنة وقت الحل مع السيرفر. حدّث الصفحة ولا تحل من جهاز آخر قبل نجاح المزامنة.');
+        }
       }
     })();
 
@@ -918,7 +958,7 @@ export default function CaseStudyPage() {
       cancelled = true;
       if (timer) window.clearInterval(timer);
     };
-  }, [trialPollBlocking, weekNoticeBlocking, hasSubmittedToday, showResults, activeCases.length, studentPhone]);
+  }, [trialPollBlocking, weekNoticeBlocking, hasSubmittedToday, showResults, activeCases.length, studentPhone, studentName]);
 
   useEffect(() => {
     if (!showLeaderboardModal) return;
@@ -979,13 +1019,44 @@ export default function CaseStudyPage() {
 
   const checkIfAlreadySubmitted = async (phone: string) => {
     try {
+      const key = canonicalPhone(phone) || phone.trim();
+      const attempt = await Promise.race([
+        readCaseSolveAttempt(db, key),
+        new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8000)),
+      ]);
+      if (attempt?.submittedAt) {
+        const list = await loadCaseSubmissions(db).catch(() => null);
+        const today = riyadhParts().ymd;
+        const todayRow = list?.find((row) => personPhone(row) === key && submissionDayKey(row) === today);
+        if (todayRow) {
+          applySavedSubmission(todayRow);
+        } else {
+          setHasSubmittedToday(true);
+          setShowResults(true);
+          setRecordedScore(typeof attempt.score === 'number' ? attempt.score : 0);
+          setRecordedMax(3);
+        }
+        clearAnswersDraft();
+        return;
+      }
+      if (attempt?.startedAt && Date.now() > caseAttemptSubmitDeadline(attempt.startedAt)) {
+        const sealed = await sealExpiredCaseAttempt(db, key, localStorage.getItem('userName') || localStorage.getItem('fullName') || '');
+        if (sealed.sealed) {
+          setHasSubmittedToday(true);
+          setShowResults(true);
+          setRecordedScore(sealed.score ?? 0);
+          setRecordedMax(3);
+          clearAnswersDraft();
+          return;
+        }
+      }
+
       const list = await Promise.race([
         loadCaseSubmissions(db),
         new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8000)),
       ]);
       if (list) {
         const today = riyadhParts().ymd;
-        const key = canonicalPhone(phone);
         const todayRow = list.find((row) => personPhone(row) === key && submissionDayKey(row) === today);
         if (todayRow) {
           applySavedSubmission(todayRow);
@@ -1084,8 +1155,8 @@ export default function CaseStudyPage() {
       const bonus = decideBonus(selectedAnswers);
       const solveScore = calculateScore(bonus, selectedAnswers);
       const now = Date.now();
-      const existing = await loadCaseSubmissions(db);
       const phoneKey = canonicalPhone(studentPhone) || studentPhone.trim();
+      const existing = await loadCaseSubmissions(db);
       const today = riyadhParts(now).ymd;
       const already = existing.find((row) => personPhone(row) === phoneKey && submissionDayKey(row) === today);
       if (already) {
@@ -1095,18 +1166,17 @@ export default function CaseStudyPage() {
       }
       const persistence = persistenceForSubmit(existing, phoneKey, now);
       const score = solveScore + persistence.amount;
-      const when = new Date(now);
       const startedAt =
         solveStartedAt
         || Number(localStorage.getItem(caseSolveTimerKey()) || 0)
-        || Date.now();
-      const solveMs = solveExpired
+        || 0;
+      const solveMs = solveExpired || !startedAt
         ? CASE_STUDY_SOLVE_MS
         : Math.min(CASE_STUDY_SOLVE_MS, Math.max(1, Date.now() - startedAt));
 
-      await addDoc(collection(db, 'case_study_submissions'), {
+      const result = await submitCaseStudyLocked(db, {
         studentName: studentName.trim(),
-        phone: canonicalPhone(studentPhone) || studentPhone.trim(),
+        phone: phoneKey,
         score,
         solveScore,
         solveMs,
@@ -1116,11 +1186,21 @@ export default function CaseStudyPage() {
         persistenceBonus: persistence.amount,
         persistenceWeek: persistence.weekKey || null,
         answers: selectedAnswers,
-        timestamp: now,
-        createdAt: when.toISOString(),
-        dateStr: when.toLocaleDateString('ar-EG', { timeZone: 'Asia/Riyadh' }),
-        timeStr: when.toLocaleTimeString('ar-EG', { timeZone: 'Asia/Riyadh' }),
-      });
+      }, now);
+
+      if (result.already) {
+        const list = await loadCaseSubmissions(db);
+        const row = list.find((item) => personPhone(item) === phoneKey && submissionDayKey(item) === today);
+        if (row) applySavedSubmission(row);
+        else {
+          setHasSubmittedToday(true);
+          setShowResults(true);
+          setRecordedScore(result.score ?? 0);
+          setRecordedMax(activeCases.length);
+        }
+        alert('تم تسجيل حل اليوم مسبقاً من جهاز آخر. التحدي يتجدد بعد منتصف الليل.');
+        return;
+      }
 
       setRevealedBonus(bonus);
       setPersistenceBonus(persistence.amount);
@@ -1130,9 +1210,9 @@ export default function CaseStudyPage() {
       setShowResults(true);
       clearAnswersDraft();
       await fetchLeaderboard();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('تعذر حفظ النتيجة. تأكد من الاتصال ثم حاول مرة أخرى.');
+      alert(err?.message || 'تعذر حفظ النتيجة. تأكد من الاتصال ثم حاول مرة أخرى.');
     } finally {
       setSubmitting(false);
     }

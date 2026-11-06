@@ -1,4 +1,4 @@
-import { Firestore, collection, doc, getDocs, increment, runTransaction, updateDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, getDoc, getDocs, increment, runTransaction, updateDoc } from 'firebase/firestore';
 import { ADMIN_PHONE } from './authIdentity';
 import { canonicalPhone } from './certificatesLookup';
 
@@ -34,9 +34,12 @@ export function riyadhParts(ms = Date.now()) {
 }
 
 export const CASE_STUDY_SOLVE_MS = 90 * 1000;
+/** مهلة قصيرة بعد 0:00 للضغط على إرسال ما تم اختياره — بعدها يُقفل اليوم */
+export const CASE_STUDY_SUBMIT_GRACE_MS = 2 * 60 * 1000;
 /** أقل وقت معقول لاحتساب «الأسرع حلاً» — يمنع إرسال فوري/ثغرة التايمر */
 export const CASE_STUDY_MIN_RACE_SOLVE_MS = 3000;
 export const CASE_STUDY_ATTEMPTS_COL = 'case_study_attempts';
+export const CASE_STUDY_SUBMISSIONS_COL = 'case_study_submissions';
 
 export function caseSolveTimerKey(ymd = riyadhParts().ymd) {
   return `nurs_case_solve_v4_${ymd}`;
@@ -70,7 +73,48 @@ export type CaseSolveAttempt = {
   phone: string;
   day: string;
   startedAt: number;
+  submittedAt?: number | null;
+  submissionId?: string | null;
+  score?: number | null;
 };
+
+export type CaseStudySubmitPayload = {
+  studentName: string;
+  phone: string;
+  score: number;
+  solveScore: number;
+  solveMs: number;
+  total: number;
+  bonusQuestionId: number | null;
+  bonusAmount: number;
+  persistenceBonus: number;
+  persistenceWeek: string | null;
+  answers: Record<number, number>;
+};
+
+function readAttemptData(id: string, phone: string, day: string, data: Record<string, any> | undefined): CaseSolveAttempt {
+  const startedAt = Number(data?.startedAt);
+  const submittedAt = Number(data?.submittedAt);
+  return {
+    id,
+    phone,
+    day,
+    startedAt: Number.isFinite(startedAt) && startedAt > 1_000_000_000_000 ? startedAt : 0,
+    submittedAt: Number.isFinite(submittedAt) && submittedAt > 1_000_000_000_000 ? submittedAt : null,
+    submissionId: data?.submissionId ? String(data.submissionId) : null,
+    score: typeof data?.score === 'number' ? data.score : null,
+  };
+}
+
+export async function readCaseSolveAttempt(db: Firestore, phone: string, now = Date.now()): Promise<CaseSolveAttempt | null> {
+  const key = canonicalPhone(phone) || String(phone || '').trim();
+  if (!key) return null;
+  const day = riyadhParts(now).ymd;
+  const id = caseSolveAttemptId(key, day);
+  const snap = await getDoc(doc(db, CASE_STUDY_ATTEMPTS_COL, id));
+  if (!snap.exists()) return null;
+  return readAttemptData(id, key, day, snap.data() as Record<string, any>);
+}
 
 export async function ensureCaseSolveAttempt(db: Firestore, phone: string, now = Date.now()): Promise<CaseSolveAttempt> {
   const key = canonicalPhone(phone) || String(phone || '').trim();
@@ -79,23 +123,209 @@ export async function ensureCaseSolveAttempt(db: Firestore, phone: string, now =
   const id = caseSolveAttemptId(key, day);
   const ref = doc(db, CASE_STUDY_ATTEMPTS_COL, id);
 
-  const startedAt = await runTransaction(db, async (tx) => {
+  return runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     if (snap.exists()) {
-      const prev = Number(snap.data()?.startedAt);
-      if (Number.isFinite(prev) && prev > 1_000_000_000_000) return prev;
+      return readAttemptData(id, key, day, snap.data() as Record<string, any>);
     }
-    const next = now;
     tx.set(ref, {
       phone: key,
       day,
-      startedAt: next,
-      createdAt: new Date(next).toISOString(),
+      startedAt: now,
+      createdAt: new Date(now).toISOString(),
+      submittedAt: null,
+      submissionId: null,
     });
-    return next;
+    return { id, phone: key, day, startedAt: now, submittedAt: null, submissionId: null, score: null };
+  });
+}
+
+export function caseAttemptDeadline(startedAt: number) {
+  return startedAt + CASE_STUDY_SOLVE_MS;
+}
+
+export function caseAttemptSubmitDeadline(startedAt: number) {
+  return startedAt + CASE_STUDY_SOLVE_MS + CASE_STUDY_SUBMIT_GRACE_MS;
+}
+
+export function isCaseAttemptExpired(startedAt: number, now = Date.now()) {
+  return Number.isFinite(startedAt) && startedAt > 0 && now >= caseAttemptDeadline(startedAt);
+}
+
+/** تسجيل حل اليوم مرة واحدة فقط، مربوط بمحاولة الوقت على السيرفر */
+export async function submitCaseStudyLocked(
+  db: Firestore,
+  payload: CaseStudySubmitPayload,
+  now = Date.now()
+) {
+  const key = canonicalPhone(payload.phone) || String(payload.phone || '').trim();
+  if (!key) throw new Error('رقم الجوال مطلوب.');
+  const day = riyadhParts(now).ymd;
+  const attemptId = caseSolveAttemptId(key, day);
+  const attemptRef = doc(db, CASE_STUDY_ATTEMPTS_COL, attemptId);
+  const submissionRef = doc(db, CASE_STUDY_SUBMISSIONS_COL, attemptId);
+
+  const result = await runTransaction(db, async (tx) => {
+    const attemptSnap = await tx.get(attemptRef);
+    const submissionSnap = await tx.get(submissionRef);
+    if (!attemptSnap.exists()) {
+      throw new Error('ابدأ وقت الحل من جهاز واحد أولاً، ثم أرسل الإجابة.');
+    }
+    const attempt = readAttemptData(attemptId, key, day, attemptSnap.data() as Record<string, any>);
+    if (submissionSnap.exists()) {
+      const prev = submissionSnap.data() as Record<string, any>;
+      if (!attempt.submittedAt) {
+        tx.update(attemptRef, {
+          submittedAt: submissionMs(prev) || now,
+          submissionId: attemptId,
+          score: Number(prev.score) || 0,
+          sealedAt: now,
+        });
+      }
+      return {
+        already: true as const,
+        submissionId: attemptId,
+        score: Number(prev.score) || 0,
+        startedAt: attempt.startedAt,
+      };
+    }
+    if (attempt.submittedAt) {
+      return { already: true as const, submissionId: attempt.submissionId, score: attempt.score, startedAt: attempt.startedAt };
+    }
+    if (!attempt.startedAt) {
+      throw new Error('وقت الحل غير صالح. حدّث الصفحة.');
+    }
+    if (now > caseAttemptSubmitDeadline(attempt.startedAt)) {
+      throw new Error('انتهت مهلة تسجيل حل اليوم على كل الأجهزة.');
+    }
+
+    const solveMs = Math.min(
+      CASE_STUDY_SOLVE_MS,
+      Math.max(1, Math.round(payload.solveMs || (now - attempt.startedAt)))
+    );
+    const when = new Date(now);
+    const row = {
+      studentName: String(payload.studentName || '').trim() || 'مشارك',
+      phone: key,
+      score: Number(payload.score) || 0,
+      solveScore: Number(payload.solveScore) || 0,
+      solveMs,
+      total: Number(payload.total) || 3,
+      bonusQuestionId: payload.bonusQuestionId,
+      bonusAmount: Number(payload.bonusAmount) || 0,
+      persistenceBonus: Number(payload.persistenceBonus) || 0,
+      persistenceWeek: payload.persistenceWeek,
+      answers: payload.answers || {},
+      timestamp: now,
+      createdAt: when.toISOString(),
+      dateStr: when.toLocaleDateString('ar-EG', { timeZone: 'Asia/Riyadh' }),
+      timeStr: when.toLocaleTimeString('ar-EG', { timeZone: 'Asia/Riyadh' }),
+      attemptId,
+      day,
+    };
+
+    tx.set(submissionRef, row);
+    tx.update(attemptRef, {
+      submittedAt: now,
+      submissionId: attemptId,
+      score: row.score,
+      sealedAt: now,
+    });
+
+    return { already: false as const, submissionId: attemptId, score: row.score, startedAt: attempt.startedAt, row };
   });
 
-  return { id, phone: key, day, startedAt };
+  return result;
+}
+
+/** إذا انتهى الوقت ولم يُسجَّل حل — يُقفل اليوم بصفر على كل الأجهزة */
+export async function sealExpiredCaseAttempt(
+  db: Firestore,
+  phone: string,
+  studentName = '',
+  now = Date.now()
+) {
+  const key = canonicalPhone(phone) || String(phone || '').trim();
+  if (!key) throw new Error('رقم الجوال مطلوب.');
+  const day = riyadhParts(now).ymd;
+  const attemptId = caseSolveAttemptId(key, day);
+  const attemptRef = doc(db, CASE_STUDY_ATTEMPTS_COL, attemptId);
+  const submissionRef = doc(db, CASE_STUDY_SUBMISSIONS_COL, attemptId);
+
+  return runTransaction(db, async (tx) => {
+    const attemptSnap = await tx.get(attemptRef);
+    const submissionSnap = await tx.get(submissionRef);
+    if (!attemptSnap.exists()) {
+      return { sealed: false as const, already: false as const, score: null as number | null, submissionId: null as string | null };
+    }
+    const attempt = readAttemptData(attemptId, key, day, attemptSnap.data() as Record<string, any>);
+    if (submissionSnap.exists()) {
+      const prev = submissionSnap.data() as Record<string, any>;
+      if (!attempt.submittedAt) {
+        tx.update(attemptRef, {
+          submittedAt: submissionMs(prev) || now,
+          submissionId: attemptId,
+          score: Number(prev.score) || 0,
+          sealedAt: now,
+        });
+      }
+      return {
+        sealed: true as const,
+        already: true as const,
+        score: Number(prev.score) || 0,
+        submissionId: attemptId,
+      };
+    }
+    if (attempt.submittedAt) {
+      return {
+        sealed: true as const,
+        already: true as const,
+        score: attempt.score ?? 0,
+        submissionId: attempt.submissionId,
+      };
+    }
+    if (!isCaseAttemptExpired(attempt.startedAt, now)) {
+      return { sealed: false as const, already: false as const, score: null, submissionId: null };
+    }
+
+    const when = new Date(now);
+    const row = {
+      studentName: String(studentName || '').trim() || 'مشارك',
+      phone: key,
+      score: 0,
+      solveScore: 0,
+      solveMs: CASE_STUDY_SOLVE_MS,
+      total: 3,
+      bonusQuestionId: null,
+      bonusAmount: 0,
+      persistenceBonus: 0,
+      persistenceWeek: null,
+      answers: {},
+      timestamp: now,
+      createdAt: when.toISOString(),
+      dateStr: when.toLocaleDateString('ar-EG', { timeZone: 'Asia/Riyadh' }),
+      timeStr: when.toLocaleTimeString('ar-EG', { timeZone: 'Asia/Riyadh' }),
+      attemptId,
+      day,
+      sealedExpired: true,
+    };
+
+    tx.set(submissionRef, row);
+    tx.update(attemptRef, {
+      submittedAt: now,
+      submissionId: attemptId,
+      score: 0,
+      sealedAt: now,
+      sealedExpired: true,
+    });
+
+    return {
+      sealed: true as const,
+      already: false as const,
+      score: 0,
+      submissionId: attemptId,
+    };
+  });
 }
 
 export function formatSolveClock(leftMs: number) {

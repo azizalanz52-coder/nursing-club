@@ -91,15 +91,29 @@ service cloud.firestore {
 
     match /case_study_submissions/{id} {
       allow read: if true;
-      allow create: if true;
-      allow update, delete: if signedIn();
+      // معرف ثابت: جوال_اليوم — يمنع تسليمين لنفس الحساب في نفس اليوم
+      allow create: if request.resource.data.phone is string
+        && request.resource.data.day is string
+        && request.resource.data.attemptId is string
+        && id == request.resource.data.attemptId
+        && id == request.resource.data.phone + '_' + request.resource.data.day
+        && exists(/databases/$(database)/documents/case_study_attempts/$(id))
+        && get(/databases/$(database)/documents/case_study_attempts/$(id)).data.phone == request.resource.data.phone
+        && get(/databases/$(database)/documents/case_study_attempts/$(id)).data.day == request.resource.data.day
+        && !(get(/databases/$(database)/documents/case_study_attempts/$(id)).data.submittedAt is number);
+      allow update, delete: if isStaff();
     }
 
-    // بداية وقت الحل لليوم — تُنشأ مرة واحدة ولا تُعدَّل من العميل
+    // بداية وقت الحل لليوم — تُنشأ مرة، ويُسمح بختم التسليم مرة واحدة فقط
     match /case_study_attempts/{id} {
       allow read: if true;
       allow create: if true;
-      allow update: if false;
+      allow update: if resource.data.keys().hasAll(['phone', 'day', 'startedAt'])
+        && !(resource.data.submittedAt is number)
+        && request.resource.data.phone == resource.data.phone
+        && request.resource.data.day == resource.data.day
+        && request.resource.data.startedAt == resource.data.startedAt
+        && request.resource.data.submittedAt is number;
       allow delete: if isStaff();
     }
 
