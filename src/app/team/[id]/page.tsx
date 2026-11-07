@@ -12,6 +12,7 @@ import HrCertificatesRegistry from '../../components/HrCertificatesRegistry';
 import HrCertificateBatches from '../../components/HrCertificateBatches';
 import QualityEventReportForm from '../../components/QualityEventReport';
 import { notifyExistingUser, notifyLeadership } from '../../lib/userAccounts';
+import { submitEventExcuse } from '../../lib/eventExcuses';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import DesignWorksBoard from '../../components/DesignWorksBoard';
@@ -483,6 +484,19 @@ export default function CommitteeDetailPage() {
     if (!excuseText.trim() || !selectedEventTitle) return;
 
     try {
+      const selectedEvent = eventsList.find((ev) => ev.title === selectedEventTitle);
+      await submitEventExcuse(db, {
+        memberName: currentUserName || 'عضو',
+        memberPhone: currentUserPhone,
+        committee: committee?.name || String(id || ''),
+        eventName: selectedEventTitle,
+        eventDate: String(selectedEvent?.date || ''),
+        reason: excuseText.trim(),
+        source: 'team-page',
+        maleLeader: committee?.maleLeader,
+        femaleLeader: committee?.femaleLeader,
+      });
+
       const updatedMembers = (committee.members || []).map((m: any) => {
         const memberPhone = normalizePhone(m.phone);
         const userNormPhone = normalizePhone(currentUserPhone);
@@ -492,19 +506,22 @@ export default function CommitteeDetailPage() {
             targetEvent: selectedEventTitle,
             excuseText: excuseText.trim(),
             excuseStatus: 'تم تسجيل الاعتذار عن الحضور بمرونة ✓',
-            excuseDate: new Date().toLocaleDateString('ar-SA')
+            excuseDate: new Date().toLocaleDateString('ar-SA'),
           };
         }
         return m;
       });
 
-      const docRef = doc(db, 'committees', id);
-      await updateDoc(docRef, { members: updatedMembers });
+      try {
+        await updateDoc(doc(db, 'committees', id), { members: updatedMembers });
+        setCommittee({ ...committee, members: updatedMembers });
+      } catch (err) {
+        console.error(err);
+      }
 
-      setCommittee({ ...committee, members: updatedMembers });
       setShowExcuseModal(false);
       setExcuseText('');
-      setModalMessage(`تم إرسال اعتذارك عن فعالية (${selectedEventTitle}) بنجاح 📋✨`);
+      setModalMessage(`تم إرسال اعتذارك عن فعالية (${selectedEventTitle}) لقادة اللجنة وقادة الجودة 📋✨`);
       setShowSuccessModal(true);
     } catch (err) {
       console.error('Error uploading excuse:', err);

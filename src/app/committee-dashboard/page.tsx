@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx';
 import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
 import HrCertificateBatches from './../components/HrCertificateBatches';
 import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
+import { submitEventExcuse } from '../lib/eventExcuses';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { committeeIdFromName, committeeNameFromId, findListedLeadership, findMemberContext, findUserDoc, isCommitteeLeaderRole, resolvePortalCommitteeId, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
@@ -1068,37 +1069,26 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     e.preventDefault();
     if (!excuseEventName.trim() || !excuseReason.trim()) return;
 
-    const currentComm = userData?.assignedCommittee || userData?.committee || 'اللجنة الخاصة';
-    const newExcuseObj = {
-      memberName: userData?.fullName || 'عضو اللجنة',
-      committee: currentComm,
-      eventName: excuseEventName.trim(),
-      eventDate: excuseEventDate || 'غير محدد',
-      reason: excuseReason.trim(),
-      status: 'تم إفادة الموارد البشرية (اعتذار عدم مشاركة)',
-      createdAt: Date.now()
-    };
-
+    const currentComm = userData?.assignedCommittee || userData?.committee || currentActiveComm || 'اللجنة الخاصة';
     try {
-      const docRef = await addDoc(collection(db, 'event_excuses'), newExcuseObj);
-      setEventExcuses([{ ...newExcuseObj, id: docRef.id }, ...eventExcuses]);
-
-      for (const usr of allUsersList) {
-        const cStr = usr.assignedCommittee || usr.committee || '';
-        if (cStr.includes('الموارد البشرية') || usr.role?.includes('رئيس') || usr.role === 'System Admin') {
-          try {
-            await setDoc(doc(db, 'users', usr.id), {
-              latestNotification: `ℹ️ [إفادة اعتذار عدم مشاركة]: أفاد الزميل (${userData?.fullName || 'عضو'}) بعدم مشاركته في فعالية (${excuseEventName}).`
-            }, { merge: true });
-          } catch (er) { console.error(er); }
-        }
-      }
+      const saved = await submitEventExcuse(db, {
+        memberName: userData?.fullName || 'عضو اللجنة',
+        memberPhone: userPhone || '',
+        committee: currentComm,
+        eventName: excuseEventName.trim(),
+        eventDate: excuseEventDate || 'غير محدد',
+        reason: excuseReason.trim(),
+        source: 'committee-dashboard',
+        maleLeader: committeeLeaders.maleLeader,
+        femaleLeader: committeeLeaders.femaleLeader,
+      });
+      setEventExcuses([{ ...saved }, ...eventExcuses]);
 
       setExcuseEventName('');
       setExcuseEventDate('');
       setExcuseReason('');
       setShowExcuseForm(false);
-      alert('تم إرسال إفادة الاعتذار وعدم المشاركة للموارد البشرية وسجلت بنجاح بدون تعقيد! 👍');
+      alert('تم إرسال الاعتذار لقادة اللجنة وقادة الجودة والموارد البشرية بنجاح.');
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء إرسال الاعتذار.');
