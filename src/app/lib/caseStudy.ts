@@ -54,9 +54,9 @@ export function isCaseStudyStaffPhone(phone?: string | null) {
   return canonicalPhone(phone || '') === canonicalPhone(ADMIN_PHONE);
 }
 
-/** تعديلات إدارية على وقت الحل (مللي ثانية) — تُطبَّق على السجل المعروض وسباق الأسرع */
+/** تعديلات إدارية على وقت الحل (مللي ثانية) — تُطبَّق على السجل وسباق الأسرع */
 const SOLVE_MS_ADMIN_FIX: Record<string, number> = {
-  // طارق خالد — 4 نوفمبر: أُلغي وقت 1ms ويُحتسب 10 ثوانٍ مع بقاء النقاط
+  // طارق خالد — 4 نوفمبر: أُلغي وقت 1ms، النقاط تبقى، والوقت يُحتسب 10 ثوانٍ
   '8Id8RfKkYXiXsT3dUSu9': 10_000,
 };
 
