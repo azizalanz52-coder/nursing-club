@@ -1,4 +1,4 @@
-import { Firestore, collection, doc, getDoc, getDocs, increment, runTransaction, updateDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, getDoc, getDocs, increment, limit, query, runTransaction, updateDoc, where } from 'firebase/firestore';
 import { ADMIN_PHONE } from './authIdentity';
 import { canonicalPhone } from './certificatesLookup';
 
@@ -554,11 +554,64 @@ export async function grantThursdayPersistence(db: Firestore, submissions: Array
   return granted;
 }
 
-export async function loadCaseSubmissions(db: Firestore) {
-  const snap = await getDocs(collection(db, 'case_study_submissions'));
-  return snap.docs
+type SubmissionsCache = { at: number; rows: Array<Record<string, any>> };
+let submissionsCache: SubmissionsCache | null = null;
+const SUBMISSIONS_CACHE_MS = 3 * 60 * 1000;
+
+export function invalidateCaseSubmissionsCache() {
+  submissionsCache = null;
+}
+
+export async function loadCaseSubmissions(db: Firestore, options?: { force?: boolean }) {
+  if (!options?.force && submissionsCache && Date.now() - submissionsCache.at < SUBMISSIONS_CACHE_MS) {
+    return submissionsCache.rows;
+  }
+  const snap = await getDocs(collection(db, CASE_STUDY_SUBMISSIONS_COL));
+  const rows = snap.docs
     .map((row) => ({ id: row.id, ...row.data() } as Record<string, any>))
     .sort((a, b) => submissionMs(b) - submissionMs(a));
+  submissionsCache = { at: Date.now(), rows };
+  return rows;
+}
+
+/** قراءة تسليم اليوم بجوال واحد — قراءة واحدة بدل مسح كل السجل */
+export async function loadTodayCaseSubmission(db: Firestore, phone: string, now = Date.now()) {
+  const key = canonicalPhone(phone) || String(phone || '').trim();
+  if (!key) return null;
+  const day = riyadhParts(now).ymd;
+  const id = caseSolveAttemptId(key, day);
+  const direct = await getDoc(doc(db, CASE_STUDY_SUBMISSIONS_COL, id));
+  if (direct.exists()) return { id: direct.id, ...direct.data() } as Record<string, any>;
+
+  try {
+    const snap = await getDocs(
+      query(collection(db, CASE_STUDY_SUBMISSIONS_COL), where('phone', '==', key), limit(12))
+    );
+    const rows = snap.docs
+      .map((row) => ({ id: row.id, ...row.data() } as Record<string, any>))
+      .filter((row) => submissionDayKey(row) === day)
+      .sort((a, b) => submissionMs(b) - submissionMs(a));
+    return rows[0] || null;
+  } catch (err) {
+    console.error(err);
+    return null;
+  }
+}
+
+export async function loadCaseSubmissionsForPhone(db: Firestore, phone: string, max = 40) {
+  const key = canonicalPhone(phone) || String(phone || '').trim();
+  if (!key) return [] as Array<Record<string, any>>;
+  try {
+    const snap = await getDocs(
+      query(collection(db, CASE_STUDY_SUBMISSIONS_COL), where('phone', '==', key), limit(max))
+    );
+    return snap.docs
+      .map((row) => ({ id: row.id, ...row.data() } as Record<string, any>))
+      .sort((a, b) => submissionMs(b) - submissionMs(a));
+  } catch (err) {
+    console.error(err);
+    return [] as Array<Record<string, any>>;
+  }
 }
 
 export type CaseLeaderboardRow = {

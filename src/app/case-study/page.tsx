@@ -14,7 +14,10 @@ import {
   ensureCaseSolveAttempt,
   formatRiyadhCountdown,
   formatSolveClock,
+  invalidateCaseSubmissionsCache,
   loadCaseSubmissions,
+  loadCaseSubmissionsForPhone,
+  loadTodayCaseSubmission,
   persistenceForSubmit,
   personPhone,
   readCaseSolveAttempt,
@@ -855,8 +858,7 @@ export default function CaseStudyPage() {
   const myLeaderboardRowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchLeaderboard();
-
+    // لا نحمّل لوحة الصدارة كاملة عند فتح الصفحة — توفر قراءات Firestore
     const savedName = localStorage.getItem('userName') || localStorage.getItem('fullName');
     const savedPhone = localStorage.getItem('userPhone') || localStorage.getItem('phone');
 
@@ -876,6 +878,11 @@ export default function CaseStudyPage() {
 
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!showLeaderboardModal) return;
+    void fetchLeaderboard();
+  }, [showLeaderboardModal]);
 
   useEffect(() => {
     setActiveCases(buildDailyCases(studentPhone));
@@ -991,10 +998,11 @@ export default function CaseStudyPage() {
       const rows = aggregateCaseLeaderboard(submissions);
 
       const myPhone = canonicalPhone(localStorage.getItem('userPhone') || localStorage.getItem('phone') || '');
-      const toResolve = rows.filter((row, idx) => idx < 20 || (myPhone && row.phone === myPhone));
+      // أسماء أول 8 فقط — توفير قراءات users
+      const toResolve = rows.filter((row, idx) => idx < 8 || (myPhone && row.phone === myPhone));
       await Promise.all(toResolve.map(async (row) => {
         if (!row.phone) return;
-        for (const id of phoneVariants(row.phone)) {
+        for (const id of phoneVariants(row.phone).slice(0, 2)) {
           try {
             const userSnap = await getDoc(doc(db, 'users', id));
             const fullName = String(userSnap.data()?.fullName || '').trim();
@@ -1020,15 +1028,6 @@ export default function CaseStudyPage() {
         })),
       });
       setLeaderboard(decorateOverallBoard(rows, submissions));
-
-      const signedIn = Boolean(localStorage.getItem('userPhone') || localStorage.getItem('phone'));
-      if (signedIn) {
-        try {
-          await syncCaseStudyDistinguished(db, submissions);
-        } catch (syncErr) {
-          console.error(syncErr);
-        }
-      }
     } catch (err) {
       console.error(err);
     }
@@ -1042,9 +1041,7 @@ export default function CaseStudyPage() {
         new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8000)),
       ]);
       if (attempt?.submittedAt) {
-        const list = await loadCaseSubmissions(db).catch(() => null);
-        const today = riyadhParts().ymd;
-        const todayRow = list?.find((row) => personPhone(row) === key && submissionDayKey(row) === today);
+        const todayRow = await loadTodayCaseSubmission(db, key).catch(() => null);
         if (todayRow) {
           applySavedSubmission(todayRow);
         } else {
@@ -1068,18 +1065,14 @@ export default function CaseStudyPage() {
         }
       }
 
-      const list = await Promise.race([
-        loadCaseSubmissions(db),
+      const todayRow = await Promise.race([
+        loadTodayCaseSubmission(db, key),
         new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8000)),
       ]);
-      if (list) {
-        const today = riyadhParts().ymd;
-        const todayRow = list.find((row) => personPhone(row) === key && submissionDayKey(row) === today);
-        if (todayRow) {
-          applySavedSubmission(todayRow);
-          clearAnswersDraft();
-          return;
-        }
+      if (todayRow) {
+        applySavedSubmission(todayRow);
+        clearAnswersDraft();
+        return;
       }
       setSelectedAnswers((prev) => (Object.keys(prev).length ? prev : readAnswersDraft()));
     } catch (err) {
@@ -1173,15 +1166,15 @@ export default function CaseStudyPage() {
       const solveScore = calculateScore(bonus, selectedAnswers);
       const now = Date.now();
       const phoneKey = canonicalPhone(studentPhone) || studentPhone.trim();
-      const existing = await loadCaseSubmissions(db);
       const today = riyadhParts(now).ymd;
-      const already = existing.find((row) => personPhone(row) === phoneKey && submissionDayKey(row) === today);
+      const already = await loadTodayCaseSubmission(db, phoneKey, now);
       if (already) {
         applySavedSubmission(already);
         alert('تم تسجيل حل اليوم مسبقاً. التحدي يتجدد بعد منتصف الليل.');
         return;
       }
-      const persistence = persistenceForSubmit(existing, phoneKey, now);
+      const ownSubs = await loadCaseSubmissionsForPhone(db, phoneKey);
+      const persistence = persistenceForSubmit(ownSubs, phoneKey, now);
       const score = solveScore + persistence.amount;
       const startedAt =
         solveStartedAt
@@ -1206,8 +1199,7 @@ export default function CaseStudyPage() {
       }, now);
 
       if (result.already) {
-        const list = await loadCaseSubmissions(db);
-        const row = list.find((item) => personPhone(item) === phoneKey && submissionDayKey(item) === today);
+        const row = await loadTodayCaseSubmission(db, phoneKey, now);
         if (row) applySavedSubmission(row);
         else {
           setHasSubmittedToday(true);
@@ -1226,7 +1218,7 @@ export default function CaseStudyPage() {
       setHasSubmittedToday(true);
       setShowResults(true);
       clearAnswersDraft();
-      await fetchLeaderboard();
+      invalidateCaseSubmissionsCache();
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'تعذر حفظ النتيجة. تأكد من الاتصال ثم حاول مرة أخرى.');
