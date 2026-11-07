@@ -54,8 +54,15 @@ export function isCaseStudyStaffPhone(phone?: string | null) {
   return canonicalPhone(phone || '') === canonicalPhone(ADMIN_PHONE);
 }
 
+/** تعديلات إدارية على وقت الحل (مللي ثانية) — تُطبَّق على السجل المعروض وسباق الأسرع */
+const SOLVE_MS_ADMIN_FIX: Record<string, number> = {
+  // طارق خالد — 4 نوفمبر: أُلغي وقت 1ms ويُحتسب 10 ثوانٍ مع بقاء النقاط
+  '8Id8RfKkYXiXsT3dUSu9': 10_000,
+};
+
 export function solveDurationMs(sub: Record<string, any> | null | undefined) {
-  const used = Number(sub?.solveMs);
+  const fixed = sub?.id ? SOLVE_MS_ADMIN_FIX[String(sub.id)] : undefined;
+  const used = typeof fixed === 'number' ? fixed : Number(sub?.solveMs);
   if (!Number.isFinite(used) || used <= 0) return null;
   return Math.min(CASE_STUDY_SOLVE_MS, Math.max(1, Math.round(used)));
 }
