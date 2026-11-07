@@ -60,6 +60,12 @@ const SOLVE_MS_ADMIN_FIX: Record<string, number> = {
   '8Id8RfKkYXiXsT3dUSu9': 10_000,
 };
 
+/** أوقات مستبعدة من سباق «الأسرع حلاً» فقط — النقاط الأسبوعية تبقى */
+const SOLVE_MS_RACE_EXCLUDE_IDS = new Set<string>([
+  'lr9wU6IsUNMryEjlGTAm', // طارق 5 نوفمبر — 3.4 ث غير معقول
+  '5CSVEv4YCu3CXaMfE5dI', // طارق 6 نوفمبر — 5.4 ث غير معقول
+]);
+
 export function solveDurationMs(sub: Record<string, any> | null | undefined) {
   const fixed = sub?.id ? SOLVE_MS_ADMIN_FIX[String(sub.id)] : undefined;
   const used = typeof fixed === 'number' ? fixed : Number(sub?.solveMs);
@@ -70,6 +76,7 @@ export function solveDurationMs(sub: Record<string, any> | null | undefined) {
 /** وقت الحل المعتمد لسباق الأسرع — يستبعد الأوقات المستحيلة وطاقم الموقع */
 export function solveDurationMsForRace(sub: Record<string, any> | null | undefined) {
   if (isCaseStudyStaffPhone(personPhone(sub))) return null;
+  if (sub?.id && SOLVE_MS_RACE_EXCLUDE_IDS.has(String(sub.id))) return null;
   const used = solveDurationMs(sub);
   if (used == null || used < CASE_STUDY_MIN_RACE_SOLVE_MS) return null;
   return used;
