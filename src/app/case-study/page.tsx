@@ -19,14 +19,11 @@ import {
   loadCaseSubmissionsForPhone,
   loadTodayCaseSubmission,
   persistenceForSubmit,
-  personPhone,
   readCaseSolveAttempt,
   riyadhParts,
   sealExpiredCaseAttempt,
-  submissionDayKey,
   submitCaseStudyLocked,
 } from '../lib/caseStudy';
-import { syncCaseStudyDistinguished } from '../lib/distinguishedMembers';
 import { ClubIcon } from '../components/icons';
 import WeeklyRaceBoard, { OverallRaceBoard } from '../components/WeeklyRaceExample';
 import WeeklyMechanismNotice from '../components/WeeklyMechanismNotice';
