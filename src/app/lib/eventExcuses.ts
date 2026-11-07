@@ -1,7 +1,14 @@
-import { Firestore, addDoc, collection, getDocs } from 'firebase/firestore';
-import { isCommitteeLeaderRole, sameMemberName } from './memberAcceptance';
+import { Firestore, addDoc, collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { canonicalPhone } from './certificatesLookup';
+import {
+  COMMITTEE_NAMES,
+  committeeIdFromName,
+  committeeNameFromId,
+  isCommitteeLeaderRole,
+  sameMemberName,
+} from './memberAcceptance';
 import { notifyExistingUser } from './userAccounts';
-import { invalidateCloudCollection } from './cloudCache';
+import { invalidateCloudCollection, loadCloudCollection } from './cloudCache';
 
 export type EventExcuseInput = {
   memberName: string;
@@ -27,48 +34,125 @@ function committeeKeyword(name: string) {
   return value.replace(/^لجنة\s*/u, '').trim().slice(0, 12);
 }
 
-function normCommittee(value: string) {
-  return String(value || '')
-    .replace(/الـ/g, '')
-    .replace(/[إأآا]/g, 'ا')
-    .replace(/ة/g, 'ه')
-    .trim();
+function normalizeCommitteeLabel(value: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return 'لجنة غير محددة';
+  const fromId = committeeNameFromId(raw);
+  if (fromId) return fromId;
+  const id = committeeIdFromName(raw);
+  if (id && COMMITTEE_NAMES[id]) return COMMITTEE_NAMES[id];
+  if (raw.startsWith('لجنة')) return raw;
+  return `لجنة ${raw}`;
 }
 
-function shouldNotifyExcuseRecipient(
-  data: Record<string, any>,
-  input: EventExcuseInput,
-  keyword: string
-) {
-  const assigned = String(data.assignedCommittee || data.committee || '');
-  const role = String(data.role || '');
-  const fullName = String(data.fullName || '');
-  const assignedNorm = normCommittee(assigned);
-  const keywordNorm = normCommittee(keyword);
+async function phonesForLeaderNames(db: Firestore, names: string[]) {
+  const wanted = names.map((name) => String(name || '').trim()).filter(Boolean);
+  const phones = new Set<string>([canonicalPhone('0553731265')].filter(Boolean));
+  if (!wanted.length) return [...phones];
 
-  const isListedLeader =
-    sameMemberName(fullName, input.maleLeader) || sameMemberName(fullName, input.femaleLeader);
-  const isOwnCommitteeLeader =
-    (Boolean(keywordNorm) && assignedNorm.includes(keywordNorm) && isCommitteeLeaderRole(role))
-    || isListedLeader;
-  const isQuality =
-    assignedNorm.includes('جوده') ||
-    assignedNorm.includes('تطوير') ||
-    role.includes('جودة') ||
-    role.includes('تطوير');
-  const isHr = assignedNorm.includes('موارد') || role.includes('موارد');
-  const isTop =
-    role === 'System Admin' ||
-    role.includes('رئيس النادي') ||
-    role.includes('نائبة الرئيس') ||
-    role.includes('General Supervisor');
+  const remember = (phoneValue?: string, fullName?: string) => {
+    if (!wanted.some((name) => sameMemberName(name, fullName || ''))) return;
+    const phone = canonicalPhone(String(phoneValue || ''));
+    if (phone) phones.add(phone);
+  };
 
-  return isOwnCommitteeLeader || isQuality || isHr || isTop;
+  try {
+    for (const name of wanted) {
+      const variants = Array.from(new Set([
+        name,
+        name.replace(/\s+/g, ' ').trim(),
+        name.replace(/عبد\s+/g, 'عبد'),
+        name.replace(/عبد(?=\S)/g, 'عبد '),
+      ]));
+      for (const variant of variants) {
+        try {
+          const snap = await getDocs(query(collection(db, 'applications'), where('fullName', '==', variant), limit(5)));
+          snap.forEach((row) => remember(String(row.data()?.phone || ''), String(row.data()?.fullName || '')));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error(err);
+  }
+
+  try {
+    const users = await loadCloudCollection(db, 'users').catch(() => [] as Array<Record<string, unknown>>);
+    for (const row of users) {
+      remember(String(row.id || row.phone || ''), String(row.fullName || ''));
+    }
+  } catch (err) {
+    console.error(err);
+  }
+
+  return [...phones];
+}
+
+async function collectExcuseRecipientPhones(db: Firestore, input: EventExcuseInput, committee: string) {
+  const phones = new Set<string>([canonicalPhone('0553731265')].filter(Boolean));
+  const leaderNames = new Set<string>();
+
+  [input.maleLeader, input.femaleLeader].forEach((name) => {
+    if (String(name || '').trim()) leaderNames.add(String(name).trim());
+  });
+
+  try {
+    const committees = await loadCloudCollection(db, 'committees');
+    const ownId = committeeIdFromName(committee);
+    for (const row of committees) {
+      const id = String(row.id || '');
+      const isOwn = Boolean(ownId && id === ownId);
+      const isQuality = id === 'quality';
+      const isHr = id === 'hr';
+      if (!isOwn && !isQuality && !isHr) continue;
+      if (row.maleLeader) leaderNames.add(String(row.maleLeader).trim());
+      if (row.femaleLeader) leaderNames.add(String(row.femaleLeader).trim());
+    }
+  } catch (err) {
+    console.error(err);
+  }
+
+  for (const phone of await phonesForLeaderNames(db, [...leaderNames])) {
+    phones.add(phone);
+  }
+
+  // إن كان للعضو صلاحية سرد المستخدمين (قائد/جودة)، أبلغ كل قادة الجودة والموارد مباشرة
+  try {
+    const users = await getDocs(collection(db, 'users'));
+    const keyword = committeeKeyword(committee);
+    users.forEach((item) => {
+      const data = item.data() || {};
+      const assigned = String(data.assignedCommittee || data.committee || '');
+      const role = String(data.role || '');
+      const fullName = String(data.fullName || '');
+      const isListedLeader =
+        sameMemberName(fullName, input.maleLeader) || sameMemberName(fullName, input.femaleLeader);
+      const isOwnCommitteeLeader =
+        (Boolean(keyword) && assigned.includes(keyword) && isCommitteeLeaderRole(role)) || isListedLeader;
+      const isQuality =
+        assigned.includes('جودة') || assigned.includes('تطوير') || role.includes('جودة') || role.includes('تطوير');
+      const isHr = assigned.includes('موارد') || role.includes('موارد');
+      const isTop =
+        role === 'System Admin'
+        || role.includes('رئيس النادي')
+        || role.includes('نائبة الرئيس')
+        || role.includes('General Supervisor');
+      if (isOwnCommitteeLeader || isQuality || isHr || isTop) {
+        const phone = canonicalPhone(item.id) || canonicalPhone(String(data.phone || ''));
+        if (phone) phones.add(phone);
+      }
+    });
+  } catch {
+    // العضو العادي لا يملك list على users — نكتفي بأسماء القادة من اللجان/الطلبات
+  }
+
+  return [...phones].filter(Boolean);
 }
 
 /** يسجّل اعتذار الفعالية ويُشعر قادة اللجنة وقادة الجودة والموارد البشرية */
 export async function submitEventExcuse(db: Firestore, input: EventExcuseInput) {
-  const committee = String(input.committee || '').trim() || 'لجنة غير محددة';
+  const committee = normalizeCommitteeLabel(input.committee);
   const eventName = String(input.eventName || '').trim();
   const reason = String(input.reason || '').trim();
   const memberName = String(input.memberName || '').trim() || 'عضو';
@@ -76,8 +160,9 @@ export async function submitEventExcuse(db: Firestore, input: EventExcuseInput) 
 
   const row = {
     memberName,
-    memberPhone: String(input.memberPhone || '').trim(),
+    memberPhone: canonicalPhone(String(input.memberPhone || '')) || String(input.memberPhone || '').trim(),
     committee,
+    committeeId: committeeIdFromName(committee) || '',
     eventName,
     eventDate: String(input.eventDate || '').trim() || 'غير محدد',
     reason,
@@ -91,14 +176,34 @@ export async function submitEventExcuse(db: Firestore, input: EventExcuseInput) 
 
   const message =
     `ℹ️ [اعتذار عن فعالية]: ${memberName} من (${committee}) اعتذر عن (${eventName}). السبب: ${reason}`;
-  const keyword = committeeKeyword(committee);
 
   try {
-    const snap = await getDocs(collection(db, 'users'));
+    await addDoc(collection(db, 'event_excuse_notices'), {
+      excuseId: docRef.id,
+      committee,
+      committeeId: row.committeeId,
+      committeeKeyword: committeeKeyword(committee),
+      memberName,
+      eventName,
+      reason,
+      message,
+      createdAt: Date.now(),
+      audience: ['committee-leaders', 'quality', 'hr'],
+    });
+    invalidateCloudCollection('event_excuse_notices');
+  } catch (err) {
+    console.error(err);
+  }
+
+  try {
+    const phones = await collectExcuseRecipientPhones(db, input, committee);
     await Promise.all(
-      snap.docs.map(async (item) => {
-        if (!shouldNotifyExcuseRecipient(item.data() || {}, input, keyword)) return;
-        await notifyExistingUser(db, item.id, { latestNotification: message });
+      phones.map(async (phone) => {
+        try {
+          await notifyExistingUser(db, phone, { latestNotification: message });
+        } catch (err) {
+          console.error(err);
+        }
       })
     );
   } catch (err) {

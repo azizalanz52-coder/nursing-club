@@ -196,6 +196,18 @@ service cloud.firestore {
       allow write: if signedIn();
     }
 
+    match /event_excuses/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if isClubOperator();
+    }
+
+    match /event_excuse_notices/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if isClubOperator();
+    }
+
     match /admin_documents/{id} {
       allow read, write: if isClubOperator();
     }

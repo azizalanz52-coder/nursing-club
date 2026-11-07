@@ -1957,7 +1957,10 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   }
 
   const displayedTasks = committeeTasks.filter(t => isSameCommittee(t.committee, currentActiveComm));
-  const committeeExcusesFiltered = eventExcuses.filter(ex => matchesTargetCommittee(ex.committee, currentActiveComm));
+  // الجودة والموارد يرون كل الاعتذارات؛ قادة اللجان يرون اعتذارات لجنتهم فقط
+  const committeeExcusesFiltered = (isQualityTeam || isHrTeam)
+    ? eventExcuses
+    : eventExcuses.filter((ex) => matchesTargetCommittee(ex.committee, currentActiveComm));
 
   const honorScoreValue = (score: unknown) => {
     const digits = String(score || '').replace(/[^\d.]/g, '');
@@ -2404,9 +2407,13 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
             </form>
           )}
 
-          {isCommitteeLeader && (
+          {(isCommitteeLeader || isQualityTeam || isHrTeam) && (
             <div className="space-y-3">
-              <h4 className="font-extrabold text-sm text-slate-800">سجل الإفادات والاعتذارات المسجلة بلجنتك:</h4>
+              <h4 className="font-extrabold text-sm text-slate-800">
+                {isQualityTeam || isHrTeam
+                  ? 'سجل الإفادات والاعتذارات (يظهر لقادة اللجنة والجودة والموارد البشرية):'
+                  : 'سجل الإفادات والاعتذارات المسجلة بلجنتك:'}
+              </h4>
               {committeeExcusesFiltered.length === 0 ? (
                 <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد إفادات اعتذار مسجلة لهذه اللجنة حتى الآن.</p>
               ) : (
@@ -2415,6 +2422,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-slate-900 text-xs">العضو: {ex.memberName}</span>
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800">{ex.committee}</span>
                         <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800">
                           {ex.status}
                         </span>
