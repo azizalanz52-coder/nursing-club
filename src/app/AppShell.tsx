@@ -17,7 +17,8 @@ export default function AppShell({
   const [showSplash, setShowSplash] = useState(false);
 
   useEffect(() => {
-    const warm = window.setTimeout(() => warmPublicCloud(), 350);
+    // تأخير أطول حتى لا يتزاحم مع أول رسم للصفحة + يشتغل مرة لكل جلسة فقط.
+    const warm = window.setTimeout(() => warmPublicCloud(), 2500);
 
     if (sessionStorage.getItem(SPLASH_KEY) === '1') {
       return () => window.clearTimeout(warm);

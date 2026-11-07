@@ -1,13 +1,14 @@
-import { Firestore, collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { Firestore, updateDoc, doc } from 'firebase/firestore';
 import { emailToPhone } from './authIdentity';
 import { canonicalPhone, normalizeUniversityId } from './certificatesLookup';
-import { findUserDoc, sameMemberPhone } from './memberAcceptance';
+import { findUserDoc } from './memberAcceptance';
 import {
   isValidUniversityId,
   persistUniversityId,
   readStoredUniversityId,
   saveUniversityIdAndLink,
 } from './memberIdentity';
+import { loadCaseSubmissionsForPhone } from './caseStudy';
 import { requireAuthUser } from './uploadFile';
 
 export function readStoredProfileName() {
@@ -43,12 +44,11 @@ export async function updateOwnName(db: Firestore, fullName: string) {
   persistProfileName(trimmed);
 
   try {
-    const snap = await getDocs(collection(db, 'case_study_submissions'));
+    const rows = await loadCaseSubmissionsForPhone(db, profileId, 80);
     await Promise.all(
-      snap.docs.map(async (row) => {
-        const phone = String(row.data()?.phone || row.data()?.phoneNumber || '');
-        if (!sameMemberPhone(phone, profileId) && phone !== profileId) return;
-        await updateDoc(row.ref, { studentName: trimmed });
+      rows.map(async (row) => {
+        if (!row.id) return;
+        await updateDoc(doc(db, 'case_study_submissions', row.id), { studentName: trimmed });
       })
     );
   } catch (err) {

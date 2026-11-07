@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
 import { writeCloudCollection } from '../lib/cloudCache';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, onSnapshot, increment, deleteField } from 'firebase/firestore';
-import { isIncompleteUserAccount, notifyCommitteeByKeyword, omitPassword, purgeAllStoredPasswords, setUserPasswordOnPhone } from '../lib/userAccounts';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, increment, deleteField } from 'firebase/firestore';
+import { isIncompleteUserAccount, notifyCommitteeByKeyword, omitPassword, setUserPasswordOnPhone } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
 import { filterFilesWithinLimit, filterMediaFilesWithinLimit, isOverUploadLimit, isPlaceholderCertMedia, mediaUploadLimitMessage, requireAuthUser, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/issueCertificate';
@@ -32,8 +32,10 @@ import {
   formatCaseDate,
   formatDayLabel,
   grantThursdayPersistence,
+  invalidateCaseSubmissionsCache,
   isRiyadhThursday,
   loadCaseSubmissions,
+  loadCaseSubmissionsForPhone,
   personPhone,
   riyadhParts,
   scoreBreakdown,
@@ -389,20 +391,6 @@ export default function AdminDashboard() {
     checkAdminAuth();
   }, [router]);
 
-  useEffect(() => {
-    if (!adminReady) return;
-    const unsub = onSnapshot(
-      collection(db, 'scientific_committee_texts'),
-      () => {
-        fetchScientificTexts();
-      },
-      (err) => {
-        console.error('Error listening to scientific texts:', err);
-      }
-    );
-    return () => unsub();
-  }, [adminReady]);
-
   const getRealUserName = (phone: string, defaultName: string) => {
     if (!phone) return defaultName;
     const found = usersList.find((u) => sameMemberPhone(u.phone, phone) || u.phone === phone);
@@ -439,9 +427,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchCaseSubmissions = async () => {
+  const fetchCaseSubmissions = async (force = false) => {
     try {
-      const rows = await loadCaseSubmissions(db);
+      const rows = await loadCaseSubmissions(db, { force });
       setCaseSubmissions(rows);
       await applyDistinguishedRanks(rows);
     } catch (e) {
@@ -961,6 +949,7 @@ export default function AdminDashboard() {
     
     try {
       await deleteDoc(doc(db, 'case_study_submissions', id));
+      invalidateCaseSubmissionsCache();
       const next = caseSubmissions.filter(sub => sub.id !== id);
       setCaseSubmissions(next);
       await applyDistinguishedRanks(next);
@@ -1475,84 +1464,12 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   useEffect(() => {
     if (!adminReady) return;
 
-    fetchEscalatedReports();
-    fetchHistoricalVault();
-    fetchStudentAchievements();
-    fetchCertificates();
-    fetchNewsletters();
-    fetchScientificTexts();
+    // التبويب الافتراضي دراسة الحالة — نحمل الأساسيات فقط عند الدخول.
     fetchCaseSubmissions();
     fetchSiteSettings();
 
     const fetchCloudData = async () => {
       try {
-        const eventsSnap = await getDocs(collection(db, 'site_events'));
-        if (!eventsSnap.empty) {
-          const eventsList: EventItem[] = [];
-          eventsSnap.forEach((d) => { eventsList.push({ id: d.id, ...d.data() } as EventItem); });
-          setEvents(eventsList);
-          writeCloudCollection('site_events', eventsList);
-        }
-
-        const welcomeRef = doc(db, 'site_banners', WELCOME_BANNER_ID);
-        const welcomeSnap = await getDoc(welcomeRef);
-        if (!welcomeSnap.exists()) {
-          await setDoc(welcomeRef, DEFAULT_WELCOME_BANNER);
-        }
-        const bannersSnap = await getDocs(collection(db, 'site_banners'));
-        const bannersList: BannerItem[] = [];
-        bannersSnap.forEach((d) => { bannersList.push({ id: d.id, ...d.data() } as BannerItem); });
-        bannersList.sort((a, b) => {
-          if (a.id === WELCOME_BANNER_ID) return -1;
-          if (b.id === WELCOME_BANNER_ID) return 1;
-          return Number(b.id) - Number(a.id);
-        });
-        setBanners(bannersList);
-        writeCloudCollection('site_banners', bannersList);
-
-        const partnersSnap = await getDocs(collection(db, 'site_partners'));
-        if (!partnersSnap.empty) {
-          const partnersList: PartnerItem[] = [];
-          partnersSnap.forEach((d) => { partnersList.push({ id: d.id, ...d.data() } as PartnerItem); });
-          setPartners(partnersList);
-          writeCloudCollection('site_partners', partnersList);
-        }
-
-        const suggestionsSnap = await getDocs(collection(db, 'suggestions'));
-        if (!suggestionsSnap.empty) {
-          const suggestionsList: SuggestionItem[] = [];
-          suggestionsSnap.forEach((d) => { suggestionsList.push({ id: d.id, ...d.data() } as SuggestionItem); });
-          setSuggestions(suggestionsList);
-        }
-
-        const passionSnap = await getDocs(collection(db, 'site_passion_slides'));
-        if (!passionSnap.empty) {
-          const slides: PassionSlide[] = [];
-          passionSnap.forEach((d) => { slides.push({ id: d.id, ...d.data() } as PassionSlide); });
-          setPassionSlides(slides);
-          writeCloudCollection('site_passion_slides', slides);
-        }
-
-        const discoverSnap = await getDocs(collection(db, 'site_discover_events'));
-        if (!discoverSnap.empty) {
-          const eventsList: DiscoverEvent[] = [];
-          discoverSnap.forEach((d) => { eventsList.push({ id: d.id, ...d.data() } as DiscoverEvent); });
-          setDiscoverEvents(eventsList);
-          writeCloudCollection('site_discover_events', eventsList);
-          setSelectedEventId(eventsList[0]?.id || '');
-        }
-
-        const querySnapshot = await getDocs(collection(db, 'applications'));
-        const fetchedRequests = querySnapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) as Record<string, any>[];
-        if (fetchedRequests.length > 0) {
-          setRequests(fetchedRequests);
-        }
-
-        try {
-          await purgeAllStoredPasswords(db);
-        } catch (err) {
-          console.error(err);
-        }
         const usersSnap = await getDocs(collection(db, 'users'));
         const fetchedUsers = usersSnap.docs.map((docSnap) => omitPassword({ phone: docSnap.id, ...docSnap.data() })) as UserAccount[];
         setUsersList(fetchedUsers);
@@ -1571,9 +1488,136 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     };
 
     fetchCloudData();
-
-    return subscribeMediaGallery(db, setMediaUploads);
   }, [adminReady]);
+
+  const tabLoadedRef = React.useRef<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!adminReady) return;
+    const once = (key: string, run: () => void) => {
+      if (tabLoadedRef.current[key]) return;
+      tabLoadedRef.current[key] = true;
+      run();
+    };
+    if (activeTab === 'escalated-reports') once('escalated-reports', () => { void fetchEscalatedReports(); });
+    if (activeTab === 'historical-vault') once('historical-vault', () => { void fetchHistoricalVault(); });
+    if (activeTab === 'student-achievements') once('student-achievements', () => { void fetchStudentAchievements(); });
+    if (activeTab === 'certificates') once('certificates', () => { void fetchCertificates(); });
+    if (activeTab === 'weekly-newsletter') once('weekly-newsletter', () => { void fetchNewsletters(); });
+    if (activeTab === 'scientific-texts') once('scientific-texts', () => { void fetchScientificTexts(); });
+    if (activeTab === 'case-study' && caseSubmissions.length === 0) once('case-study', () => { void fetchCaseSubmissions(); });
+  }, [adminReady, activeTab]);
+
+  useEffect(() => {
+    if (!adminReady) return;
+    const loadKey =
+      activeTab === 'events' || activeTab === 'team' ? 'site_events'
+      : activeTab === 'banners' ? 'site_banners'
+      : activeTab === 'partners' ? 'site_partners'
+      : activeTab === 'suggestions' ? 'suggestions'
+      : activeTab === 'passion' ? 'site_passion_slides'
+      : activeTab === 'discover' ? 'site_discover_events'
+      : activeTab === 'requests' ? 'applications'
+      : '';
+    if (!loadKey || tabLoadedRef.current[loadKey]) return;
+    tabLoadedRef.current[loadKey] = true;
+
+    let cancelled = false;
+    const fetchTabCloud = async () => {
+      try {
+        if (loadKey === 'site_events') {
+          const eventsSnap = await getDocs(collection(db, 'site_events'));
+          if (!cancelled && !eventsSnap.empty) {
+            const eventsList: EventItem[] = [];
+            eventsSnap.forEach((d) => { eventsList.push({ id: d.id, ...d.data() } as EventItem); });
+            setEvents(eventsList);
+            writeCloudCollection('site_events', eventsList);
+          }
+        }
+
+        if (loadKey === 'site_banners') {
+          const welcomeRef = doc(db, 'site_banners', WELCOME_BANNER_ID);
+          const welcomeSnap = await getDoc(welcomeRef);
+          if (!welcomeSnap.exists()) {
+            await setDoc(welcomeRef, DEFAULT_WELCOME_BANNER);
+          }
+          const bannersSnap = await getDocs(collection(db, 'site_banners'));
+          if (cancelled) return;
+          const bannersList: BannerItem[] = [];
+          bannersSnap.forEach((d) => { bannersList.push({ id: d.id, ...d.data() } as BannerItem); });
+          bannersList.sort((a, b) => {
+            if (a.id === WELCOME_BANNER_ID) return -1;
+            if (b.id === WELCOME_BANNER_ID) return 1;
+            return Number(b.id) - Number(a.id);
+          });
+          setBanners(bannersList);
+          writeCloudCollection('site_banners', bannersList);
+        }
+
+        if (loadKey === 'site_partners') {
+          const partnersSnap = await getDocs(collection(db, 'site_partners'));
+          if (!cancelled && !partnersSnap.empty) {
+            const partnersList: PartnerItem[] = [];
+            partnersSnap.forEach((d) => { partnersList.push({ id: d.id, ...d.data() } as PartnerItem); });
+            setPartners(partnersList);
+            writeCloudCollection('site_partners', partnersList);
+          }
+        }
+
+        if (loadKey === 'suggestions') {
+          const suggestionsSnap = await getDocs(collection(db, 'suggestions'));
+          if (!cancelled && !suggestionsSnap.empty) {
+            const suggestionsList: SuggestionItem[] = [];
+            suggestionsSnap.forEach((d) => { suggestionsList.push({ id: d.id, ...d.data() } as SuggestionItem); });
+            setSuggestions(suggestionsList);
+          }
+        }
+
+        if (loadKey === 'site_passion_slides') {
+          const passionSnap = await getDocs(collection(db, 'site_passion_slides'));
+          if (!cancelled && !passionSnap.empty) {
+            const slides: PassionSlide[] = [];
+            passionSnap.forEach((d) => { slides.push({ id: d.id, ...d.data() } as PassionSlide); });
+            setPassionSlides(slides);
+            writeCloudCollection('site_passion_slides', slides);
+          }
+        }
+
+        if (loadKey === 'site_discover_events') {
+          const discoverSnap = await getDocs(collection(db, 'site_discover_events'));
+          if (!cancelled && !discoverSnap.empty) {
+            const eventsList: DiscoverEvent[] = [];
+            discoverSnap.forEach((d) => { eventsList.push({ id: d.id, ...d.data() } as DiscoverEvent); });
+            setDiscoverEvents(eventsList);
+            writeCloudCollection('site_discover_events', eventsList);
+            setSelectedEventId(eventsList[0]?.id || '');
+          }
+        }
+
+        if (loadKey === 'applications') {
+          const querySnapshot = await getDocs(collection(db, 'applications'));
+          if (cancelled) return;
+          const fetchedRequests = querySnapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })) as Record<string, any>[];
+          if (fetchedRequests.length > 0) {
+            setRequests(fetchedRequests);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching tab cloud data:', err);
+        tabLoadedRef.current[loadKey] = false;
+      }
+    };
+
+    void fetchTabCloud();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminReady, activeTab]);
+
+  useEffect(() => {
+    if (!adminReady || activeTab !== 'media-committee') return;
+    return subscribeMediaGallery(db, setMediaUploads);
+  }, [adminReady, activeTab]);
 
   const handleDeleteIncompleteAccounts = async () => {
     const stubs = usersList.filter((u) => isIncompleteUserAccount(u) && u.phone !== '0553731265');
@@ -1652,6 +1696,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         score: increment(delta),
         scoreAdjustments: [...adjustmentsOf(current), entry],
       });
+      invalidateCaseSubmissionsCache();
       const next = caseSubmissions.map((sub) => (
         sub.id === id
           ? {
@@ -1675,7 +1720,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     try {
       await requireAuthUser();
       const granted = await grantThursdayPersistence(db, caseSubmissions);
-      await fetchCaseSubmissions();
+      invalidateCaseSubmissionsCache();
+      await fetchCaseSubmissions(true);
       setModalMessage(granted
         ? `تم صرف شكر الاستمرارية لـ ${granted} مشاركين (+2 لمن أكمل الأيام الخمسة).`
         : 'ما فيه أحد مستحق اليوم، أو البونص انصرف مسبقاً.');
@@ -1817,12 +1863,14 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       await updateDoc(userRef, { fullName: trimmedName });
       setUsersList(usersList.map(u => u.phone === activeUserPhoneForAction ? { ...u, fullName: trimmedName } : u));
 
-      const submissionsSnap = await getDocs(collection(db, 'case_study_submissions'));
-      await Promise.all(submissionsSnap.docs.map(async (row) => {
-        const phone = String(row.data()?.phone || row.data()?.phoneNumber || '');
-        if (!sameMemberPhone(phone, activeUserPhoneForAction) && phone !== activeUserPhoneForAction) return;
-        await updateDoc(row.ref, { studentName: trimmedName });
-      }));
+      const ownSubs = await loadCaseSubmissionsForPhone(db, activeUserPhoneForAction, 80);
+      await Promise.all(
+        ownSubs.map(async (row) => {
+          if (!row.id) return;
+          await updateDoc(doc(db, 'case_study_submissions', row.id), { studentName: trimmedName });
+        })
+      );
+      invalidateCaseSubmissionsCache();
       setCaseSubmissions((prev) => prev.map((sub) => (
         sameMemberPhone(sub.phone || sub.phoneNumber, activeUserPhoneForAction)
           ? { ...sub, studentName: trimmedName }

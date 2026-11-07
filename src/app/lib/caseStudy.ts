@@ -556,7 +556,8 @@ export async function grantThursdayPersistence(db: Firestore, submissions: Array
 
 type SubmissionsCache = { at: number; rows: Array<Record<string, any>> };
 let submissionsCache: SubmissionsCache | null = null;
-const SUBMISSIONS_CACHE_MS = 3 * 60 * 1000;
+/** كاش أطول يقلل مسح المجموعة الكاملة عند التنقل المتكرر دون كسر التحديث بعد الإرسال (invalidate). */
+const SUBMISSIONS_CACHE_MS = 15 * 60 * 1000;
 
 export function invalidateCaseSubmissionsCache() {
   submissionsCache = null;

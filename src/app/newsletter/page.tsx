@@ -3,8 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { peekCloudCollection, writeCloudCollection } from '../lib/cloudCache';
+import { loadCloudCollection, peekCloudCollection } from '../lib/cloudCache';
 import {
   NEWS_CAT,
   WEEKDAY_LABEL,
@@ -101,45 +100,51 @@ export default function NewsletterPage() {
   const [queryText, setQueryText] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
     const cached = peekCloudCollection<NewsletterItem>('site_newsletters');
     if (cached?.length) {
       setItems(cached.map(hydrateNewsletterItem));
       setLoading(false);
     }
-    const unsub = onSnapshot(
-      collection(db, 'site_newsletters'),
-      (snap) => {
-        const list = snap.docs
-          .map((docSnap) => {
-            const data = docSnap.data() as Partial<NewsletterItem>;
-            const exams = Array.isArray(data.exams) ? data.exams : [];
-            return hydrateNewsletterItem({
-              id: docSnap.id,
-              title: data.title || 'إصدار النشرة',
-              category: data.category || NEWS_CAT.club,
-              content: data.content || '',
-              link: data.link || '',
-              date: data.date || '',
-              image: data.image || '/logo.png',
-              type: data.type || (exams.length ? 'exam-schedule' : 'article'),
-              featured: Boolean(data.featured),
-              examCohort: data.examCohort || 'جميع الدفعات',
-              examSemester: data.examSemester || '',
-              exams,
-              cadence: data.cadence,
-              weekday: data.weekday,
-              monthKey: data.monthKey,
-              slot: data.slot,
-            } as NewsletterItem);
-          })
-          .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-        writeCloudCollection('site_newsletters', list);
-        setItems(list);
-        setLoading(false);
+
+    void loadCloudCollection<NewsletterItem>(db, 'site_newsletters', {
+      mapDoc: (id, data) => {
+        const exams = Array.isArray(data.exams) ? data.exams : [];
+        return hydrateNewsletterItem({
+          id,
+          title: String(data.title || 'إصدار النشرة'),
+          category: String(data.category || NEWS_CAT.club),
+          content: String(data.content || ''),
+          link: String(data.link || ''),
+          date: String(data.date || ''),
+          image: String(data.image || '/logo.png'),
+          type: (data.type as NewsletterItem['type']) || (exams.length ? 'exam-schedule' : 'article'),
+          featured: Boolean(data.featured),
+          examCohort: String(data.examCohort || 'جميع الدفعات'),
+          examSemester: String(data.examSemester || ''),
+          exams: exams as NewsletterItem['exams'],
+          cadence: data.cadence as NewsletterItem['cadence'],
+          weekday: data.weekday as NewsletterItem['weekday'],
+          monthKey: data.monthKey ? String(data.monthKey) : undefined,
+          slot: data.slot as NewsletterItem['slot'],
+        } as NewsletterItem);
       },
-      () => setLoading(false)
-    );
-    return () => unsub();
+    })
+      .then((list) => {
+        if (cancelled) return;
+        const sorted = [...list].sort(
+          (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
+        );
+        setItems(sorted);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const examBoards = useMemo(

@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from "next/link";
 import { db } from './../lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
 import { DEFAULT_WELCOME_BANNER } from '../lib/welcomeBanner';
-import { peekCloudCollection, writeCloudCollection } from '../lib/cloudCache';
+import { loadCloudCollection, peekCloudCollection } from '../lib/cloudCache';
 import { ClubIcon } from './icons';
 
 interface BannerItem {
@@ -39,42 +38,42 @@ export default function Hero() {
 
   useEffect(() => {
     if (!live) return;
+    let cancelled = false;
     const cached = peekCloudCollection<BannerItem>('site_banners');
     if (cached?.length) setBanners(sortBanners(cached));
     localStorage.removeItem('UHB_BANNERS');
-    const unsub = onSnapshot(
-      collection(db, 'site_banners'),
-      (bannersSnap) => {
-        if (bannersSnap.empty) {
+
+    void loadCloudCollection<BannerItem>(db, 'site_banners', {
+      mapDoc: (id, dat) => ({
+        id,
+        tag: String(dat.tag || 'مناسبة خاصة'),
+        title: String(dat.title || 'نادي التمريض'),
+        description: String(dat.description || ''),
+        image: String(dat.image || '/header-banner.png'),
+        buttonText: String(dat.buttonText || 'اكتشف النادي'),
+        buttonLink: String(dat.buttonLink || '/discover'),
+        theme: dat.theme === 'pink-october' ? 'pink-october' : 'club',
+        cinematic: Boolean(dat.cinematic),
+      }),
+    })
+      .then((cloudList) => {
+        if (cancelled) return;
+        if (!cloudList.length) {
           setBanners([DEFAULT_WELCOME_BANNER]);
           setCurrentIndex(0);
           return;
         }
-        const cloudList: BannerItem[] = [];
-        bannersSnap.forEach((d) => {
-          const dat = d.data();
-          cloudList.push({
-            id: d.id,
-            tag: dat.tag || 'مناسبة خاصة',
-            title: dat.title || 'نادي التمريض',
-            description: dat.description || '',
-            image: dat.image || '/header-banner.png',
-            buttonText: dat.buttonText || 'اكتشف النادي',
-            buttonLink: dat.buttonLink || '/discover',
-            theme: dat.theme === 'pink-october' ? 'pink-october' : 'club',
-            cinematic: Boolean(dat.cinematic),
-          });
-        });
         const sorted = sortBanners(cloudList);
-        writeCloudCollection('site_banners', sorted);
         setBanners(sorted);
         setCurrentIndex(0);
-      },
-      (err) => {
+      })
+      .catch((err) => {
         console.error('Error fetching cloud banners:', err);
-      }
-    );
-    return () => unsub();
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [live]);
 
   useEffect(() => {

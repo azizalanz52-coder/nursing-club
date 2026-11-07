@@ -12,7 +12,8 @@ const memory = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<CloudRow[]>>();
 
 const CACHE_PREFIX = 'nurs_cloud_v1_';
-const FRESH_MS = 25_000;
+/** كان 25 ثانية فيعيد مسح كل المجموعات العامة عند كل تنقّل تقريبًا. */
+const FRESH_MS = 10 * 60 * 1000;
 const MAX_LS_CHARS = 1_800_000;
 
 const MEMORY_ONLY = new Set([
@@ -242,12 +243,18 @@ export function mergeCachedCollections<T extends { id: string } = CloudRow>(...n
   return Array.from(mapped.values());
 }
 
+const WARM_SESSION_KEY = 'nurs_cloud_warmed_v2';
+
 export function warmPublicCloud(firestore: Firestore = db) {
   if (typeof window === 'undefined') return;
+  try {
+    if (sessionStorage.getItem(WARM_SESSION_KEY) === '1') return;
+    sessionStorage.setItem(WARM_SESSION_KEY, '1');
+  } catch {
+    /* private mode — ما زلنا نوسّخ مرة لكل تحميل صفحة */
+  }
+  // المجموعات العامة الخفيفة فقط. شهادات/دفعات HR ثقيلة وتُحمَّل عند الحاجة.
   PUBLIC_CLOUD_COLLECTIONS.forEach((name) => {
-    void loadCloudCollection(firestore, name).catch(() => undefined);
-  });
-  HR_INDEX_COLLECTIONS.forEach((name) => {
     void loadCloudCollection(firestore, name).catch(() => undefined);
   });
 }
