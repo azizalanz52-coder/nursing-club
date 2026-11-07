@@ -3802,15 +3802,67 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                         <span className="px-2.5 py-1 rounded-full bg-white border border-[#630517]/20 text-[#630517]">هذا اليوم: {person.total}</span>
                         <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700">قبل أسبوع: {person.weekAgoTotal}</span>
                         <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800">من الحل: {person.solve}</span>
-                        <span className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-800">إدارة: +{person.admin}</span>
                         {person.persistence > 0 ? <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800">استمرارية: +{person.persistence}</span> : null}
                         {person.unverified > 0 ? <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-800">غير موثّق: +{person.unverified}</span> : null}
                       </div>
                     </div>
 
+                    {(() => {
+                      const adminLogs = person.rows.flatMap((sub) =>
+                        adjustmentsOf(sub).map((log, logIdx) => ({
+                          ...log,
+                          key: `${sub.id}-${log.at}-${logIdx}`,
+                        }))
+                      ).sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+                      const netAdmin = person.admin;
+                      const netLabel = `${netAdmin > 0 ? '+' : ''}${netAdmin}`;
+                      return (
+                        <details className="rounded-2xl border border-sky-200 bg-sky-50/60 open:bg-white open:shadow-sm">
+                          <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 text-[11px] font-black text-sky-900">
+                            <span>
+                              إدارة: {netLabel}
+                              {adminLogs.length ? ` · ${adminLogs.length} حركة` : ' · لا حركات'}
+                            </span>
+                            <span className="text-sky-700 font-bold">
+                              {adminLogs.length ? 'اضغط لعرض من أعطى البونص أو الخصم ▾' : '▾'}
+                            </span>
+                          </summary>
+                          <div className="px-3.5 pb-3.5 space-y-2 border-t border-sky-100 pt-3">
+                            {adminLogs.length === 0 ? (
+                              <p className="text-[11px] text-slate-500 font-bold">ما فيه بونص أو خصم إداري مسجّل لهذا اليوم.</p>
+                            ) : (
+                              adminLogs.map((log) => (
+                                <div
+                                  key={log.key}
+                                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="text-[11px] font-black text-slate-900">
+                                      من: <span className="text-[#630517]">{log.byName || 'لوحة الأدمن'}</span>
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                                      {formatCaseDate({ timestamp: log.at })}
+                                    </p>
+                                  </div>
+                                  <span
+                                    className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-black ${
+                                      log.delta > 0
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : 'bg-amber-50 text-amber-800'
+                                    }`}
+                                  >
+                                    {log.delta > 0 ? `بونص +${log.delta}` : `خصم ${log.delta}`}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </details>
+                      );
+                    })()}
+
                     {person.rows.map((sub) => {
                       const br = scoreBreakdown(sub);
-                      const logs = adjustmentsOf(sub);
                       return (
                         <div key={sub.id} className="bg-white rounded-2xl border border-[#630517]/10 p-3 space-y-2">
                           <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
@@ -3821,21 +3873,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                             حل {br.solve}
                             {br.surprise > 0 ? ` • مفاجأة +${br.surprise}` : ''}
                             {br.persistence > 0 ? ` • استمرارية +${br.persistence}` : ''}
-                            {br.adminLogged ? ` • إدارة ${br.adminLogged > 0 ? '+' : ''}${br.adminLogged}` : ''}
                             {br.unverified > 0 ? ` • زيادة قديمة غير موثّقة +${br.unverified}` : ''}
                           </p>
-                          {logs.length > 0 ? (
-                            <div className="space-y-1">
-                              {logs.map((log, logIdx) => (
-                                <p key={`${sub.id}-${log.at}-${logIdx}`} className="text-[11px] text-slate-700 bg-slate-50 rounded-xl px-3 py-1.5">
-                                  {log.delta > 0 ? `+${log.delta}` : log.delta} من {log.byName || 'لوحة الأدمن'}
-                                  <span className="text-slate-400 mr-2">{formatCaseDate({ timestamp: log.at })}</span>
-                                </p>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-[10px] text-slate-400">ما فيه زيادة موثّقة بعد. أي +بونص من الآن ينكتب باسم من ضغطه.</p>
-                          )}
                           <div className="flex flex-wrap gap-1.5 justify-end">
                             <button type="button" onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, 1)} className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 cursor-pointer text-[11px]">+ بونص 🟢</button>
                             <button type="button" onClick={() => handleUpdateCaseScore(sub.id, sub.score || 0, -1)} className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-bold hover:bg-amber-100 cursor-pointer text-[11px]">- خصم 🟠</button>
