@@ -123,6 +123,12 @@ export async function readCaseSolveAttempt(db: Firestore, phone: string, now = D
   return readAttemptData(id, key, day, snap.data() as Record<string, any>);
 }
 
+function isQuotaError(err: unknown) {
+  const code = String((err as { code?: string })?.code || '');
+  const message = String((err as { message?: string })?.message || '');
+  return code.includes('resource-exhausted') || /quota|resource.?exhausted/i.test(message);
+}
+
 export async function ensureCaseSolveAttempt(db: Firestore, phone: string, now = Date.now()): Promise<CaseSolveAttempt> {
   const key = canonicalPhone(phone) || String(phone || '').trim();
   if (!key) throw new Error('رقم الجوال مطلوب لبدء وقت الحل.');
@@ -130,21 +136,38 @@ export async function ensureCaseSolveAttempt(db: Firestore, phone: string, now =
   const id = caseSolveAttemptId(key, day);
   const ref = doc(db, CASE_STUDY_ATTEMPTS_COL, id);
 
-  return runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (snap.exists()) {
-      return readAttemptData(id, key, day, snap.data() as Record<string, any>);
-    }
-    tx.set(ref, {
-      phone: key,
-      day,
-      startedAt: now,
-      createdAt: new Date(now).toISOString(),
-      submittedAt: null,
-      submissionId: null,
+  // قراءة أولاً لتفادي كتابة بلا حاجة (مهم عند امتلاء حصة Firebase)
+  const existing = await getDoc(ref);
+  if (existing.exists()) {
+    return readAttemptData(id, key, day, existing.data() as Record<string, any>);
+  }
+
+  try {
+    return await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.exists()) {
+        return readAttemptData(id, key, day, snap.data() as Record<string, any>);
+      }
+      tx.set(ref, {
+        phone: key,
+        day,
+        startedAt: now,
+        createdAt: new Date(now).toISOString(),
+        submittedAt: null,
+        submissionId: null,
+      });
+      return { id, phone: key, day, startedAt: now, submittedAt: null, submissionId: null, score: null };
     });
-    return { id, phone: key, day, startedAt: now, submittedAt: null, submissionId: null, score: null };
-  });
+  } catch (err) {
+    const again = await getDoc(ref).catch(() => null);
+    if (again?.exists()) {
+      return readAttemptData(id, key, day, again.data() as Record<string, any>);
+    }
+    if (isQuotaError(err)) {
+      throw new Error('السيرفر ممتلئ مؤقتاً (حصة Firebase). حاول بعد دقيقة أو حدّث الصفحة.');
+    }
+    throw err;
+  }
 }
 
 export function caseAttemptDeadline(startedAt: number) {

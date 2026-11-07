@@ -929,7 +929,7 @@ export default function CaseStudyPage() {
     };
 
     (async () => {
-      try {
+      const syncOnce = async () => {
         const attempt = await ensureCaseSolveAttempt(db, phone);
         if (cancelled) return;
         if (attempt.submittedAt) {
@@ -937,19 +937,36 @@ export default function CaseStudyPage() {
           return;
         }
         if (Date.now() > caseAttemptSubmitDeadline(attempt.startedAt)) {
-          const sealed = await sealExpiredCaseAttempt(db, phone, studentName);
-          if (cancelled) return;
-          if (sealed.sealed) {
-            applyLockedDay(sealed.score ?? 0);
+          try {
+            const sealed = await sealExpiredCaseAttempt(db, phone, studentName);
+            if (cancelled) return;
+            if (sealed.sealed) {
+              applyLockedDay(sealed.score ?? 0);
+              return;
+            }
+          } catch (sealErr) {
+            console.error(sealErr);
+            if (!cancelled) applyLockedDay(0);
             return;
           }
         }
         arm(attempt.startedAt);
+      };
+
+      try {
+        await syncOnce();
       } catch (err) {
         console.error(err);
-        if (!cancelled) {
-          setTimerArmed(false);
-          alert('تعذر مزامنة وقت الحل مع السيرفر. حدّث الصفحة ولا تحل من جهاز آخر قبل نجاح المزامنة.');
+        try {
+          await new Promise((resolve) => window.setTimeout(resolve, 1200));
+          if (cancelled) return;
+          await syncOnce();
+        } catch (retryErr: any) {
+          console.error(retryErr);
+          if (!cancelled) {
+            setTimerArmed(false);
+            alert(retryErr?.message || 'تعذر مزامنة وقت الحل مع السيرفر. حدّث الصفحة بعد دقيقة.');
+          }
         }
       }
     })();
