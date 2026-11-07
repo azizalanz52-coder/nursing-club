@@ -1088,7 +1088,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       setExcuseEventDate('');
       setExcuseReason('');
       setShowExcuseForm(false);
-      alert('تم إرسال الاعتذار لقادة اللجنة وقادة الجودة والموارد البشرية بنجاح.');
+      alert('تم إرسال الاعتذار لقادة اللجنة وقادة الجودة بنجاح.');
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء إرسال الاعتذار.');
@@ -1957,8 +1957,8 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   }
 
   const displayedTasks = committeeTasks.filter(t => isSameCommittee(t.committee, currentActiveComm));
-  // الجودة والموارد يرون كل الاعتذارات؛ قادة اللجان يرون اعتذارات لجنتهم فقط
-  const committeeExcusesFiltered = (isQualityTeam || isHrTeam)
+  // الجودة ترى كل الاعتذارات؛ قادة اللجان يرون اعتذارات لجنتهم فقط (بدون الموارد البشرية)
+  const committeeExcusesFiltered = isQualityTeam
     ? eventExcuses
     : eventExcuses.filter((ex) => matchesTargetCommittee(ex.committee, currentActiveComm));
 
@@ -2351,7 +2351,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
               <h3 className="text-lg font-black text-slate-900">📝 إفادة عدم المشاركة والاعتذار للفعاليات</h3>
-              <p className="text-xs text-slate-500">يصل الاعتذار لقادة لجنتك وقادة الجودة والموارد البشرية، ويظهر في سجل اللجنة.</p>
+              <p className="text-xs text-slate-500">يصل الاعتذار لقادة لجنتك وقادة الجودة، ويظهر في سجل اللجنة.</p>
             </div>
             <button
               type="button"
@@ -2364,7 +2364,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
           {showExcuseForm && (
             <form onSubmit={handleSubmitExcuse} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
-              <h4 className="font-extrabold text-sm text-[#630517]">نموذج إفادة عدم المشاركة للموارد البشرية</h4>
+              <h4 className="font-extrabold text-sm text-[#630517]">نموذج إفادة عدم المشاركة</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">اسم الفعالية</label>
@@ -2401,17 +2401,17 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
               </div>
               <div className="flex justify-end">
                 <button type="submit" className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow hover:bg-emerald-700 cursor-pointer">
-                  إرسال الإفادة للموارد البشرية مباشرة 🚀
+                  إرسال الإفادة لقادة اللجنة والجودة 🚀
                 </button>
               </div>
             </form>
           )}
 
-          {(isCommitteeLeader || isQualityTeam || isHrTeam) && (
+          {(isCommitteeLeader || isQualityTeam) && (
             <div className="space-y-3">
               <h4 className="font-extrabold text-sm text-slate-800">
-                {isQualityTeam || isHrTeam
-                  ? 'سجل الإفادات والاعتذارات (يظهر لقادة اللجنة والجودة والموارد البشرية):'
+                {isQualityTeam
+                  ? 'سجل الإفادات والاعتذارات (يظهر لقادة اللجان وقادة الجودة):'
                   : 'سجل الإفادات والاعتذارات المسجلة بلجنتك:'}
               </h4>
               {committeeExcusesFiltered.length === 0 ? (

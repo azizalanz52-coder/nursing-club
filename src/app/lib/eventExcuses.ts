@@ -104,8 +104,7 @@ async function collectExcuseRecipientPhones(db: Firestore, input: EventExcuseInp
       const id = String(row.id || '');
       const isOwn = Boolean(ownId && id === ownId);
       const isQuality = id === 'quality';
-      const isHr = id === 'hr';
-      if (!isOwn && !isQuality && !isHr) continue;
+      if (!isOwn && !isQuality) continue;
       if (row.maleLeader) leaderNames.add(String(row.maleLeader).trim());
       if (row.femaleLeader) leaderNames.add(String(row.femaleLeader).trim());
     }
@@ -117,7 +116,7 @@ async function collectExcuseRecipientPhones(db: Firestore, input: EventExcuseInp
     phones.add(phone);
   }
 
-  // إن كان للعضو صلاحية سرد المستخدمين (قائد/جودة)، أبلغ كل قادة الجودة والموارد مباشرة
+  // إن كان للعضو صلاحية سرد المستخدمين (قائد/جودة)، أبلغ قادة اللجنة والجودة مباشرة
   try {
     const users = await getDocs(collection(db, 'users'));
     const keyword = committeeKeyword(committee);
@@ -132,13 +131,12 @@ async function collectExcuseRecipientPhones(db: Firestore, input: EventExcuseInp
         (Boolean(keyword) && assigned.includes(keyword) && isCommitteeLeaderRole(role)) || isListedLeader;
       const isQuality =
         assigned.includes('جودة') || assigned.includes('تطوير') || role.includes('جودة') || role.includes('تطوير');
-      const isHr = assigned.includes('موارد') || role.includes('موارد');
       const isTop =
         role === 'System Admin'
         || role.includes('رئيس النادي')
         || role.includes('نائبة الرئيس')
         || role.includes('General Supervisor');
-      if (isOwnCommitteeLeader || isQuality || isHr || isTop) {
+      if (isOwnCommitteeLeader || isQuality || isTop) {
         const phone = canonicalPhone(item.id) || canonicalPhone(String(data.phone || ''));
         if (phone) phones.add(phone);
       }
@@ -150,7 +148,7 @@ async function collectExcuseRecipientPhones(db: Firestore, input: EventExcuseInp
   return [...phones].filter(Boolean);
 }
 
-/** يسجّل اعتذار الفعالية ويُشعر قادة اللجنة وقادة الجودة والموارد البشرية */
+/** يسجّل اعتذار الفعالية ويُشعر قادة اللجنة وقادة الجودة */
 export async function submitEventExcuse(db: Firestore, input: EventExcuseInput) {
   const committee = normalizeCommitteeLabel(input.committee);
   const eventName = String(input.eventName || '').trim();
@@ -188,7 +186,7 @@ export async function submitEventExcuse(db: Firestore, input: EventExcuseInput) 
       reason,
       message,
       createdAt: Date.now(),
-      audience: ['committee-leaders', 'quality', 'hr'],
+      audience: ['committee-leaders', 'quality'],
     });
     invalidateCloudCollection('event_excuse_notices');
   } catch (err) {
