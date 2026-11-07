@@ -2347,8 +2347,8 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
         <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
             <div>
-              <h3 className="text-lg font-black text-slate-900">📝 إفادة عدم المشاركة والاعتذار للفعاليات (خصوصية تامة للأعضاء)</h3>
-              <p className="text-xs text-slate-500">أبلغ الموارد البشرية فوراً بعدم مشاركتك في الفعالية بدون موافقة أو إظهار القوائم الخاصة للآخرين:</p>
+              <h3 className="text-lg font-black text-slate-900">📝 إفادة عدم المشاركة والاعتذار للفعاليات</h3>
+              <p className="text-xs text-slate-500">يصل الاعتذار لقادة لجنتك وقادة الجودة والموارد البشرية، ويظهر في سجل اللجنة.</p>
             </div>
             <button
               type="button"
