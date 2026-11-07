@@ -559,20 +559,88 @@ let submissionsCache: SubmissionsCache | null = null;
 /** كاش أطول يقلل مسح المجموعة الكاملة عند التنقل المتكرر دون كسر التحديث بعد الإرسال (invalidate). */
 const SUBMISSIONS_CACHE_MS = 15 * 60 * 1000;
 
+/**
+ * تعويض إداري لأيام انقطع فيها الحل بغير ذنب المتسابق (مثل امتلاء حصة Spark).
+ * يُحقَن عند القراءة فقط؛ إن وُجد تسليم حقيقي بنفس اليوم بـ ≥ النقاط المعوَّضة يُتجاهل.
+ * solveMs هنا لسباق «الأسرع» حتى تتعادل جوري مع طارق وغلا بعد تعويض اليوم.
+ */
+export const ADMIN_CASE_DAY_CREDITS: Array<{
+  phone: string;
+  day: string;
+  studentName: string;
+  score: number;
+  solveScore: number;
+  solveMs: number;
+  note: string;
+}> = [
+  {
+    phone: '0558591612',
+    day: '2026-11-07',
+    studentName: 'جوري مبارك الشمري',
+    score: 3,
+    solveScore: 3,
+    solveMs: 15_000,
+    note: 'تعويض تعذر الحل بسبب امتلاء حصة Firebase',
+  },
+];
+
+function rawSolvePoints(sub: Record<string, any>) {
+  const surprise = Number(sub.bonusAmount || 0);
+  const persistence = Number(sub.persistenceBonus || 0);
+  const admin = adjustmentSum(sub);
+  const totalScore = Number(sub.score || 0);
+  const stripped = typeof sub.solveScore === 'number'
+    ? Number(sub.solveScore) - surprise
+    : totalScore - surprise - persistence - admin;
+  return Math.max(0, Math.round(stripped));
+}
+
+export function withAdminCaseDayCredits(rows: Array<Record<string, any>>) {
+  const list = Array.isArray(rows) ? [...rows] : [];
+  for (const credit of ADMIN_CASE_DAY_CREDITS) {
+    const phone = canonicalPhone(credit.phone);
+    if (!phone) continue;
+    const covered = list.some(
+      (row) => personPhone(row) === phone
+        && submissionDayKey(row) === credit.day
+        && rawSolvePoints(row) >= credit.solveScore
+    );
+    if (covered) continue;
+    const createdAtMs = Date.parse(`${credit.day}T18:30:00+03:00`);
+    const id = caseSolveAttemptId(phone, credit.day);
+    list.push({
+      id,
+      phone,
+      studentName: credit.studentName,
+      day: credit.day,
+      score: credit.score,
+      solveScore: credit.solveScore,
+      solveMs: credit.solveMs,
+      createdAt: createdAtMs,
+      createdAtMs,
+      timestamp: createdAtMs,
+      adminDayCredit: true,
+      adminCreditNote: credit.note,
+      attemptId: id,
+    });
+  }
+  return list.sort((a, b) => submissionMs(b) - submissionMs(a));
+}
+
 export function invalidateCaseSubmissionsCache() {
   submissionsCache = null;
 }
 
 export async function loadCaseSubmissions(db: Firestore, options?: { force?: boolean }) {
   if (!options?.force && submissionsCache && Date.now() - submissionsCache.at < SUBMISSIONS_CACHE_MS) {
-    return submissionsCache.rows;
+    return withAdminCaseDayCredits(submissionsCache.rows);
   }
   const snap = await getDocs(collection(db, CASE_STUDY_SUBMISSIONS_COL));
   const rows = snap.docs
     .map((row) => ({ id: row.id, ...row.data() } as Record<string, any>))
     .sort((a, b) => submissionMs(b) - submissionMs(a));
   submissionsCache = { at: Date.now(), rows };
-  return rows;
+  return withAdminCaseDayCredits(rows);
 }
 
 /** قراءة تسليم اليوم بجوال واحد — قراءة واحدة بدل مسح كل السجل */
@@ -580,11 +648,18 @@ export async function loadTodayCaseSubmission(db: Firestore, phone: string, now 
   const key = canonicalPhone(phone) || String(phone || '').trim();
   if (!key) return null;
   const day = riyadhParts(now).ymd;
-  const id = caseSolveAttemptId(key, day);
-  const direct = await getDoc(doc(db, CASE_STUDY_SUBMISSIONS_COL, id));
-  if (direct.exists()) return { id: direct.id, ...direct.data() } as Record<string, any>;
+  const credited = withAdminCaseDayCredits([]).find(
+    (row) => personPhone(row) === key && submissionDayKey(row) === day
+  );
 
+  const id = caseSolveAttemptId(key, day);
   try {
+    const direct = await getDoc(doc(db, CASE_STUDY_SUBMISSIONS_COL, id));
+    if (direct.exists()) {
+      const row = { id: direct.id, ...direct.data() } as Record<string, any>;
+      if (rawSolvePoints(row) >= (credited?.solveScore || 0)) return row;
+    }
+
     const snap = await getDocs(
       query(collection(db, CASE_STUDY_SUBMISSIONS_COL), where('phone', '==', key), limit(12))
     );
@@ -592,11 +667,12 @@ export async function loadTodayCaseSubmission(db: Firestore, phone: string, now 
       .map((row) => ({ id: row.id, ...row.data() } as Record<string, any>))
       .filter((row) => submissionDayKey(row) === day)
       .sort((a, b) => submissionMs(b) - submissionMs(a));
-    return rows[0] || null;
+    const best = rows[0] || null;
+    if (best && rawSolvePoints(best) >= (credited?.solveScore || 0)) return best;
   } catch (err) {
     console.error(err);
-    return null;
   }
+  return credited || null;
 }
 
 export async function loadCaseSubmissionsForPhone(db: Firestore, phone: string, max = 40) {
@@ -606,12 +682,13 @@ export async function loadCaseSubmissionsForPhone(db: Firestore, phone: string, 
     const snap = await getDocs(
       query(collection(db, CASE_STUDY_SUBMISSIONS_COL), where('phone', '==', key), limit(max))
     );
-    return snap.docs
+    const rows = snap.docs
       .map((row) => ({ id: row.id, ...row.data() } as Record<string, any>))
       .sort((a, b) => submissionMs(b) - submissionMs(a));
+    return withAdminCaseDayCredits(rows).filter((row) => personPhone(row) === key);
   } catch (err) {
     console.error(err);
-    return [] as Array<Record<string, any>>;
+    return withAdminCaseDayCredits([]).filter((row) => personPhone(row) === key);
   }
 }
 
