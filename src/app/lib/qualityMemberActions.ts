@@ -190,3 +190,35 @@ export async function loadInactiveMemberReports(db: Firestore) {
     }))
     .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 }
+
+export async function deleteInactiveMemberReport(db: Firestore, reportId: string) {
+  const id = String(reportId || '').trim();
+  if (!id) throw new Error('معرّف التقرير غير صالح.');
+  await deleteDoc(doc(db, INACTIVE_MEMBER_REPORTS_COL, id));
+  invalidateCloudCollection(INACTIVE_MEMBER_REPORTS_COL);
+}
+
+export async function removeMemberFromInactiveReport(
+  db: Firestore,
+  report: InactiveMemberReport,
+  memberPhone: string
+) {
+  const id = String(report.id || '').trim();
+  if (!id) throw new Error('معرّف التقرير غير صالح.');
+  const phone = canonicalPhone(memberPhone) || String(memberPhone || '').trim();
+  const nextMembers = (report.members || []).filter(
+    (row) => (canonicalPhone(row.phone) || row.phone) !== phone
+  );
+  if (nextMembers.length === 0) {
+    await deleteDoc(doc(db, INACTIVE_MEMBER_REPORTS_COL, id));
+    invalidateCloudCollection(INACTIVE_MEMBER_REPORTS_COL);
+    return { ...report, members: [] as InactiveMemberRow[], deleted: true as const };
+  }
+  await setDoc(
+    doc(db, INACTIVE_MEMBER_REPORTS_COL, id),
+    { members: nextMembers },
+    { merge: true }
+  );
+  invalidateCloudCollection(INACTIVE_MEMBER_REPORTS_COL);
+  return { ...report, members: nextMembers, deleted: false as const };
+}

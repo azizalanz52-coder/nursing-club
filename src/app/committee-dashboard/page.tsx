@@ -14,7 +14,9 @@ import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { submitEventExcuse } from '../lib/eventExcuses';
 import {
   deleteEventExcuse,
+  deleteInactiveMemberReport,
   loadInactiveMemberReports,
+  removeMemberFromInactiveReport,
   sendIndividualMemberWarning,
   submitInactiveMembersReport,
   type InactiveMemberReport,
@@ -1474,6 +1476,31 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     }
   };
 
+  const handleDeleteInactiveReport = async (reportId: string) => {
+    if (!(await clubConfirm('حذف تقرير أسماء غير العاملين بالكامل؟'))) return;
+    try {
+      await deleteInactiveMemberReport(db, reportId);
+      setInactiveMemberReports((prev) => prev.filter((item) => item.id !== reportId));
+    } catch (err) {
+      console.error(err);
+      alert('تعذر حذف التقرير.');
+    }
+  };
+
+  const handleDeleteInactiveName = async (report: InactiveMemberReport, memberPhone: string) => {
+    if (!(await clubConfirm('حذف هذا الاسم من التقرير؟'))) return;
+    try {
+      const next = await removeMemberFromInactiveReport(db, report, memberPhone);
+      setInactiveMemberReports((prev) => {
+        if (next.deleted) return prev.filter((item) => item.id !== report.id);
+        return prev.map((item) => (item.id === report.id ? { ...item, members: next.members } : item));
+      });
+    } catch (err) {
+      console.error(err);
+      alert('تعذر حذف الاسم.');
+    }
+  };
+
   const openMemberWarning = (
     member: { fullName: string; phone: string; committee?: string },
     sourceReportId?: string,
@@ -2665,12 +2692,28 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                         <span className="text-[11px] font-bold text-slate-500">
                           {rep.createdAt ? new Date(rep.createdAt).toLocaleString('ar-SA') : ''}
                         </span>
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-800">{rep.status}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-800">{rep.status}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInactiveReport(rep.id)}
+                            className="text-[10px] font-black text-red-600 hover:underline"
+                          >
+                            حذف التقرير
+                          </button>
+                        </div>
                       </div>
                       {rep.members.map((member) => (
-                        <p key={`${rep.id}-${member.phone}`} className="text-xs text-slate-700">
-                          <strong>{member.fullName}</strong>: {member.reason}
-                        </p>
+                        <div key={`${rep.id}-${member.phone}`} className="flex items-center justify-between gap-2 text-xs text-slate-700">
+                          <p><strong>{member.fullName}</strong>: {member.reason}</p>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInactiveName(rep, member.phone)}
+                            className="text-[10px] font-black text-red-600 hover:underline shrink-0"
+                          >
+                            حذف الاسم
+                          </button>
+                        </div>
                       ))}
                     </div>
                   ))}
@@ -3425,7 +3468,16 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                           <p className="text-xs font-black text-[#630517]">{rep.committee}</p>
                           <p className="text-[11px] text-slate-500">الرافع: {rep.reporterName}</p>
                         </div>
-                        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-white border border-amber-200 text-amber-800">{rep.status}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-white border border-amber-200 text-amber-800">{rep.status}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInactiveReport(rep.id)}
+                            className="px-2.5 py-1 rounded-lg bg-red-50 text-red-700 border border-red-200 text-[10px] font-black hover:bg-red-100"
+                          >
+                            حذف التقرير
+                          </button>
+                        </div>
                       </div>
                       {rep.members.map((member) => (
                         <div key={`${rep.id}-${member.phone}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-xl border border-slate-200 p-3">
@@ -3433,17 +3485,26 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                             <p className="text-xs font-black text-slate-900">{member.fullName} <span className="font-mono text-slate-500" dir="ltr">{member.phone}</span></p>
                             <p className="text-[11px] text-slate-600 mt-1">سبب مقترح: {member.reason}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => openMemberWarning({
-                              fullName: member.fullName,
-                              phone: member.phone,
-                              committee: rep.committee,
-                            }, rep.id, member.reason)}
-                            className="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-[11px] font-black hover:bg-amber-700 shrink-0"
-                          >
-                            إرسال إنذار لهذا العضو
-                          </button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => openMemberWarning({
+                                fullName: member.fullName,
+                                phone: member.phone,
+                                committee: rep.committee,
+                              }, rep.id, member.reason)}
+                              className="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-[11px] font-black hover:bg-amber-700"
+                            >
+                              إرسال إنذار لهذا العضو
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteInactiveName(rep, member.phone)}
+                              className="px-3 py-1.5 rounded-xl bg-red-50 text-red-700 border border-red-200 text-[11px] font-black hover:bg-red-100"
+                            >
+                              حذف الاسم
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
