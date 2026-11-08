@@ -176,6 +176,11 @@ service cloud.firestore {
       allow write: if signedIn();
     }
 
+    match /committee_honor_board/{id} {
+      allow read: if true;
+      allow create, update, delete: if signedIn();
+    }
+
     match /student_achievements/{id} {
       allow read: if true;
       allow write: if isStaff();

@@ -37,7 +37,7 @@ import { auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { emailToPhone, isPrivilegedRole } from '../lib/authIdentity';
 import PageLoading from '../components/PageLoading';
-import { clubConfirm } from '../lib/clubNotice';
+import { clubConfirm, humanizeNotice } from '../lib/clubNotice';
 import {
   MEDIA_CATEGORIES,
   MEDIA_STORAGE_FOLDER,
@@ -212,6 +212,9 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [honorBoardList, setHonorBoardList] = useState<any[]>([]);
   const [newHonorMemberName, setNewHonorMemberName] = useState('');
   const [newHonorScore, setNewHonorScore] = useState('');
+  const [honorEditId, setHonorEditId] = useState<string | null>(null);
+  const [honorEditScore, setHonorEditScore] = useState('');
+  const [honorBusyId, setHonorBusyId] = useState<string | null>(null);
 
   // حقول رفع الشهادات (لجنة الموارد البشرية: القادة والأعضاء)
   const [certStudentName, setCertStudentName] = useState('');
@@ -325,6 +328,63 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     }
   };
 
+  const parseHonorPoints = (score: unknown) => {
+    const digits = String(score || '').replace(/[^\d.]/g, '');
+    const num = Number(digits);
+    return Number.isFinite(num) && digits ? num : 0;
+  };
+
+  const formatHonorPoints = (value: number) => `${Math.max(0, Math.round(value))} نقطة`;
+
+  const persistHonorMemberScore = async (id: string, nextScore: string) => {
+    setHonorBusyId(id);
+    try {
+      await requireAuthUser();
+      const ref = doc(db, 'committee_honor_board', id);
+      const payload = { score: nextScore, updatedAt: Date.now() };
+      try {
+        await updateDoc(ref, payload);
+      } catch {
+        await setDoc(ref, payload, { merge: true });
+      }
+      const nextHonor = honorBoardList.map((item) => (
+        item.id === id ? { ...item, score: nextScore, updatedAt: Date.now() } : item
+      ));
+      setHonorBoardList(nextHonor);
+      writeCloudCollection('committee_honor_board', nextHonor);
+    } finally {
+      setHonorBusyId(null);
+    }
+  };
+
+  const handleAdjustHonorPoints = async (id: string, delta: number) => {
+    const member = honorBoardList.find((item) => item.id === id);
+    if (!member) return;
+    try {
+      await persistHonorMemberScore(id, formatHonorPoints(parseHonorPoints(member.score) + delta));
+    } catch (err: any) {
+      console.error(err);
+      alert(humanizeNotice(err?.message || 'تعذر تحديث النقاط.'));
+    }
+  };
+
+  const handleSaveHonorEditScore = async (id: string) => {
+    const raw = honorEditScore.trim();
+    if (!raw) {
+      alert('اكتب عدد النقاط أولاً.');
+      return;
+    }
+    const nextScore = /\d/.test(raw) ? formatHonorPoints(parseHonorPoints(raw)) : raw;
+    try {
+      await persistHonorMemberScore(id, nextScore);
+      setHonorEditId(null);
+      setHonorEditScore('');
+    } catch (err: any) {
+      console.error(err);
+      alert(humanizeNotice(err?.message || 'تعذر حفظ النقاط.'));
+    }
+  };
+
   const handleAddHonorMember = async (e: FormEvent) => {
     e.preventDefault();
     if (!newHonorMemberName.trim() || !newHonorScore.trim()) {
@@ -333,24 +393,48 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     }
 
     const currentComm = currentActiveComm;
-    const newEntry = {
-      name: newHonorMemberName.trim(),
-      score: newHonorScore.trim(),
-      committee: currentComm,
-      createdAt: Date.now()
-    };
+    if (!String(currentComm || '').trim()) {
+      alert('تعذر تحديد اللجنة الحالية. حدّث الصفحة ثم أعد المحاولة.');
+      return;
+    }
+    const name = newHonorMemberName.trim();
+    const incomingScore = newHonorScore.trim();
+    const existing = honorBoardList.find(
+      (item) => isSameCommittee(item.committee, currentComm) && sameMemberName(item.name, name)
+    );
 
     try {
+      await requireAuthUser();
+      if (existing?.id) {
+        const nextScore = formatHonorPoints(
+          parseHonorPoints(existing.score) + (/\d/.test(incomingScore) ? parseHonorPoints(incomingScore) : 0)
+        );
+        await persistHonorMemberScore(existing.id, /\d/.test(incomingScore) ? nextScore : incomingScore);
+        setNewHonorMemberName('');
+        setNewHonorScore('');
+        alert(`تم تحديث نقاط ${name} في لوحة الشرف بدون حذف.`);
+        return;
+      }
+
+      const newEntry = {
+        name,
+        score: /\d/.test(incomingScore) ? formatHonorPoints(parseHonorPoints(incomingScore)) : incomingScore,
+        committee: currentComm,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        addedBy: userData?.fullName || 'قائد اللجنة',
+        addedByPhone: userPhone || '',
+      };
       const docRef = await addDoc(collection(db, 'committee_honor_board'), newEntry);
       const nextHonor = [{ ...newEntry, id: docRef.id }, ...honorBoardList];
       setHonorBoardList(nextHonor);
       writeCloudCollection('committee_honor_board', nextHonor);
       setNewHonorMemberName('');
       setNewHonorScore('');
-      alert('تم إضافة العضو ونقاطه بنجاح إلى لوحة الشرف! 🏆');
-    } catch (err) {
+      alert('تم إضافة العضو ونقاطه بنجاح إلى لوحة الشرف.');
+    } catch (err: any) {
       console.error(err);
-      alert('حدث خطأ أثناء حفظ بيانات لوحة الشرف.');
+      alert(humanizeNotice(err?.message || 'حدث خطأ أثناء حفظ بيانات لوحة الشرف.'));
     }
   };
 
@@ -574,12 +658,14 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const handleDeleteHonorMember = async (id: string) => {
     if (await clubConfirm('هل أنت متأكد من حذف هذا العضو من لوحة الشرف؟')) {
       try {
+        await requireAuthUser();
         await deleteDoc(doc(db, 'committee_honor_board', id));
         const nextHonor = honorBoardList.filter(item => item.id !== id);
         setHonorBoardList(nextHonor);
         writeCloudCollection('committee_honor_board', nextHonor);
-      } catch (e) {
+      } catch (e: any) {
         console.error(e);
+        alert(humanizeNotice(e?.message || 'تعذر حذف العضو من لوحة الشرف.'));
       }
     }
   };
@@ -3833,7 +3919,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
             {isCommitteeLeader && (
               <form onSubmit={handleAddHonorMember} className="space-y-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                <span className="text-[11px] font-bold text-[#630517] block">إضافة عضو جديد للوحة الشرف:</span>
+                <span className="text-[11px] font-bold text-[#630517] block">إضافة عضو أو زيادة نقاط اسم موجود:</span>
                 <input
                   type="text"
                   placeholder="اسم العضو..."
@@ -3843,43 +3929,92 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                 />
                 <input
                   type="text"
-                  placeholder="عدد النقاط أو التقييم (مثال: 100 نقطة أو متميز جداً)"
+                  placeholder="عدد النقاط (مثال: 10) — إذا الاسم موجود تُضاف لنقاطه"
                   value={newHonorScore}
                   onChange={(e) => setNewHonorScore(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
                 />
                 <button type="submit" className="w-full py-2 bg-[#630517] text-[#F5D061] font-bold text-xs rounded-xl shadow cursor-pointer">
-                  + إضافة للوحة الشرف 🏆
+                  حفظ / زيادة النقاط
                 </button>
               </form>
             )}
 
-            <div className="space-y-2.5 overflow-y-auto max-h-[300px] pt-2">
+            <div className="space-y-2.5 overflow-y-auto max-h-[360px] pt-2">
               {currentCommitteeHonorMembers.length === 0 ? (
                 <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لم يتم إضافة أعضاء يدوياً للوحة الشرف بعد.</p>
               ) : (
                 currentCommitteeHonorMembers.map((member, idx) => {
                   const isMe = sameMemberName(member.name, userData?.fullName);
+                  const busy = honorBusyId === member.id;
+                  const editing = honorEditId === member.id;
                   return (
-                  <div key={member.id} className={`flex items-center justify-between p-3 rounded-2xl border text-xs ${
+                  <div key={member.id} className={`p-3 rounded-2xl border text-xs space-y-2 ${
                     isMe ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-slate-200'
                   }`}>
-                    <div className="flex items-center gap-2.5">
-                      <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${
-                        idx === 0 ? 'bg-amber-400 text-slate-900 shadow' : idx === 1 ? 'bg-slate-300 text-slate-900' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'
-                      }`}>
-                        {idx + 1}
-                      </span>
-                      <div>
-                        <span className="font-bold text-slate-800 block">
-                          {member.name}
-                          {isMe ? <span className="mr-1 text-[10px] font-black text-amber-800">أنت</span> : null}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] shrink-0 ${
+                          idx === 0 ? 'bg-amber-400 text-slate-900 shadow' : idx === 1 ? 'bg-slate-300 text-slate-900' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          {idx + 1}
                         </span>
-                        <span className="font-black text-[#630517] text-[11px]">{member.score}</span>
+                        <div className="min-w-0">
+                          <span className="font-bold text-slate-800 block truncate">
+                            {member.name}
+                            {isMe ? <span className="mr-1 text-[10px] font-black text-amber-800">أنت</span> : null}
+                          </span>
+                          <span className="font-black text-[#630517] text-[11px]">{member.score}</span>
+                        </div>
                       </div>
+                      {isCommitteeLeader && (
+                        <button type="button" onClick={() => handleDeleteHonorMember(member.id)} className="text-red-600 font-bold text-[11px] hover:underline px-1 shrink-0">حذف</button>
+                      )}
                     </div>
                     {isCommitteeLeader && (
-                      <button type="button" onClick={() => handleDeleteHonorMember(member.id)} className="text-red-600 font-bold text-xs hover:underline px-2">حذف ✕</button>
+                      editing ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={honorEditScore}
+                            onChange={(e) => setHonorEditScore(e.target.value)}
+                            placeholder="النقاط الجديدة"
+                            className="flex-1 min-w-[110px] px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-[11px]"
+                          />
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => handleSaveHonorEditScore(member.id)}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[10px] font-black disabled:opacity-60"
+                          >
+                            حفظ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setHonorEditId(null); setHonorEditScore(''); }}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-200 text-slate-700 text-[10px] font-bold"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button type="button" disabled={busy} onClick={() => handleAdjustHonorPoints(member.id, -1)} className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[10px] font-black disabled:opacity-60">−1</button>
+                          <button type="button" disabled={busy} onClick={() => handleAdjustHonorPoints(member.id, 1)} className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[10px] font-black disabled:opacity-60">+1</button>
+                          <button type="button" disabled={busy} onClick={() => handleAdjustHonorPoints(member.id, 5)} className="px-2 py-1 rounded-lg bg-[#630517] text-[#F5D061] text-[10px] font-black disabled:opacity-60">+5</button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              setHonorEditId(member.id);
+                              setHonorEditScore(String(parseHonorPoints(member.score) || member.score || ''));
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black disabled:opacity-60"
+                          >
+                            تعديل النقاط
+                          </button>
+                        </div>
+                      )
                     )}
                   </div>
                   );
@@ -3887,7 +4022,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
               )}
             </div>
             {isCommitteeLeader ? (
-              <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center">* التحكم كامل للقائد/ة بإضافة وتحديث الأسماء والتقييمات يدوياً.</div>
+              <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center">* زد النقاط من الأزرار أو عدّلها مباشرة بدون حذف الاسم.</div>
             ) : null}
           </div>
         </div>
