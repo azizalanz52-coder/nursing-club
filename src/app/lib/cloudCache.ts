@@ -23,6 +23,8 @@ const MEMORY_ONLY = new Set([
   'quality_reports_archive',
   'quality_uploaded_files',
   'event_excuses',
+  'inactive_member_reports',
+  'member_warnings',
 ]);
 
 const SLIM_REST_COLLECTIONS = new Set(['certificates', 'site_certificates']);

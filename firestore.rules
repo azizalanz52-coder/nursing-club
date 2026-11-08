@@ -208,6 +208,18 @@ service cloud.firestore {
       allow update, delete: if isClubOperator();
     }
 
+    match /inactive_member_reports/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if isClubOperator();
+    }
+
+    match /member_warnings/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if isClubOperator();
+    }
+
     match /admin_documents/{id} {
       allow read, write: if isClubOperator();
     }

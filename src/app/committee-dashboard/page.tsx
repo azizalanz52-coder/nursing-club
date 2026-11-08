@@ -12,6 +12,14 @@ import HrCertificatesRegistry from './../components/HrCertificatesRegistry';
 import HrCertificateBatches from './../components/HrCertificateBatches';
 import { notifyExistingUser, notifyLeadership } from '../lib/userAccounts';
 import { submitEventExcuse } from '../lib/eventExcuses';
+import {
+  deleteEventExcuse,
+  loadInactiveMemberReports,
+  sendIndividualMemberWarning,
+  submitInactiveMembersReport,
+  type InactiveMemberReport,
+  type InactiveMemberRow,
+} from '../lib/qualityMemberActions';
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { committeeIdFromName, committeeNameFromId, findListedLeadership, findMemberContext, findUserDoc, isCommitteeLeaderRole, resolvePortalCommitteeId, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
@@ -135,7 +143,13 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [warningReason, setWarningReason] = useState('');
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [targetCommitteeForWarning, setTargetCommitteeForWarning] = useState('');
-  const [warningStepType, setWarningStepType] = useState<'warn-leaders' | 'warn-members' | 'escalate-presidents'>('warn-leaders');
+  const [warningStepType, setWarningStepType] = useState<'warn-leaders' | 'warn-members' | 'warn-member' | 'escalate-presidents'>('warn-leaders');
+  const [warningTargetMember, setWarningTargetMember] = useState<{ fullName: string; phone: string; committee: string; sourceReportId?: string } | null>(null);
+  const [inactiveMemberReports, setInactiveMemberReports] = useState<InactiveMemberReport[]>([]);
+  const [inactiveDraftRows, setInactiveDraftRows] = useState<InactiveMemberRow[]>([]);
+  const [inactivePickPhone, setInactivePickPhone] = useState('');
+  const [inactivePickReason, setInactivePickReason] = useState('');
+  const [isSubmittingInactive, setIsSubmittingInactive] = useState(false);
 
   const [showReplyModal, setShowReplyModal] = useState(false);
   const [activeReportToReply, setActiveReportToReply] = useState<any>(null);
@@ -693,6 +707,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
         fetchAllUsers();
         fetchQualityArchives();
         fetchEventExcuses();
+        fetchInactiveMemberReports();
         fetchPublicPartners();
         fetchQualityUploadedFiles();
       }
@@ -754,6 +769,14 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     try {
       setEventExcuses(await loadCloudCollection(db, 'event_excuses'));
     } catch (e) { console.error(e); }
+  };
+
+  const fetchInactiveMemberReports = async () => {
+    try {
+      setInactiveMemberReports(await loadInactiveMemberReports(db));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const fetchScientificTexts = async () => {
@@ -1439,6 +1462,88 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     }
   };
 
+  const handleDeleteExcuse = async (excuseId: string) => {
+    if (!(await clubConfirm('هل تريد حذف إفادة الاعتذار هذه نهائياً؟'))) return;
+    try {
+      await deleteEventExcuse(db, excuseId);
+      setEventExcuses((prev) => prev.filter((item) => item.id !== excuseId));
+      alert('تم حذف الإفادة.');
+    } catch (err) {
+      console.error(err);
+      alert('تعذر حذف الإفادة. تأكد أن لديك صلاحية الجودة.');
+    }
+  };
+
+  const openMemberWarning = (
+    member: { fullName: string; phone: string; committee?: string },
+    sourceReportId?: string,
+    initialReason = ''
+  ) => {
+    setWarningTargetMember({
+      fullName: member.fullName,
+      phone: member.phone,
+      committee: member.committee || currentActiveComm || targetCommitteeForWarning,
+      sourceReportId,
+    });
+    setTargetCommitteeForWarning(member.committee || currentActiveComm || targetCommitteeForWarning);
+    setWarningStepType('warn-member');
+    setWarningReason(initialReason);
+    setShowWarningModal(true);
+  };
+
+  const handleAddInactiveDraftRow = () => {
+    const phone = canonicalPhone(inactivePickPhone) || String(inactivePickPhone || '').trim();
+    const reason = inactivePickReason.trim();
+    if (!phone || !reason) {
+      alert('اختر العضو واكتب سبب اقتراح الإنذار.');
+      return;
+    }
+    const fromAccepted = requests.find((m) =>
+      (sameMemberPhone(m.phone, phone) || m.phone === phone)
+      && matchesTargetCommittee(m.acceptedCommittee, currentActiveComm)
+      && m.status === 'مقبول'
+    );
+    const fromRoster = committeeRoster.find((m) => sameMemberPhone(m.phone, phone) || m.phone === phone);
+    const picked = fromAccepted || fromRoster;
+    const fullName = String(picked?.fullName || picked?.name || '').trim();
+    if (!fullName) {
+      alert('اختر عضواً من قائمة لجنتك.');
+      return;
+    }
+    if (inactiveDraftRows.some((row) => sameMemberPhone(row.phone, phone))) {
+      alert('هذا العضو مضاف مسبقاً في المسودة.');
+      return;
+    }
+    setInactiveDraftRows((prev) => [...prev, { fullName, phone, reason }]);
+    setInactivePickPhone('');
+    setInactivePickReason('');
+  };
+
+  const handleSubmitInactiveReport = async () => {
+    if (!inactiveDraftRows.length) {
+      alert('أضف اسماً واحداً على الأقل مع سبب الإنذار.');
+      return;
+    }
+    setIsSubmittingInactive(true);
+    try {
+      await requireAuthUser();
+      const saved = await submitInactiveMembersReport(db, {
+        committee: currentActiveComm,
+        reporterName: userData?.fullName || 'قائد لجنة',
+        reporterPhone: userPhone || '',
+        members: inactiveDraftRows,
+      });
+      setInactiveMemberReports((prev) => [saved, ...prev]);
+      setInactiveDraftRows([]);
+      alert('تم رفع الأسماء للجنة الجودة مع أسباب الإنذار.');
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'تعذر رفع التقرير للجودة.');
+    } finally {
+      setIsSubmittingInactive(false);
+    }
+  };
+
   const handleExecuteWarningOrEscalation = async () => {
     if (!warningReason.trim()) {
       alert('الرجاء كتابة تفاصيل الإنذار أو التقصير بوضوح.');
@@ -1446,6 +1551,29 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     }
 
     try {
+      if (warningStepType === 'warn-member') {
+        if (!warningTargetMember?.phone) {
+          alert('تعذر تحديد العضو المستهدف.');
+          return;
+        }
+        await sendIndividualMemberWarning(db, {
+          memberName: warningTargetMember.fullName,
+          memberPhone: warningTargetMember.phone,
+          committee: warningTargetMember.committee || targetCommitteeForWarning,
+          reason: warningReason.trim(),
+          reporter: userData?.fullName || 'لجنة الجودة والتطوير',
+          sourceReportId: warningTargetMember.sourceReportId,
+        });
+        alert(`تم إرسال إنذار مستقل إلى ${warningTargetMember.fullName}.`);
+        setShowWarningModal(false);
+        setWarningReason('');
+        setWarningTargetMember(null);
+        setWarningHidden(false);
+        fetchEscalatedReports();
+        fetchInactiveMemberReports();
+        return;
+      }
+
       let alertMsg = '';
       if (warningStepType === 'warn-leaders') {
         alertMsg = `⚠️ [إنذار رسمي من الجودة قادة لجنة ${targetCommitteeForWarning}]: ${warningReason} (يُرجى إرسال الرد والتبرير خلال 24 ساعة)`;
@@ -1526,6 +1654,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
       setShowWarningModal(false);
       setWarningReason('');
+      setWarningTargetMember(null);
       setWarningHidden(false);
       fetchEscalatedReports();
     } catch (err) {
@@ -2430,12 +2559,125 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                       <p className="text-xs text-slate-700 font-semibold">الفعالية: <span className="text-[#630517]">{ex.eventName}</span> (تاريخ: {ex.eventDate})</p>
                       <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-100"><strong className="text-slate-800">السبب:</strong> {ex.reason}</p>
                     </div>
+                    {isQualityTeam && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteExcuse(ex.id)}
+                        className="px-3 py-1.5 rounded-xl bg-red-50 text-red-700 border border-red-200 text-[11px] font-black hover:bg-red-100 shrink-0"
+                      >
+                        حذف الإفادة
+                      </button>
+                    )}
                   </div>
                 ))
               )}
             </div>
           )}
         </div>
+
+        {isCommitteeLeader && !isQualityTeam && (
+          <div className="bg-white rounded-3xl p-8 border border-amber-200 shadow-sm space-y-5">
+            <div className="border-b border-amber-100 pb-4">
+              <h3 className="text-lg font-black text-slate-900">رفع أسماء غير العاملين</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                ارفع أسماء الأعضاء غير الملتزمين مع سبب مقترح لكل إنذار. تصل مباشرة للجنة الجودة ليتابعوا ويرسلوا الإنذارات.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-[1.2fr_1.5fr_auto] gap-3 items-end bg-amber-50/60 border border-amber-100 rounded-2xl p-4">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700">العضو</label>
+                <select
+                  value={inactivePickPhone}
+                  onChange={(e) => setInactivePickPhone(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs bg-white"
+                >
+                  <option value="">اختر من أعضاء لجنتك</option>
+                  {acceptedFromApps.map((member) => (
+                    <option key={`acc-${member.id || member.phone}`} value={member.phone}>
+                      {member.fullName} — {member.phone}
+                    </option>
+                  ))}
+                  {rosterOnlyMembers.map((member: any, idx: number) => (
+                    <option key={`ros-${idx}-${member.phone}`} value={member.phone}>
+                      {member.name || member.fullName} — {member.phone}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700">سبب اقتراح الإنذار</label>
+                <input
+                  type="text"
+                  value={inactivePickReason}
+                  onChange={(e) => setInactivePickReason(e.target.value)}
+                  placeholder="مثال: غياب متكرر عن المهام / عدم تجاوب"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs bg-white"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleAddInactiveDraftRow}
+                className="px-4 py-2.5 rounded-xl bg-[#630517] text-[#F5D061] text-xs font-black hover:brightness-110"
+              >
+                إضافة للاسم
+              </button>
+            </div>
+
+            {inactiveDraftRows.length > 0 && (
+              <div className="space-y-2">
+                {inactiveDraftRows.map((row) => (
+                  <div key={`${row.phone}-${row.reason}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                    <div>
+                      <p className="text-xs font-black text-slate-900">{row.fullName} <span className="font-mono text-slate-500" dir="ltr">{row.phone}</span></p>
+                      <p className="text-[11px] text-slate-600 mt-1">سبب الإنذار: {row.reason}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setInactiveDraftRows((prev) => prev.filter((item) => item.phone !== row.phone))}
+                      className="text-[11px] font-bold text-red-600 hover:underline"
+                    >
+                      إزالة
+                    </button>
+                  </div>
+                ))}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    disabled={isSubmittingInactive}
+                    onClick={handleSubmitInactiveReport}
+                    className="px-5 py-2.5 rounded-xl bg-amber-600 text-white text-xs font-black hover:bg-amber-700 disabled:opacity-60"
+                  >
+                    {isSubmittingInactive ? 'جاري الرفع...' : 'رفع الأسماء للجنة الجودة'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {inactiveMemberReports.filter((rep) => matchesTargetCommittee(rep.committee, currentActiveComm)).length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <h4 className="text-sm font-black text-slate-800">تقاريرك السابقة للجودة</h4>
+                {inactiveMemberReports
+                  .filter((rep) => matchesTargetCommittee(rep.committee, currentActiveComm))
+                  .map((rep) => (
+                    <div key={rep.id} className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2">
+                      <div className="flex flex-wrap items-center gap-2 justify-between">
+                        <span className="text-[11px] font-bold text-slate-500">
+                          {rep.createdAt ? new Date(rep.createdAt).toLocaleString('ar-SA') : ''}
+                        </span>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-800">{rep.status}</span>
+                      </div>
+                      {rep.members.map((member) => (
+                        <p key={`${rep.id}-${member.phone}`} className="text-xs text-slate-700">
+                          <strong>{member.fullName}</strong>: {member.reason}
+                        </p>
+                      ))}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {(currentActiveComm === 'لجنة العلاقات العامة' || currentActiveComm === 'لجنة العلاقات') && isCommitteeLeader && (
           <Link
@@ -3140,6 +3382,13 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                                 </a>
                                 <button
                                   type="button"
+                                  onClick={() => openMemberWarning({ fullName: member.fullName, phone: member.phone, committee: currentActiveComm })}
+                                  className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 font-bold rounded-lg text-[11px] hover:bg-amber-100"
+                                >
+                                  إنذار
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => handleRemoveAcceptedMember(member.id, member.phone, member.fullName)}
                                   className="px-2.5 py-1 bg-red-50 text-red-600 font-bold rounded-lg text-[11px] hover:bg-red-100"
                                 >
@@ -3154,6 +3403,54 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                 </div>
               </div>
             )}
+
+            <div className="bg-white rounded-3xl p-6 border border-amber-200 shadow-sm space-y-4 mt-6">
+              <div className="flex justify-between items-center flex-wrap gap-3 border-b border-amber-100 pb-3">
+                <div>
+                  <h3 className="text-base font-black text-slate-900">أسماء غير العاملين المرفوعة من قادة اللجان</h3>
+                  <p className="text-xs text-slate-500">راجع الأسباب ثم أرسل إنذاراً مستقلاً لكل عضو عند الحاجة.</p>
+                </div>
+                <span className="px-3 py-1 rounded-xl bg-amber-50 text-amber-800 font-bold text-xs">
+                  {inactiveMemberReports.length} تقرير
+                </span>
+              </div>
+              {inactiveMemberReports.length === 0 ? (
+                <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لا توجد بلاغات غير عاملين حتى الآن.</p>
+              ) : (
+                <div className="space-y-3">
+                  {inactiveMemberReports.map((rep) => (
+                    <div key={rep.id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-black text-[#630517]">{rep.committee}</p>
+                          <p className="text-[11px] text-slate-500">الرافع: {rep.reporterName}</p>
+                        </div>
+                        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-white border border-amber-200 text-amber-800">{rep.status}</span>
+                      </div>
+                      {rep.members.map((member) => (
+                        <div key={`${rep.id}-${member.phone}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-xl border border-slate-200 p-3">
+                          <div>
+                            <p className="text-xs font-black text-slate-900">{member.fullName} <span className="font-mono text-slate-500" dir="ltr">{member.phone}</span></p>
+                            <p className="text-[11px] text-slate-600 mt-1">سبب مقترح: {member.reason}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openMemberWarning({
+                              fullName: member.fullName,
+                              phone: member.phone,
+                              committee: rep.committee,
+                            }, rep.id, member.reason)}
+                            className="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-[11px] font-black hover:bg-amber-700 shrink-0"
+                          >
+                            إرسال إنذار لهذا العضو
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -3747,13 +4044,27 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       {showWarningModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" dir="rtl">
           <div className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-500">
-            <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold text-white ${warningStepType === 'warn-leaders' ? 'bg-amber-500' : warningStepType === 'warn-members' ? 'bg-sky-500' : 'bg-red-600'}`}>
-              {warningStepType === 'warn-leaders' ? '⚠️' : warningStepType === 'warn-members' ? '📢' : '🚨'}
+            <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl font-bold text-white ${
+              warningStepType === 'warn-leaders' ? 'bg-amber-500'
+              : warningStepType === 'warn-members' ? 'bg-sky-500'
+              : warningStepType === 'warn-member' ? 'bg-[#630517]'
+              : 'bg-red-600'
+            }`}>
+              {warningStepType === 'warn-leaders' ? '⚠️' : warningStepType === 'warn-members' ? '📢' : warningStepType === 'warn-member' ? '👤' : '🚨'}
             </div>
             <div className="text-center space-y-1">
               <h3 className="text-xl font-black text-slate-900">
-                {warningStepType === 'warn-leaders' ? 'تنبيه قائد وقائدة اللجنة' : warningStepType === 'warn-members' ? 'إرسال تحذير لكافة أعضاء اللجنة' : 'إحالة البلاغ للرئيس ونائبة الرئيس'}
+                {warningStepType === 'warn-leaders'
+                  ? 'تنبيه قائد وقائدة اللجنة'
+                  : warningStepType === 'warn-members'
+                    ? 'إرسال تحذير لكافة أعضاء اللجنة'
+                    : warningStepType === 'warn-member'
+                      ? `إنذار مستقل: ${warningTargetMember?.fullName || 'عضو'}`
+                      : 'إحالة البلاغ للرئيس ونائبة الرئيس'}
               </h3>
+              {warningStepType === 'warn-member' && warningTargetMember?.phone ? (
+                <p className="text-[11px] text-slate-500 font-mono" dir="ltr">{warningTargetMember.phone}</p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-700 block">التفاصيل أو الملاحظة المرصودة:</label>
@@ -3766,15 +4077,33 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
               />
             </div>
             <div className="flex gap-3">
-              <button type="button" onClick={() => setShowWarningModal(false)} className="w-1/2 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs">إلغاء</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowWarningModal(false);
+                  setWarningTargetMember(null);
+                }}
+                className="w-1/2 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-xs"
+              >
+                إلغاء
+              </button>
               <button
                 type="button"
                 onClick={handleExecuteWarningOrEscalation}
                 className={`w-1/2 py-3 rounded-2xl text-white font-black text-xs shadow-lg cursor-pointer ${
-                  warningStepType === 'warn-leaders' ? 'bg-amber-600 hover:bg-amber-700' : warningStepType === 'warn-members' ? 'bg-sky-600 hover:bg-sky-700' : 'bg-red-600 hover:bg-red-700'
+                  warningStepType === 'warn-leaders' ? 'bg-amber-600 hover:bg-amber-700'
+                  : warningStepType === 'warn-members' ? 'bg-sky-600 hover:bg-sky-700'
+                  : warningStepType === 'warn-member' ? 'bg-[#630517] hover:brightness-110'
+                  : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
-                {warningStepType === 'warn-leaders' ? 'إرسال التنبيه 📨' : warningStepType === 'warn-members' ? 'إرسال التحذير للأعضاء 📢' : 'إحالة البلاغ ⚖️'}
+                {warningStepType === 'warn-leaders'
+                  ? 'إرسال التنبيه 📨'
+                  : warningStepType === 'warn-members'
+                    ? 'إرسال التحذير للأعضاء 📢'
+                    : warningStepType === 'warn-member'
+                      ? 'إرسال الإنذار للعضو'
+                      : 'إحالة البلاغ ⚖️'}
               </button>
             </div>
           </div>
