@@ -582,6 +582,16 @@ export const ADMIN_CASE_DAY_CREDITS: Array<{
     solveMs: 15_000,
     note: 'تعويض تعذر الحل بسبب امتلاء حصة Firebase',
   },
+  {
+    phone: '0534955294',
+    day: '2026-11-11',
+    studentName: 'ديم خالد العبيدان',
+    // الصدارة العامة فيها 3 من تعديلات إدارية على نفس التسليم. score يبقى 0 حتى لا تُحسب مرتين.
+    score: 0,
+    solveScore: 3,
+    solveMs: CASE_STUDY_SOLVE_MS,
+    note: 'تعويض تعليق الكيس ستدي يوم الأربعاء: 3 من 3 لصدارة الأسبوع، بلا سباق الأسرع',
+  },
 ];
 
 function rawSolvePoints(sub: Record<string, any>) {
