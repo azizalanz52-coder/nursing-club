@@ -1,4 +1,4 @@
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { getDownloadURL, ref, uploadBytes, uploadBytesResumable } from 'firebase/storage';
 import { auth, storage } from './firebase';
 
@@ -149,6 +149,54 @@ export async function readyAuthUser(timeoutMs = 2500) {
   ]);
   if (auth.currentUser) return auth.currentUser;
   await new Promise((resolve) => setTimeout(resolve, 700));
+  return auth.currentUser;
+}
+
+const UPLOAD_SESSION_KEY = 'nurs_upload_session_v1';
+
+function readUploadSession() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(UPLOAD_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { email?: string; password?: string };
+    if (!parsed.email || !parsed.password) return null;
+    return { email: parsed.email, password: parsed.password };
+  } catch {
+    return null;
+  }
+}
+
+function writeUploadSession(email: string, password: string) {
+  localStorage.setItem(UPLOAD_SESSION_KEY, JSON.stringify({ email, password }));
+}
+
+export async function ensureUploadAuth() {
+  const existing = await readyAuthUser();
+  if (existing) return existing;
+
+  const saved = readUploadSession();
+  if (saved) {
+    try {
+      await signInWithEmailAndPassword(auth, saved.email, saved.password);
+      if (auth.currentUser) return auth.currentUser;
+    } catch {
+      localStorage.removeItem(UPLOAD_SESSION_KEY);
+    }
+  }
+
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}${Math.random().toString(36).slice(2)}`;
+  const email = `upload.${id}@accounts.nursing-club.app`;
+  const password = `Up${id.replace(/-/g, '').slice(0, 24)}9`;
+  try {
+    await createUserWithEmailAndPassword(auth, email, password);
+  } catch {
+    throw new Error('تعذر تثبيت جلسة الرفع. أعد فتح الصفحة وحاول مرة ثانية.');
+  }
+  writeUploadSession(email, password);
+  if (!auth.currentUser) throw new Error('تعذر تثبيت جلسة الرفع. أعد فتح الصفحة وحاول مرة ثانية.');
   return auth.currentUser;
 }
 

@@ -6,12 +6,11 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { canonicalPhone } from '../lib/certificatesLookup';
 import { sortEventsByLatest, type ClubEvent } from '../lib/clubEvents';
-import { loginWithPhonePassword } from '../lib/sessionAuth';
 import {
   DISCOVER_GALLERY_FOLDER,
   DISCOVER_GALLERY_MAX_PHOTOS,
+  ensureUploadAuth,
   filterFilesWithinLimit,
-  readyAuthUser,
   uploadClubFile,
   uploadingLabel,
 } from '../lib/uploadFile';
@@ -55,8 +54,6 @@ export default function ActivityGalleryUploader({ uploaderName, uploaderPhone, o
   const [pickedFiles, setPickedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [password, setPassword] = useState('');
-  const [needsPassword, setNeedsPassword] = useState(false);
 
   useEffect(() => {
     return onSnapshot(collection(db, 'site_events'), (snap) => {
@@ -86,8 +83,7 @@ export default function ActivityGalleryUploader({ uploaderName, uploaderPhone, o
 
   useEffect(() => {
     let unsubFiles = () => {};
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (user) setNeedsPassword(false);
+    const unsubAuth = onAuthStateChanged(auth, () => {
       unsubFiles();
       unsubFiles = subscribeDiscoverGalleryFiles(db, (rows) => {
         setFiles(rows);
@@ -132,19 +128,8 @@ export default function ActivityGalleryUploader({ uploaderName, uploaderPhone, o
       } catch {
         wakeLock = null;
       }
-      const existing = await readyAuthUser();
-      if (!existing) {
-        if (!password.trim()) {
-          setNeedsPassword(true);
-          alert('جلسة الجوال انقطعت. اكتب كلمة المرور في الخانة الظاهرة ثم أعد الرفع.');
-          return;
-        }
-        await loginWithPhonePassword(uploaderPhone, password.trim());
-        const signedIn = await readyAuthUser();
-        if (!signedIn) throw new Error('تعذر تثبيت جلسة الدخول. أعد المحاولة.');
-        setPassword('');
-        setNeedsPassword(false);
-      }
+      const existing = await ensureUploadAuth();
+      if (!existing) throw new Error('تعذر تثبيت جلسة الرفع. أعد فتح الصفحة وحاول مرة ثانية.');
 
       const failed: string[] = [];
       let saved = 0;
@@ -254,17 +239,6 @@ export default function ActivityGalleryUploader({ uploaderName, uploaderPhone, o
             ))}
           </div>
         )}
-
-        {needsPassword ? (
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="كلمة المرور لإكمال الرفع"
-            autoComplete="current-password"
-            className="w-full px-4 py-2.5 rounded-xl border border-amber-300 text-xs bg-white text-slate-900"
-          />
-        ) : null}
 
         <button
           type="submit"
