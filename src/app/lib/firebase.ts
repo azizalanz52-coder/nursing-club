@@ -16,12 +16,21 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
+function prefersLocalAuthPersistence() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  const iOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  return iOS;
+}
+
 function getClubAuth() {
   if (typeof window === "undefined") return getAuth(app);
+  // الآيفون يمسح IndexedDB، فتضيع جلسة Firebase واللوحة تبقى مفتوحة برقم الجوال فقط.
+  const persistence = prefersLocalAuthPersistence()
+    ? browserLocalPersistence
+    : [indexedDBLocalPersistence, browserLocalPersistence];
   try {
-    return initializeAuth(app, {
-      persistence: [indexedDBLocalPersistence, browserLocalPersistence],
-    });
+    return initializeAuth(app, { persistence });
   } catch {
     const existing = getAuth(app);
     existing.setPersistence(browserLocalPersistence).catch(() => undefined);

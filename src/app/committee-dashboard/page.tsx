@@ -25,7 +25,8 @@ import {
 import { canonicalPhone, normalizeUniversityId } from '../lib/certificatesLookup';
 import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../lib/memberIdentity';
 import { committeeIdFromName, committeeNameFromId, findListedLeadership, findMemberContext, findUserDoc, isCommitteeLeaderRole, resolvePortalCommitteeId, sameMemberName, sameMemberPhone, stampMemberAcceptance } from '../lib/memberAcceptance';
-import { cloneUploadFile, filterMediaFilesWithinLimit, isOverUploadLimit, mediaUploadLimitMessage, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
+import { cloneUploadFile, filterMediaFilesWithinLimit, isOverUploadLimit, mediaUploadLimitMessage, omitHeavyCertMedia, readyAuthUser, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
+import { loginWithPhonePassword } from '../lib/sessionAuth';
 import { certificateIssuerName, issuerMatchesMember } from '../lib/hrCertificateBatches';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/issueCertificate';
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
@@ -215,6 +216,8 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [honorEditId, setHonorEditId] = useState<string | null>(null);
   const [honorEditScore, setHonorEditScore] = useState('');
   const [honorBusyId, setHonorBusyId] = useState<string | null>(null);
+  const [honorPassword, setHonorPassword] = useState('');
+  const [honorNeedsPassword, setHonorNeedsPassword] = useState(false);
 
   // حقول رفع الشهادات (لجنة الموارد البشرية: القادة والأعضاء)
   const [certStudentName, setCertStudentName] = useState('');
@@ -336,10 +339,31 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
   const formatHonorPoints = (value: number) => `${Math.max(0, Math.round(value))} نقطة`;
 
+  const reviveHonorAuth = async () => {
+    const existing = await readyAuthUser();
+    if (existing) {
+      await existing.getIdToken().catch(() => existing.getIdToken(true));
+      return true;
+    }
+    const password = honorPassword.trim();
+    if (!password) {
+      setHonorNeedsPassword(true);
+      return false;
+    }
+    await loginWithPhonePassword(userPhone, password);
+    const signedIn = await readyAuthUser();
+    if (!signedIn) throw new Error('تعذر تثبيت جلسة الدخول. أعد المحاولة.');
+    await signedIn.getIdToken(true);
+    setHonorPassword('');
+    setHonorNeedsPassword(false);
+    return true;
+  };
+
   const persistHonorMemberScore = async (id: string, nextScore: string) => {
     setHonorBusyId(id);
     try {
-      await requireAuthUser();
+      const ready = await reviveHonorAuth();
+      if (!ready) return false;
       const ref = doc(db, 'committee_honor_board', id);
       const payload = { score: nextScore, updatedAt: Date.now() };
       try {
@@ -352,6 +376,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
       ));
       setHonorBoardList(nextHonor);
       writeCloudCollection('committee_honor_board', nextHonor);
+      return true;
     } finally {
       setHonorBusyId(null);
     }
@@ -376,7 +401,8 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     }
     const nextScore = /\d/.test(raw) ? formatHonorPoints(parseHonorPoints(raw)) : raw;
     try {
-      await persistHonorMemberScore(id, nextScore);
+      const saved = await persistHonorMemberScore(id, nextScore);
+      if (!saved) return;
       setHonorEditId(null);
       setHonorEditScore('');
     } catch (err: any) {
@@ -404,12 +430,14 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
     );
 
     try {
-      await requireAuthUser();
+      const ready = await reviveHonorAuth();
+      if (!ready) return;
       if (existing?.id) {
         const nextScore = formatHonorPoints(
           parseHonorPoints(existing.score) + (/\d/.test(incomingScore) ? parseHonorPoints(incomingScore) : 0)
         );
-        await persistHonorMemberScore(existing.id, /\d/.test(incomingScore) ? nextScore : incomingScore);
+        const saved = await persistHonorMemberScore(existing.id, /\d/.test(incomingScore) ? nextScore : incomingScore);
+        if (!saved) return;
         setNewHonorMemberName('');
         setNewHonorScore('');
         alert(`تم تحديث نقاط ${name} في لوحة الشرف بدون حذف.`);
@@ -658,7 +686,8 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const handleDeleteHonorMember = async (id: string) => {
     if (await clubConfirm('هل أنت متأكد من حذف هذا العضو من لوحة الشرف؟')) {
       try {
-        await requireAuthUser();
+        const ready = await reviveHonorAuth();
+        if (!ready) return;
         await deleteDoc(doc(db, 'committee_honor_board', id));
         const nextHonor = honorBoardList.filter(item => item.id !== id);
         setHonorBoardList(nextHonor);
@@ -3934,8 +3963,23 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
                   onChange={(e) => setNewHonorScore(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
                 />
+                {honorNeedsPassword ? (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold text-amber-800 leading-5">
+                      جلسة الجوال انقطعت. اكتب كلمة المرور هنا ونكمل الحفظ من نفس الصفحة، بدون ما تطلع منها.
+                    </p>
+                    <input
+                      type="password"
+                      placeholder="كلمة المرور"
+                      value={honorPassword}
+                      autoComplete="current-password"
+                      onChange={(e) => setHonorPassword(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-amber-300 text-xs bg-white text-slate-900"
+                    />
+                  </div>
+                ) : null}
                 <button type="submit" className="w-full py-2 bg-[#630517] text-[#F5D061] font-bold text-xs rounded-xl shadow cursor-pointer">
-                  حفظ / زيادة النقاط
+                  {honorNeedsPassword ? 'دخول ومتابعة الحفظ' : 'حفظ / زيادة النقاط'}
                 </button>
               </form>
             )}
