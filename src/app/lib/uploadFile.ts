@@ -5,6 +5,15 @@ import { auth, storage } from './firebase';
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 export const MAX_IMAGE_UPLOAD_BYTES = 8 * 1024 * 1024;
 export const MAX_VIDEO_UPLOAD_BYTES = 8 * 1024 * 1024;
+
+/**
+ * معرض الأنشطة (discover-events).
+ * كل صورة حدها 8 ميغابايت، والصور تجتمع تحت اسم فعالية واحدة بحد 50 صورة.
+ * سقف 20 ميغابايت غير مستخدم لأن قاعدة التخزين تقف عند 8 ميغابايت.
+ */
+export const DISCOVER_GALLERY_FOLDER = 'discover-events';
+export const DISCOVER_GALLERY_MEMBER_MAX_BYTES = 20 * 1024 * 1024;
+export const DISCOVER_GALLERY_MAX_PHOTOS = 50;
 const FIRESTORE_SAFE_BYTES = 450 * 1024;
 
 function isVideoFile(file: File) {
@@ -590,7 +599,11 @@ export async function uploadClubFile(
         onProgress?.(100);
         return dataUrl;
       } catch {
-        throw new Error('تعذر رفع صورة الشهادة. أعد اختيار الملف وجرّب على واي فاي.');
+        throw new Error(
+          folderPath.includes('discover-events')
+            ? 'تعذر رفع الصورة. أعد المحاولة على واي فاي.'
+            : 'تعذر رفع صورة الشهادة. أعد اختيار الملف وجرّب على واي فاي.'
+        );
       }
     }
 

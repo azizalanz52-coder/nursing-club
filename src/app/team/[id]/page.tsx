@@ -16,8 +16,9 @@ import { submitEventExcuse } from '../../lib/eventExcuses';
 import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scientificTexts';
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import DesignWorksBoard from '../../components/DesignWorksBoard';
+import ActivityGalleryUploader from '../../components/ActivityGalleryUploader';
 import PageLoading from '../../components/PageLoading';
-import { cloneUploadFile, filterMediaFilesWithinLimit, isOverUploadLimit, mediaUploadLimitMessage, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../../lib/uploadFile';
+import { cloneUploadFile, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadingLabel } from '../../lib/uploadFile';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../../lib/issueCertificate';
 import { canonicalPhone, normalizeUniversityId } from '../../lib/certificatesLookup';
 import { linkCertificatesToIdentity, resolveLinkedIdentity } from '../../lib/memberIdentity';
@@ -25,17 +26,6 @@ import { canAccessCommittee, findMemberContext, isAcceptedStatus, sameMemberName
 import { clubConfirm, inferNoticeKind } from '../../lib/clubNotice';
 import { ClubNoticeDialog } from '../../components/ClubNotice';
 import { ClubIcon, CommitteeIcon, IconText, SocialIcon } from '../../components/icons';
-import {
-  MEDIA_CATEGORIES,
-  MEDIA_STORAGE_FOLDER,
-  saveMediaRecords,
-  deleteMediaRecord,
-  isMediaVideo,
-  mediaFileUrls,
-  mediaOriginLabel,
-  subscribeMediaGallery,
-} from '../../lib/mediaGallery';
-
 // دالة تحويل الملف إلى Base64 كخيار احتياطي ومضمون
 const convertFileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -199,14 +189,6 @@ export default function CommitteeDetailPage() {
   const [partnerStatus, setPartnerStatus] = useState<'قيد المراجعة' | 'وافقوا' | 'رفضوا'>('قيد المراجعة');
   const [partnerNotes, setPartnerNotes] = useState('');
 
-  // خصائص لجنة الإعلام (رفع الصور ومقاطع الفيديو)
-  const [mediaGallery, setMediaGallery] = useState<any[]>([]);
-  const [mediaTitle, setMediaTitle] = useState('');
-  const [mediaCategory, setMediaCategory] = useState<string>(MEDIA_CATEGORIES[0]);
-  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
-  const [isUploadingMedia, setIsUploadingMedia] = useState<boolean>(false);
-  const [mediaUploadProgress, setMediaUploadProgress] = useState(0);
-
   // خصائص لجنة المحتوى العلمي ولجنة التصميم (بنك النصوص والعبارات)
   const [scientificTextsList, setScientificTextsList] = useState<any[]>([]);
   const [textBannerTitle, setTextBannerTitle] = useState('');
@@ -214,9 +196,6 @@ export default function CommitteeDetailPage() {
   const [textArchiveTitle, setTextArchiveTitle] = useState('');
   const [textPdfFile, setTextPdfFile] = useState<File | null>(null);
   const [isUploadingScientific, setIsUploadingScientific] = useState(false);
-
-  // نافذة معاينة الميديا الكبيرة داخل الصفحة
-  const [previewItem, setPreviewItem] = useState<any | null>(null);
 
   // رفع الشهادات (لجنة الموارد البشرية: القادة والأعضاء)
   const [certStudentName, setCertStudentName] = useState('');
@@ -440,11 +419,6 @@ export default function CommitteeDetailPage() {
   }, [id, baseDetails]);
 
   useEffect(() => {
-    if (id === 'hr' && certsLoading) return;
-    return subscribeMediaGallery(db, setMediaGallery);
-  }, [id, certsLoading]);
-
-  useEffect(() => {
     const cached = peekCloudCollection('committee_honor_board');
     if (cached?.length) setHonorBoardList(cached);
     const unsub = onSnapshot(
@@ -607,54 +581,6 @@ export default function CommitteeDetailPage() {
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'تعذر حذف السجل. سجّل الدخول ثم أعد المحاولة.');
-    }
-  };
-
-  // رفع صورة أو فيديو (خاص بلجنة الإعلام) - مربوط بقاعدة البيانات المركزية
-  const handleUploadMediaSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!mediaTitle.trim() || mediaFiles.length === 0) {
-      alert('يرجى كتابة عنوان التغطية واختيار ملف الصورة أو الفيديو.');
-      return;
-    }
-
-    try {
-      setIsUploadingMedia(true);
-      setMediaUploadProgress(0);
-
-      const urls = await uploadMediaFiles(mediaFiles, MEDIA_STORAGE_FOLDER, setMediaUploadProgress);
-      await saveMediaRecords(db, {
-        title: mediaTitle,
-        category: mediaCategory,
-        urls,
-        isVideo: mediaFiles.some((file) => file.type.startsWith('video')),
-        addedBy: currentUserName || 'عضو الإعلام',
-        source: 'بوابة أعضاء لجنة الإعلام',
-        uploaderRole: 'عضو لجنة',
-      });
-
-      setMediaTitle('');
-      setMediaFiles([]);
-      alert('تم الرفع. التغطية ظهرت لقادة الإعلام وفي تبويب الإعلام بالأدمن.');
-    } catch (err: any) {
-      console.error('Error uploading media:', err);
-      alert(err?.message || 'حدث خطأ أثناء رفع الملف، يرجى المحاولة مرة أخرى.');
-    } finally {
-      setIsUploadingMedia(false);
-      setMediaUploadProgress(0);
-    }
-  };
-
-  // حذف عنصر ميديا من الأرشيف
-  const handleDeleteMediaItem = async (itemId: string) => {
-    if (!(await clubConfirm('هل أنت متأكد من حذف هذه المادة الإعلامية نهائياً؟'))) return;
-    try {
-      const target = mediaGallery.find((item) => item.id === itemId) || { id: itemId };
-      await deleteMediaRecord(db, target);
-      alert('تم حذف المادة الإعلامية بنجاح 🗑️');
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ أثناء الحذف.');
     }
   };
 
@@ -1323,146 +1249,12 @@ export default function CommitteeDetailPage() {
           </div>
         )}
 
-        {/* 📸 الخاصية المخصصة: رفع الصور والمقاطع (لجنة الإعلام) - مع عرض المعاينة وزر الحذف */}
         {(id === 'media' || normalizeArabic(committee?.name || '').includes('اعلام') || normalizeArabic(committee?.name || '').includes('إعلام')) && (
-          <div className="bg-white rounded-3xl p-8 sm:p-10 border border-purple-200 shadow-xl space-y-6">
-            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
-              <div>
-                <h2 className="text-xl font-black text-slate-900"><IconText text="📸 مركز رفع وتوثيق محتوى لجنة الإعلام" /></h2>
-                <p className="text-xs text-slate-500 mt-1">أرشيف واحد مشترك: كل رفع هنا يظهر مباشرة في لوحة قادة الإعلام وفي تبويب قسم الإعلام بلوحة الأدمن.</p>
-              </div>
-              <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
-                إجمالي المواد: {mediaGallery.length}
-              </span>
-            </div>
-
-            <form onSubmit={handleUploadMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">عنوان التغطية أو الفعالية</label>
-                <input
-                  type="text"
-                  placeholder="مثال: تغطية ملتقى التمريض المرئي"
-                  value={mediaTitle}
-                  onChange={(e) => setMediaTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">تصنيف المحتوى</label>
-                <select
-                  value={mediaCategory}
-                  onChange={(e) => setMediaCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
-                >
-                  {MEDIA_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-bold text-slate-700">اختر صوراً أو مقاطع (أكثر من ملف دفعة واحدة)</label>
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  multiple
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    const picked = Array.from(e.target.files || []);
-                    e.target.value = '';
-                    if (!picked.length) return;
-                    const { accepted, rejected } = filterMediaFilesWithinLimit(picked);
-                    if (rejected.length > 0) alert(mediaUploadLimitMessage(rejected[0]));
-                    if (accepted.length > 0) setMediaFiles((prev) => [...prev, ...accepted]);
-                  }}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white cursor-pointer"
-                />
-                <p className="text-[11px] text-slate-500">حد الرفع 8 ميغابايت. الصور تُحفظ حتى لو التخزين السحابي مقفل.</p>
-              </div>
-
-              {mediaFiles.length > 0 && (
-                <div className="sm:col-span-2 p-4 bg-white rounded-2xl border border-purple-200 space-y-2">
-                  <span className="text-xs font-bold text-purple-800">جاهز للرفع: {mediaFiles.length} ملف — {mediaFiles.map((file) => file.name).join('، ')}</span>
-                </div>
-              )}
-
-              <div className="sm:col-span-2 pt-2 space-y-2">
-                <button
-                  type="submit"
-                  disabled={isUploadingMedia || mediaFiles.length === 0}
-                  className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 disabled:bg-slate-400 cursor-pointer"
-                >
-                  {uploadingLabel(isUploadingMedia, mediaUploadProgress, '+ رفع ونشر محتوى لجنة الإعلام سحابياً 🎬')}
-                </button>
-                {isUploadingMedia ? (
-                  <div className="h-2 rounded-full bg-purple-100 overflow-hidden" dir="ltr">
-                    <div
-                      className={`h-full bg-purple-600 ${mediaUploadProgress <= 0 ? 'w-1/3 animate-pulse' : 'transition-all duration-200'}`}
-                      style={mediaUploadProgress > 0 ? { width: `${mediaUploadProgress}%` } : undefined}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            </form>
-
-            {/* عرض أرشيف ومقاطع لجنة الإعلام المرئية بالتصميم الميسونري الحافظ للأبعاد الطولية والعريضة بدون انكسار */}
-            <div className="space-y-4 pt-4 border-t border-slate-100">
-              <h3 className="font-black text-slate-900 text-sm">أرشيف تغطيات لجنة الإعلام ({mediaGallery.length})</h3>
-              {mediaGallery.length === 0 ? (
-                <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لم يتم رفع أي محتوى مرئي أو صور للجنة الإعلام حتى الآن.</p>
-              ) : (
-                <div className="columns-1 sm:columns-2 md:columns-3 gap-6 space-y-6">
-                  {mediaGallery.map((item) => {
-                    const sources = mediaFileUrls(item);
-                    const primary = sources[0] || '';
-                    return (
-                    <div key={item.id} className="break-inside-avoid p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between shadow-sm hover:shadow-md transition-all">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1.5">
-                          <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{item.category}</span>
-                          <span className="text-[10px] bg-slate-200 text-slate-700 px-2.5 py-0.5 rounded-full font-bold">{mediaOriginLabel(item)}</span>
-                        </div>
-                        <h5 className="font-extrabold text-slate-900 text-sm leading-snug">{item.title}</h5>
-                        <p className="text-[10px] text-slate-400">بواسطة: {item.addedBy || item.uploadedBy} ({item.createdAt})</p>
-                      </div>
-
-                      <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900/5 flex items-center justify-center min-h-[140px]">
-                        {isMediaVideo(primary, item) ? (
-                          <video src={primary} controls className="w-full h-auto max-h-[450px] object-contain rounded-xl" />
-                        ) : primary ? (
-                          <img src={primary} alt={item.title} className="w-full h-auto max-h-[450px] object-contain rounded-xl" />
-                        ) : (
-                          <p className="text-[11px] text-slate-400 font-bold p-6">لا يوجد ملف للعرض</p>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewItem(item)}
-                          className="flex-1 py-2 bg-sky-50 text-sky-700 text-center font-bold text-xs rounded-xl border border-sky-200 hover:bg-sky-100 transition-all cursor-pointer"
-                        >
-                          <span className="inline-flex items-center gap-1"><ClubIcon name="eye" size={13} /> عرض المعاينة</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteMediaItem(item.id)}
-                          className="px-3 py-2 bg-red-50 text-red-600 text-center font-bold text-xs rounded-xl border border-red-200 hover:bg-red-100 transition-all cursor-pointer"
-                          title="حذف المادة"
-                        >
-                          <span className="inline-flex items-center gap-1"><ClubIcon name="trash" size={13} /> حذف</span>
-                        </button>
-                      </div>
-                    </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+          <ActivityGalleryUploader
+            uploaderName={currentUserName || 'عضو الإعلام'}
+            uploaderPhone={currentUserPhone}
+          />
         )}
-
         {/* 🔬 الخاصية المخصصة: بنك النصوص والعبارات الطبية (لجنة المحتوى العلمي ولجنة التصميم) */}
         {canAccessScientificTexts && (
           <div className="bg-white rounded-3xl p-8 sm:p-10 border border-emerald-200 shadow-xl space-y-6">
@@ -1638,46 +1430,6 @@ export default function CommitteeDetailPage() {
         </div>
 
       </div>
-
-      {/* نافذة معاينة الميديا الكبيرة داخل الصفحة */}
-      {previewItem && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 max-w-3xl w-full shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b pb-3">
-              <div>
-                <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{previewItem.category}</span>
-                <h3 className="font-black text-slate-900 text-lg mt-1">{previewItem.title}</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreviewItem(null)}
-                className="w-10 h-10 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center hover:bg-slate-200 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="rounded-2xl overflow-hidden border max-h-[60vh] flex items-center justify-center bg-black">
-              {isMediaVideo(mediaFileUrls(previewItem)[0] || '', previewItem) ? (
-                <video src={mediaFileUrls(previewItem)[0]} controls autoPlay className="max-h-[60vh] w-auto mx-auto object-contain" />
-              ) : mediaFileUrls(previewItem)[0] ? (
-                <img src={mediaFileUrls(previewItem)[0]} alt={previewItem.title} className="max-h-[60vh] w-auto mx-auto object-contain" />
-              ) : null}
-            </div>
-
-            <div className="flex justify-between items-center text-xs text-slate-500 pt-2">
-              <span>تم الرفع بواسطة: <strong>{previewItem.addedBy || previewItem.uploadedBy}</strong> ({previewItem.createdAt})</span>
-              <button
-                type="button"
-                onClick={() => setPreviewItem(null)}
-                className="px-6 py-2 bg-[#630517] text-[#F5D061] font-bold rounded-xl cursor-pointer"
-              >
-                إغلاق
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* نافذة رفع الاعتذار */}
       {showExcuseModal && (

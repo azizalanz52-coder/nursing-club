@@ -152,6 +152,15 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
+    match /discover_gallery_files/{id} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.eventId is string
+        && request.resource.data.url is string
+        && request.resource.data.uploaderPhone is string;
+      allow update, delete: if signedIn();
+    }
+
     match /site_scientific_texts/{id} {
       allow read: if true;
       allow write: if isStaff();

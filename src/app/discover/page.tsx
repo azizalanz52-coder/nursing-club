@@ -3,9 +3,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { db } from '../lib/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { loadCloudCollection, peekCloudCollection } from '../lib/cloudCache';
 import { CLUB_GOALS, CLUB_MISSION, CLUB_VISION } from '../lib/clubIdentity';
 import { ClubIcon } from '../components/icons';
+import { eventGalleryUrls, subscribeDiscoverGalleryFiles, visibleGalleryAlbums, type DiscoverGalleryFile } from '../lib/discoverGallery';
+import GalleryPhoto from '../components/GalleryPhoto';
 
 const DEFAULT_PASSION_SLIDES = [
   {
@@ -125,6 +128,8 @@ export default function DiscoverPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [passionSlides, setPassionSlides] = useState(DEFAULT_PASSION_SLIDES);
   const [discoverEvents, setDiscoverEvents] = useState(DEFAULT_DISCOVER_EVENTS);
+  const [galleryFiles, setGalleryFiles] = useState<DiscoverGalleryFile[]>([]);
+  const [clubEvents, setClubEvents] = useState<Array<{ id: string; title: string; description?: string; date?: string; poster?: string }>>([]);
   const [partners, setPartners] = useState<PartnerItem[]>(DEFAULT_PARTNERS);
   const [studentAchievements, setStudentAchievements] = useState<StudentAchievement[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
@@ -186,6 +191,24 @@ export default function DiscoverPage() {
     };
   }, []);
 
+  useEffect(() => subscribeDiscoverGalleryFiles(db, setGalleryFiles), []);
+
+  useEffect(() => onSnapshot(collection(db, 'site_events'), (snap) => {
+    setClubEvents(snap.docs.map((row) => {
+      const data = row.data() as { title?: string; description?: string; date?: string; poster?: string };
+      return {
+        id: row.id,
+        title: String(data.title || '').trim(),
+        description: String(data.description || ''),
+        date: String(data.date || ''),
+        poster: String(data.poster || ''),
+      };
+    }).filter((event) => event.title));
+  }, (err) => {
+    console.error(err);
+    setClubEvents([]);
+  }), []);
+
   const activeSlide = passionSlides[currentSlide] || passionSlides[0];
 
   const getCategoryPriority = (category: string = '') => {
@@ -204,6 +227,7 @@ export default function DiscoverPage() {
   const goldAndStrategic = sortedPartners.filter((p) => getCategoryPriority(p.category) <= 2);
   const silverPartners = sortedPartners.filter((p) => getCategoryPriority(p.category) === 3);
   const bronzeAndOthers = sortedPartners.filter((p) => getCategoryPriority(p.category) >= 4);
+  const galleryAlbums = visibleGalleryAlbums(discoverEvents, clubEvents, galleryFiles);
 
   const copyOfferCode = async (code: string, event: React.MouseEvent) => {
     event.preventDefault();
@@ -527,8 +551,9 @@ export default function DiscoverPage() {
           </Reveal>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {discoverEvents.map((event, index) => {
-              const coverImage = (event.images && event.images.length > 0 && event.images[0]) ? event.images[0] : '/header-banner.png';
+            {galleryAlbums.map((event, index) => {
+              const photos = eventGalleryUrls(event.images, galleryFiles, event.id, event.title);
+              const coverImage = photos[0] || (event.images && event.images[0]) || '/header-banner.png';
               return (
                 <Reveal key={event.id} delay={index * 90}>
                   <div
@@ -551,7 +576,7 @@ export default function DiscoverPage() {
 
                     <div className="absolute bottom-0 right-0 left-0 p-6 z-20 space-y-2 text-right">
                       <span className="inline-block px-3 py-1 rounded-full bg-[#F5D061] text-[#630517] font-bold text-xs shadow">
-                        {event.category || 'فعالية'} • {event.images?.length || 0} صور
+                        {event.category || 'فعالية'} • {photos.length || event.images?.length || 0} صور
                       </span>
                       <h4 className="text-xl font-black text-white leading-tight drop-shadow-md">{event.title}</h4>
                       <p className="text-xs text-amber-50/90 font-medium line-clamp-1 drop-shadow">{event.description}</p>
@@ -564,7 +589,11 @@ export default function DiscoverPage() {
         </div>
       </section>
 
-      {selectedEvent && (
+      {selectedEvent && (() => {
+        const live = discoverEvents.find((event) => event.id === selectedEvent.id) || selectedEvent;
+        const galleryPhotos = eventGalleryUrls(live.images, galleryFiles, live.id, live.title);
+        const shownPhotos = galleryPhotos.length ? galleryPhotos : (live.images || []);
+        return (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
             <div className="bg-[#630517] text-white p-6 flex justify-between items-center border-b border-[#F5D061]/20">
@@ -586,25 +615,31 @@ export default function DiscoverPage() {
               </p>
 
               <div>
-                <h4 className="font-extrabold text-slate-900 text-lg mb-4">معرض الصور ({selectedEvent.images?.length || 0} صورة)</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {selectedEvent.images?.map((img: string, idx: number) => (
-                    <div key={idx} className="h-48 rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative group bg-slate-100">
-                      <img
-                        src={img}
-                        alt={`صورة ${idx + 1}`}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/header-banner.png';
-                        }}
-                      />
-                      <div className="absolute top-3 right-3 bg-black/60 text-[#F5D061] px-2.5 py-1 rounded-lg text-xs font-black">
-                        #{idx + 1}
-                      </div>
-                    </div>
-                  ))}
+                <h4 className="font-extrabold text-slate-900 text-lg mb-4">معرض الصور ({shownPhotos.length} صورة)</h4>
+                <div className="columns-1 sm:columns-2 lg:columns-3 gap-4">
+                  {shownPhotos.map((img: string, idx: number) => {
+                    const isVideo = img.startsWith('data:video') || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(img);
+                    return (
+                      <figure key={`${img}-${idx}`} className="relative mb-4 break-inside-avoid">
+                        {isVideo ? (
+                          <video
+                            src={img}
+                            controls
+                            className="w-full h-auto rounded-2xl border border-slate-200 shadow-sm bg-slate-950"
+                          />
+                        ) : (
+                          <GalleryPhoto
+                            src={img}
+                            alt={`${selectedEvent.title} ${idx + 1}`}
+                            className="w-full h-auto rounded-2xl border border-slate-200 shadow-sm bg-slate-100"
+                          />
+                        )}
+                        <div className="absolute top-3 right-3 bg-black/60 text-[#F5D061] px-2.5 py-1 rounded-lg text-xs font-black">
+                          #{idx + 1}
+                        </div>
+                      </figure>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -619,7 +654,8 @@ export default function DiscoverPage() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       <section className="py-16 border-t border-slate-200 bg-white overflow-hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-12">

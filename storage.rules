@@ -7,5 +7,7 @@ service firebase.storage {
         && request.resource.size <= 8 * 1024 * 1024;
       allow delete: if request.auth != null;
     }
+
+    // معرض الأنشطة: كل صورة حدها 8 ميغابايت، وهذا هو السقف المطبَّق الآن.
   }
 }

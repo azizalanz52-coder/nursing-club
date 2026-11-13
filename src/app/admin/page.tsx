@@ -8,7 +8,8 @@ import { writeCloudCollection } from '../lib/cloudCache';
 import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, increment, deleteField } from 'firebase/firestore';
 import { isIncompleteUserAccount, notifyCommitteeByKeyword, omitPassword, setUserPasswordOnPhone } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
-import { filterFilesWithinLimit, filterMediaFilesWithinLimit, isOverUploadLimit, isPlaceholderCertMedia, mediaUploadLimitMessage, requireAuthUser, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
+import { DISCOVER_GALLERY_FOLDER, DISCOVER_GALLERY_MAX_PHOTOS, filterFilesWithinLimit, filterMediaFilesWithinLimit, isOverUploadLimit, isPlaceholderCertMedia, mediaUploadLimitMessage, requireAuthUser, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
+import { countEventGalleryPhotos, subscribeDiscoverGalleryFiles, type DiscoverGalleryFile } from '../lib/discoverGallery';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/issueCertificate';
 import { DEFAULT_WELCOME_BANNER, WELCOME_BANNER_ID } from '../lib/welcomeBanner';
 import { clubConfirm, inferNoticeKind } from '../lib/clubNotice';
@@ -17,6 +18,7 @@ import HrCertificateBatches from '../components/HrCertificateBatches';
 import { printQualityEventReport, QUALITY_EVENT_REPORTS, computedSuccessIndex, recommendationLabel, type QualityEventReport } from '../lib/qualityEventReport';
 import CommitteePerformanceRadar from '../components/admin/CommitteePerformanceRadar';
 import DesignWorksBoard from '../components/DesignWorksBoard';
+import MediaGalleryReview from '../components/MediaGalleryReview';
 import { IconText } from '../components/icons';
 import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import CollegeAdministrationEditor from '../components/admin/CollegeAdministrationEditor';
@@ -1377,6 +1379,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const [newPassionImage, setNewPassionImage] = useState<string>('/header-banner.png');
 
   const [discoverEvents, setDiscoverEvents] = useState<DiscoverEvent[]>([]);
+  const [discoverMemberFiles, setDiscoverMemberFiles] = useState<DiscoverGalleryFile[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [newDiscTitle, setNewDiscTitle] = useState<string>('');
   const [newDiscCategory, setNewDiscCategory] = useState<string>('أنشطة كبرى');
@@ -1506,6 +1509,11 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     if (activeTab === 'weekly-newsletter') once('weekly-newsletter', () => { void fetchNewsletters(); });
     if (activeTab === 'scientific-texts') once('scientific-texts', () => { void fetchScientificTexts(); });
     if (activeTab === 'case-study' && caseSubmissions.length === 0) once('case-study', () => { void fetchCaseSubmissions(); });
+  }, [adminReady, activeTab]);
+
+  useEffect(() => {
+    if (!adminReady || activeTab !== 'discover') return;
+    return subscribeDiscoverGalleryFiles(db, setDiscoverMemberFiles);
   }, [adminReady, activeTab]);
 
   useEffect(() => {
@@ -2175,15 +2183,57 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     }
   };
 
+  const galleryPhotoCount = (eventId: string, images?: string[]) =>
+    countEventGalleryPhotos(images, discoverMemberFiles, eventId);
+
+  const clipGallerySelection = (files: File[], used: number) => {
+    const room = Math.max(0, DISCOVER_GALLERY_MAX_PHOTOS - used);
+    return { allowed: files.slice(0, room), overflow: files.slice(room), room };
+  };
+
+  const formatGalleryFileSize = (bytes: number) => {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} م.ب`;
+    return `${Math.max(1, Math.round(bytes / 1024))} ك.ب`;
+  };
+
+  const describeRejectedGalleryFiles = (files: File[]) => {
+    const names = files.map((file) => `${file.name} (${formatGalleryFileSize(file.size)})`).join('، ');
+    return `هذه الملفات تجاوزت حدها (8 ميغابايت) ولن تُرفع: ${names}. كل صورة تُقاس وحدها، والصور المقبولة تجتمع تحت اسم الفعالية.`;
+  };
+
+  const uploadGalleryFiles = async (files: File[]) => {
+    const uploadedUrls: string[] = [];
+    const failed: string[] = [];
+    for (let i = 0; i < files.length; i += 1) {
+      const file = files[i];
+      try {
+        const url = await uploadClubFile(file, DISCOVER_GALLERY_FOLDER, (percent) => {
+          setCloudUploadProgress(Math.round(((i + percent / 100) / Math.max(files.length, 1)) * 100));
+        });
+        uploadedUrls.push(url);
+      } catch (err: any) {
+        failed.push(file.name);
+        console.error(err);
+      }
+    }
+    return { uploadedUrls, failed };
+  };
+
   const handleSelectMultipleImagesForNewEvent = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const { accepted, rejected } = filterFilesWithinLimit(Array.from(e.target.files));
-    if (rejected.length > 0) {
-      setModalMessage(uploadLimitMessage());
+    const { allowed, overflow } = clipGallerySelection(accepted, newDiscFiles.length);
+    const notes: string[] = [];
+    if (rejected.length > 0) notes.push(describeRejectedGalleryFiles(rejected));
+    if (overflow.length > 0) {
+      notes.push(`الفعالية تقبل ${DISCOVER_GALLERY_MAX_PHOTOS} صورة. أُضيف ${allowed.length} وبقي ${overflow.length} خارج الحد.`);
+    }
+    if (notes.length > 0) {
+      setModalMessage(notes.join(' '));
       setModalType('success');
     }
-    if (accepted.length > 0) {
-      setNewDiscFiles((prev) => [...prev, ...accepted]);
+    if (allowed.length > 0) {
+      setNewDiscFiles((prev) => [...prev, ...allowed].slice(0, DISCOVER_GALLERY_MAX_PHOTOS));
     }
     e.target.value = '';
   };
@@ -2197,13 +2247,19 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     const eventId = Date.now().toString();
 
     try {
-      const uploadedUrls = await uploadClubFiles(newDiscFiles, 'discover-events', setCloudUploadProgress);
+      const files = newDiscFiles.slice(0, DISCOVER_GALLERY_MAX_PHOTOS);
+      const { uploadedUrls, failed } = await uploadGalleryFiles(files);
+      if (files.length > 0 && uploadedUrls.length === 0) {
+        throw new Error('تعذر رفع الصور المختارة. أعد المحاولة.');
+      }
       const newEventObj: DiscoverEvent = {
         id: eventId,
         title: newDiscTitle.trim(),
         category: newDiscCategory,
         description: newDiscDesc || 'فعالية تابعة لنادي التمريض.',
-        images: uploadedUrls.length > 0 ? uploadedUrls : ['/logo.png']
+        images: uploadedUrls.slice(0, DISCOVER_GALLERY_MAX_PHOTOS).length > 0
+          ? uploadedUrls.slice(0, DISCOVER_GALLERY_MAX_PHOTOS)
+          : ['/logo.png']
       };
       await setDoc(doc(db, 'site_discover_events', eventId), newEventObj);
       const nextDiscover = [newEventObj, ...discoverEvents];
@@ -2214,7 +2270,11 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
       setNewDiscDesc('');
       setNewDiscImages([]);
       setNewDiscFiles([]);
-      setModalMessage('تم إنشاء الفعالية ونشر الصور سحابياً للجميع بنجاح! 🖼️🚀');
+      setModalMessage(
+        failed.length
+          ? `تم نشر الفعالية بالصور المقبولة. تعذر رفع: ${failed.join('، ')}.`
+          : 'تم إنشاء الفعالية ونشر الصور سحابياً للجميع بنجاح! 🖼️🚀'
+      );
       setModalType('success');
     } catch (err: any) {
       console.error('Error saving event:', err);
@@ -2292,26 +2352,42 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     if (!e.target.files || !selectedEventId) return;
     const { accepted, rejected } = filterFilesWithinLimit(Array.from(e.target.files));
     e.target.value = '';
-    if (rejected.length > 0) {
-      setModalMessage(uploadLimitMessage());
-      setModalType('success');
-    }
-    if (accepted.length === 0) return;
-
     const targetEvent = discoverEvents.find((ev) => ev.id === selectedEventId);
     if (!targetEvent) return;
+    const { allowed, overflow } = clipGallerySelection(accepted, galleryPhotoCount(targetEvent.id, targetEvent.images));
+    const notes: string[] = [];
+    if (rejected.length > 0) notes.push(describeRejectedGalleryFiles(rejected));
+    if (galleryPhotoCount(targetEvent.id, targetEvent.images) >= DISCOVER_GALLERY_MAX_PHOTOS) {
+      notes.push(`فعالية ${targetEvent.title} وصلت حد ${DISCOVER_GALLERY_MAX_PHOTOS} صورة.`);
+    } else if (overflow.length > 0) {
+      notes.push(`أُخذ ${allowed.length} صورة حتى يكتمل حد ${DISCOVER_GALLERY_MAX_PHOTOS}. بقي ${overflow.length} خارج الفعالية.`);
+    }
+    if (notes.length > 0) {
+      setModalMessage(notes.join(' '));
+      setModalType('success');
+    }
+    if (allowed.length === 0) return;
 
     try {
       setIsUploadingDiscover(true);
       setCloudUploadProgress(0);
-      const uploadedUrls = await uploadClubFiles(accepted, 'discover-events', setCloudUploadProgress);
-      const updatedImages = [...(targetEvent.images || []), ...uploadedUrls];
+      const { uploadedUrls, failed } = await uploadGalleryFiles(allowed);
+      if (uploadedUrls.length === 0) {
+        throw new Error('تعذر رفع الصور المختارة. أعد المحاولة.');
+      }
+      const previous = (targetEvent.images || []).filter((img) => img && img !== '/logo.png');
+      const updatedImages = [...previous, ...uploadedUrls].slice(0, DISCOVER_GALLERY_MAX_PHOTOS);
       const updatedEventObj = { ...targetEvent, images: updatedImages };
       await setDoc(doc(db, 'site_discover_events', selectedEventId), updatedEventObj);
       const nextDiscover = discoverEvents.map((ev) => (ev.id === selectedEventId ? updatedEventObj : ev));
       setDiscoverEvents(nextDiscover);
       writeCloudCollection('site_discover_events', nextDiscover);
-      setModalMessage('تم رفع وإضافة الصور سحابياً بنجاح! 🚀');
+      const keptOut = overflow.length ? ` بقي ${overflow.length} خارج حد الـ ${DISCOVER_GALLERY_MAX_PHOTOS}.` : '';
+      setModalMessage(
+        failed.length
+          ? `أُضيفت الصور المقبولة إلى ${targetEvent.title}. تعذر رفع: ${failed.join('، ')}.${keptOut}`
+          : `تم رفع وإضافة الصور سحابياً بنجاح! 🚀${keptOut}`
+      );
       setModalType('success');
     } catch (err: any) {
       console.error(err);
@@ -4358,11 +4434,12 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   </div>
 )}
         {activeTab === 'media-committee' && (
-          <div className="space-y-8">
+            <div className="space-y-8">
+            <MediaGalleryReview />
             <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm space-y-6">
               <div className="border-b border-slate-100 pb-4">
-                <h3 className="text-xl font-black text-rose-900">🎥 رفع وتوثيق محتوى لجنة الإعلام</h3>
-                <p className="text-xs text-slate-500">تبويب قسم الإعلام مربوط مباشرة ببوابة أعضاء لجنة الإعلام ولوحة قادة الإعلام: أي رفع أو حذف في أي صفحة يظهر هنا وفي الصفحتين الأخريين فوراً.</p>
+                <h3 className="text-xl font-black text-rose-900">أرشيف التغطيات السابق</h3>
+                <p className="text-xs text-slate-500">هذا أرشيف التغطيات القديمة. رفع الأعضاء والقادة الجديد يمر من الاعتماد أعلاه.</p>
               </div>
 
               <form onSubmit={handleUploadMediaCommitteeContent} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-rose-50/30 p-6 rounded-2xl border border-rose-100">
@@ -5069,7 +5146,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           <div className="space-y-8">
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
               <h3 className="text-xl font-black text-slate-900">➕ إضافة فعالية جديدة مع معرض صور وفيديوهات سحابي</h3>
-              <p className="text-xs text-slate-500">الحد الأقصى 8 ميغابايت لكل ملف. الملفات تُرفع سحابياً ولا تُحفظ داخل فايرستور.</p>
+              <p className="text-xs text-slate-500">كل صورة حدها 8 ميغابايت، والفعالية الواحدة تقبل 50 صورة كحد أقصى. الصور تجتمع تحت اسم الفعالية.</p>
               <form onSubmit={handleCreateNewDiscoverEvent} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">عنوان الفعالية الجديدة</label>
@@ -5103,7 +5180,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">اختر صور وفيديوهات المعرض (الحد 8 ميغابايت لكل ملف)</label>
+                  <label className="text-xs font-bold text-slate-700">صور الفعالية: كل صورة حدها 8 ميغابايت، وبحد 50 صورة تحت نفس الاسم ({newDiscFiles.length}/{DISCOVER_GALLERY_MAX_PHOTOS})</label>
                   <input
                     type="file"
                     accept="image/*,video/*"
@@ -5112,7 +5189,21 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
                   {newDiscFiles.length > 0 && (
-                    <p className="text-xs font-bold text-emerald-600 mt-1">✅ تم اختيار {newDiscFiles.length} ملف: {newDiscFiles.map((f) => f.name).join('، ')}</p>
+                    <div className="mt-2 space-y-1.5">
+                      {newDiscFiles.map((file, index) => (
+                        <div key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                          <span className="text-[11px] font-bold text-emerald-800 truncate">{file.name}</span>
+                          <span className="text-[11px] font-black text-emerald-700 shrink-0">{formatGalleryFileSize(file.size)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setNewDiscFiles((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                            className="text-[11px] font-black text-red-600 shrink-0"
+                          >
+                            إزالة
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <div className="sm:col-span-2 pt-2">
@@ -5139,7 +5230,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                       selectedEventId === ev.id ? 'bg-[#630517] text-[#F5D061] shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    {ev.title} ({ev.images?.length || 0} ملفات)
+                    {ev.title} ({galleryPhotoCount(ev.id, ev.images)}/{DISCOVER_GALLERY_MAX_PHOTOS})
                   </button>
                 ))}
               </div>
@@ -5163,22 +5254,22 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     onChange={handleAddMultipleImagesToExistingEvent}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061] cursor-pointer"
                   />
-                  <p className="text-[11px] text-slate-500 font-bold">الحد 8 ميغابايت لكل ملف.</p>
+                  <p className="text-[11px] text-slate-500 font-bold">كل صورة تُقاس وحدها بحد 8 ميغابايت. هذه الفعالية فيها {galleryPhotoCount(currentEditedEvent.id, currentEditedEvent.images)}/{DISCOVER_GALLERY_MAX_PHOTOS} صورة.</p>
                 </div>
               )}
 
               {currentEditedEvent && (
                 <div className="space-y-4">
                   <h4 className="font-extrabold text-slate-900 text-sm">الملفات الحالية بالسحابة للفعالية ({currentEditedEvent.images?.length || 0})</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                  <div className="columns-2 sm:columns-3 md:columns-4 gap-4">
                     {currentEditedEvent.images?.map((img, idx) => {
-                      const isVideo = img.startsWith('data:video') || img.includes('.mp4');
+                      const isVideo = img.startsWith('data:video') || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(img);
                       return (
-                        <div key={idx} className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 group bg-slate-900 shadow-sm">
+                        <div key={`${img}-${idx}`} className="relative mb-4 break-inside-avoid group">
                           {isVideo ? (
-                            <video src={img} className="w-full h-full object-cover" />
+                            <video src={img} className="w-full h-auto rounded-2xl border border-slate-200 bg-slate-950" />
                           ) : (
-                            <img src={img} alt={`ملف ${idx + 1}`} className="w-full h-full object-cover" />
+                            <img src={img} alt={`ملف ${idx + 1}`} className="w-full h-auto rounded-2xl border border-slate-200 bg-slate-100" />
                           )}
                           <button
                             type="button"

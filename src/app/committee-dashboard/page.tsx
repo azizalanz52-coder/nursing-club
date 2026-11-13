@@ -32,6 +32,7 @@ import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/i
 import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientificTexts';
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
 import DesignWorksBoard from '../components/DesignWorksBoard';
+import ActivityGalleryUploader from '../components/ActivityGalleryUploader';
 import { ClubIcon, IconText } from '../components/icons';
 import QualityEventReportForm from '../components/QualityEventReport';
 import { auth } from '../lib/firebase';
@@ -49,6 +50,7 @@ import {
   mediaOriginLabel,
   subscribeMediaGallery,
 } from '../lib/mediaGallery';
+import { summarizeGalleryUploaders, type DiscoverGalleryFile } from '../lib/discoverGallery';
 
 const DASH_CACHE_PREFIX = 'nurs_dash_portal_v1_';
 
@@ -170,6 +172,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [mediaUploadProgress, setMediaUploadProgress] = useState(0);
   const [mediaGallery, setMediaGallery] = useState<any[]>([]);
+  const [activityGalleryFiles, setActivityGalleryFiles] = useState<DiscoverGalleryFile[]>([]);
 
   const [textBannerTitle, setTextBannerTitle] = useState('');
   const [textArchiveTitle, setTextArchiveTitle] = useState('');
@@ -3154,125 +3157,36 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
         )}
 
         {(isSameCommittee(currentActiveComm, 'لجنة الإعلام') || isSameCommittee(currentActiveComm, 'لجنة الاعلام')) && (
-          <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-6">
-            <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
-              <div>
-                <h3 className="text-xl font-black text-slate-900">📸 مركز رفع ونشر الصور ومقاطع الفيديو (لجنة الإعلام)</h3>
-                <p className="text-xs text-slate-500">أرشيف واحد مشترك مع بوابة أعضاء الإعلام وتبويب قسم الإعلام في لوحة الأدمن. أي رفع أو حذف يتحدث في الثلاث صفحات فوراً.</p>
-              </div>
-              <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
-                إجمالي المواد المرفوعة: {mediaGallery.length}
-              </span>
-            </div>
-
-            <form onSubmit={handleUploadMediaSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-purple-50/40 p-6 rounded-2xl border border-purple-200">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">عنوان الصورة أو المقطع</label>
-                <input
-                  type="text"
-                  placeholder="مثال: تغطية ملتقى التمريض التوعوي"
-                  value={mediaTitle}
-                  onChange={(e) => setMediaTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">التصنيف الإعلامي</label>
-                <select
-                  value={mediaCategory}
-                  onChange={(e) => setMediaCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-900 font-bold"
-                >
-                  {MEDIA_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-bold text-slate-700">اختر صوراً أو مقاطع (أكثر من ملف دفعة واحدة)</label>
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  multiple
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    const picked = Array.from(e.target.files || []);
-                    e.target.value = '';
-                    if (!picked.length) return;
-                    const { accepted, rejected } = filterMediaFilesWithinLimit(picked);
-                    if (rejected.length > 0) alert(mediaUploadLimitMessage(rejected[0]));
-                    if (accepted.length > 0) setMediaUploadFiles((prev) => [...prev, ...accepted]);
-                  }}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs bg-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-600 file:text-white cursor-pointer"
-                />
-                {mediaUploadFiles.length > 0 ? (
-                  <p className="text-[11px] text-purple-800 font-bold">
-                    جاهز للرفع: {mediaUploadFiles.length} ملف — {mediaUploadFiles.map((file) => file.name).join('، ')}
-                  </p>
-                ) : (
-                  <p className="text-[11px] text-slate-500">حد الرفع 8 ميغابايت. الصور تُحفظ حتى لو التخزين السحابي مقفل. الفيديو ينتظر تفعيل Storage.</p>
-                )}
-              </div>
-
-              <div className="sm:col-span-2 pt-2 space-y-2">
-                <button
-                  type="submit"
-                  disabled={isUploadingMedia || mediaUploadFiles.length === 0}
-                  className="bg-purple-600 text-white px-8 py-3 rounded-xl font-black text-xs shadow hover:bg-purple-700 cursor-pointer disabled:opacity-60"
-                >
-                  {uploadingLabel(isUploadingMedia, mediaUploadProgress, '+ رفع ونشر المواد سحابياً (تصل للأدمن) 🎬')}
-                </button>
-                {isUploadingMedia ? (
-                  <div className="h-2 rounded-full bg-purple-100 overflow-hidden" dir="ltr">
-                    <div
-                      className={`h-full bg-purple-600 ${mediaUploadProgress <= 0 ? 'w-1/3 animate-pulse' : 'transition-all duration-200'}`}
-                      style={mediaUploadProgress > 0 ? { width: `${mediaUploadProgress}%` } : undefined}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            </form>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
-              {mediaGallery.length === 0 ? (
-                <p className="col-span-3 text-center py-8 text-slate-400 font-bold text-xs">لم يصل أي محتوى بعد من الأعضاء أو الأدمن.</p>
-              ) : mediaGallery.map((item) => {
-                const sources = mediaFileUrls(item);
-                const primary = sources[0] || '';
-                return (
-                <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 flex flex-col justify-between">
-                  <div className="space-y-1.5">
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="text-[10px] bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full font-bold">{item.category}</span>
-                      <span className="text-[10px] bg-slate-200 text-slate-700 px-2.5 py-0.5 rounded-full font-bold">{mediaOriginLabel(item)}</span>
-                    </div>
-                    <h5 className="font-extrabold text-slate-900 text-xs">{item.title}</h5>
-                    <p className="text-[10px] text-slate-400">بواسطة: {item.addedBy || item.uploadedBy} — {item.createdAt}</p>
-                  </div>
-                  <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900/5 min-h-[120px] flex items-center justify-center">
-                    {isMediaVideo(primary, item) ? (
-                      <video src={primary} controls className="w-full h-auto max-h-48 object-contain" />
-                    ) : primary ? (
-                      <img src={primary} alt={item.title} className="w-full h-auto max-h-48 object-contain" />
-                    ) : (
-                      <p className="text-[11px] text-slate-400 font-bold p-4">لا يوجد ملف للعرض</p>
-                    )}
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    {primary ? (
-                      <a href={primary} target="_blank" rel="noopener noreferrer" className="flex-1 py-1.5 bg-sky-50 text-sky-700 text-center font-bold text-xs rounded-lg">عرض 👁️</a>
-                    ) : null}
-                    <button type="button" onClick={() => handleDeleteMedia(item.id)} className="px-3 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-lg">حذف ✕</button>
-                  </div>
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-4">
+              <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">كم رفع كل عضو في معرض الأنشطة</h3>
+                  <p className="text-xs text-slate-500">العدد يشمل الصور المرفوضة، حتى يبقى رفع العضو محفوظاً.</p>
                 </div>
-                );
-              })}
+                <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
+                  صور الأعضاء: {activityGalleryFiles.length}
+                </span>
+              </div>
+              {summarizeGalleryUploaders(activityGalleryFiles).length === 0 ? (
+                <p className="text-center py-6 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لم يرفع الأعضاء صوراً بعد.</p>
+              ) : summarizeGalleryUploaders(activityGalleryFiles).map((person) => (
+                <div key={person.phone || person.name} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-purple-100 bg-purple-50/40 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-black text-slate-900">{person.name}</p>
+                    <p className="text-[11px] text-slate-500">{person.events.map((event) => `${event.title}: ${event.count}`).join(' · ')}</p>
+                  </div>
+                  <span className="px-3 py-1 rounded-xl bg-white text-purple-800 font-black text-xs border border-purple-100">{person.count} صورة</span>
+                </div>
+              ))}
             </div>
+            <ActivityGalleryUploader
+              uploaderName={userData?.fullName || 'قائد الإعلام'}
+              uploaderPhone={userPhone || ''}
+              onFiles={setActivityGalleryFiles}
+            />
           </div>
         )}
-
         {/* بنك النصوص: حصري للجنة المحتوى العلمي (مرسل) ولجنة التصميم (مستقبل) */}
         {canAccessScientificTexts && (
           <div className="bg-white rounded-3xl p-8 border border-emerald-200 shadow-sm space-y-6">
