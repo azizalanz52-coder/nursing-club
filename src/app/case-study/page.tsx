@@ -95,19 +95,6 @@ function hashSeed(value: string) {
   return hash >>> 0;
 }
 
-function bonusAmountForRank(rank: number, rng: () => number) {
-  if (rank > 0 && rank <= 3) {
-    return rng() < 0.16 ? 1 : 0;
-  }
-  if (rank > 0 && rank <= 10) {
-    return rng() < 0.34 ? 1 : 0;
-  }
-  const roll = rng();
-  if (roll < 0.28) return 2;
-  if (roll < 0.62) return 1;
-  return 0;
-}
-
 const DIFFICULTY_LABEL: Record<CaseQuestion['difficulty'], string> = {
   Easy: 'سهل',
   Moderate: 'متوسط',
@@ -1124,13 +1111,8 @@ export default function CaseStudyPage() {
   const getMaxPossibleScore = () => 3 + (revealedBonus?.amount || 0);
 
   const decideBonus = (answers: Record<number, number>) => {
-    const myPhone = canonicalPhone(studentPhone);
-    const rank = leaderboard.findIndex((item) => (
-      (myPhone && item.phone === myPhone) || item.studentName === studentName.trim()
-    )) + 1;
     const rng = mulberry32(dailySeed() ^ hashSeed(`${studentPhone}|${studentName}|bonus`));
-    const amount = bonusAmountForRank(rank, rng);
-    if (amount <= 0) return null;
+    if (rng() >= 0.1) return null;
 
     const correctIds = activeCases
       .filter((item) => answers[item.id] === item.correctIndex)
@@ -1138,7 +1120,7 @@ export default function CaseStudyPage() {
     if (correctIds.length === 0) return null;
 
     const questionId = correctIds[Math.floor(rng() * correctIds.length)];
-    return { questionId, amount };
+    return { questionId, amount: 1 };
   };
 
   const handleSubmitAnswers = async (e: React.FormEvent) => {

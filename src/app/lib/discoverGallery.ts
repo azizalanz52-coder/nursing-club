@@ -1,6 +1,7 @@
-import { Firestore, addDoc, collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { Firestore, addDoc, collection, deleteField, doc, onSnapshot, updateDoc } from 'firebase/firestore';
 
 export const DISCOVER_GALLERY_FILES_COL = 'discover_gallery_files';
+export const GALLERY_REJECT_HOLD_MS = 24 * 60 * 60 * 1000;
 
 export type GalleryReviewStatus = 'pending' | 'approved' | 'rejected';
 
@@ -14,6 +15,8 @@ export type DiscoverGalleryFile = {
   uploaderPhone: string;
   createdAt: number;
   status: GalleryReviewStatus;
+  rejectedAt: number;
+  clearedAt: number;
 };
 
 export function isDiscoverGalleryVideo(url: string) {
@@ -34,7 +37,32 @@ export function mapDiscoverGalleryFile(id: string, data: Record<string, any>): D
     uploaderPhone: String(data.uploaderPhone || ''),
     createdAt: Number(data.createdAt) || 0,
     status,
+    rejectedAt: Number(data.rejectedAt) || 0,
+    clearedAt: Number(data.clearedAt) || 0,
   };
+}
+
+export function isGalleryFileCleared(file: DiscoverGalleryFile) {
+  return file.clearedAt > 0;
+}
+
+export function rejectionHoldStartedAt(file: DiscoverGalleryFile) {
+  return file.rejectedAt || 0;
+}
+
+export function canClearRejectedGalleryFile(file: DiscoverGalleryFile, now = Date.now()) {
+  if (file.status !== 'rejected' || isGalleryFileCleared(file)) return false;
+  const started = rejectionHoldStartedAt(file);
+  return started > 0 && now - started >= GALLERY_REJECT_HOLD_MS;
+}
+
+export function rejectedClearWaitLabel(file: DiscoverGalleryFile, now = Date.now()) {
+  if (file.status !== 'rejected' || isGalleryFileCleared(file)) return '';
+  if (canClearRejectedGalleryFile(file, now)) return '';
+  const started = rejectionHoldStartedAt(file);
+  if (!started) return 'الحذف يتاح بعد يوم من الرفض';
+  const hours = Math.max(1, Math.ceil((GALLERY_REJECT_HOLD_MS - (now - started)) / 3600000));
+  return `الحذف يتاح بعد ${hours} ساعة`;
 }
 
 export function galleryStatusLabel(status: GalleryReviewStatus) {
@@ -143,7 +171,7 @@ export function subscribeDiscoverGalleryFiles(
 
 export async function saveDiscoverGalleryFile(
   db: Firestore,
-  file: Omit<DiscoverGalleryFile, 'id' | 'status'> & { status?: GalleryReviewStatus }
+  file: Omit<DiscoverGalleryFile, 'id' | 'status' | 'rejectedAt' | 'clearedAt'> & { status?: GalleryReviewStatus }
 ) {
   const ref = await addDoc(collection(db, DISCOVER_GALLERY_FILES_COL), {
     ...file,
@@ -157,5 +185,24 @@ export async function setDiscoverGalleryFileStatus(
   id: string,
   status: GalleryReviewStatus
 ) {
-  await updateDoc(doc(db, DISCOVER_GALLERY_FILES_COL, id), { status });
+  if (status === 'rejected') {
+    await updateDoc(doc(db, DISCOVER_GALLERY_FILES_COL, id), {
+      status,
+      rejectedAt: Date.now(),
+      clearedAt: deleteField(),
+    });
+    return;
+  }
+  await updateDoc(doc(db, DISCOVER_GALLERY_FILES_COL, id), {
+    status,
+    clearedAt: deleteField(),
+  });
+}
+
+export async function stampGalleryRejection(db: Firestore, id: string) {
+  await updateDoc(doc(db, DISCOVER_GALLERY_FILES_COL, id), { rejectedAt: Date.now() });
+}
+
+export async function clearRejectedGalleryFile(db: Firestore, id: string) {
+  await updateDoc(doc(db, DISCOVER_GALLERY_FILES_COL, id), { clearedAt: Date.now() });
 }

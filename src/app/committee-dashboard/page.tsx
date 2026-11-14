@@ -3162,7 +3162,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
               <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
                 <div>
                   <h3 className="text-xl font-black text-slate-900">كم رفع كل عضو في معرض الأنشطة</h3>
-                  <p className="text-xs text-slate-500">العدد يشمل الصور المرفوضة، حتى يبقى رفع العضو محفوظاً.</p>
+                  <p className="text-xs text-slate-500">العدد يشمل الصور المرفوضة، وحتى التي حُذفت من القائمة بعد يوم.</p>
                 </div>
                 <span className="px-3.5 py-1.5 rounded-xl bg-purple-100 text-purple-800 font-bold text-xs">
                   صور الأعضاء: {activityGalleryFiles.length}

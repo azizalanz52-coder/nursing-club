@@ -19,6 +19,7 @@ import {
   filesForEvent,
   galleryStatusLabel,
   isDiscoverGalleryVideo,
+  isGalleryFileCleared,
   saveDiscoverGalleryFile,
   subscribeDiscoverGalleryFiles,
   type DiscoverGalleryFile,
@@ -97,7 +98,8 @@ export default function ActivityGalleryUploader({ uploaderName, uploaderPhone, o
   }, []);
 
   const mine = files.filter((file) => sameUploader(file, uploaderPhone));
-  const mineForEvent = filesForEvent(files, selectedEventId).filter((file) => sameUploader(file, uploaderPhone));
+  const mineForEvent = filesForEvent(files, selectedEventId).filter((file) => sameUploader(file, uploaderPhone) && !isGalleryFileCleared(file));
+  const clearedInEvent = filesForEvent(files, selectedEventId).filter((file) => sameUploader(file, uploaderPhone) && isGalleryFileCleared(file)).length;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -251,6 +253,9 @@ export default function ActivityGalleryUploader({ uploaderName, uploaderPhone, o
 
       <div className="space-y-3 pt-2 border-t border-slate-100">
         <h3 className="font-black text-slate-900 text-sm">ملفاتك في هذه الفعالية</h3>
+        {clearedInEvent > 0 ? (
+          <p className="text-[11px] font-bold text-slate-500">صور مرفوضة حُذفت من العرض بعد يوم، وما زالت داخلة في عدد رفعك.</p>
+        ) : null}
         {mineForEvent.length === 0 ? (
           <p className="text-center py-8 text-slate-400 font-bold text-xs bg-slate-50 rounded-2xl">لم ترفع شيئاً في هذه الفعالية بعد.</p>
         ) : (

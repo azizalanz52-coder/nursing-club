@@ -1,14 +1,19 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { sortEventsByLatest, type ClubEvent } from '../lib/clubEvents';
 import {
+  canClearRejectedGalleryFile,
+  clearRejectedGalleryFile,
   filesForEvent,
   galleryStatusLabel,
   isDiscoverGalleryVideo,
+  isGalleryFileCleared,
+  rejectedClearWaitLabel,
   setDiscoverGalleryFileStatus,
+  stampGalleryRejection,
   subscribeDiscoverGalleryFiles,
   type DiscoverGalleryFile,
   type GalleryReviewStatus,
@@ -28,6 +33,8 @@ export default function MediaGalleryReview() {
   const [selectedId, setSelectedId] = useState('');
   const [filter, setFilter] = useState<'all' | GalleryReviewStatus>('pending');
   const [busyId, setBusyId] = useState('');
+  const [now, setNow] = useState(() => Date.now());
+  const stampedRejections = useRef(new Set<string>());
 
   useEffect(() => {
     return onSnapshot(collection(db, 'site_events'), (snap) => {
@@ -51,16 +58,31 @@ export default function MediaGalleryReview() {
 
   useEffect(() => subscribeDiscoverGalleryFiles(db, setFiles), []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const missing = files.filter((file) => file.status === 'rejected' && !file.rejectedAt && !file.clearedAt && !stampedRejections.current.has(file.id));
+    if (!missing.length) return;
+    missing.forEach((file) => stampedRejections.current.add(file.id));
+    void Promise.all(missing.map((file) => stampGalleryRejection(db, file.id))).catch(() => {
+      missing.forEach((file) => stampedRejections.current.delete(file.id));
+    });
+  }, [files]);
+
+  const visibleFiles = files.filter((file) => !isGalleryFileCleared(file));
   const selected = events.find((event) => event.id === selectedId) || events[0];
   const knownIds = new Set(events.map((event) => event.id));
-  const orphanFiles = files.filter((file) => file.eventId && !knownIds.has(file.eventId));
+  const orphanFiles = visibleFiles.filter((file) => file.eventId && !knownIds.has(file.eventId));
   const eventFiles = selectedId === 'orphans'
     ? orphanFiles
-    : selected
-      ? filesForEvent(files, selected.id)
+      : selected
+      ? filesForEvent(visibleFiles, selected.id)
       : [];
   const shown = eventFiles.filter((file) => filter === 'all' || file.status === filter);
-  const pendingCount = files.filter((file) => file.status === 'pending').length;
+  const pendingCount = visibleFiles.filter((file) => file.status === 'pending').length;
 
   const decide = async (file: DiscoverGalleryFile, status: GalleryReviewStatus) => {
     try {
@@ -74,12 +96,26 @@ export default function MediaGalleryReview() {
     }
   };
 
+  const clearRejected = async (file: DiscoverGalleryFile) => {
+    if (!canClearRejectedGalleryFile(file, now)) return;
+    if (!window.confirm('تختفي الصورة من القائمة، ويبقى عددها محسوباً للعضو.')) return;
+    try {
+      setBusyId(file.id);
+      await clearRejectedGalleryFile(db, file.id);
+    } catch (err) {
+      console.error(err);
+      alert('تعذر حذف الصورة من القائمة. تأكد أن الجلسة ما زالت مسجّلة.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
   return (
     <div className="bg-white rounded-3xl p-8 border border-rose-200 shadow-sm space-y-6">
       <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
         <div>
           <h3 className="text-xl font-black text-rose-900">اعتماد صور لجنة الإعلام</h3>
-          <p className="text-xs text-slate-500">اضغط الفعالية وشوف رفع الأعضاء. الاعتماد ينشر الصورة في معرض الأنشطة، والرفض يخفيها ويبقي العدد محسوباً للعضو.</p>
+          <p className="text-xs text-slate-500">الاعتماد ينشر الصورة في معرض الأنشطة. المرفوضة تبقى يوماً ثم تقدر تحذفها من القائمة، ويبقى العدد محسوباً للعضو.</p>
         </div>
         <span className="px-3.5 py-1.5 rounded-xl bg-amber-100 text-amber-900 font-bold text-xs">
           بانتظار الاعتماد: {pendingCount}
@@ -102,7 +138,7 @@ export default function MediaGalleryReview() {
             </button>
           ) : null}
           {events.map((event) => {
-            const rows = filesForEvent(files, event.id);
+            const rows = filesForEvent(visibleFiles, event.id);
             const waiting = rows.filter((file) => file.status === 'pending').length;
             const active = selected?.id === event.id;
             return (
@@ -157,7 +193,7 @@ export default function MediaGalleryReview() {
                       {galleryStatusLabel(file.status)}
                     </span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       disabled={busyId === file.id || file.status === 'approved'}
@@ -174,7 +210,20 @@ export default function MediaGalleryReview() {
                     >
                       رفض
                     </button>
+                    {canClearRejectedGalleryFile(file, now) ? (
+                      <button
+                        type="button"
+                        disabled={busyId === file.id}
+                        onClick={() => clearRejected(file)}
+                        className="flex-1 py-2 rounded-xl bg-slate-800 text-white text-[11px] font-black disabled:bg-slate-300 cursor-pointer"
+                      >
+                        حذف
+                      </button>
+                    ) : null}
                   </div>
+                  {rejectedClearWaitLabel(file, now) ? (
+                    <p className="text-[10px] font-bold text-slate-500">{rejectedClearWaitLabel(file, now)}</p>
+                  ) : null}
                 </article>
               ))}
             </div>
