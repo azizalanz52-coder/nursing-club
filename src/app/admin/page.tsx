@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
@@ -202,6 +203,11 @@ interface ScientificTextItem {
   collectionName?: 'scientific_committee_texts' | 'site_scientific_texts';
 }
 
+function isPdfCert(src: string) {
+  const lower = src.toLowerCase();
+  return lower.includes('application/pdf') || lower.includes('.pdf');
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   
@@ -237,6 +243,7 @@ export default function AdminDashboard() {
   const [certPasswordInput, setCertPasswordInput] = useState<string>('');
   const [certTitleInput, setCertTitleInput] = useState<string>('');
   const [certCategoryInput, setCertCategoryInput] = useState<string>('شهادة شكر وتقدير');
+  const [certPreview, setCertPreview] = useState<{ src: string; name: string; title: string } | null>(null);
   const [certImageInput, setCertImageInput] = useState<string>('/logo.png');
   const [certImageDirty, setCertImageDirty] = useState(false);
   const [certDescInput, setCertDescInput] = useState<string>('');
@@ -4204,7 +4211,18 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     <div key={cert.id} className="p-6 rounded-2xl border border-sky-200 bg-sky-50/20 shadow-sm flex flex-col justify-between space-y-4">
                       <div className="space-y-3">
                         <div className="flex items-center gap-3">
-                          <img src={cert.image || cert.fileUrl || '/logo.png'} alt={cert.certTitle} className="w-14 h-14 rounded-2xl object-cover border-2 border-sky-400 shadow" />
+                          <button
+                            type="button"
+                            onClick={() => setCertPreview({
+                              src: (cert.fileUrl || cert.image || '').trim(),
+                              name: cert.recipientName,
+                              title: cert.certTitle,
+                            })}
+                            className="shrink-0 cursor-zoom-in rounded-2xl"
+                            title="اضغط لمعاينة الشهادة والتأكد من الاسم"
+                          >
+                            <img src={cert.image || cert.fileUrl || '/logo.png'} alt={cert.certTitle} className="w-14 h-14 rounded-2xl object-cover border-2 border-sky-400 shadow" />
+                          </button>
                           <div>
                             <h4 className="font-black text-slate-900 text-sm">👤 {cert.recipientName}</h4>
                             <span className="text-[10px] text-slate-500 font-mono block" dir="ltr">📞 {cert.phone || 'غير مسجل'}</span>
@@ -4243,6 +4261,29 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                 </div>
               )}
             </div>
+            {certPreview && typeof document !== 'undefined' ? createPortal(
+              <div className="fixed inset-0 z-[500] bg-black/85 flex items-center justify-center p-4" onClick={() => setCertPreview(null)}>
+                <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col items-center gap-3 pt-12" onClick={(event) => event.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => setCertPreview(null)}
+                    className="fixed top-4 left-4 z-10 h-10 w-10 rounded-full bg-white font-black text-slate-900"
+                  >
+                    ✕
+                  </button>
+                  <p className="text-sm font-black text-white">{certPreview.name}</p>
+                  <p className="text-xs font-bold text-white/80">{certPreview.title}</p>
+                  {!certPreview.src || isPlaceholderCertMedia(certPreview.src) ? (
+                    <p className="rounded-2xl bg-white px-6 py-8 text-sm font-bold text-slate-700">ما فيه صورة شهادة مرفوعة في هذا السجل.</p>
+                  ) : isPdfCert(certPreview.src) ? (
+                    <iframe src={certPreview.src} title={certPreview.name} className="h-[78vh] w-full rounded-2xl bg-white" />
+                  ) : (
+                    <img src={certPreview.src} alt={certPreview.name} className="max-h-[78vh] max-w-full rounded-2xl bg-white object-contain" />
+                  )}
+                </div>
+              </div>,
+              document.body
+            ) : null}
           </div>
         )}
 
