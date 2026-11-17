@@ -1,98 +1,132 @@
-let ctx: AudioContext | null = null;
-let noiseBuffer: AudioBuffer | null = null;
 let popPending = false;
-let unlockArmed = false;
-let played = false;
+let popPlayed = false;
+let installed = false;
+let lastPlayedAt = 0;
 
-function audioContext() {
-  if (typeof window === 'undefined') return null;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
-  const Ctx = window.AudioContext
-    ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctx) return null;
-  if (!ctx) ctx = new Ctx();
-  return ctx;
-}
+const CONTROL = 'a[href], button, [role="button"], [role="tab"], summary, input[type="checkbox"], input[type="radio"], input[type="submit"], input[type="button"]';
+const FIELD = 'input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]), textarea, select, [contenteditable="true"]';
 
-function noise(context: AudioContext) {
-  if (noiseBuffer) return noiseBuffer;
-  const length = context.sampleRate * 2;
-  const buffer = context.createBuffer(1, length, context.sampleRate);
-  const data = buffer.getChannelData(0);
-  let last = 0;
-  for (let i = 0; i < length; i += 1) {
-    const white = Math.random() * 2 - 1;
-    last = last * 0.98 + white * 0.02;
-    data[i] = last * 4;
+function tone(freq: number, ms: number, volume: number, rate = 22050) {
+  const count = Math.max(1, Math.floor((rate * ms) / 1000));
+  const samples = new Float32Array(count);
+  for (let i = 0; i < count; i += 1) {
+    const t = i / rate;
+    const env = Math.exp(-t * (ms < 70 ? 46 : 16));
+    samples[i] = Math.sin(2 * Math.PI * freq * t) * env * volume;
   }
-  noiseBuffer = buffer;
-  return buffer;
+  return samples;
 }
 
-function burstNow(context: AudioContext) {
-  const now = context.currentTime;
-  crack(context, now, -0.7);
-  crack(context, now + 0.09, 0.7);
+function mix(parts: Float32Array[]) {
+  const count = parts.reduce((max, part) => Math.max(max, part.length), 0);
+  const out = new Float32Array(count);
+  for (const part of parts) {
+    for (let i = 0; i < part.length; i += 1) out[i] += part[i];
+  }
+  return out;
 }
 
-function crack(context: AudioContext, when: number, pan: number) {
-  const src = context.createBufferSource();
-  src.buffer = noise(context);
-  const filter = context.createBiquadFilter();
-  filter.type = 'highpass';
-  filter.frequency.value = 900;
-  const gain = context.createGain();
-  gain.gain.setValueAtTime(0.0001, when);
-  gain.gain.exponentialRampToValueAtTime(1.25, when + 0.012);
-  gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.16);
-  const panner = context.createStereoPanner();
-  panner.pan.value = pan;
-  src.connect(filter).connect(gain).connect(panner).connect(context.destination);
-  src.start(when);
-  src.stop(when + 0.2);
-
-  const thump = context.createOscillator();
-  thump.type = 'sine';
-  thump.frequency.setValueAtTime(210, when);
-  thump.frequency.exponentialRampToValueAtTime(70, when + 0.12);
-  const thumpGain = context.createGain();
-  thumpGain.gain.setValueAtTime(0.0001, when);
-  thumpGain.gain.exponentialRampToValueAtTime(0.95, when + 0.01);
-  thumpGain.gain.exponentialRampToValueAtTime(0.0001, when + 0.14);
-  thump.connect(thumpGain).connect(panner);
-  thump.start(when);
-  thump.stop(when + 0.16);
+function wavUri(samples: Float32Array, rate = 22050) {
+  const count = samples.length;
+  const buffer = new ArrayBuffer(44 + count * 2);
+  const view = new DataView(buffer);
+  const text = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i));
+  };
+  text(0, 'RIFF');
+  view.setUint32(4, 36 + count * 2, true);
+  text(8, 'WAVE');
+  text(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  text(36, 'data');
+  view.setUint32(40, count * 2, true);
+  let offset = 44;
+  for (let i = 0; i < count; i += 1) {
+    const sample = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+    offset += 2;
+  }
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+  return `data:audio/wav;base64,${btoa(binary)}`;
 }
 
-function kick() {
-  const context = audioContext();
-  if (!context || played) return;
-  void context.resume();
-  if (!popPending) return;
-  popPending = false;
-  played = true;
-  burstNow(context);
+const CLICK = wavUri(tone(1480, 42, 0.95));
+const OPEN = wavUri(mix([
+  tone(523, 90, 0.72),
+  (() => {
+    const high = tone(784, 110, 0.62);
+    const delayed = new Float32Array(high.length + 700);
+    delayed.set(high, 700);
+    return delayed;
+  })(),
+]));
+const POP = wavUri(mix([
+  tone(210, 140, 0.9),
+  (() => {
+    const count = Math.floor(22050 * 0.12);
+    const noise = new Float32Array(count);
+    for (let i = 0; i < count; i += 1) {
+      const t = i / 22050;
+      noise[i] = (Math.random() * 2 - 1) * Math.exp(-t * 38) * 0.85;
+    }
+    return noise;
+  })(),
+]));
+
+function playClip(uri: string) {
+  const audio = new Audio(uri);
+  audio.volume = 1;
+  audio.setAttribute('playsinline', 'true');
+  void audio.play().catch(() => undefined);
 }
 
-function armUnlock() {
-  if (unlockArmed || typeof window === 'undefined') return;
-  unlockArmed = true;
-  window.addEventListener('pointerdown', kick, true);
-  window.addEventListener('touchstart', kick, true);
-  window.addEventListener('keydown', kick, true);
+function controlOf(event: Event) {
+  const target = event.target;
+  if (!(target instanceof Element)) return null;
+  if (target.closest(FIELD)) return null;
+  const control = target.closest(CONTROL);
+  if (!(control instanceof HTMLElement)) return null;
+  if (control.matches(':disabled') || control.getAttribute('aria-disabled') === 'true') return null;
+  return control;
+}
+
+function isEntrance(control: HTMLElement) {
+  const label = `${control.getAttribute('aria-label') || ''} ${control.textContent || ''} ${control.getAttribute('href') || ''}`;
+  return /اكتشف|لوحة|بواب|دخول|تسجيل الدخول|dashboard|admin|discover|committee/i.test(label);
+}
+
+function onPress(event: Event) {
+  const now = performance.now();
+  if (now - lastPlayedAt < 280) return;
+  const control = controlOf(event);
+  if (!control && !(popPending && !popPlayed)) return;
+  lastPlayedAt = now;
+  if (popPending && !popPlayed) {
+    popPending = false;
+    popPlayed = true;
+    playClip(POP);
+  }
+  if (!control) return;
+  playClip(isEntrance(control) ? OPEN : CLICK);
 }
 
 export function prepareAwardSound() {
-  armUnlock();
+  if (installed || typeof window === 'undefined') return;
+  installed = true;
+  window.addEventListener('touchstart', onPress, { capture: true, passive: true });
+  window.addEventListener('pointerdown', onPress, { capture: true, passive: true });
 }
 
 export function playPopperBurst() {
-  if (played) return;
+  if (popPlayed) return;
   popPending = true;
-  armUnlock();
-  if (ctx?.state === 'running') {
-    popPending = false;
-    played = true;
-    burstNow(ctx);
-  }
+  prepareAwardSound();
 }
