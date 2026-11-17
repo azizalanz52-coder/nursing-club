@@ -6,7 +6,6 @@ import OpeningSplash from './components/OpeningSplash';
 import ClubNoticeHost from './components/ClubNotice';
 import MonthCelebrationNotice from './components/MonthCelebrationNotice';
 import AwardPopper from './components/AwardPopper';
-import { prepareAwardSound } from './lib/awardSounds';
 import { warmPublicCloud } from './lib/cloudCache';
 
 const SPLASH_KEY = 'nurs_splash_seen';
@@ -19,7 +18,6 @@ export default function AppShell({
   const [showSplash, setShowSplash] = useState(false);
 
   useEffect(() => {
-    prepareAwardSound();
     // تأخير أطول حتى لا يتزاحم مع أول رسم للصفحة + يشتغل مرة لكل جلسة فقط.
     const warm = window.setTimeout(() => warmPublicCloud(), 2500);
 

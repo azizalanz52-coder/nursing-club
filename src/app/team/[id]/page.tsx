@@ -17,6 +17,7 @@ import { existingArchiveTitles, scientificArchiveTitle } from '../../lib/scienti
 import ScientificTextsShelf from '../../components/ScientificTextsShelf';
 import DesignWorksBoard from '../../components/DesignWorksBoard';
 import ActivityGalleryUploader from '../../components/ActivityGalleryUploader';
+import MediaWorkflowNotice from '../../components/MediaWorkflowNotice';
 import PageLoading from '../../components/PageLoading';
 import { cloneUploadFile, omitHeavyCertMedia, requireAuthUser, uploadClubFile, uploadingLabel } from '../../lib/uploadFile';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../../lib/issueCertificate';
@@ -1250,10 +1251,13 @@ export default function CommitteeDetailPage() {
         )}
 
         {(id === 'media' || normalizeArabic(committee?.name || '').includes('اعلام') || normalizeArabic(committee?.name || '').includes('إعلام')) && (
-          <ActivityGalleryUploader
-            uploaderName={currentUserName || 'عضو الإعلام'}
-            uploaderPhone={currentUserPhone}
-          />
+          <>
+            <MediaWorkflowNotice audience="member" />
+            <ActivityGalleryUploader
+              uploaderName={currentUserName || 'عضو الإعلام'}
+              uploaderPhone={currentUserPhone}
+            />
+          </>
         )}
         {/* 🔬 الخاصية المخصصة: بنك النصوص والعبارات الطبية (لجنة المحتوى العلمي ولجنة التصميم) */}
         {canAccessScientificTexts && (

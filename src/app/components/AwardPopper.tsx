@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { isClubAwardLive } from '../lib/clubAwardCelebration';
-import { playPopperBurst, prepareAwardSound } from '../lib/awardSounds';
 
 const AWARD_PATHS = new Set(['/', '/case-study']);
 const SPLASH_KEY = 'nurs_splash_seen';
@@ -65,10 +64,6 @@ export default function AwardPopper() {
   const [play, setPlay] = useState(false);
 
   useEffect(() => {
-    prepareAwardSound();
-  }, []);
-
-  useEffect(() => {
     const sync = () => setLive(isClubAwardLive());
     sync();
     const timer = window.setInterval(sync, 60_000);
@@ -87,7 +82,6 @@ export default function AwardPopper() {
 
   useEffect(() => {
     if (!play) return;
-    playPopperBurst();
     const timer = window.setTimeout(() => setPlay(false), 3800);
     return () => window.clearTimeout(timer);
   }, [play]);

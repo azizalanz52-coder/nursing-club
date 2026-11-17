@@ -33,6 +33,7 @@ import { existingArchiveTitles, scientificArchiveTitle } from '../lib/scientific
 import ScientificTextsShelf from '../components/ScientificTextsShelf';
 import DesignWorksBoard from '../components/DesignWorksBoard';
 import ActivityGalleryUploader from '../components/ActivityGalleryUploader';
+import MediaWorkflowNotice from '../components/MediaWorkflowNotice';
 import { ClubIcon, IconText } from '../components/icons';
 import QualityEventReportForm from '../components/QualityEventReport';
 import { auth } from '../lib/firebase';
@@ -3158,6 +3159,7 @@ const handleDeleteQualityUploadedFile = async (fileId: string) => {
 
         {(isSameCommittee(currentActiveComm, 'لجنة الإعلام') || isSameCommittee(currentActiveComm, 'لجنة الاعلام')) && (
           <div className="space-y-6">
+            <MediaWorkflowNotice audience="leader" />
             <div className="bg-white rounded-3xl p-8 border border-purple-200 shadow-sm space-y-4">
               <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
                 <div>
