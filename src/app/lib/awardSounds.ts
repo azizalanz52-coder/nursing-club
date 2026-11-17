@@ -1,13 +1,14 @@
 let ctx: AudioContext | null = null;
 let noiseBuffer: AudioBuffer | null = null;
 let popPending = false;
-let popAt = 0;
 let unlockArmed = false;
+let played = false;
 
 function audioContext() {
   if (typeof window === 'undefined') return null;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
-  const Ctx = window.AudioContext;
+  const Ctx = window.AudioContext
+    ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Ctx) return null;
   if (!ctx) ctx = new Ctx();
   return ctx;
@@ -63,40 +64,35 @@ function crack(context: AudioContext, when: number, pan: number) {
   thump.stop(when + 0.16);
 }
 
-function flush() {
+function kick() {
   const context = audioContext();
-  if (!context || context.state !== 'running') return;
-  if (popPending && performance.now() - popAt < 3500) {
-    popPending = false;
-    burstNow(context);
-  } else {
-    popPending = false;
-  }
+  if (!context || played) return;
+  void context.resume();
+  if (!popPending) return;
+  popPending = false;
+  played = true;
+  burstNow(context);
 }
 
 function armUnlock() {
   if (unlockArmed || typeof window === 'undefined') return;
   unlockArmed = true;
-  const kick = () => {
-    const context = audioContext();
-    if (!context) return;
-    const silent = context.createBuffer(1, 1, context.sampleRate);
-    const blip = context.createBufferSource();
-    blip.buffer = silent;
-    blip.connect(context.destination);
-    blip.start();
-    void context.resume().then(flush);
-    flush();
-  };
-  window.addEventListener('pointerdown', kick);
-  window.addEventListener('keydown', kick);
+  window.addEventListener('pointerdown', kick, true);
+  window.addEventListener('touchstart', kick, true);
+  window.addEventListener('keydown', kick, true);
+}
+
+export function prepareAwardSound() {
+  armUnlock();
 }
 
 export function playPopperBurst() {
-  const context = audioContext();
-  if (!context) return;
-  popAt = performance.now();
+  if (played) return;
   popPending = true;
   armUnlock();
-  void context.resume().then(flush);
+  if (ctx?.state === 'running') {
+    popPending = false;
+    played = true;
+    burstNow(ctx);
+  }
 }

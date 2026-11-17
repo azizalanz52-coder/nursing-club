@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { isClubAwardLive } from '../lib/clubAwardCelebration';
-import { playPopperBurst } from '../lib/awardSounds';
+import { playPopperBurst, prepareAwardSound } from '../lib/awardSounds';
 
 const AWARD_PATHS = new Set(['/', '/case-study']);
 const SPLASH_KEY = 'nurs_splash_seen';
@@ -63,6 +63,10 @@ export default function AwardPopper() {
   const path = usePathname();
   const [live, setLive] = useState(false);
   const [play, setPlay] = useState(false);
+
+  useEffect(() => {
+    prepareAwardSound();
+  }, []);
 
   useEffect(() => {
     const sync = () => setLive(isClubAwardLive());
