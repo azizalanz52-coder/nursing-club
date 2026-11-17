@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from "next/link";
 import { db } from './../lib/firebase';
 import { DEFAULT_WELCOME_BANNER } from '../lib/welcomeBanner';
@@ -46,14 +46,17 @@ function awardBanner(): BannerItem {
 
 function presentBanners(list: BannerItem[]) {
   const sorted = sortBanners(list.filter((item) => item.id !== CLUB_AWARD_BANNER_ID));
-  if (!isClubAwardLive()) return sorted.length ? sorted : [DEFAULT_WELCOME_BANNER];
-  return [awardBanner(), ...sorted];
+  const welcome = sorted.length ? sorted : [DEFAULT_WELCOME_BANNER];
+  if (!isClubAwardLive()) return welcome;
+  return [awardBanner()];
 }
 
 export default function Hero() {
   const [banners, setBanners] = useState<BannerItem[]>(() => presentBanners([DEFAULT_WELCOME_BANNER]));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [live, setLive] = useState(false);
+  const sourceRef = useRef<BannerItem[]>([DEFAULT_WELCOME_BANNER]);
+  const awardLiveRef = useRef(isClubAwardLive());
 
   useEffect(() => {
     setLive(true);
@@ -63,7 +66,10 @@ export default function Hero() {
     if (!live) return;
     let cancelled = false;
     const cached = peekCloudCollection<BannerItem>('site_banners');
-    if (cached?.length) setBanners(presentBanners(cached));
+    if (cached?.length) {
+      sourceRef.current = cached;
+      setBanners(presentBanners(cached));
+    }
     localStorage.removeItem('UHB_BANNERS');
 
     void loadCloudCollection<BannerItem>(db, 'site_banners', {
@@ -82,10 +88,12 @@ export default function Hero() {
       .then((cloudList) => {
         if (cancelled) return;
         if (!cloudList.length) {
-          setBanners(presentBanners([DEFAULT_WELCOME_BANNER]));
+          sourceRef.current = [DEFAULT_WELCOME_BANNER];
+          setBanners(presentBanners(sourceRef.current));
           setCurrentIndex(0);
           return;
         }
+        sourceRef.current = cloudList;
         setBanners(presentBanners(cloudList));
         setCurrentIndex(0);
       })
@@ -97,6 +105,17 @@ export default function Hero() {
       cancelled = true;
     };
   }, [live]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const next = isClubAwardLive();
+      if (next === awardLiveRef.current) return;
+      awardLiveRef.current = next;
+      setBanners(presentBanners(sourceRef.current));
+      setCurrentIndex(0);
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (banners.length <= 1) return;

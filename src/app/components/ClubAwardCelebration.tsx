@@ -3,10 +3,10 @@
 import { CLUB_AWARD_CELEBRATION } from '../lib/clubAwardCelebration';
 
 const LINES = [
-  { key: 'ceremony', delay: '0.2s', className: 'text-sm font-bold text-[#F5D061] sm:text-base' },
-  { key: 'place', delay: '2.4s', className: 'text-lg font-black text-[#F5D061] sm:text-2xl' },
-  { key: 'award', delay: '4.8s', className: 'text-4xl font-black text-white sm:text-6xl' },
-  { key: 'scope', delay: '7.2s', className: 'text-sm font-bold text-[#FFF6D6] sm:text-lg' },
+  { key: 'ceremony', delay: '0.2s', className: 'text-xl font-bold text-[#F5D061] sm:text-2xl' },
+  { key: 'place', delay: '2.4s', className: 'text-3xl font-black text-[#F5D061] sm:text-4xl' },
+  { key: 'award', delay: '4.8s', className: 'text-[2.7rem] font-black leading-tight text-white sm:text-7xl' },
+  { key: 'scope', delay: '7.2s', className: 'text-xl font-bold text-[#FFF6D6] sm:text-2xl' },
 ] as const;
 
 export default function ClubAwardCelebration() {
@@ -39,7 +39,7 @@ export default function ClubAwardCelebration() {
         }
       `}</style>
 
-      <div className="flex min-h-[9.5rem] flex-col items-center justify-end gap-2 text-center sm:min-h-[11rem] sm:gap-3">
+      <div className="flex min-h-[14rem] flex-col items-center justify-end gap-1 text-center sm:min-h-[16rem] sm:gap-2">
         {LINES.map((line) => (
           <p key={line.key} className={`award-mask ${line.className}`}>
             <span style={{ animationDelay: line.delay }}>{copy[line.key]}</span>
