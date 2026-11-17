@@ -5,7 +5,10 @@ import Link from "next/link";
 import { db } from './../lib/firebase';
 import { DEFAULT_WELCOME_BANNER } from '../lib/welcomeBanner';
 import { loadCloudCollection, peekCloudCollection } from '../lib/cloudCache';
+import { CLUB_AWARD_BANNER_ID, CLUB_AWARD_CELEBRATION, isClubAwardLive } from '../lib/clubAwardCelebration';
 import { ClubIcon } from './icons';
+import ClubAwardCelebration from './ClubAwardCelebration';
+import AwardConfetti from './AwardConfetti';
 
 interface BannerItem {
   id: string;
@@ -27,8 +30,28 @@ function sortBanners(list: BannerItem[]) {
   });
 }
 
+function awardBanner(): BannerItem {
+  return {
+    id: CLUB_AWARD_BANNER_ID,
+    tag: `حفل ${CLUB_AWARD_CELEBRATION.ceremony}`,
+    title: CLUB_AWARD_CELEBRATION.award,
+    description: `${CLUB_AWARD_CELEBRATION.place} ${CLUB_AWARD_CELEBRATION.scope}`,
+    image: CLUB_AWARD_CELEBRATION.image,
+    buttonText: 'اكتشف النادي',
+    buttonLink: '/discover',
+    theme: 'club',
+    cinematic: true,
+  };
+}
+
+function presentBanners(list: BannerItem[]) {
+  const sorted = sortBanners(list.filter((item) => item.id !== CLUB_AWARD_BANNER_ID));
+  if (!isClubAwardLive()) return sorted.length ? sorted : [DEFAULT_WELCOME_BANNER];
+  return [awardBanner(), ...sorted];
+}
+
 export default function Hero() {
-  const [banners, setBanners] = useState<BannerItem[]>([DEFAULT_WELCOME_BANNER]);
+  const [banners, setBanners] = useState<BannerItem[]>(() => presentBanners([DEFAULT_WELCOME_BANNER]));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [live, setLive] = useState(false);
 
@@ -40,7 +63,7 @@ export default function Hero() {
     if (!live) return;
     let cancelled = false;
     const cached = peekCloudCollection<BannerItem>('site_banners');
-    if (cached?.length) setBanners(sortBanners(cached));
+    if (cached?.length) setBanners(presentBanners(cached));
     localStorage.removeItem('UHB_BANNERS');
 
     void loadCloudCollection<BannerItem>(db, 'site_banners', {
@@ -59,12 +82,11 @@ export default function Hero() {
       .then((cloudList) => {
         if (cancelled) return;
         if (!cloudList.length) {
-          setBanners([DEFAULT_WELCOME_BANNER]);
+          setBanners(presentBanners([DEFAULT_WELCOME_BANNER]));
           setCurrentIndex(0);
           return;
         }
-        const sorted = sortBanners(cloudList);
-        setBanners(sorted);
+        setBanners(presentBanners(cloudList));
         setCurrentIndex(0);
       })
       .catch((err) => {
@@ -78,13 +100,15 @@ export default function Hero() {
 
   useEffect(() => {
     if (banners.length <= 1) return;
-    const interval = setInterval(() => {
+    const delay = banners[currentIndex]?.id === CLUB_AWARD_BANNER_ID ? 15000 : 5000;
+    const timer = window.setTimeout(() => {
       setCurrentIndex((prev) => (prev + 1) % banners.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [banners.length]);
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [banners, currentIndex]);
 
   const currentBanner = banners[currentIndex] || banners[0];
+  const isAward = currentBanner.id === CLUB_AWARD_BANNER_ID;
   const isPink = currentBanner.theme === 'pink-october';
   const heroCtaHref = currentBanner.buttonLink || (isPink ? '/case-study' : '/discover');
   const heroCtaLabel = currentBanner.buttonText || (isPink ? 'ابدئي التحدي الوردي' : 'اكتشف النادي');
@@ -98,60 +122,71 @@ export default function Hero() {
       }`}
       dir="rtl"
     >
+      <AwardConfetti />
       <div className={`absolute top-1/4 left-1/2 -translate-x-1/2 w-[34rem] h-[34rem] rounded-full blur-[140px] pointer-events-none ${
         isPink ? 'bg-pink-300/25' : 'bg-[#F5D061]/22'
       }`} />
       <div className="absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-[#F5D061]/10 blur-[100px] pointer-events-none" />
 
-      <div className="relative z-10 max-w-5xl mx-auto text-center flex flex-col items-center justify-center space-y-7">
-        <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full backdrop-blur-xl text-xs sm:text-sm font-bold shadow-sm border ${
-          isPink
-            ? 'bg-white/10 border-white/40 text-pink-100'
-            : 'bg-[#F5D061]/10 border-[#F5D061]/40 text-[#F5D061]'
-        }`}>
-          <span className="inline-flex items-center gap-1.5">
-            <ClubIcon name={isPink ? 'heart' : 'sparkles'} size={14} />
-            {currentBanner.tag}
-          </span>
-        </div>
-
-        <h1 className="text-4xl sm:text-6xl font-black text-white drop-shadow-md">
-          {currentBanner.title}
-        </h1>
-
-        <div className="relative w-full max-w-4xl mx-auto">
-          <div className={`absolute -inset-3 rounded-[2.2rem] blur-2xl pointer-events-none ${
-            isPink ? 'bg-pink-400/20' : 'bg-[#F5D061]/25'
-          }`} />
-          <div
-            className={`relative overflow-hidden rounded-[1.5rem] sm:rounded-[2.2rem] p-[2px] shadow-[0_24px_60px_rgba(0,0,0,0.35)] ${
+      <div className="relative z-10 w-full max-w-5xl mx-auto text-center flex flex-col items-center justify-center space-y-7">
+        {isAward ? (
+          <h1 className="sr-only">{currentBanner.title}</h1>
+        ) : (
+          <>
+            <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full backdrop-blur-xl text-xs sm:text-sm font-bold shadow-sm border ${
               isPink
-                ? 'bg-gradient-to-br from-pink-200 via-white/30 to-[#9d174d]'
-                : 'bg-gradient-to-br from-[#F5D061] via-[#FFF3C4] to-[#C9A227]'
-            }`}
-          >
-            <div className="overflow-hidden rounded-[1.4rem] sm:rounded-[2.05rem] bg-[#1a0208]">
-              {currentBanner.image?.startsWith('data:video') || currentBanner.image?.includes('.mp4') ? (
-                <video 
-                  src={currentBanner.image} 
-                  autoPlay 
-                  loop 
-                  muted 
-                  playsInline
-                  className="w-full h-auto block object-cover max-h-[75vh] mx-auto"
-                />
-              ) : (
-                <img
-                  src={currentBanner.image || '/header-banner.png'} 
-                  alt={currentBanner.title || "بانر نادي التمريض"}
-                  className="w-full h-auto block object-cover max-h-[75vh] mx-auto"
-                />
-              )}
+                ? 'bg-white/10 border-white/40 text-pink-100'
+                : 'bg-[#F5D061]/10 border-[#F5D061]/40 text-[#F5D061]'
+            }`}>
+              <span className="inline-flex items-center gap-1.5">
+                <ClubIcon name={isPink ? 'heart' : 'sparkles'} size={14} />
+                {currentBanner.tag}
+              </span>
+            </div>
+
+            <h1 className="text-4xl sm:text-6xl font-black text-white drop-shadow-md">
+              {currentBanner.title}
+            </h1>
+          </>
+        )}
+
+        {isAward ? (
+          <ClubAwardCelebration />
+        ) : (
+          <div className="relative w-full max-w-4xl mx-auto">
+            <div className={`absolute -inset-3 rounded-[2.2rem] blur-2xl pointer-events-none ${
+              isPink ? 'bg-pink-400/20' : 'bg-[#F5D061]/25'
+            }`} />
+            <div
+              className={`relative overflow-hidden rounded-[1.5rem] sm:rounded-[2.2rem] p-[2px] shadow-[0_24px_60px_rgba(0,0,0,0.35)] ${
+                isPink
+                  ? 'bg-gradient-to-br from-pink-200 via-white/30 to-[#9d174d]'
+                  : 'bg-gradient-to-br from-[#F5D061] via-[#FFF3C4] to-[#C9A227]'
+              }`}
+            >
+              <div className="overflow-hidden rounded-[1.4rem] sm:rounded-[2.05rem] bg-[#1a0208]">
+                {currentBanner.image?.startsWith('data:video') || currentBanner.image?.includes('.mp4') ? (
+                  <video
+                    src={currentBanner.image}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-auto block object-cover max-h-[75vh] mx-auto"
+                  />
+                ) : (
+                  <img
+                    src={currentBanner.image || '/header-banner.png'}
+                    alt={currentBanner.title || 'بانر نادي التمريض'}
+                    className="w-full h-auto block object-cover max-h-[75vh] mx-auto"
+                  />
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {currentBanner.description ? (
+        {currentBanner.description && !isAward ? (
           <p className={`max-w-2xl mx-auto text-base sm:text-lg leading-relaxed text-center font-medium px-6 py-4 backdrop-blur-md rounded-2xl border ${
             isPink
               ? 'text-pink-50 bg-white/10 border-white/15'

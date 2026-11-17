@@ -25,6 +25,7 @@ import {
   submitCaseStudyLocked,
 } from '../lib/caseStudy';
 import { ClubIcon } from '../components/icons';
+import AwardConfetti from '../components/AwardConfetti';
 import WeeklyRaceBoard, { OverallRaceBoard } from '../components/WeeklyRaceExample';
 import WeeklyMechanismNotice from '../components/WeeklyMechanismNotice';
 import CaseStudyTrialPoll from '../components/CaseStudyTrialPoll';
@@ -1208,8 +1209,9 @@ export default function CaseStudyPage() {
 
   return (
     <main className="min-h-screen bg-[#F6F0E8] text-slate-900 relative" dir="rtl">
-      <div className="bg-gradient-to-r from-[#3a020c] via-[#630517] to-[#4A030F] text-white py-12 px-4 sm:px-6 shadow-xl border-b-4 border-[#F5D061]">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
+      <div className="relative overflow-hidden bg-gradient-to-r from-[#3a020c] via-[#630517] to-[#4A030F] text-white py-12 px-4 sm:px-6 shadow-xl border-b-4 border-[#F5D061]">
+        <AwardConfetti />
+        <div className="relative z-10 max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
           <div className="space-y-3 text-center sm:text-right">
             <div className="inline-flex items-center gap-2 bg-[#F5D061] text-[#630517] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
               <span className="inline-flex items-center gap-1.5"><ClubIcon name="zap" size={13} /> Daily Clinical Challenge</span>
