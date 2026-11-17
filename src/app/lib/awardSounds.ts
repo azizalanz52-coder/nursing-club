@@ -1,17 +1,13 @@
 let popPending = false;
 let popPlayed = false;
 let installed = false;
-let lastPlayedAt = 0;
-
-const CONTROL = 'a[href], button, [role="button"], [role="tab"], summary, input[type="checkbox"], input[type="radio"], input[type="submit"], input[type="button"]';
-const FIELD = 'input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]), textarea, select, [contenteditable="true"]';
 
 function tone(freq: number, ms: number, volume: number, rate = 22050) {
   const count = Math.max(1, Math.floor((rate * ms) / 1000));
   const samples = new Float32Array(count);
   for (let i = 0; i < count; i += 1) {
     const t = i / rate;
-    const env = Math.exp(-t * (ms < 70 ? 46 : 16));
+    const env = Math.exp(-t * 16);
     samples[i] = Math.sin(2 * Math.PI * freq * t) * env * volume;
   }
   return samples;
@@ -58,16 +54,6 @@ function wavUri(samples: Float32Array, rate = 22050) {
   return `data:audio/wav;base64,${btoa(binary)}`;
 }
 
-const CLICK = wavUri(tone(1480, 42, 0.95));
-const OPEN = wavUri(mix([
-  tone(523, 90, 0.72),
-  (() => {
-    const high = tone(784, 110, 0.62);
-    const delayed = new Float32Array(high.length + 700);
-    delayed.set(high, 700);
-    return delayed;
-  })(),
-]));
 const POP = wavUri(mix([
   tone(210, 140, 0.9),
   (() => {
@@ -81,48 +67,25 @@ const POP = wavUri(mix([
   })(),
 ]));
 
-function playClip(uri: string) {
-  const audio = new Audio(uri);
+function playPop() {
+  const audio = new Audio(POP);
   audio.volume = 1;
   audio.setAttribute('playsinline', 'true');
   void audio.play().catch(() => undefined);
 }
 
-function controlOf(event: Event) {
-  const target = event.target;
-  if (!(target instanceof Element)) return null;
-  if (target.closest(FIELD)) return null;
-  const control = target.closest(CONTROL);
-  if (!(control instanceof HTMLElement)) return null;
-  if (control.matches(':disabled') || control.getAttribute('aria-disabled') === 'true') return null;
-  return control;
-}
-
-function isEntrance(control: HTMLElement) {
-  const label = `${control.getAttribute('aria-label') || ''} ${control.textContent || ''} ${control.getAttribute('href') || ''}`;
-  return /اكتشف|لوحة|بواب|دخول|تسجيل الدخول|dashboard|admin|discover|committee/i.test(label);
-}
-
-function onPress(event: Event) {
-  const now = performance.now();
-  if (now - lastPlayedAt < 280) return;
-  const control = controlOf(event);
-  if (!control && !(popPending && !popPlayed)) return;
-  lastPlayedAt = now;
-  if (popPending && !popPlayed) {
-    popPending = false;
-    popPlayed = true;
-    playClip(POP);
-  }
-  if (!control) return;
-  playClip(isEntrance(control) ? OPEN : CLICK);
+function onFirstTouch() {
+  if (!popPending || popPlayed) return;
+  popPending = false;
+  popPlayed = true;
+  playPop();
 }
 
 export function prepareAwardSound() {
   if (installed || typeof window === 'undefined') return;
   installed = true;
-  window.addEventListener('touchstart', onPress, { capture: true, passive: true });
-  window.addEventListener('pointerdown', onPress, { capture: true, passive: true });
+  window.addEventListener('touchstart', onFirstTouch, { capture: true, passive: true });
+  window.addEventListener('pointerdown', onFirstTouch, { capture: true, passive: true });
 }
 
 export function playPopperBurst() {
