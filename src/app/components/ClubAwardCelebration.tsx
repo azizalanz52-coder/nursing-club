@@ -74,11 +74,11 @@ export default function ClubAwardCelebration() {
         ))}
       </div>
 
-      <div className="w-full overflow-hidden rounded-[1.15rem] border border-[#F5D061]/85 bg-[#1a0208] shadow-[0_16px_36px_rgba(0,0,0,0.28)]">
+      <div className="max-w-full overflow-hidden rounded-[1.15rem] border border-[#F5D061]/85 bg-[#1a0208] shadow-[0_16px_36px_rgba(0,0,0,0.28)]">
         <img
           src={award.image}
           alt="تتويج نادي التمريض بالمركز الأول في حفل روّاد التفوق والتميز"
-          className="block h-auto w-full max-h-[52vh] object-contain"
+          className="block h-auto max-h-[68vh] w-auto max-w-full"
         />
       </div>
     </div>
