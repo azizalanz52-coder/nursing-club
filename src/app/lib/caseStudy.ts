@@ -85,6 +85,17 @@ export type CaseSolveAttempt = {
   score?: number | null;
 };
 
+export const FIRST_PLACE_BONUS_POINTS = 3;
+export const FIRST_PLACE_BONUS_LABEL = '3+ بمناسبة حصول نادي التمريض على المركز الاول';
+const FIRST_PLACE_BONUS_FROM_MS = Date.parse('2026-11-18T12:00:00+03:00');
+const FIRST_PLACE_BONUS_UNTIL_MS = Date.parse('2026-11-19T00:00:00+03:00');
+
+export function firstPlaceBonusAmount(now = Date.now()) {
+  return now >= FIRST_PLACE_BONUS_FROM_MS && now < FIRST_PLACE_BONUS_UNTIL_MS
+    ? FIRST_PLACE_BONUS_POINTS
+    : 0;
+}
+
 export type CaseStudySubmitPayload = {
   studentName: string;
   phone: string;
@@ -96,6 +107,7 @@ export type CaseStudySubmitPayload = {
   bonusAmount: number;
   persistenceBonus: number;
   persistenceWeek: string | null;
+  awardBonus: number;
   answers: Record<number, number>;
 };
 
@@ -245,6 +257,7 @@ export async function submitCaseStudyLocked(
       bonusAmount: Number(payload.bonusAmount) || 0,
       persistenceBonus: Number(payload.persistenceBonus) || 0,
       persistenceWeek: payload.persistenceWeek,
+      awardBonus: Number(payload.awardBonus) || 0,
       answers: payload.answers || {},
       timestamp: now,
       createdAt: when.toISOString(),
@@ -457,6 +470,7 @@ export function scoreBreakdown(sub: Record<string, any> | null | undefined): Sco
   const total = Number(sub?.score || 0);
   const surprise = Number(sub?.bonusAmount || 0);
   const persistence = Number(sub?.persistenceBonus || 0);
+  const award = Number(sub?.awardBonus || 0);
   const adminLogged = adjustmentSum(sub);
   const cap = Number(sub?.total || 3) + surprise;
   if (typeof sub?.solveScore === 'number') {
@@ -466,17 +480,17 @@ export function scoreBreakdown(sub: Record<string, any> | null | undefined): Sco
       surprise,
       persistence,
       adminLogged,
-      unverified: Math.max(0, total - solve - persistence - adminLogged),
+      unverified: Math.max(0, total - solve - persistence - adminLogged - award),
       total,
     };
   }
-  const estimatedSolve = Math.min(Math.max(0, total - adminLogged - persistence), cap);
+  const estimatedSolve = Math.min(Math.max(0, total - adminLogged - persistence - award), cap);
   return {
     solve: estimatedSolve,
     surprise,
     persistence,
     adminLogged,
-    unverified: Math.max(0, total - estimatedSolve - persistence - adminLogged),
+    unverified: Math.max(0, total - estimatedSolve - persistence - adminLogged - award),
     total,
   };
 }
@@ -597,11 +611,12 @@ export const ADMIN_CASE_DAY_CREDITS: Array<{
 function rawSolvePoints(sub: Record<string, any>) {
   const surprise = Number(sub.bonusAmount || 0);
   const persistence = Number(sub.persistenceBonus || 0);
+  const award = Number(sub.awardBonus || 0);
   const admin = adjustmentSum(sub);
   const totalScore = Number(sub.score || 0);
   const stripped = typeof sub.solveScore === 'number'
     ? Number(sub.solveScore) - surprise
-    : totalScore - surprise - persistence - admin;
+    : totalScore - surprise - persistence - admin - award;
   return Math.max(0, Math.round(stripped));
 }
 

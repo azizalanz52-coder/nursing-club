@@ -117,11 +117,12 @@ function personKey(sub: Record<string, any>) {
 function correctAnswersOf(sub: Record<string, any>) {
   const surprise = Number(sub.bonusAmount || 0);
   const persistence = Number(sub.persistenceBonus || 0);
+  const award = Number(sub.awardBonus || 0);
   const admin = adjustmentSum(sub);
   const totalScore = Number(sub.score || 0);
   const stripped = typeof sub.solveScore === 'number'
     ? Number(sub.solveScore) - surprise
-    : totalScore - surprise - persistence - admin;
+    : totalScore - surprise - persistence - admin - award;
   return Math.min(WEEKLY_DAY_CAP, Math.max(0, Math.round(stripped)));
 }
 

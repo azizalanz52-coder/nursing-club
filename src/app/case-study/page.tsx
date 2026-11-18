@@ -18,6 +18,8 @@ import {
   loadCaseSubmissions,
   loadCaseSubmissionsForPhone,
   loadTodayCaseSubmission,
+  firstPlaceBonusAmount,
+  FIRST_PLACE_BONUS_LABEL,
   persistenceForSubmit,
   readCaseSolveAttempt,
   riyadhParts,
@@ -815,6 +817,8 @@ export default function CaseStudyPage() {
   const [timeLeft, setTimeLeft] = useState('');
   const [revealedBonus, setRevealedBonus] = useState<RevealedBonus | null>(null);
   const [persistenceBonus, setPersistenceBonus] = useState(0);
+  const [awardBonus, setAwardBonus] = useState(0);
+  const firstPlacePoints = firstPlaceBonusAmount();
   const [authReady, setAuthReady] = useState(false);
 
   const [studentName, setStudentName] = useState('');
@@ -1071,12 +1075,14 @@ export default function CaseStudyPage() {
   const applySavedSubmission = (row: Record<string, any>) => {
     const persistence = Number(row.persistenceBonus || 0);
     const bonusAmount = Number(row.bonusAmount || 0);
+    const award = Number(row.awardBonus || 0);
     const totalCases = Number(row.total || 3);
     setHasSubmittedToday(true);
     setShowResults(true);
     setPersistenceBonus(persistence);
+    setAwardBonus(award);
     setRecordedScore(Number(row.score || 0));
-    setRecordedMax(totalCases + bonusAmount + persistence);
+    setRecordedMax(totalCases + bonusAmount + persistence + award);
     if (row.bonusQuestionId) {
       setRevealedBonus({ questionId: Number(row.bonusQuestionId), amount: bonusAmount });
     }
@@ -1155,7 +1161,9 @@ export default function CaseStudyPage() {
       }
       const ownSubs = await loadCaseSubmissionsForPhone(db, phoneKey);
       const persistence = persistenceForSubmit(ownSubs, phoneKey, now);
-      const score = solveScore + persistence.amount;
+      const allCorrect = activeCases.length > 0 && activeCases.every((item) => selectedAnswers[item.id] === item.correctIndex);
+      const award = allCorrect ? firstPlaceBonusAmount(now) : 0;
+      const score = solveScore + persistence.amount + award;
       const startedAt =
         solveStartedAt
         || Number(localStorage.getItem(caseSolveTimerKey()) || 0)
@@ -1175,6 +1183,7 @@ export default function CaseStudyPage() {
         bonusAmount: bonus?.amount || 0,
         persistenceBonus: persistence.amount,
         persistenceWeek: persistence.weekKey || null,
+        awardBonus: award,
         answers: selectedAnswers,
       }, now);
 
@@ -1193,8 +1202,9 @@ export default function CaseStudyPage() {
 
       setRevealedBonus(bonus);
       setPersistenceBonus(persistence.amount);
+      setAwardBonus(award);
       setRecordedScore(score);
-      setRecordedMax(activeCases.length + (bonus?.amount || 0) + persistence.amount);
+      setRecordedMax(activeCases.length + (bonus?.amount || 0) + persistence.amount + award);
       setHasSubmittedToday(true);
       setShowResults(true);
       clearAnswersDraft();
@@ -1223,6 +1233,11 @@ export default function CaseStudyPage() {
               <ClubIcon name="clock" size={14} className="inline-block align-middle" /> <span>يتجدد التحدي بعد: </span>
               <strong suppressHydrationWarning className="text-[#F5D061] font-black px-1">{timeLeft || 'جاري التحديث...'}</strong>
             </div>
+            {firstPlacePoints > 0 ? (
+              <p className="bg-[#F5D061] text-[#630517] font-black text-sm leading-7 px-4 py-3 rounded-2xl">
+                {FIRST_PLACE_BONUS_LABEL}
+              </p>
+            ) : null}
             <div>
               <Link href="/" className="text-xs text-[#F5D061] hover:underline font-bold inline-block pt-1">
                 العودة للرئيسية
@@ -1526,6 +1541,11 @@ export default function CaseStudyPage() {
         ) : showResults ? (
           <div className="bg-amber-50 border-2 border-[#F5D061] p-6 rounded-3xl space-y-3 text-center" dir="rtl">
             <h3 className="text-xl font-black text-[#630517]">نتيجتك: {recordedScore ?? (calculateScore() + persistenceBonus)} / {recordedMax ?? (getMaxPossibleScore() + persistenceBonus)}</h3>
+            {awardBonus > 0 ? (
+              <p className="text-sm text-[#630517] font-black bg-white/80 border border-[#F5D061] rounded-2xl px-4 py-3">
+                {FIRST_PLACE_BONUS_LABEL}
+              </p>
+            ) : null}
             {persistenceBonus > 0 ? (
               <p className="text-sm text-[#630517] font-black bg-white/80 border border-[#F5D061] rounded-2xl px-4 py-3">
                 شكراً لاستمراريتك معنا طول الأسبوع في الحل
@@ -1533,7 +1553,7 @@ export default function CaseStudyPage() {
             ) : null}
             {revealedBonus ? (
               <p className="text-xs text-amber-800 font-bold">ظهر بونص مفاجئ بعد التسليم على الحالة {revealedBonus.questionId}.</p>
-            ) : (
+            ) : awardBonus > 0 ? null : (
               <p className="text-xs text-stone-600 font-medium">ما ظهر بونص إضافي اليوم. نراك في تحدي الغد.</p>
             )}
             <p className="text-xs text-stone-600 font-medium">
