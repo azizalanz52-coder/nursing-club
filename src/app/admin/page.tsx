@@ -6,13 +6,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '../lib/firebase';
 import { writeCloudCollection } from '../lib/cloudCache';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, increment, deleteField } from 'firebase/firestore';
+import { arrayUnion, collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, addDoc, increment, deleteField } from 'firebase/firestore';
 import { isIncompleteUserAccount, notifyCommitteeByKeyword, omitPassword, setUserPasswordOnPhone } from '../lib/userAccounts';
 import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle, scientificPdfUrl, scientificStatusLabel } from '../lib/scientificTexts';
 import { DISCOVER_GALLERY_FOLDER, DISCOVER_GALLERY_MAX_PHOTOS, filterFilesWithinLimit, filterMediaFilesWithinLimit, isOverUploadLimit, isPlaceholderCertMedia, mediaUploadLimitMessage, requireAuthUser, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
 import { countEventGalleryPhotos, subscribeDiscoverGalleryFiles, type DiscoverGalleryFile } from '../lib/discoverGallery';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/issueCertificate';
 import { DEFAULT_WELCOME_BANNER, WELCOME_BANNER_ID } from '../lib/welcomeBanner';
+import { BANNER_CONTROL_DOC, CLUB_AWARD_POSTER_BANNER, CLUB_AWARD_POSTER_ID, readBannerControl } from '../lib/clubAwardCelebration';
 import { clubConfirm, inferNoticeKind } from '../lib/clubNotice';
 import { ClubNoticeDialog } from '../components/ClubNotice';
 import HrCertificateBatches from '../components/HrCertificateBatches';
@@ -1413,6 +1414,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const [newDesc, setNewDesc] = useState<string>('');
 
   const [banners, setBanners] = useState<BannerItem[]>([]);
+  const [welcomeOnHome, setWelcomeOnHome] = useState(false);
   const [bannerTag, setBannerTag] = useState<string>('');
   const [bannerTitle, setBannerTitle] = useState<string>('');
   const [bannerDescription, setBannerDescription] = useState<string>('');
@@ -1556,10 +1558,20 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           if (!welcomeSnap.exists()) {
             await setDoc(welcomeRef, DEFAULT_WELCOME_BANNER);
           }
-          const bannersSnap = await getDocs(collection(db, 'site_banners'));
+          const [bannersSnap, controlSnap] = await Promise.all([
+            getDocs(collection(db, 'site_banners')),
+            getDoc(doc(db, 'site_settings', BANNER_CONTROL_DOC)),
+          ]);
           if (cancelled) return;
+          const control = readBannerControl(controlSnap.data());
+          const posterRetired = control.posterRetired;
+          setWelcomeOnHome(control.welcomeOnHome);
           const bannersList: BannerItem[] = [];
           bannersSnap.forEach((d) => { bannersList.push({ id: d.id, ...d.data() } as BannerItem); });
+          if (!posterRetired && !bannersList.some((item) => item.id === CLUB_AWARD_POSTER_ID)) {
+            await setDoc(doc(db, 'site_banners', CLUB_AWARD_POSTER_ID), CLUB_AWARD_POSTER_BANNER);
+            bannersList.push(CLUB_AWARD_POSTER_BANNER);
+          }
           bannersList.sort((a, b) => {
             if (a.id === WELCOME_BANNER_ID) return -1;
             if (b.id === WELCOME_BANNER_ID) return 1;
@@ -2595,9 +2607,38 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     }
   };
 
+  const handleToggleWelcomeHome = () => {
+    const next = !welcomeOnHome;
+    triggerConfirmModal(
+      next
+        ? 'نرجّع بنر الترحيب للصفحة الرئيسية؟'
+        : 'نخفي بنر الترحيب من الصفحة الرئيسية؟ يبقى محفوظ في لوحة التحكم.',
+      async () => {
+        try {
+          await setDoc(doc(db, 'site_settings', BANNER_CONTROL_DOC), { welcomeOnHome: next }, { merge: true });
+          setWelcomeOnHome(next);
+          setModalMessage(next ? 'الترحيب رجع للرئيسية.' : 'الترحيب انشال من الرئيسية وبقي في لوحة التحكم.');
+          setModalType('success');
+        } catch (err) {
+          console.error(err);
+        }
+      },
+    );
+  };
+
   const handleDeleteBanner = (id: string) => {
-    triggerConfirmModal('هل أنت متأكد من حذف هذا البانر؟', async () => {
+    if (id === WELCOME_BANNER_ID) {
+      handleToggleWelcomeHome();
+      return;
+    }
+    const prompt = id === CLUB_AWARD_POSTER_ID
+      ? 'نحذف مباركة المركز الأول من الرئيسية؟ الترحيب يبقى في لوحة التحكم لين ترجعه.'
+      : 'هل أنت متأكد من حذف هذا البانر؟';
+    triggerConfirmModal(prompt, async () => {
       try {
+        if (id === CLUB_AWARD_POSTER_ID) {
+          await setDoc(doc(db, 'site_settings', BANNER_CONTROL_DOC), { retiredIds: arrayUnion(id) }, { merge: true });
+        }
         await deleteDoc(doc(db, 'site_banners', id));
         const nextBanners = banners.filter((b) => b.id !== id);
         setBanners(nextBanners);
@@ -5560,7 +5601,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
               <div className="space-y-1">
                 <h3 className="text-xl font-black text-slate-900">بنرات الصفحة الترحيبية</h3>
                 <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  أول بطاقة هي بنر NURSS الترحيبي اللي كان ثابتاً في الكود. غيّر صورته من هنا، وPink October بنر منفصل تقدر تحذفه أو تخليه معهم.
+                  المباركة باقية في الرئيسية بكلامها. بنر الترحيب السابق محفوظ هنا وما يظهر في الرئيسية إلا إذا رجّعته.
                 </p>
               </div>
               {banners.length === 0 ? (
@@ -5576,7 +5617,11 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                       />
                       <p className="text-sm font-black text-slate-900">{ban.title}</p>
                       <p className="text-[11px] text-slate-500 font-bold">
-                        {ban.id === WELCOME_BANNER_ID ? 'البنر الترحيبي الافتراضي (NURSS)' : ban.tag}
+                        {ban.id === WELCOME_BANNER_ID
+                          ? (welcomeOnHome ? 'الترحيب السابق ظاهر في الرئيسية' : 'الترحيب السابق محفوظ هنا، مو ظاهر في الرئيسية')
+                          : ban.id === CLUB_AWARD_POSTER_ID
+                            ? 'مباركة المركز الأول — الكلام ثابت، والصورة هي البوستر'
+                            : ban.tag}
                       </p>
                       <div className="flex flex-wrap items-center gap-2">
                         <label className="px-3 py-1.5 rounded-lg bg-[#630517] text-[#F5D061] font-bold text-[11px] cursor-pointer">
@@ -5598,7 +5643,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                           onClick={() => handleDeleteBanner(ban.id)}
                           className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold text-[11px] hover:bg-red-100 cursor-pointer"
                         >
-                          حذف
+                          {ban.id === WELCOME_BANNER_ID ? (welcomeOnHome ? 'إخفاؤه من الرئيسية' : 'إرجاعه للرئيسية') : ban.id === CLUB_AWARD_POSTER_ID ? 'حذف المباركة' : 'حذف'}
                         </button>
                       </div>
                     </div>
@@ -5781,7 +5826,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                             onClick={() => handleDeleteBanner(ban.id)}
                             className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 cursor-pointer"
                           >
-                            حذف ✕
+                            {ban.id === WELCOME_BANNER_ID ? (welcomeOnHome ? 'إخفاء من الرئيسية' : 'إرجاع للرئيسية') : ban.id === CLUB_AWARD_POSTER_ID ? 'حذف المباركة' : 'حذف ✕'}
                           </button>
                         </td>
                       </tr>

@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { isClubAwardLive } from '../lib/clubAwardCelebration';
+import { db } from '../lib/firebase';
+import { BANNER_CONTROL_DOC, readBannerControl } from '../lib/clubAwardCelebration';
+import { doc, getDoc } from 'firebase/firestore';
 
 const PIECES = [
   { left: '3%', delay: '0s', duration: '7.2s', color: '#F5D061', w: 10, h: 16, round: false },
@@ -28,10 +30,22 @@ export default function AwardConfetti() {
   const [live, setLive] = useState(false);
 
   useEffect(() => {
-    const sync = () => setLive(isClubAwardLive());
+    let cancelled = false;
+    const sync = () => {
+      void getDoc(doc(db, 'site_settings', BANNER_CONTROL_DOC))
+        .then((snap) => {
+          if (!cancelled) setLive(!readBannerControl(snap.data()).posterRetired);
+        })
+        .catch(() => {
+          if (!cancelled) setLive(true);
+        });
+    };
     sync();
     const timer = window.setInterval(sync, 60_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, []);
 
   if (!live) return null;

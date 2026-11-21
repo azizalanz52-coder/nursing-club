@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { isClubAwardLive } from '../lib/clubAwardCelebration';
+import { db } from '../lib/firebase';
+import { BANNER_CONTROL_DOC, readBannerControl } from '../lib/clubAwardCelebration';
+import { doc, getDoc } from 'firebase/firestore';
 
 const AWARD_PATHS = new Set(['/', '/case-study']);
 const SPLASH_KEY = 'nurs_splash_seen';
@@ -64,10 +66,22 @@ export default function AwardPopper() {
   const [play, setPlay] = useState(false);
 
   useEffect(() => {
-    const sync = () => setLive(isClubAwardLive());
+    let cancelled = false;
+    const sync = () => {
+      void getDoc(doc(db, 'site_settings', BANNER_CONTROL_DOC))
+        .then((snap) => {
+          if (!cancelled) setLive(!readBannerControl(snap.data()).posterRetired);
+        })
+        .catch(() => {
+          if (!cancelled) setLive(true);
+        });
+    };
     sync();
     const timer = window.setInterval(sync, 60_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {

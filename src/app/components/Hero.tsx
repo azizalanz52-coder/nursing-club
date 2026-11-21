@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from "next/link";
 import { db } from './../lib/firebase';
-import { DEFAULT_WELCOME_BANNER } from '../lib/welcomeBanner';
+import { DEFAULT_WELCOME_BANNER, WELCOME_BANNER_ID } from '../lib/welcomeBanner';
 import { loadCloudCollection, peekCloudCollection } from '../lib/cloudCache';
-import { CLUB_AWARD_BANNER_ID, CLUB_AWARD_CELEBRATION, isClubAwardLive } from '../lib/clubAwardCelebration';
+import { BANNER_CONTROL_DOC, CLUB_AWARD_BANNER_ID, CLUB_AWARD_POSTER_BANNER, CLUB_AWARD_POSTER_ID, readBannerControl } from '../lib/clubAwardCelebration';
+import { doc, getDoc } from 'firebase/firestore';
 import { ClubIcon } from './icons';
 import ClubAwardCelebration from './ClubAwardCelebration';
 import AwardConfetti from './AwardConfetti';
@@ -30,33 +31,23 @@ function sortBanners(list: BannerItem[]) {
   });
 }
 
-function awardBanner(): BannerItem {
-  return {
-    id: CLUB_AWARD_BANNER_ID,
-    tag: `حفل ${CLUB_AWARD_CELEBRATION.ceremony}`,
-    title: CLUB_AWARD_CELEBRATION.award,
-    description: `${CLUB_AWARD_CELEBRATION.place} ${CLUB_AWARD_CELEBRATION.scope}`,
-    image: CLUB_AWARD_CELEBRATION.image,
-    buttonText: 'اكتشف النادي',
-    buttonLink: '/discover',
-    theme: 'club',
-    cinematic: true,
-  };
-}
+const HIDDEN_HOME = { posterRetired: false, welcomeOnHome: false };
 
-function presentBanners(list: BannerItem[]) {
-  const sorted = sortBanners(list.filter((item) => item.id !== CLUB_AWARD_BANNER_ID));
-  const welcome = sorted.length ? sorted : [DEFAULT_WELCOME_BANNER];
-  if (!isClubAwardLive()) return welcome;
-  return [awardBanner()];
+function presentBanners(list: BannerItem[], control: { posterRetired: boolean; welcomeOnHome: boolean }) {
+  const poster = list.find((item) => item.id === CLUB_AWARD_POSTER_ID) ?? CLUB_AWARD_POSTER_BANNER;
+  const rest = sortBanners(list.filter((item) => item.id !== CLUB_AWARD_POSTER_ID && item.id !== CLUB_AWARD_BANNER_ID));
+  const withWelcome = rest.some((item) => item.id === WELCOME_BANNER_ID)
+    ? rest
+    : [DEFAULT_WELCOME_BANNER, ...rest];
+  const published = control.welcomeOnHome ? withWelcome : [];
+  const slides = control.posterRetired ? published : [poster, ...published];
+  return slides.length ? slides : [DEFAULT_WELCOME_BANNER];
 }
 
 export default function Hero() {
-  const [banners, setBanners] = useState<BannerItem[]>(() => presentBanners([DEFAULT_WELCOME_BANNER]));
+  const [banners, setBanners] = useState<BannerItem[]>(() => presentBanners([], HIDDEN_HOME));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [live, setLive] = useState(false);
-  const sourceRef = useRef<BannerItem[]>([DEFAULT_WELCOME_BANNER]);
-  const awardLiveRef = useRef(isClubAwardLive());
 
   useEffect(() => {
     setLive(true);
@@ -67,12 +58,16 @@ export default function Hero() {
     let cancelled = false;
     const cached = peekCloudCollection<BannerItem>('site_banners');
     if (cached?.length) {
-      sourceRef.current = cached;
-      setBanners(presentBanners(cached));
+      setBanners(presentBanners(cached, HIDDEN_HOME));
     }
     localStorage.removeItem('UHB_BANNERS');
 
-    void loadCloudCollection<BannerItem>(db, 'site_banners', {
+    const controlPromise = getDoc(doc(db, 'site_settings', BANNER_CONTROL_DOC))
+      .then((snap) => readBannerControl(snap.data()))
+      .catch(() => HIDDEN_HOME);
+
+    void Promise.all([
+      loadCloudCollection<BannerItem>(db, 'site_banners', {
       mapDoc: (id, dat) => ({
         id,
         tag: String(dat.tag || 'مناسبة خاصة'),
@@ -84,17 +79,12 @@ export default function Hero() {
         theme: dat.theme === 'pink-october' ? 'pink-october' : 'club',
         cinematic: Boolean(dat.cinematic),
       }),
-    })
-      .then((cloudList) => {
+    }),
+      controlPromise,
+    ])
+      .then(([cloudList, control]) => {
         if (cancelled) return;
-        if (!cloudList.length) {
-          sourceRef.current = [DEFAULT_WELCOME_BANNER];
-          setBanners(presentBanners(sourceRef.current));
-          setCurrentIndex(0);
-          return;
-        }
-        sourceRef.current = cloudList;
-        setBanners(presentBanners(cloudList));
+        setBanners(presentBanners(cloudList, control));
         setCurrentIndex(0);
       })
       .catch((err) => {
@@ -107,19 +97,8 @@ export default function Hero() {
   }, [live]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      const next = isClubAwardLive();
-      if (next === awardLiveRef.current) return;
-      awardLiveRef.current = next;
-      setBanners(presentBanners(sourceRef.current));
-      setCurrentIndex(0);
-    }, 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     if (banners.length <= 1) return;
-    const delay = banners[currentIndex]?.id === CLUB_AWARD_BANNER_ID ? 15000 : 5000;
+    const delay = banners[currentIndex]?.id === CLUB_AWARD_POSTER_ID ? 15000 : 5000;
     const timer = window.setTimeout(() => {
       setCurrentIndex((prev) => (prev + 1) % banners.length);
     }, delay);
@@ -127,14 +106,16 @@ export default function Hero() {
   }, [banners, currentIndex]);
 
   const currentBanner = banners[currentIndex] || banners[0];
-  const isAward = currentBanner.id === CLUB_AWARD_BANNER_ID;
+  const isPoster = currentBanner.id === CLUB_AWARD_POSTER_ID;
   const isPink = currentBanner.theme === 'pink-october';
   const heroCtaHref = currentBanner.buttonLink || (isPink ? '/case-study' : '/discover');
   const heroCtaLabel = currentBanner.buttonText || (isPink ? 'ابدئي التحدي الوردي' : 'اكتشف النادي');
 
   return (
     <section 
-      className={`relative min-h-[85vh] flex items-center justify-center overflow-hidden px-4 sm:px-6 lg:px-8 text-white pt-10 pb-16 ${
+      className={`relative flex overflow-hidden px-4 sm:px-6 lg:px-8 text-white ${
+        isPoster ? 'items-start justify-center py-6' : 'min-h-[85vh] items-center justify-center pt-10 pb-16'
+      } ${
         isPink
           ? 'bg-gradient-to-br from-[#4a0326] via-[#9d174d] to-[#be185d]'
           : 'bg-[radial-gradient(ellipse_at_50%_0%,rgba(245,208,97,0.18),transparent_42%),linear-gradient(165deg,#2a050c_0%,#630517_48%,#1a0208_100%)]'
@@ -147,8 +128,8 @@ export default function Hero() {
       }`} />
       <div className="absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-[#F5D061]/10 blur-[100px] pointer-events-none" />
 
-      <div className="relative z-10 w-full max-w-5xl mx-auto text-center flex flex-col items-center justify-center space-y-7">
-        {isAward ? (
+      <div className={`relative z-10 w-full max-w-5xl mx-auto text-center flex flex-col items-center ${isPoster ? 'justify-start gap-4' : 'justify-center space-y-7'}`}>
+        {isPoster ? (
           <h1 className="sr-only">{currentBanner.title}</h1>
         ) : (
           <>
@@ -169,8 +150,8 @@ export default function Hero() {
           </>
         )}
 
-        {isAward ? (
-          <ClubAwardCelebration />
+        {isPoster ? (
+          <ClubAwardCelebration image={currentBanner.image || CLUB_AWARD_POSTER_BANNER.image} />
         ) : (
           <div className="relative w-full max-w-4xl mx-auto">
             <div className={`absolute -inset-3 rounded-[2.2rem] blur-2xl pointer-events-none ${
@@ -205,7 +186,7 @@ export default function Hero() {
           </div>
         )}
 
-        {currentBanner.description && !isAward ? (
+        {currentBanner.description && !isPoster ? (
           <p className={`max-w-2xl mx-auto text-base sm:text-lg leading-relaxed text-center font-medium px-6 py-4 backdrop-blur-md rounded-2xl border ${
             isPink
               ? 'text-pink-50 bg-white/10 border-white/15'

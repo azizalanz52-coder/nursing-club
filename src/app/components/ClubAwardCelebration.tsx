@@ -9,7 +9,7 @@ const LINES = [
   { key: 'scope', motion: 'award-line-scope', className: 'text-xl font-bold text-[#FFF6D6] sm:text-2xl' },
 ] as const;
 
-export default function ClubAwardCelebration() {
+export default function ClubAwardCelebration({ image }: { image: string }) {
   const award = CLUB_AWARD_CELEBRATION;
   const copy = {
     ceremony: `حفل ${award.ceremony}`,
@@ -37,6 +37,9 @@ export default function ClubAwardCelebration() {
         .award-line-place span { animation-name: awardLinePlace; }
         .award-line-award span { animation-name: awardLineAward; }
         .award-line-scope span { animation-name: awardLineScope; }
+        .award-photo {
+          animation: awardPhotoIn 15s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+        }
         @keyframes awardLineCeremony {
           0%, 1.3% { transform: translateY(110%); }
           7% { transform: translateY(0); }
@@ -61,12 +64,18 @@ export default function ClubAwardCelebration() {
           92% { transform: translateY(0); }
           96%, 100% { transform: translateY(110%); }
         }
+        @keyframes awardPhotoIn {
+          0% { opacity: 0; transform: translateY(28px) scale(0.96); }
+          14% { opacity: 1; transform: translateY(0) scale(1); }
+          92% { opacity: 1; transform: translateY(0) scale(1); }
+          100% { opacity: 0; transform: translateY(16px) scale(0.98); }
+        }
         @media (prefers-reduced-motion: reduce) {
-          .award-mask span { animation: none; transform: none; }
+          .award-mask span, .award-photo { animation: none; transform: none; opacity: 1; }
         }
       `}</style>
 
-      <div className="flex min-h-[14rem] flex-col items-center justify-end gap-1 text-center sm:min-h-[16rem] sm:gap-2">
+      <div className="flex flex-col items-center justify-end gap-0 text-center">
         {LINES.map((line) => (
           <p key={line.key} className={`award-mask ${line.motion} ${line.className}`}>
             <span>{copy[line.key]}</span>
@@ -74,11 +83,11 @@ export default function ClubAwardCelebration() {
         ))}
       </div>
 
-      <div className="max-w-full overflow-hidden rounded-[1.15rem] border border-[#F5D061]/85 bg-[#1a0208] shadow-[0_16px_36px_rgba(0,0,0,0.28)]">
+      <div className="award-photo max-w-full overflow-hidden rounded-[1.15rem] border border-[#F5D061]/85 bg-[#1a0208] shadow-[0_16px_36px_rgba(0,0,0,0.28)]">
         <img
-          src={award.image}
-          alt="تتويج نادي التمريض بالمركز الأول في حفل روّاد التفوق والتميز"
-          className="block h-auto max-h-[68vh] w-auto max-w-full"
+          src={image}
+          alt="تهنئة نادي التمريض بالمركز الأول لعام 25-26"
+          className="block h-auto max-h-[38vh] w-auto max-w-full sm:max-h-[42vh]"
         />
       </div>
     </div>
