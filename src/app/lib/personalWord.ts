@@ -45,3 +45,20 @@ export async function assignPersonalWord(phone: string, now = Date.now()) {
 
   return list[0];
 }
+
+export async function releaseEmptyWord(phone: string, word: string) {
+  if (!phone || !word) return;
+  const day = riyadhDateKey();
+  const assignRef = doc(db, 'word_assignments', `${phone}_${day}`);
+  const claimRef = doc(db, 'word_claims', claimId(day, word));
+  await runTransaction(db, async (tx) => {
+    const assign = await tx.get(assignRef);
+    const data = assign.data();
+    const guesses = Array.isArray(data?.guesses) ? data.guesses : [];
+    if (!assign.exists() || guesses.length || data?.startedAt) return;
+    if (data?.word !== word) return;
+    const claim = await tx.get(claimRef);
+    tx.delete(assignRef);
+    if (claim.exists() && claim.data()?.phone === phone) tx.delete(claimRef);
+  });
+}

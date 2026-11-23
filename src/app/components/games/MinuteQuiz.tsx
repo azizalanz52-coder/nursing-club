@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ClubIcon } from '../icons';
 import { msUntilNextWord, riyadhDateKey } from '../../lib/dailyWord';
-import { loadGamePlays, recordGamePlay } from '../../lib/gameActivity';
+import { answerQuiz, loadMyPlay, recordGamePlay } from '../../lib/gameActivity';
 import { quizShareText } from '../../lib/shareResult';
 import ShareResultButton from './ShareResultButton';
 
@@ -61,8 +61,8 @@ function resultCopy(score: number) {
   return 'الخيارات كلها تبدو مقبولة، والأصح واحد. اقرأ التوضيح قبل محاولة الغد.';
 }
 
-function quizKey() {
-  return `nurs-quiz-${riyadhDateKey()}`;
+function quizKey(phone: string) {
+  return `nurs-quiz-${phone}-${riyadhDateKey()}`;
 }
 
 export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; name: string; onPlayed?: () => void }) {
@@ -72,82 +72,123 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
   const [done, setDone] = useState(false);
   const [durationMs, setDurationMs] = useState<number | undefined>();
   const [left, setLeft] = useState(0);
+  const [ready, setReady] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [saving, setSaving] = useState(false);
   const startedAt = useRef<number | null>(null);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(quizKey());
-    if (saved) {
-      try {
-        const row = JSON.parse(saved) as { step?: number; score?: number; done?: boolean; startedAt?: number; durationMs?: number };
-        if (row.done) {
-          setScore(Number(row.score) || 0);
-          setDone(true);
-          if (row.durationMs) setDurationMs(row.durationMs);
-        }
-        if (row.startedAt) startedAt.current = row.startedAt;
-      } catch {
-        window.localStorage.removeItem(quizKey());
-      }
-    }
-    void loadGamePlays(riyadhDateKey()).then(async (list) => {
-      const mine = list.find((row) => row.game === 'quiz' && row.phone === phone && row.status === 'finished');
-      if (mine) {
-        setScore(mine.score || 0);
-        setDone(true);
-        if (mine.durationMs) setDurationMs(mine.durationMs);
-        window.localStorage.setItem(quizKey(), JSON.stringify({ done: true, score: mine.score || 0, durationMs: mine.durationMs }));
+    let cancelled = false;
+    const key = quizKey(phone);
+    const saved = window.localStorage.getItem(key) || window.localStorage.getItem(`nurs-quiz-${riyadhDateKey()}`);
+    void loadMyPlay('quiz', phone).then(async (gate) => {
+      if (cancelled) return;
+      if (!gate.ok) {
+        setBlocked(true);
+        setReady(true);
         return;
       }
-      if (!saved) return;
-      try {
-        const row = JSON.parse(saved) as { done?: boolean; score?: number; durationMs?: number };
-        if (!row.done) return;
-        await recordGamePlay({
-          game: 'quiz',
-          phone,
-          name,
-          status: 'finished',
-          attempts: QUESTIONS.length,
-          score: Number(row.score) || 0,
-          durationMs: Number(row.durationMs) || undefined,
-        });
-        onPlayed?.();
-      } catch (err) {
-        console.error(err);
+      if (gate.play?.status === 'finished') {
+        setScore(gate.play.score || 0);
+        setDone(true);
+        if (gate.play.durationMs) setDurationMs(gate.play.durationMs);
+        window.localStorage.setItem(key, JSON.stringify({ done: true, score: gate.play.score || 0, durationMs: gate.play.durationMs }));
+        setReady(true);
+        return;
       }
-    }).catch((err) => console.error(err));
+      if (gate.play?.status === 'playing') {
+        setStep(Math.min(gate.play.step || 0, QUESTIONS.length));
+        setScore(gate.play.score || 0);
+        if (gate.play.startedAt) startedAt.current = gate.play.startedAt;
+        setReady(true);
+        return;
+      }
+      if (saved) {
+        try {
+          const row = JSON.parse(saved) as { done?: boolean; score?: number; durationMs?: number };
+          if (row.done) {
+            await recordGamePlay({
+              game: 'quiz',
+              phone,
+              name,
+              status: 'finished',
+              attempts: QUESTIONS.length,
+              score: Number(row.score) || 0,
+              durationMs: Number(row.durationMs) || undefined,
+            });
+            if (cancelled) return;
+            setScore(Number(row.score) || 0);
+            setDone(true);
+            if (row.durationMs) setDurationMs(row.durationMs);
+            onPlayed?.();
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      if (!cancelled) setReady(true);
+    }).catch((err) => {
+      console.error(err);
+      if (!cancelled) {
+        setBlocked(true);
+        setReady(true);
+      }
+    });
     const tick = () => setLeft(msUntilNextWord());
     tick();
     const timer = window.setInterval(tick, 30_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, [phone, name]);
 
   const question = QUESTIONS[step];
   const revealed = picked !== null;
 
   const choose = (index: number) => {
-    if (revealed) return;
-    if (!startedAt.current) startedAt.current = Date.now();
-    setPicked(index);
-    if (index === question.answer) setScore((value) => value + 1);
+    if (!question || revealed || done || saving || blocked) return;
+    setSaving(true);
+    void answerQuiz({
+      phone,
+      name,
+      step,
+      correct: index === question.answer,
+      total: QUESTIONS.length,
+    }).then((result) => {
+      if (!result.ok) {
+        setBlocked(true);
+        return;
+      }
+      const play = result.play;
+      setScore(play.score || 0);
+      if (play.durationMs) setDurationMs(play.durationMs);
+      if (play.startedAt) startedAt.current = play.startedAt;
+      if (!play.applied) {
+        if (play.status === 'finished') {
+          setDone(true);
+          window.localStorage.setItem(quizKey(phone), JSON.stringify({ done: true, score: play.score || 0, durationMs: play.durationMs }));
+          onPlayed?.();
+          return;
+        }
+        setStep(Math.min(play.step || 0, QUESTIONS.length - 1));
+        setPicked(null);
+        return;
+      }
+      setPicked(index);
+      if (play.status === 'finished') {
+        window.localStorage.setItem(quizKey(phone), JSON.stringify({ done: true, score: play.score || 0, durationMs: play.durationMs }));
+      }
+    }).catch((err) => {
+      console.error(err);
+      setBlocked(true);
+    }).finally(() => setSaving(false));
   };
 
   const next = () => {
-    if (step === QUESTIONS.length - 1) {
-      const finalScore = score;
-      const elapsed = startedAt.current ? Date.now() - startedAt.current : undefined;
+    if (step >= QUESTIONS.length - 1) {
       setDone(true);
-      setDurationMs(elapsed);
-      window.localStorage.setItem(quizKey(), JSON.stringify({ done: true, score: finalScore, startedAt: startedAt.current, durationMs: elapsed }));
-      void recordGamePlay({
-        game: 'quiz',
-        phone,
-        name,
-        status: 'finished',
-        attempts: QUESTIONS.length,
-        score: finalScore,
-        durationMs: elapsed,
-      }).then(() => onPlayed?.()).catch((err) => console.error(err));
+      onPlayed?.();
       return;
     }
     setStep((value) => value + 1);
@@ -156,6 +197,13 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
 
   const hours = Math.floor(Math.max(0, left) / 3_600_000);
   const minutes = Math.floor((Math.max(0, left) % 3_600_000) / 60_000);
+
+  if (!ready) {
+    return <p className="text-center text-sm font-bold text-[#630517]">نتحقق من محاولتك...</p>;
+  }
+  if (blocked) {
+    return <p className="text-center text-sm font-bold text-[#630517]">ما انربطت المحاولة بالحساب. حدّث الصفحة وأنت داخل.</p>;
+  }
 
   return (
     <div dir="rtl">
@@ -183,7 +231,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
               التحدي السريري للتمريض
             </Link>
           </div>
-        ) : (
+        ) : question ? (
           <div className="space-y-4">
             <h2 className="text-xl font-black leading-snug text-[#1a0208] sm:text-2xl">{question.prompt}</h2>
             <div className="grid gap-2">
@@ -199,7 +247,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
                     key={option}
                     type="button"
                     onClick={() => choose(index)}
-                    disabled={revealed}
+                    disabled={revealed || saving || !question}
                     className={`rounded-2xl border px-4 py-3 text-right text-sm font-bold leading-relaxed transition ${tone}`}
                   >
                     {option}
@@ -222,7 +270,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
               </div>
             ) : null}
           </div>
-        )}
+        ) : null}
     </div>
   );
 }
