@@ -1,37 +1,98 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { ClubIcon } from '../icons';
 
+const LINKS = [
+  {
+    href: '/games/word',
+    icon: 'trophy' as const,
+    title: 'تحدي الكلمة',
+    text: 'كلمة طبية خاصة فيك، ست محاولات.',
+  },
+  {
+    href: '/games/quiz',
+    icon: 'zap' as const,
+    title: 'دقيقة إسعاف',
+    text: 'أربع أسئلة سريعة، مرة واحدة اليوم.',
+  },
+];
+
 export default function CaseStudyCard() {
+  const [open, setOpen] = useState(false);
+
   return (
-    <section className="w-full max-w-5xl mx-auto px-4 my-10" dir="ltr">
-      <div className="bg-gradient-to-r from-[#7a081d] via-[#630517] to-[#8c1c32] border-2 border-[#F5D061] rounded-[2.5rem] p-8 sm:p-10 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 text-left relative overflow-hidden group">
-        <div className="absolute -top-24 -left-24 w-56 h-56 bg-[#F5D061]/20 rounded-full blur-3xl pointer-events-none group-hover:scale-125 transition-transform duration-700" />
-        <div className="absolute -bottom-24 -right-24 w-56 h-56 bg-amber-400/20 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="space-y-3 z-10">
-          <span className="bg-[#F5D061] text-[#630517] font-black text-xs px-4 py-1.5 rounded-full uppercase tracking-wider inline-block shadow-md">
-            <span className="inline-flex items-center gap-1.5"><ClubIcon name="zap" size={13} /> Daily Challenge</span>
+    <section className="w-full max-w-5xl mx-auto px-4 my-10" dir="rtl">
+      <div className="relative overflow-hidden rounded-[2.2rem] border-2 border-[#F5D061] bg-gradient-to-br from-[#4a0714] via-[#630517] to-[#8c1c32] p-6 text-white shadow-2xl sm:p-8">
+        <div className="pointer-events-none absolute -top-16 -left-10 text-[#F5D061]/15">
+          <ClubIcon name="trophy" size={120} />
+        </div>
+        <div className="pointer-events-none absolute -bottom-10 -right-6 text-[#F5D061]/10">
+          <ClubIcon name="medal" size={110} />
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="relative z-10 flex w-full items-center justify-between gap-4 text-right"
+          aria-expanded={open}
+        >
+          <span className="space-y-3">
+            <span className="inline-flex items-center gap-2 rounded-full bg-[#F5D061] px-3 py-1 text-[11px] font-black text-[#3b020b]">
+              <ClubIcon name="sparkles" size={13} />
+              كل يوم تحدٍ جديد
+            </span>
+            <span className="block text-3xl font-black leading-tight sm:text-4xl">الألعاب والتحديات</span>
+            <span className="block max-w-xl text-sm font-medium leading-relaxed text-[#fff6d6]">
+              دراسة الحالة، تحدي الكلمة، ودقيقة الإسعاف. اضغط واختر وين تبي تدخل.
+            </span>
           </span>
-          <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-            Clinical Case Study Challenge
-          </h2>
-          <p className="text-xs sm:text-sm text-amber-100 font-medium max-w-xl leading-relaxed">
-            Test your clinical knowledge with daily scenarios (Easy, Moderate & Hard). Three cases, four options each.
-          </p>
-        </div>
-
-        <div className="z-10 whitespace-nowrap">
-          <Link
-            href="/case-study"
-            className="inline-flex items-center justify-center gap-3 bg-[#F5D061] text-[#630517] px-8 py-4 rounded-2xl font-black text-sm shadow-lg hover:scale-105 active:scale-95 transition-all duration-300"
-          >
-            <span>Start Challenge</span>
-            <ClubIcon name="stethoscope" size={16} />
-          </Link>
-        </div>
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-[#F5D061] text-[#630517] shadow-lg">
+            <ClubIcon name={open ? 'chevronDown' : 'award'} size={28} />
+          </span>
+        </button>
+        {open ? (
+          <div className="relative z-10 mt-6 space-y-3">
+            <Link href="/case-study" className="flex items-center gap-3 rounded-3xl border border-[#F5D061]/40 bg-[#1a0208]/35 p-4 transition hover:bg-[#1a0208]/55">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F5D061] text-[#630517]">
+                <ClubIcon name="stethoscope" size={20} />
+              </span>
+              <span>
+                <span className="block text-base font-black">دراسة الحالة</span>
+                <span className="mt-1 block text-xs font-medium leading-relaxed text-[#fff6d6]/85">ثلاث حالات سريرية، أربع خيارات لكل حالة.</span>
+              </span>
+            </Link>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {LINKS.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-3 rounded-3xl border border-[#F5D061]/40 bg-[#1a0208]/35 p-4 transition hover:bg-[#1a0208]/55"
+                >
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F5D061] text-[#630517]">
+                    <ClubIcon name={item.icon} size={20} />
+                  </span>
+                  <span>
+                    <span className="block text-base font-black">{item.title}</span>
+                    <span className="mt-1 block text-xs font-medium leading-relaxed text-[#fff6d6]/85">{item.text}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="relative z-10 mt-5 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#F5D061]/40 px-3 py-1 text-[11px] font-bold text-[#F5D061]">
+              <ClubIcon name="stethoscope" size={13} /> دراسة الحالة
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#F5D061]/40 px-3 py-1 text-[11px] font-bold text-[#F5D061]">
+              <ClubIcon name="trophy" size={13} /> تحدي الكلمة
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#F5D061]/40 px-3 py-1 text-[11px] font-bold text-[#F5D061]">
+              <ClubIcon name="zap" size={13} /> دقيقة إسعاف
+            </span>
+          </div>
+        )}
       </div>
     </section>
   );

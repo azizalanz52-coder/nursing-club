@@ -1239,8 +1239,8 @@ export default function CaseStudyPage() {
               </p>
             ) : null}
             <div>
-              <Link href="/" className="text-xs text-[#F5D061] hover:underline font-bold inline-block pt-1">
-                العودة للرئيسية
+              <Link href="/games" className="inline-flex rounded-2xl bg-[#F5D061] px-4 py-2.5 text-xs font-black text-[#630517]">
+                العودة لقائمة الألعاب
               </Link>
             </div>
           </div>
