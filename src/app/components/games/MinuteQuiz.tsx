@@ -1,62 +1,16 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ClubIcon } from '../icons';
 import { msUntilNextWord, riyadhDateKey } from '../../lib/dailyWord';
+import { dailyQuizQuestions } from '../../lib/quizBank';
 import { answerQuiz, loadMyPlay, recordGamePlay } from '../../lib/gameActivity';
 import { quizShareText } from '../../lib/shareResult';
 import ShareResultButton from './ShareResultButton';
 
-const QUESTIONS = [
-  {
-    prompt: 'حرق سطحي صغير في الساعد، الجلد أحمر ومتألم دون فقاعات. ما الإجراء الأصح في الدقيقة الأولى؟',
-    options: [
-      'تبريد الموضع بماء فاتر جارٍ نحو عشرين دقيقة، ثم تغطيته بشاش نظيف غير لاصق',
-      'وضع كمادات ثلج على الجلد مباشرة حتى يتخدر الألم',
-      'دهن طبقة من مرهم مضاد حيوي وتغطيتها بضماد محكم',
-      'غسل الحرق بصابون مطهّر ثم تركه مكشوفًا ليجف',
-    ],
-    answer: 0,
-    why: 'التبريد بالماء الفاتر الجاري يوقف امتداد الحرارة. الثلج يزيد ضرر الجلد، والمرهم مع الضماد المحكم يحبس الحرارة، والصابون يهيّج الحرق الحديث.',
-  },
-  {
-    prompt: 'بالغ يمسك رقبته، لا يسعل ولا يتكلم، ويومئ أنه يختنق. ما التصرّف الأصح؟',
-    options: [
-      'خمس ضربات بين لوحي الكتف، ثم خمس ضغطات بطنية، مع طلب الإسعاف',
-      'البدء بالضغطات البطنية فقط وتكرارها دون ضربات ظهرية',
-      'إنزال رأسه للأسفل وتوجيه ضربات قوية متواصلة على الظهر',
-      'فتح الفم وإخراج الجسم بالإصبع ما دام المصاب واعيًا',
-    ],
-    answer: 0,
-    why: 'الانسداد الكامل يُعالج بتبادل ضربات الظهر والضغطات البطنية مع الإسعاف. الضغطات وحدها ليست الخطة الأولى، والضرب المتواصل أو الإصبع قد يدفع الجسم أعمق.',
-  },
-  {
-    prompt: 'جرح في الساعد ينزف باستمرار، والمصاب واعٍ. ما الإجراء الأصح أولًا؟',
-    options: [
-      'الضغط المباشر بقماش نظيف مع رفع الطرف، وإضافة قماش فوق الأول إن تشرّب الدم',
-      'ربط رباط ضاغط أعلى الجرح فورًا لإيقاف النزف من مصدره',
-      'غسل الجرح بماء غزير وصابون قبل الضغط حتى تُزال الأوساخ',
-      'إزالة الجلطة الظاهرة ثم الضغط على قاعدة الجرح من جديد',
-    ],
-    answer: 0,
-    why: 'الضغط المباشر مع الرفع هو الأولى، ويُضاف قماش فوق المتشرّب دون رفعه. الرباط الضاغط إجراء أخير، والغسل أولًا يؤخر الإيقاف، وإزالة الجلطة تعيد النزف.',
-  },
-  {
-    prompt: 'ألم ضاغط مفاجئ في الصدر مع تعرّق وغثيان، والمصاب واعٍ ويتنفس. ما الأصح في الدقيقة الأولى؟',
-    options: [
-      'الاتصال بالإسعاف فورًا، وإبقاؤه جالسًا مستريحًا دون أي مجهود',
-      'تهوية المكان وإعطاؤه ماءً باردًا ثم إعادة التقييم بعد ربع ساعة',
-      'مساعدته على المشي البطيء داخل الغرفة لتنشيط الدورة وهو واعٍ',
-      'تمديده على ظهره ورفع ساقيه كما يُفعل عند هبوط الضغط',
-    ],
-    answer: 0,
-    why: 'هذه العلامات قد تكون جلطة قلبية. الإسعاف مع الراحة في وضع الجلوس أولى من الانتظار أو الحركة أو وضع الصدمة.',
-  },
-] as const;
-
-function resultCopy(score: number) {
-  if (score === QUESTIONS.length) return 'اخترت الأصح في الأسئلة الأربعة. هذا هو المطلوب في الدقيقة الأولى.';
+function resultCopy(score: number, total: number) {
+  if (score === total) return 'اخترت الأصح في الأسئلة الأربعة. هذا هو المطلوب في الدقيقة الأولى.';
   if (score >= 2) return 'الخيارات كانت متقاربة. راجع التوضيح، فالأصح ليس أول إجراء يخطر.';
   return 'الخيارات كلها تبدو مقبولة، والأصح واحد. اقرأ التوضيح قبل محاولة الغد.';
 }
@@ -66,6 +20,7 @@ function quizKey(phone: string) {
 }
 
 export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; name: string; onPlayed?: () => void }) {
+  const questions = useMemo(() => dailyQuizQuestions(), []);
   const [step, setStep] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [score, setScore] = useState(0);
@@ -97,7 +52,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
         return;
       }
       if (gate.play?.status === 'playing') {
-        setStep(Math.min(gate.play.step || 0, QUESTIONS.length));
+        setStep(Math.min(gate.play.step || 0, questions.length));
         setScore(gate.play.score || 0);
         if (gate.play.startedAt) startedAt.current = gate.play.startedAt;
         setReady(true);
@@ -112,7 +67,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
               phone,
               name,
               status: 'finished',
-              attempts: QUESTIONS.length,
+              attempts: questions.length,
               score: Number(row.score) || 0,
               durationMs: Number(row.durationMs) || undefined,
             });
@@ -143,7 +98,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
     };
   }, [phone, name]);
 
-  const question = QUESTIONS[step];
+  const question = questions[step];
   const revealed = picked !== null;
 
   const choose = (index: number) => {
@@ -154,7 +109,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
       name,
       step,
       correct: index === question.answer,
-      total: QUESTIONS.length,
+      total: questions.length,
     }).then((result) => {
       if (!result.ok) {
         setBlocked(true);
@@ -171,7 +126,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
           onPlayed?.();
           return;
         }
-        setStep(Math.min(play.step || 0, QUESTIONS.length - 1));
+        setStep(Math.min(play.step || 0, questions.length - 1));
         setPicked(null);
         return;
       }
@@ -186,7 +141,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
   };
 
   const next = () => {
-    if (step >= QUESTIONS.length - 1) {
+    if (step >= questions.length - 1) {
       setDone(true);
       onPlayed?.();
       return;
@@ -213,15 +168,15 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
             إسعاف الدقيقة الأولى
           </span>
           <span className="text-xs font-bold text-[#630517]/70">
-            {done ? 'النتيجة' : `${step + 1} من ${QUESTIONS.length}`}
+            {done ? 'النتيجة' : `${step + 1} من ${questions.length}`}
           </span>
         </div>
 
         {done ? (
           <div className="space-y-5 text-center">
-            <p className="text-5xl font-black text-[#630517]">{score}/{QUESTIONS.length}</p>
+            <p className="text-5xl font-black text-[#630517]">{score}/{questions.length}</p>
             <h2 className="text-2xl font-black text-[#1a0208]">إسعاف الدقيقة الأولى</h2>
-            <p className="text-sm font-medium leading-relaxed text-[#3a020c]">{resultCopy(score)}</p>
+            <p className="text-sm font-medium leading-relaxed text-[#3a020c]">{resultCopy(score, questions.length)}</p>
             <p className="text-sm font-black text-[#630517]">مرة واحدة كل ٢٤ ساعة. المحاولة التالية بعد {hours} س {minutes} د.</p>
             <ShareResultButton text={quizShareText(score, durationMs)} />
             <Link
@@ -265,7 +220,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
                   onClick={next}
                   className="w-full rounded-2xl bg-[#630517] px-5 py-3 text-sm font-black text-[#F5D061]"
                 >
-                  {step === QUESTIONS.length - 1 ? 'عرض النتيجة' : 'السؤال التالي'}
+                  {step === questions.length - 1 ? 'عرض النتيجة' : 'السؤال التالي'}
                 </button>
               </div>
             ) : null}

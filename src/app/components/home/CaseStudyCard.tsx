@@ -15,7 +15,7 @@ const LINKS = [
     href: '/games/quiz',
     icon: 'zap' as const,
     title: 'دقيقة إسعاف',
-    text: 'أربع أسئلة سريعة، مرة واحدة اليوم.',
+    text: 'أربع حالات جديدة، مرة واحدة اليوم.',
   },
 ];
 
