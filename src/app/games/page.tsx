@@ -13,7 +13,7 @@ const CARDS = [
     href: '/games/word',
     icon: 'trophy' as const,
     title: 'تحدي الكلمة',
-    text: 'كلمة طبية خاصة فيك، ست محاولات، مرة كل يوم.',
+    text: 'كلمة طبية، ست محاولات، مرة كل يوم.',
   },
   {
     href: '/games/quiz',
@@ -35,9 +35,6 @@ export default function GamesHubPage() {
           كل يوم تحدٍ جديد
         </p>
         <h1 className="mt-4 text-3xl font-black text-[#630517] sm:text-4xl">الألعاب والتحديات</h1>
-        <p className="mt-2 max-w-xl text-sm font-medium leading-relaxed text-[#3a020c]">
-          ثلاث ألعاب، كل واحدة في صفحتها. اضغط على اللي تبيه.
-        </p>
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
           {CARDS.map((card) => (
             <Link

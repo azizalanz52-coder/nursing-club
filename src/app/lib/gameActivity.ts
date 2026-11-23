@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { riyadhDateKey } from './dailyWord';
 
@@ -62,6 +62,10 @@ export async function recordGamePlay(input: Omit<GamePlay, 'id' | 'updatedAt' | 
     durationMs: input.durationMs || null,
     updatedAt: Date.now(),
   }, { merge: true });
+}
+
+export async function deleteGamePlay(id: string) {
+  await deleteDoc(doc(db, 'game_activity', id));
 }
 
 export async function loadGamePlays(day: string) {

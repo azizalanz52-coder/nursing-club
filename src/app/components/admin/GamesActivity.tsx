@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { riyadhDateKey } from '../../lib/dailyWord';
-import { formatPlayTime, loadGamePlays, rankPlays, type GameId, type GamePlay } from '../../lib/gameActivity';
+import { clubConfirm } from '../../lib/clubNotice';
+import { deleteGamePlay, formatPlayTime, loadGamePlays, rankPlays, type GameId, type GamePlay } from '../../lib/gameActivity';
 
 const GAME_LABEL = { word: 'تحدي الكلمة', quiz: 'دقيقة إسعاف' };
 const STATUS_LABEL = {
@@ -17,6 +18,7 @@ export default function GamesActivity() {
   const [rows, setRows] = useState<GamePlay[]>([]);
   const [game, setGame] = useState<GameId>('word');
   const [loading, setLoading] = useState(true);
+  const [removing, setRemoving] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +39,21 @@ export default function GamesActivity() {
 
   const wordRows = rows.filter((row) => row.game === 'word');
   const quizRows = rows.filter((row) => row.game === 'quiz');
+  const removeRow = async (row: GamePlay) => {
+    const name = row.name || row.phone;
+    const ok = await clubConfirm(`تحذف ${name} من صدارة ${GAME_LABEL[row.game]} لهذا اليوم؟`);
+    if (!ok) return;
+    setRemoving(row.id);
+    try {
+      await deleteGamePlay(row.id);
+      setRows((list) => list.filter((item) => item.id !== row.id));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRemoving('');
+    }
+  };
+
   const visible = game === 'word'
     ? [...rankPlays(rows, 'word'), ...wordRows.filter((row) => row.status !== 'won')]
     : rankPlays(rows, 'quiz');
@@ -89,6 +106,7 @@ export default function GamesActivity() {
                 <th className="pb-3 pr-2">الاسم</th>
                 <th className="pb-3">الجوال</th>
                 <th className="pb-3">النتيجة</th>
+                <th className="pb-3">حذف</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -100,6 +118,16 @@ export default function GamesActivity() {
                     {STATUS_LABEL[row.status] || row.status}
                     {row.game === 'quiz' ? ` · ${row.score}/4` : row.attempts ? ` · من المحاولة ${row.attempts}` : ''}
                     {row.durationMs ? ` · ${formatPlayTime(row.durationMs)}` : ''}
+                  </td>
+                  <td className="py-3">
+                    <button
+                      type="button"
+                      onClick={() => removeRow(row)}
+                      disabled={removing === row.id}
+                      className="rounded-xl bg-rose-50 px-3 py-1.5 font-black text-rose-700 disabled:opacity-50"
+                    >
+                      {removing === row.id ? 'يحذف...' : 'حذف'}
+                    </button>
                   </td>
                 </tr>
               ))}
