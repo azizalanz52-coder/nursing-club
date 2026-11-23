@@ -13,11 +13,13 @@ type Player = { phone: string; name: string };
 
 export default function GameScreen({
   title,
+  subtitle,
   game,
   loginNext,
   children,
 }: {
   title: string;
+  subtitle?: string;
   game: GameId;
   loginNext: string;
   children: (player: Player, onPlayed: () => void) => React.ReactNode;
@@ -44,7 +46,10 @@ export default function GameScreen({
           </Link>
           {player ? <DailyBoard game={game} phone={player.phone} refresh={boardTick} /> : null}
         </div>
-        <h1 className="text-2xl font-black">{title}</h1>
+        <div>
+          <h1 className="text-2xl font-black">{title}</h1>
+          {subtitle ? <p className="mt-1 text-sm font-bold text-[#F5D061]">{subtitle}</p> : null}
+        </div>
         {!ready ? <p className="text-center text-sm font-bold text-[#F5D061]">نتحقق من حسابك...</p> : null}
         {ready && !player ? (
           <div className="rounded-[2rem] border border-[#F5D061]/40 bg-[#fff6d6] p-6 text-center text-[#1a0208]">
