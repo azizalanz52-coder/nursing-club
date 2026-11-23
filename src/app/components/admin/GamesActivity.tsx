@@ -54,9 +54,7 @@ export default function GamesActivity({ onOpenRadar }: { onOpenRadar?: () => voi
     }
   };
 
-  const visible = game === 'word'
-    ? [...rankPlays(rows, 'word'), ...wordRows.filter((row) => row.status !== 'won')]
-    : rankPlays(rows, 'quiz');
+  const visible = rankPlays(rows, game);
 
   return (
     <div className="space-y-6">
@@ -114,9 +112,9 @@ export default function GamesActivity({ onOpenRadar }: { onOpenRadar?: () => voi
                 <th className="pb-3">حذف</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody key={game} className="divide-y divide-slate-100">
               {visible.map((row) => (
-                <tr key={row.id}>
+                <tr key={`${game}-${row.id}`}>
                   <td className="py-3 pr-2 font-black text-slate-900">{row.name || 'بدون اسم'}</td>
                   <td className="py-3 font-bold text-slate-600" dir="ltr">{row.phone}</td>
                   <td className="py-3 font-bold text-slate-700">

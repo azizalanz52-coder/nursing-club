@@ -22,7 +22,9 @@ export default function DailyBoard({
 }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<GamePlay[]>([]);
-  const rule = game === 'word' ? 'أقل محاولة، ثم الأسرع' : 'أعلى درجة، ثم الأسرع';
+  const rule = game === 'word'
+    ? 'كل اللي شاركوا. اللي حلها بأقل محاولة يتقدم، ثم الأسرع، والوقت الطويل يبقى في اللوحة.'
+    : 'كل اللي شاركوا. الأعلى درجة يتقدم، ثم الأسرع، والوقت الطويل يبقى في اللوحة.';
 
   useEffect(() => {
     if (!open) return;
@@ -66,16 +68,25 @@ export default function DailyBoard({
               </button>
             </div>
             <div className="max-h-[62vh] space-y-2 overflow-y-auto">
-              {rows.length === 0 ? <p className="text-sm font-bold text-slate-500">لسا ما فيه أحد في لوحة اليوم.</p> : null}
+              {rows.length === 0 ? <p className="text-sm font-bold text-slate-500">لسا ما فيه أحد في لوحة اليوم.</p> : (
+                <p className="text-[11px] font-bold text-slate-400">{rows.length} مشاركين اليوم</p>
+              )}
               {rows.map((row, index) => {
                 const mine = row.phone === phone;
+                const time = formatPlayTime(row.durationMs);
                 const detail = game === 'word'
-                  ? `من المحاولة ${row.attempts} · ${formatPlayTime(row.durationMs)}`
-                  : `${row.score}/4 · ${formatPlayTime(row.durationMs)}`;
+                  ? row.status === 'won'
+                    ? `حلها من المحاولة ${row.attempts} · الوقت ${time}`
+                    : row.status === 'lost'
+                      ? `ما وصل بعد ${row.attempts} محاولات · الوقت ${time}`
+                      : 'بدأ وما خلّص'
+                  : row.status === 'finished'
+                    ? `${row.score}/4 · الوقت ${time}`
+                    : 'بدأ وما خلّص';
                 return (
-                  <div key={row.id} className={`flex items-center justify-between gap-3 rounded-2xl px-3 py-3 text-sm ${mine ? 'bg-[#F5D061] text-[#3b020b]' : 'bg-slate-50 text-[#1a0208]'}`}>
+                  <div key={`${row.game}-${row.id}`} className={`flex items-center justify-between gap-3 rounded-2xl px-3 py-3 text-sm ${mine ? 'bg-[#F5D061] text-[#3b020b]' : 'bg-slate-50 text-[#1a0208]'}`}>
                     <span className="font-black">{index + 1}. {displayName(row)}</span>
-                    <span className="font-bold">{detail}</span>
+                    <span className="text-left text-xs font-bold leading-5">{detail}</span>
                   </div>
                 );
               })}

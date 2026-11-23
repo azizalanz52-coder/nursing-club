@@ -35,19 +35,29 @@ export function formatPlayTime(ms?: number) {
 }
 
 export function rankPlays(rows: GamePlay[], game: GameId) {
-  const list = rows.filter((row) => row.game === game);
-  const time = (row: GamePlay) => row.durationMs || Number.MAX_SAFE_INTEGER;
-  if (game === 'word') {
-    return list
-      .filter((row) => row.status === 'won' || row.status === 'lost')
-      .sort((a, b) => {
-        if (a.status !== b.status) return a.status === 'won' ? -1 : 1;
-        return a.attempts - b.attempts || time(a) - time(b);
-      });
+  const byPhone = new Map<string, GamePlay>();
+  for (const row of rows) {
+    if (row.game !== game) continue;
+    const key = canonicalPhone(row.phone) || row.id;
+    const prev = byPhone.get(key);
+    if (!prev || (row.updatedAt || 0) >= (prev.updatedAt || 0)) byPhone.set(key, row);
   }
-  return list
-    .filter((row) => row.status === 'finished')
-    .sort((a, b) => b.score - a.score || time(a) - time(b));
+  const time = (row: GamePlay) => (row.durationMs && row.durationMs > 0 ? row.durationMs : Number.MAX_SAFE_INTEGER);
+  const group = (row: GamePlay) => {
+    if (game === 'word') {
+      if (row.status === 'won') return 0;
+      if (row.status === 'lost') return 1;
+      return 2;
+    }
+    return row.status === 'finished' ? 0 : 1;
+  };
+  return [...byPhone.values()].sort((a, b) => {
+    const order = group(a) - group(b);
+    if (order) return order;
+    if (game === 'quiz' && a.status === 'finished') return b.score - a.score || time(a) - time(b);
+    if (game === 'word' && a.status === 'won') return a.attempts - b.attempts || time(a) - time(b);
+    return time(a) - time(b);
+  });
 }
 
 function signedInUser() {
