@@ -13,7 +13,7 @@ const STATUS_LABEL = {
   finished: 'خلّص الاختبار',
 };
 
-export default function GamesActivity() {
+export default function GamesActivity({ onOpenRadar }: { onOpenRadar?: () => void }) {
   const [day, setDay] = useState(riyadhDateKey());
   const [rows, setRows] = useState<GamePlay[]>([]);
   const [game, setGame] = useState<GameId>('word');
@@ -65,6 +65,11 @@ export default function GamesActivity() {
           <div>
             <h3 className="text-xl font-black text-slate-900">تفاعل الألعاب اليومي</h3>
             <p className="text-xs text-slate-500 font-medium mt-1">اضغط اللعبة عشان تشوف أسماءها لحاله.</p>
+            {onOpenRadar ? (
+              <button type="button" onClick={onOpenRadar} className="mt-3 rounded-2xl bg-[#630517] px-4 py-2 text-xs font-black text-[#F5D061]">
+                رادار الترم
+              </button>
+            ) : null}
           </div>
           <label className="text-xs font-bold text-slate-600">
             اليوم

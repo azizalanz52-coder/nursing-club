@@ -26,6 +26,7 @@ import PlatformBriefingEditor from '../components/admin/PlatformBriefingEditor';
 import CollegeAdministrationEditor from '../components/admin/CollegeAdministrationEditor';
 import FaqEditor from '../components/admin/FaqEditor';
 import GamesActivity from '../components/admin/GamesActivity';
+import GamesRadar from '../components/admin/GamesRadar';
 import CaseStudyCompetitionVotes from '../components/admin/CaseStudyCompetitionVotes';
 import CaseStudyTrialVotes from '../components/admin/CaseStudyTrialVotes';
 import { DISTINGUISHED_MEMBER_ROLE, emailToPhone, isAdminPhone, isLeadershipRole } from '../lib/authIdentity';
@@ -216,7 +217,7 @@ export default function AdminDashboard() {
   const [isSystemAdminUser, setIsSystemAdminUser] = useState<boolean>(false);
   const [isPresidentsRole, setIsPresidentsRole] = useState<boolean>(false);
   const [adminReady, setAdminReady] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'design-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter' | 'scientific-texts' | 'platform-briefing' | 'college-admin' | 'faq' | 'games'>('case-study');
+  const [activeTab, setActiveTab] = useState<'users-manager' | 'discover' | 'passion' | 'events' | 'banners' | 'team' | 'requests' | 'partners' | 'suggestions' | 'escalated-reports' | 'historical-vault' | 'performance-radar' | 'media-committee' | 'design-committee' | 'student-achievements' | 'certificates' | 'case-study' | 'weekly-newsletter' | 'scientific-texts' | 'platform-briefing' | 'college-admin' | 'faq' | 'games' | 'games-radar'>('case-study');
 
   const [isRegistrationClosed, setIsRegistrationClosed] = useState<boolean>(false);
 
@@ -3278,6 +3279,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           </button>
 
           {[
+            { id: 'games-radar', label: '📡 رادار الألعاب' },
             { id: 'games', label: '🎮 تفاعل الألعاب' },
             { id: 'banners', label: '🖼️ بنر الترحيب' },
             { id: 'requests', label: '📥 طلبات الانضمام والأكسل' },
@@ -3306,7 +3308,8 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
         </div>
 
         {activeTab === 'platform-briefing' && <PlatformBriefingEditor />}
-        {activeTab === 'games' && <GamesActivity />}
+        {activeTab === 'games' && <GamesActivity onOpenRadar={() => setActiveTab('games-radar')} />}
+        {activeTab === 'games-radar' && <GamesRadar />}
 
         {/* تبويب نصوص المحتوى العلمي: صندوق تقييم من اللجنة */}
         {activeTab === 'scientific-texts' && (

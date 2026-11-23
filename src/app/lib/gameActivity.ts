@@ -88,3 +88,8 @@ export async function loadGamePlays(day: string) {
   const snap = await getDocs(query(collection(db, 'game_activity'), where('day', '==', day)));
   return snap.docs.map((item) => ({ id: item.id, ...item.data() }) as GamePlay);
 }
+
+export async function loadAllGamePlays() {
+  const snap = await getDocs(collection(db, 'game_activity'));
+  return snap.docs.map((item) => ({ id: item.id, ...item.data() }) as GamePlay);
+}
