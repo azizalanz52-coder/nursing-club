@@ -1,5 +1,3 @@
-import { formatPlayTime } from './gameActivity';
-
 const FALLBACK_ORIGIN = 'https://nursing-club.vercel.app';
 
 function link(path: string) {
@@ -7,35 +5,47 @@ function link(path: string) {
   return `${origin}${path}`;
 }
 
-function who(name: string) {
-  const clean = name.trim();
-  return clean || 'لاعب';
+function shareClock(ms?: number) {
+  const sec = !ms || ms < 0 ? 0 : Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(sec / 60);
+  const seconds = String(sec % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
 }
 
-function during(ms?: number) {
-  if (!ms || ms < 0) return '';
-  return ` خلال ${formatPlayTime(ms)}`;
-}
-
-export function quizShareText(name: string, score: number, durationMs?: number) {
+export function quizShareText(score: number, durationMs?: number) {
+  const mark = score >= 4 ? '✅' : '❌';
   return [
-    'دقيقة إسعاف — نادي التمريض',
-    `${who(name)}: ${score} من 4${during(durationMs)}`,
+    '🚑 دقيقة إسعاف',
+    '',
+    `${mark} النتيجة: ${score}/4`,
+    `⏱️ الوقت: ${shareClock(durationMs)}`,
+    '',
+    '👇 جربها',
     link('/games/quiz'),
   ].join('\n');
 }
 
-export function wordShareText(name: string, won: boolean, attempts: number, durationMs?: number) {
-  const line = won
-    ? `${who(name)}: وصل للكلمة من المحاولة ${attempts}${during(durationMs)}`
-    : `${who(name)}: انتهت المحاولات الست`;
-  return ['تحدي الكلمة — نادي التمريض', line, link('/games/word')].join('\n');
+export function wordShareText(won: boolean, attempts: number, durationMs?: number) {
+  return [
+    '🎮 خمن كلمة اليوم',
+    '',
+    `${won ? '✅' : '❌'} النتيجة: ${attempts}/6`,
+    `⏱️ الوقت: ${shareClock(durationMs)}`,
+    '',
+    '👇 جربها بدون ما نحرق الكلمة',
+    link('/games/word'),
+  ].join('\n');
 }
 
-export function caseShareText(name: string, score: number, max: number, durationMs?: number) {
+export function caseShareText(score: number, max: number, durationMs?: number) {
+  const mark = max > 0 && score >= max ? '✅' : '❌';
   return [
-    'دراسة الحالة — نادي التمريض',
-    `${who(name)}: ${score} من ${max}${during(durationMs)}`,
+    '🩺 دراسة الحالة',
+    '',
+    `${mark} النتيجة: ${score}/${max}`,
+    `⏱️ الوقت: ${shareClock(durationMs)}`,
+    '',
+    '👇 جربها',
     link('/case-study'),
   ].join('\n');
 }

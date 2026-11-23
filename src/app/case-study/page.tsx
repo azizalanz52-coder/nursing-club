@@ -1548,7 +1548,6 @@ export default function CaseStudyPage() {
             <h3 className="text-xl font-black text-[#630517]">نتيجتك: {recordedScore ?? (calculateScore() + persistenceBonus)} / {recordedMax ?? (getMaxPossibleScore() + persistenceBonus)}</h3>
             <ShareResultButton
               text={caseShareText(
-                studentName,
                 recordedScore ?? (calculateScore() + persistenceBonus),
                 recordedMax ?? (getMaxPossibleScore() + persistenceBonus),
                 recordedSolveMs,

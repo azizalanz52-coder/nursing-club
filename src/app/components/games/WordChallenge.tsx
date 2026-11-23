@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { msUntilNextWord, riyadhDateKey, riyadhDayIndex, scoreGuess, todayWord, wordLetters, type LetterMark } from '../../lib/dailyWord';
+import { msUntilNextWord, riyadhDateKey, riyadhDayIndex, scoreGuess, todayWord, wordHint, wordLetters, type LetterMark } from '../../lib/dailyWord';
 import { loadGamePlays, recordGamePlay } from '../../lib/gameActivity';
 import { assignPersonalWord } from '../../lib/personalWord';
 import { wordShareText } from '../../lib/shareResult';
@@ -217,6 +217,10 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
           </div>
         ))}
       </div>
+      <div className="text-center">
+        <p className="text-[11px] font-bold text-[#fff6d6]/70">التلميح</p>
+        <p className="text-2xl font-black text-[#F5D061]">{wordHint(answer)}</p>
+      </div>
       <div className="mx-auto grid max-w-sm gap-2">
         {rows.map((row, rowIndex) => {
           const letters = [...row];
@@ -237,12 +241,19 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
           );
         })}
       </div>
-      <p className="text-center text-xs font-bold text-[#fff6d6]/75">
-        {won ? `وصلت للكلمة. المحاولة التالية بعد ${clock(left)}.` : lost ? `انتهت المحاولات. الكلمة: ${answer}` : sealed ? `مرة واحدة كل ٢٤ ساعة. ترجع بعد ${clock(left)}.` : `${[...current].length}/5 حروف · مرة واحدة اليوم`}
-      </p>
+      {won || lost ? (
+        <div className="space-y-1 text-center">
+          <p className="text-xl font-black text-[#F5D061]">{won ? `أحسنت. كلمة اليوم هي ${answer}` : `كلمة اليوم ${answer}`}</p>
+          <p className="text-xs font-bold text-[#fff6d6]/70">المحاولة التالية بعد {clock(left)}.</p>
+        </div>
+      ) : (
+        <p className="text-center text-xs font-bold text-[#fff6d6]/75">
+          {sealed ? `مرة واحدة كل ٢٤ ساعة. ترجع بعد ${clock(left)}.` : `${[...current].length}/5 حروف · مرة واحدة اليوم`}
+        </p>
+      )}
       {won || lost ? (
         <div className="text-center">
-          <ShareResultButton dark text={wordShareText(name, won, guesses.length, playedMs)} />
+          <ShareResultButton dark text={wordShareText(won, guesses.length, playedMs)} />
         </div>
       ) : null}
       <div className="space-y-2">
