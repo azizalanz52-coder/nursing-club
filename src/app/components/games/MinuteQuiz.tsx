@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { ClubIcon } from '../icons';
 import { msUntilNextWord, riyadhDateKey } from '../../lib/dailyWord';
 import { loadGamePlays, recordGamePlay } from '../../lib/gameActivity';
+import { quizShareText } from '../../lib/shareResult';
+import ShareResultButton from './ShareResultButton';
 
 const QUESTIONS = [
   {
@@ -68,6 +70,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
   const [picked, setPicked] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
+  const [durationMs, setDurationMs] = useState<number | undefined>();
   const [left, setLeft] = useState(0);
   const startedAt = useRef<number | null>(null);
 
@@ -75,28 +78,49 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
     const saved = window.localStorage.getItem(quizKey());
     if (saved) {
       try {
-        const row = JSON.parse(saved) as { step?: number; score?: number; done?: boolean; startedAt?: number };
+        const row = JSON.parse(saved) as { step?: number; score?: number; done?: boolean; startedAt?: number; durationMs?: number };
         if (row.done) {
           setScore(Number(row.score) || 0);
           setDone(true);
+          if (row.durationMs) setDurationMs(row.durationMs);
         }
         if (row.startedAt) startedAt.current = row.startedAt;
       } catch {
         window.localStorage.removeItem(quizKey());
       }
     }
-    void loadGamePlays(riyadhDateKey()).then((list) => {
+    void loadGamePlays(riyadhDateKey()).then(async (list) => {
       const mine = list.find((row) => row.game === 'quiz' && row.phone === phone && row.status === 'finished');
-      if (!mine) return;
-      setScore(mine.score || 0);
-      setDone(true);
-      window.localStorage.setItem(quizKey(), JSON.stringify({ done: true, score: mine.score || 0 }));
+      if (mine) {
+        setScore(mine.score || 0);
+        setDone(true);
+        if (mine.durationMs) setDurationMs(mine.durationMs);
+        window.localStorage.setItem(quizKey(), JSON.stringify({ done: true, score: mine.score || 0, durationMs: mine.durationMs }));
+        return;
+      }
+      if (!saved) return;
+      try {
+        const row = JSON.parse(saved) as { done?: boolean; score?: number; durationMs?: number };
+        if (!row.done) return;
+        await recordGamePlay({
+          game: 'quiz',
+          phone,
+          name,
+          status: 'finished',
+          attempts: QUESTIONS.length,
+          score: Number(row.score) || 0,
+          durationMs: Number(row.durationMs) || undefined,
+        });
+        onPlayed?.();
+      } catch (err) {
+        console.error(err);
+      }
     }).catch((err) => console.error(err));
     const tick = () => setLeft(msUntilNextWord());
     tick();
     const timer = window.setInterval(tick, 30_000);
     return () => window.clearInterval(timer);
-  }, [phone]);
+  }, [phone, name]);
 
   const question = QUESTIONS[step];
   const revealed = picked !== null;
@@ -111,8 +135,10 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
   const next = () => {
     if (step === QUESTIONS.length - 1) {
       const finalScore = score;
+      const elapsed = startedAt.current ? Date.now() - startedAt.current : undefined;
       setDone(true);
-      window.localStorage.setItem(quizKey(), JSON.stringify({ done: true, score: finalScore, startedAt: startedAt.current }));
+      setDurationMs(elapsed);
+      window.localStorage.setItem(quizKey(), JSON.stringify({ done: true, score: finalScore, startedAt: startedAt.current, durationMs: elapsed }));
       void recordGamePlay({
         game: 'quiz',
         phone,
@@ -120,7 +146,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
         status: 'finished',
         attempts: QUESTIONS.length,
         score: finalScore,
-        durationMs: startedAt.current ? Date.now() - startedAt.current : undefined,
+        durationMs: elapsed,
       }).then(() => onPlayed?.()).catch((err) => console.error(err));
       return;
     }
@@ -149,6 +175,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
             <h2 className="text-2xl font-black text-[#1a0208]">إسعاف الدقيقة الأولى</h2>
             <p className="text-sm font-medium leading-relaxed text-[#3a020c]">{resultCopy(score)}</p>
             <p className="text-sm font-black text-[#630517]">مرة واحدة كل ٢٤ ساعة. المحاولة التالية بعد {hours} س {minutes} د.</p>
+            <ShareResultButton text={quizShareText(name, score, durationMs)} />
             <Link
               href="/case-study"
               className="inline-flex rounded-2xl bg-[#630517] px-5 py-3 text-sm font-black text-[#F5D061]"

@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { msUntilNextWord, riyadhDateKey, riyadhDayIndex, scoreGuess, todayWord, wordLetters, type LetterMark } from '../../lib/dailyWord';
 import { loadGamePlays, recordGamePlay } from '../../lib/gameActivity';
 import { assignPersonalWord } from '../../lib/personalWord';
+import { wordShareText } from '../../lib/shareResult';
+import ShareResultButton from './ShareResultButton';
 
 const KEYS = [
   ['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج', 'د'],
@@ -35,6 +37,7 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
   const [current, setCurrent] = useState('');
   const [left, setLeft] = useState(0);
   const [sealed, setSealed] = useState(false);
+  const [playedMs, setPlayedMs] = useState<number | undefined>();
   const startedAt = useRef<number | null>(null);
 
   useEffect(() => {
@@ -45,6 +48,15 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
     setDay(index);
     const savedStart = Number(window.localStorage.getItem(`nurs-word-start-${index}`));
     if (savedStart) startedAt.current = savedStart;
+    const savedResult = window.localStorage.getItem(`nurs-word-result-${index}`);
+    if (savedResult) {
+      try {
+        const row = JSON.parse(savedResult) as { durationMs?: number };
+        if (row.durationMs) setPlayedMs(row.durationMs);
+      } catch {
+        window.localStorage.removeItem(`nurs-word-result-${index}`);
+      }
+    }
     const savedGuesses = window.localStorage.getItem(`nurs-word-${index}`);
     if (savedGuesses) {
       try {
@@ -68,14 +80,52 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
         applyWord(todayWord(now));
       });
     }
-    void loadGamePlays(riyadhDateKey(now)).then((list) => {
+    void loadGamePlays(riyadhDateKey(now)).then(async (list) => {
       const mine = list.find((row) => row.game === 'word' && row.phone === phone && (row.status === 'won' || row.status === 'lost'));
-      if (!cancelled && mine) setSealed(true);
+      if (mine) {
+        if (!cancelled) {
+          setSealed(true);
+          if (mine.durationMs) setPlayedMs(mine.durationMs);
+        }
+        return;
+      }
+      const secret = window.localStorage.getItem(secretKey) || '';
+      let savedRows: string[] = [];
+      if (savedGuesses) {
+        try {
+          const parsed = JSON.parse(savedGuesses) as string[];
+          if (Array.isArray(parsed)) savedRows = parsed.filter((row) => typeof row === 'string').slice(0, 6);
+        } catch {
+          savedRows = [];
+        }
+      }
+      const solved = secret ? savedRows.some((guess) => wordLetters(guess) === wordLetters(secret)) : false;
+      const finished = solved || savedRows.length >= 6;
+      if (!finished) return;
+      let durationMs: number | undefined;
+      if (savedResult) {
+        try {
+          const row = JSON.parse(savedResult) as { durationMs?: number };
+          if (row.durationMs) durationMs = row.durationMs;
+        } catch {
+          durationMs = undefined;
+        }
+      }
+      await recordGamePlay({
+        game: 'word',
+        phone,
+        name,
+        status: solved ? 'won' : 'lost',
+        attempts: savedRows.length,
+        score: solved ? 1 : 0,
+        durationMs,
+      });
+      if (!cancelled) onPlayed?.();
     }).catch((err) => console.error(err));
     return () => {
       cancelled = true;
     };
-  }, [phone]);
+  }, [phone, name]);
 
   useEffect(() => {
     const tick = () => setLeft(msUntilNextWord());
@@ -128,6 +178,10 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
     const solved = wordLetters(current) === answerKey;
     const finished = solved || next.length >= 6;
     const durationMs = startedAt.current ? Date.now() - startedAt.current : undefined;
+    if (finished && day) {
+      setPlayedMs(durationMs);
+      window.localStorage.setItem(`nurs-word-result-${day}`, JSON.stringify({ durationMs }));
+    }
     void recordGamePlay({
       game: 'word',
       phone,
@@ -184,8 +238,13 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
         })}
       </div>
       <p className="text-center text-xs font-bold text-[#fff6d6]/75">
-        {won ? `جبتيها. الكلمة الجاية بعد ${clock(left)}.` : lost ? `انتهت محاولاتك. الكلمة: ${answer}` : sealed ? `مرة واحدة كل ٢٤ ساعة. ترجع بعد ${clock(left)}.` : `${[...current].length}/5 حروف · مرة واحدة اليوم`}
+        {won ? `وصلت للكلمة. المحاولة التالية بعد ${clock(left)}.` : lost ? `انتهت المحاولات. الكلمة: ${answer}` : sealed ? `مرة واحدة كل ٢٤ ساعة. ترجع بعد ${clock(left)}.` : `${[...current].length}/5 حروف · مرة واحدة اليوم`}
       </p>
+      {won || lost ? (
+        <div className="text-center">
+          <ShareResultButton dark text={wordShareText(name, won, guesses.length, playedMs)} />
+        </div>
+      ) : null}
       <div className="space-y-2">
         {KEYS.map((row) => (
           <div key={row.join('')} className="flex flex-wrap justify-center gap-1">

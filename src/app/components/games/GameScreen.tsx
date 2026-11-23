@@ -27,14 +27,12 @@ export default function GameScreen({
   const [boardTick, setBoardTick] = useState(0);
 
   useEffect(() => {
-    const read = () => {
-      const phone = canonicalPhone(localStorage.getItem('userPhone') || emailToPhone(auth.currentUser?.email));
+    return onAuthStateChanged(auth, (user) => {
+      const phone = canonicalPhone(localStorage.getItem('userPhone') || emailToPhone(user?.email));
       const name = localStorage.getItem('userName') || localStorage.getItem('fullName') || '';
       setPlayer(phone ? { phone, name } : null);
       setReady(true);
-    };
-    read();
-    return onAuthStateChanged(auth, read);
+    });
   }, []);
 
   return (
@@ -51,7 +49,7 @@ export default function GameScreen({
         {ready && !player ? (
           <div className="rounded-[2rem] border border-[#F5D061]/40 bg-[#fff6d6] p-6 text-center text-[#1a0208]">
             <h2 className="text-2xl font-black">سجّل دخولك عشان تلعب</h2>
-            <p className="mt-2 text-sm font-medium leading-relaxed">اللعبة للحسابات المسجلة، عشان نعرف مين تفاعل اليوم.</p>
+            <p className="mt-2 text-sm font-medium leading-relaxed">الألعاب للحسابات المسجلة، عشان نعرف مين تفاعل اليوم.</p>
             <Link href={`/login?next=${encodeURIComponent(loginNext)}`} className="mt-5 inline-flex rounded-2xl bg-[#630517] px-6 py-3 text-sm font-black text-[#F5D061]">
               تسجيل الدخول
             </Link>

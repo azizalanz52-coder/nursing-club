@@ -31,6 +31,8 @@ import AwardConfetti from '../components/AwardConfetti';
 import WeeklyRaceBoard, { OverallRaceBoard } from '../components/WeeklyRaceExample';
 import WeeklyMechanismNotice from '../components/WeeklyMechanismNotice';
 import CaseStudyTrialPoll from '../components/CaseStudyTrialPoll';
+import ShareResultButton from '../components/games/ShareResultButton';
+import { caseShareText } from '../lib/shareResult';
 import {
   aggregateWeeklyBoard,
   decorateOverallBoard,
@@ -828,6 +830,7 @@ export default function CaseStudyPage() {
   const [submitting, setSubmitting] = useState(false);
   const [recordedScore, setRecordedScore] = useState<number | null>(null);
   const [recordedMax, setRecordedMax] = useState<number | null>(null);
+  const [recordedSolveMs, setRecordedSolveMs] = useState<number | undefined>();
   const [solveLeftMs, setSolveLeftMs] = useState(CASE_STUDY_SOLVE_MS);
   const [solveExpired, setSolveExpired] = useState(false);
   const [solveStartedAt, setSolveStartedAt] = useState<number | null>(null);
@@ -1083,6 +1086,7 @@ export default function CaseStudyPage() {
     setAwardBonus(award);
     setRecordedScore(Number(row.score || 0));
     setRecordedMax(totalCases + bonusAmount + persistence + award);
+    setRecordedSolveMs(Number(row.solveMs) > 0 ? Number(row.solveMs) : undefined);
     if (row.bonusQuestionId) {
       setRevealedBonus({ questionId: Number(row.bonusQuestionId), amount: bonusAmount });
     }
@@ -1205,6 +1209,7 @@ export default function CaseStudyPage() {
       setAwardBonus(award);
       setRecordedScore(score);
       setRecordedMax(activeCases.length + (bonus?.amount || 0) + persistence.amount + award);
+      setRecordedSolveMs(solveMs);
       setHasSubmittedToday(true);
       setShowResults(true);
       clearAnswersDraft();
@@ -1541,6 +1546,14 @@ export default function CaseStudyPage() {
         ) : showResults ? (
           <div className="bg-amber-50 border-2 border-[#F5D061] p-6 rounded-3xl space-y-3 text-center" dir="rtl">
             <h3 className="text-xl font-black text-[#630517]">نتيجتك: {recordedScore ?? (calculateScore() + persistenceBonus)} / {recordedMax ?? (getMaxPossibleScore() + persistenceBonus)}</h3>
+            <ShareResultButton
+              text={caseShareText(
+                studentName,
+                recordedScore ?? (calculateScore() + persistenceBonus),
+                recordedMax ?? (getMaxPossibleScore() + persistenceBonus),
+                recordedSolveMs,
+              )}
+            />
             {awardBonus > 0 ? (
               <p className="text-sm text-[#630517] font-black bg-white/80 border border-[#F5D061] rounded-2xl px-4 py-3">
                 {FIRST_PLACE_BONUS_LABEL}

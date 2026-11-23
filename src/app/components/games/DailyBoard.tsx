@@ -29,7 +29,7 @@ export default function DailyBoard({
     let cancelled = false;
     loadGamePlays(riyadhDateKey())
       .then((list) => {
-        if (!cancelled) setRows(rankPlays(list, game).slice(0, 5));
+        if (!cancelled) setRows(rankPlays(list, game));
       })
       .catch((err) => console.error(err));
     return () => {

@@ -1,5 +1,6 @@
+import { onAuthStateChanged } from 'firebase/auth';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
-import { db } from './firebase';
+import { auth, db } from './firebase';
 import { riyadhDateKey } from './dailyWord';
 
 export type GameId = 'word' | 'quiz';
@@ -31,15 +32,30 @@ export function rankPlays(rows: GamePlay[], game: GameId) {
   const time = (row: GamePlay) => row.durationMs || Number.MAX_SAFE_INTEGER;
   if (game === 'word') {
     return list
-      .filter((row) => row.status === 'won')
-      .sort((a, b) => a.attempts - b.attempts || time(a) - time(b));
+      .filter((row) => row.status === 'won' || row.status === 'lost')
+      .sort((a, b) => {
+        if (a.status !== b.status) return a.status === 'won' ? -1 : 1;
+        return a.attempts - b.attempts || time(a) - time(b);
+      });
   }
   return list
     .filter((row) => row.status === 'finished')
     .sort((a, b) => b.score - a.score || time(a) - time(b));
 }
 
+function signedInUser() {
+  if (auth.currentUser) return Promise.resolve(auth.currentUser);
+  return new Promise<typeof auth.currentUser>((resolve) => {
+    const stop = onAuthStateChanged(auth, (user) => {
+      stop();
+      resolve(user);
+    });
+  });
+}
+
 export async function recordGamePlay(input: Omit<GamePlay, 'id' | 'updatedAt' | 'day'> & { day?: string }) {
+  const user = await signedInUser();
+  if (!user) return;
   const day = input.day || riyadhDateKey();
   const id = `${input.game}_${input.phone}_${day}`;
   const ref = doc(db, 'game_activity', id);
