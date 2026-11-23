@@ -26,13 +26,16 @@ export default function GameScreen({
 }) {
   const [ready, setReady] = useState(false);
   const [player, setPlayer] = useState<Player | null>(null);
+  const [sessionDropped, setSessionDropped] = useState(false);
   const [boardTick, setBoardTick] = useState(0);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (user) => {
-      const phone = canonicalPhone(localStorage.getItem('userPhone') || emailToPhone(user?.email));
+      const phone = canonicalPhone(emailToPhone(user?.email || ''));
+      const stored = canonicalPhone(localStorage.getItem('userPhone') || '');
       const name = localStorage.getItem('userName') || localStorage.getItem('fullName') || '';
-      setPlayer(phone ? { phone, name } : null);
+      setSessionDropped(Boolean(stored) && !user);
+      setPlayer(user && phone ? { phone, name } : null);
       setReady(true);
     });
   }, []);
@@ -53,8 +56,12 @@ export default function GameScreen({
         {!ready ? <p className="text-center text-sm font-bold text-[#F5D061]">نتحقق من حسابك...</p> : null}
         {ready && !player ? (
           <div className="rounded-[2rem] border border-[#F5D061]/40 bg-[#fff6d6] p-6 text-center text-[#1a0208]">
-            <h2 className="text-2xl font-black">سجّل دخولك عشان تلعب</h2>
-            <p className="mt-2 text-sm font-medium leading-relaxed">الألعاب للحسابات المسجلة، عشان نعرف مين تفاعل اليوم.</p>
+            <h2 className="text-2xl font-black">{sessionDropped ? 'جلستك انقطعت' : 'سجّل دخولك عشان تلعب'}</h2>
+            <p className="mt-2 text-sm font-medium leading-relaxed">
+              {sessionDropped
+                ? 'النتيجة ما تنحفظ في الصدارة إلا والحساب متصل. ادخل مرة ثانية.'
+                : 'الألعاب للحسابات المسجلة، عشان نعرف مين تفاعل اليوم.'}
+            </p>
             <Link href={`/login?next=${encodeURIComponent(loginNext)}`} className="mt-5 inline-flex rounded-2xl bg-[#630517] px-6 py-3 text-sm font-black text-[#F5D061]">
               تسجيل الدخول
             </Link>

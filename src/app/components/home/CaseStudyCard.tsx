@@ -9,13 +9,13 @@ const LINKS = [
     href: '/games/word',
     icon: 'trophy' as const,
     title: 'تحدي الكلمة',
-    text: 'كلمة طبية خاصة فيك، ست محاولات.',
+    text: 'كلمة طبية خاصة فيك، ثلاث دقائق.',
   },
   {
     href: '/games/quiz',
     icon: 'zap' as const,
     title: 'دقيقة إسعاف',
-    text: 'أربع حالات جديدة، مرة واحدة اليوم.',
+    text: 'أربع حالات جديدة، ثلاث دقائق.',
   },
 ];
 

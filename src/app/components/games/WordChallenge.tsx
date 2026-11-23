@@ -2,9 +2,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { msUntilNextWord, riyadhDayIndex, scoreGuess, wordHint, wordLetters, type LetterMark } from '../../lib/dailyWord';
-import { commitWordGuess, loadWordAttempt } from '../../lib/gameActivity';
+import { beginRound, commitWordGuess, GAME_ROUND_MS, loadWordAttempt, roundClock, roundLeft, sealRound } from '../../lib/gameActivity';
 import { wordSealed } from '../../lib/gameAttempt';
-import { releaseEmptyWord } from '../../lib/personalWord';
 import { wordShareText } from '../../lib/shareResult';
 import ShareResultButton from './ShareResultButton';
 
@@ -42,7 +41,9 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
   const [blocked, setBlocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [playedMs, setPlayedMs] = useState<number | undefined>();
+  const [now, setNow] = useState(Date.now());
   const startedAt = useRef<number | null>(null);
+  const sealing = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,9 +74,17 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
       let status = gate.play.status;
       let word = gate.play.word;
       if (gate.play.durationMs) setPlayedMs(gate.play.durationMs);
-      if (wordSealed(status || undefined) && guesses.length === 0 && localWord && wordLetters(localWord) !== wordLetters(word)) {
-        if (word) await releaseEmptyWord(phone, word);
-        word = localWord;
+      if (!wordSealed(status || undefined)) {
+        const begun = await beginRound('word', phone, name);
+        if (cancelled) return;
+        if (!begun.ok) {
+          setBlocked(true);
+          setReady(true);
+          return;
+        }
+        startedAt.current = begun.play.startedAt || Date.now();
+        if (wordSealed(begun.play.status)) status = begun.play.status;
+        if (begun.play.durationMs) setPlayedMs(begun.play.durationMs);
       }
       const sameWord = Boolean(localWord) && wordLetters(localWord) === wordLetters(word);
       const prefix = guesses.every((guess, guessIndex) => legacyGuesses[guessIndex] === guess);
@@ -88,8 +97,6 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
           if (committed.play.durationMs) setPlayedMs(committed.play.durationMs);
         }
         if (!cancelled && (status === 'won' || status === 'lost')) onPlayed?.();
-      } else if (wordSealed(status || undefined) && guesses.length === 0 && sameWord && legacyGuesses.length) {
-        guesses = legacyGuesses;
       }
       if (cancelled) return;
       if (!word) {
@@ -122,12 +129,38 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (!ready || accountStatus) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [ready, accountStatus]);
+
+  const liveLeft = startedAt.current ? roundLeft(startedAt.current, now) : GAME_ROUND_MS;
+  const timedOut = Boolean(startedAt.current) && !accountStatus && liveLeft === 0;
+
+  useEffect(() => {
+    if (!timedOut || sealing.current) return;
+    sealing.current = true;
+    void sealRound('word', phone, name).then((result) => {
+      if (!result.ok) {
+        setBlocked(true);
+        return;
+      }
+      setAccountStatus(result.play.status === 'won' ? 'won' : 'lost');
+      setPlayedMs(result.play.durationMs || GAME_ROUND_MS);
+      onPlayed?.();
+    }).catch((err) => {
+      console.error(err);
+      setBlocked(true);
+    });
+  }, [timedOut, phone, name, onPlayed]);
+
   const answerKey = wordLetters(answer);
   const guessWon = Boolean(answer) && guesses.some((guess) => wordLetters(guess) === answerKey);
   const guessLost = !guessWon && guesses.length >= 6;
   const won = guessWon || (accountStatus === 'won' && !guessLost);
   const lost = guessLost || (accountStatus === 'lost' && !guessWon);
-  const locked = !ready || blocked || saving || won || lost || accountStatus === 'won' || accountStatus === 'lost';
+  const locked = !ready || blocked || saving || won || lost || timedOut || accountStatus === 'won' || accountStatus === 'lost';
   const keyMarks = useMemo(() => {
     const marks = new Map<string, LetterMark>();
     if (!answer) return marks;
@@ -149,16 +182,8 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
     return <p className="text-center text-sm font-bold text-[#F5D061]">ما انربطت المحاولة بالحساب. حدّث الصفحة وأنت داخل.</p>;
   }
 
-  const markStart = () => {
-    if (startedAt.current || !day) return;
-    const now = Date.now();
-    startedAt.current = now;
-    window.localStorage.setItem(`nurs-word-start-${day}`, String(now));
-  };
-
   const typeLetter = (letter: string) => {
     if (locked || [...current].length >= 5) return;
-    markStart();
     setCurrent((value) => value + letter);
   };
 
@@ -192,7 +217,7 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <span className="rounded-full bg-[#F5D061] px-3 py-1 text-[11px] font-black text-[#3b020b]">كلمة اليوم</span>
-        <span className="text-xs font-black text-[#fff6d6]">{guesses.length}/6</span>
+        <span className="text-xs font-black text-[#F5D061]">{won || lost ? `${guesses.length}/6` : `متبقي ${roundClock(liveLeft)}`}</span>
       </div>
       <div className="grid grid-cols-3 gap-2 text-center">
         {[
@@ -237,7 +262,7 @@ export default function WordChallenge({ phone, name, onPlayed }: { phone: string
         </div>
       ) : (
         <p className="text-center text-xs font-bold text-[#fff6d6]/75">
-          {`${[...current].length}/5 حروف · مرة واحدة اليوم`}
+          {`${[...current].length}/5 حروف · ثلاث دقائق · وإذا خلص الوقت تنحفظ في الصدارة`}
         </p>
       )}
       {won || lost ? (

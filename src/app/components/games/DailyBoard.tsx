@@ -78,7 +78,9 @@ export default function DailyBoard({
                   ? row.status === 'won'
                     ? `حلها من المحاولة ${row.attempts} · الوقت ${time}`
                     : row.status === 'lost'
-                      ? `ما وصل بعد ${row.attempts} محاولات · الوقت ${time}`
+                      ? row.attempts
+                        ? `ما وصل بعد ${row.attempts} محاولات · الوقت ${time}`
+                        : `خلص الوقت · ${time}`
                       : 'بدأ وما خلّص'
                   : row.status === 'finished'
                     ? `${row.score}/4 · الوقت ${time}`

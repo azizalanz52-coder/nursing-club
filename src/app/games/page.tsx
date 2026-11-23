@@ -13,13 +13,13 @@ const CARDS = [
     href: '/games/word',
     icon: 'trophy' as const,
     title: 'تحدي الكلمة',
-    text: 'كلمة طبية، ست محاولات، مرة كل يوم.',
+    text: 'كلمة طبية، ست محاولات، ثلاث دقائق.',
   },
   {
     href: '/games/quiz',
     icon: 'zap' as const,
     title: 'دقيقة إسعاف',
-    text: 'أربع حالات جديدة كل يوم، مرة واحدة.',
+    text: 'أربع حالات جديدة، ثلاث دقائق، مرة كل يوم.',
   },
 ];
 

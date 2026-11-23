@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ClubIcon } from '../icons';
 import { msUntilNextWord, riyadhDateKey } from '../../lib/dailyWord';
 import { dailyQuizQuestions } from '../../lib/quizBank';
-import { answerQuiz, loadMyPlay, recordGamePlay } from '../../lib/gameActivity';
+import { answerQuiz, beginRound, GAME_ROUND_MS, loadMyPlay, recordGamePlay, roundClock, roundLeft, sealRound } from '../../lib/gameActivity';
 import { quizShareText } from '../../lib/shareResult';
 import ShareResultButton from './ShareResultButton';
 
@@ -29,8 +29,11 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
   const [left, setLeft] = useState(0);
   const [ready, setReady] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [held, setHeld] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const startedAt = useRef<number | null>(null);
+  const sealing = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,18 +54,11 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
         setReady(true);
         return;
       }
-      if (gate.play?.status === 'playing') {
-        setStep(Math.min(gate.play.step || 0, questions.length));
-        setScore(gate.play.score || 0);
-        if (gate.play.startedAt) startedAt.current = gate.play.startedAt;
-        setReady(true);
-        return;
-      }
-      if (saved) {
+      if (saved && gate.play?.status !== 'finished') {
         try {
           const row = JSON.parse(saved) as { done?: boolean; score?: number; durationMs?: number };
-          if (row.done) {
-            await recordGamePlay({
+          if (row.done && !(gate.play?.step && gate.play.step > 0)) {
+            const uploaded = await recordGamePlay({
               game: 'quiz',
               phone,
               name,
@@ -71,15 +67,44 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
               score: Number(row.score) || 0,
               durationMs: Number(row.durationMs) || undefined,
             });
+            const again = await loadMyPlay('quiz', phone);
             if (cancelled) return;
-            setScore(Number(row.score) || 0);
-            setDone(true);
-            if (row.durationMs) setDurationMs(row.durationMs);
-            onPlayed?.();
+            if (again.ok && again.play?.status === 'finished') {
+              setScore(again.play.score || 0);
+              setDone(true);
+              if (again.play.durationMs) setDurationMs(again.play.durationMs);
+              onPlayed?.();
+              setReady(true);
+              return;
+            }
+            if (!uploaded || !again.ok) {
+              setHeld(true);
+              setReady(true);
+              return;
+            }
           }
         } catch (err) {
           console.error(err);
         }
+      }
+      const begun = await beginRound('quiz', phone, name);
+      if (cancelled) return;
+      if (!begun.ok) {
+        setBlocked(true);
+        setReady(true);
+        return;
+      }
+      if (begun.play.status === 'finished') {
+        setScore(begun.play.score || 0);
+        setDone(true);
+        if (begun.play.durationMs) setDurationMs(begun.play.durationMs);
+        setReady(true);
+        return;
+      }
+      startedAt.current = begun.play.startedAt || Date.now();
+      if (gate.play?.status === 'playing') {
+        setStep(Math.min(gate.play.step || 0, questions.length));
+        setScore(gate.play.score || 0);
       }
       if (!cancelled) setReady(true);
     }).catch((err) => {
@@ -98,11 +123,38 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
     };
   }, [phone, name]);
 
+  useEffect(() => {
+    if (!ready || done || held) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [ready, done, held]);
+
+  const liveLeft = startedAt.current ? roundLeft(startedAt.current, now) : GAME_ROUND_MS;
+  const timedOut = Boolean(startedAt.current) && !done && liveLeft === 0;
+
+  useEffect(() => {
+    if (!timedOut || sealing.current) return;
+    sealing.current = true;
+    void sealRound('quiz', phone, name).then((result) => {
+      if (!result.ok) {
+        setBlocked(true);
+        return;
+      }
+      setScore(result.play.score || 0);
+      setDurationMs(result.play.durationMs || GAME_ROUND_MS);
+      setDone(true);
+      onPlayed?.();
+    }).catch((err) => {
+      console.error(err);
+      setBlocked(true);
+    });
+  }, [timedOut, phone, name, onPlayed]);
+
   const question = questions[step];
   const revealed = picked !== null;
 
   const choose = (index: number) => {
-    if (!question || revealed || done || saving || blocked) return;
+    if (!question || revealed || done || saving || blocked || held || timedOut) return;
     setSaving(true);
     void answerQuiz({
       phone,
@@ -159,6 +211,9 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
   if (blocked) {
     return <p className="text-center text-sm font-bold text-[#630517]">ما انربطت المحاولة بالحساب. حدّث الصفحة وأنت داخل.</p>;
   }
+  if (held) {
+    return <p className="text-center text-sm font-bold text-[#630517]">نتيجتك على جهازك وما وصلت الصدارة. حدّث الصفحة وأنت داخل.</p>;
+  }
 
   return (
     <div dir="rtl">
@@ -168,7 +223,7 @@ export default function MinuteQuiz({ phone, name, onPlayed }: { phone: string; n
             إسعاف الدقيقة الأولى
           </span>
           <span className="text-xs font-bold text-[#630517]/70">
-            {done ? 'النتيجة' : `${step + 1} من ${questions.length}`}
+            {done ? 'النتيجة' : `${step + 1} من ${questions.length} · ${roundClock(liveLeft)}`}
           </span>
         </div>
 
