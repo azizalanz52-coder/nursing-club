@@ -12,6 +12,7 @@ import { formatScientificDate, groupTextsByArchiveTitle, scientificArchiveTitle,
 import { DISCOVER_GALLERY_FOLDER, DISCOVER_GALLERY_MAX_PHOTOS, filterFilesWithinLimit, filterMediaFilesWithinLimit, isOverUploadLimit, isPlaceholderCertMedia, mediaUploadLimitMessage, requireAuthUser, uploadClubFile, uploadClubFiles, uploadLimitMessage, uploadMediaFiles, uploadingLabel } from '../lib/uploadFile';
 import { countEventGalleryPhotos, subscribeDiscoverGalleryFiles, type DiscoverGalleryFile } from '../lib/discoverGallery';
 import { findExistingIssuedCertificate, upsertIssuedCertificate } from '../lib/issueCertificate';
+import { queueSpecialCertGreeting, SPECIAL_CERT_CATEGORY } from '../lib/specialCertificates';
 import { DEFAULT_WELCOME_BANNER, WELCOME_BANNER_ID } from '../lib/welcomeBanner';
 import { BANNER_CONTROL_DOC, CLUB_AWARD_POSTER_BANNER, CLUB_AWARD_POSTER_ID, readBannerControl } from '../lib/clubAwardCelebration';
 import { clubConfirm, inferNoticeKind } from '../lib/clubNotice';
@@ -185,6 +186,8 @@ interface CertificateItem {
   fileUrl?: string;
   issueDate: string;
   description: string;
+  specialCert?: boolean;
+  congratsMessage?: string;
 }
 
 
@@ -250,6 +253,13 @@ export default function AdminDashboard() {
   const [certImageInput, setCertImageInput] = useState<string>('/logo.png');
   const [certImageDirty, setCertImageDirty] = useState(false);
   const [certDescInput, setCertDescInput] = useState<string>('');
+  const [specialName, setSpecialName] = useState('');
+  const [specialPhone, setSpecialPhone] = useState('');
+  const [specialUniversityId, setSpecialUniversityId] = useState('');
+  const [specialTitle, setSpecialTitle] = useState('');
+  const [specialMessage, setSpecialMessage] = useState('');
+  const [specialFile, setSpecialFile] = useState('');
+  const [specialSaving, setSpecialSaving] = useState(false);
 
   const emptyExamRow = (): ExamEntry => ({ course: '', courseCode: '', date: '', time: '', location: '', notes: '' });
 
@@ -926,6 +936,98 @@ export default function AdminDashboard() {
       console.error(err);
       setModalMessage(err instanceof Error ? err.message : 'حدث خطأ أثناء حفظ الشهادة. السجل لم يُحذف.');
       setModalType('success');
+    }
+  };
+
+  const handleIssueSpecialCertificate = async (e: FormEvent) => {
+    e.preventDefault();
+    const recipientName = specialName.trim();
+    const title = specialTitle.trim();
+    const message = specialMessage.trim();
+    const phone = canonicalPhone(specialPhone);
+    if (!recipientName || !phone || !title || !message) {
+      setModalMessage('اكتب الاسم ورقم الجوال وعنوان الشهادة ونص المباركة.');
+      setModalType('success');
+      return;
+    }
+    if (isPlaceholderCertMedia(specialFile)) {
+      setModalMessage('ارفع ملف الشهادة الخاصة قبل الإصدار.');
+      setModalType('success');
+      return;
+    }
+
+    setSpecialSaving(true);
+    try {
+      const linked = await resolveLinkedIdentity(db, phone, specialUniversityId);
+      const savedPhone = linked.phone || phone;
+      const universityId = linked.universityId || normalizeUniversityId(specialUniversityId);
+      const saved = await upsertIssuedCertificate(db, {
+        record: {
+          recipientName,
+          fullName: recipientName,
+          phone: savedPhone,
+          universityId,
+          password: '',
+          certTitle: title,
+          title,
+          category: SPECIAL_CERT_CATEGORY,
+          description: message,
+          congratsMessage: message,
+          specialCert: true,
+          issueDate: new Date().toISOString(),
+        },
+        fileUrl: specialFile,
+      });
+      if (savedPhone && universityId) {
+        try {
+          await linkCertificatesToIdentity(db, savedPhone, universityId);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      let greeted = false;
+      try {
+        greeted = await queueSpecialCertGreeting(db, savedPhone, {
+          certId: saved.id,
+          title,
+          message,
+          recipientName,
+          issuedAt: Date.now(),
+        });
+      } catch (err) {
+        console.error(err);
+      }
+      const issued: CertificateItem = {
+        id: saved.id,
+        recipientName,
+        phone: savedPhone,
+        universityId,
+        certTitle: title,
+        category: SPECIAL_CERT_CATEGORY,
+        image: specialFile.startsWith('data:') ? '' : specialFile,
+        fileUrl: specialFile,
+        description: message,
+        congratsMessage: message,
+        specialCert: true,
+        issueDate: new Date().toISOString(),
+      };
+      setCertificates((prev) => [issued, ...prev.filter((cert) => cert.id !== saved.id)]);
+      setSpecialName('');
+      setSpecialPhone('');
+      setSpecialUniversityId('');
+      setSpecialTitle('');
+      setSpecialMessage('');
+      setSpecialFile('');
+      setModalMessage(greeted
+        ? `تم إصدار الشهادة الخاصة لـ ${recipientName}. أول ما يدخل الموقع تظهر له المباركة مرة واحدة، والشهادة تبقى في السجل.`
+        : `انحفظت الشهادة في السجل، لكن ما لقيت حساباً على ${savedPhone}. المباركة تظهر إذا سجّل الدخول بنفس الجوال.`);
+      setModalType('success');
+    } catch (err) {
+      console.error(err);
+      setModalMessage(err instanceof Error ? err.message : 'تعذر إصدار الشهادة الخاصة.');
+      setModalType('success');
+    } finally {
+      setSpecialSaving(false);
     }
   };
 
@@ -4084,6 +4186,124 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
 
         {activeTab === 'certificates' && (
           <div className="space-y-8">
+            <div className="bg-[#fff6d6] rounded-3xl p-8 border border-[#F5D061] shadow-sm space-y-6">
+              <div className="border-b border-[#F5D061]/60 pb-4">
+                <h3 className="text-xl font-black text-[#630517]">الشهادات الخاصة</h3>
+                <p className="text-xs font-bold text-[#630517]/80 leading-6 mt-1">
+                  الشهادة تنحفظ في سجل الشهادات تحت، وأول مرة يدخل المستفيد الموقع وهو مسجّل تظهر له مباركة بالنص الذي تكتبه. بعد ما يقفلها ما تتكرر، ويرجع للشهادة من تبويب الشهادات.
+                </p>
+              </div>
+              <form onSubmit={handleIssueSpecialCertificate} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#630517]">اسم المستفيد</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: محمد احمد ناصر"
+                    value={specialName}
+                    onChange={(e) => setSpecialName(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#F5D061] text-xs text-slate-900 bg-white"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#630517]">رقم الجوال</label>
+                  <input
+                    type="text"
+                    placeholder="05XXXXXXXX"
+                    value={specialPhone}
+                    onChange={(e) => setSpecialPhone(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#F5D061] text-xs text-slate-900 bg-white font-mono"
+                    dir="ltr"
+                    required
+                  />
+                  {canonicalPhone(specialPhone).length === 10 ? (
+                    <p className="text-[11px] font-bold text-[#630517]/70">
+                      {usersList.some((user) => canonicalPhone(user.phone) === canonicalPhone(specialPhone))
+                        ? `الحساب موجود: ${usersList.find((user) => canonicalPhone(user.phone) === canonicalPhone(specialPhone))?.fullName || 'مسجّل'}`
+                        : 'ما فيه حساب بهذا الجوال. الشهادة تنحفظ، والمباركة تنتظر تسجيل الدخول بنفس الرقم.'}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#630517]">الرقم الجامعي (إن وجد)</label>
+                  <input
+                    type="text"
+                    placeholder="الرقم الجامعي"
+                    value={specialUniversityId}
+                    onChange={(e) => setSpecialUniversityId(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#F5D061] text-xs text-slate-900 bg-white font-mono"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-[#630517]">عنوان الشهادة</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: شهادة تميز في دراسة الحالة"
+                    value={specialTitle}
+                    onChange={(e) => setSpecialTitle(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#F5D061] text-xs text-slate-900 bg-white"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-[#630517]">نص المباركة الذي يظهر أول دخول</label>
+                  <textarea
+                    rows={3}
+                    placeholder="مثال: مبروك يا محمد، هذه شهادتك الخاصة تقديراً لالتزامك في دراسة الحالة. تقدر ترجع لها من تبويب الشهادات وقت ما تبي."
+                    value={specialMessage}
+                    onChange={(e) => setSpecialMessage(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#F5D061] text-xs text-slate-900 bg-white"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-[#630517]">ملف الشهادة (الحد 8 ميغابايت)</label>
+                  <input
+                    key={specialFile ? 'special-file-ready' : 'special-file-empty'}
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        setSpecialFile(await uploadClubFile(file, 'certificates'));
+                      } catch (err) {
+                        setModalMessage(err instanceof Error ? err.message : 'تعذر رفع ملف الشهادة.');
+                        setModalType('success');
+                      }
+                    }}
+                    className="w-full px-4 py-2 rounded-xl border border-[#F5D061] text-xs bg-white file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#630517] file:text-[#F5D061]"
+                  />
+                  {specialFile ? <p className="text-[11px] font-bold text-[#1f7a3a]">تم رفع الملف وجاهز للإصدار.</p> : null}
+                </div>
+                <div className="sm:col-span-2">
+                  <button
+                    type="submit"
+                    disabled={specialSaving}
+                    className="bg-[#630517] text-[#F5D061] px-8 py-3 rounded-xl font-black text-xs shadow disabled:opacity-60"
+                  >
+                    {specialSaving ? 'نصدر الشهادة...' : 'إصدار الشهادة الخاصة'}
+                  </button>
+                </div>
+              </form>
+              {certificates.some((cert) => cert.category === SPECIAL_CERT_CATEGORY || cert.specialCert) ? (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-black text-[#630517]">اللي صدرت لهم شهادة خاصة</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {certificates.filter((cert) => cert.category === SPECIAL_CERT_CATEGORY || cert.specialCert).map((cert) => (
+                      <div key={cert.id} className="rounded-2xl border border-[#F5D061] bg-white p-4 space-y-1">
+                        <p className="text-sm font-black text-[#1a0208]">{cert.recipientName}</p>
+                        <p className="text-xs font-bold text-[#630517]">{cert.certTitle}</p>
+                        <p className="text-[11px] font-mono text-slate-500" dir="ltr">{cert.phone || 'بدون جوال'}</p>
+                        <p className="text-xs leading-6 text-slate-700">{cert.congratsMessage || cert.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
             <div className="bg-white rounded-3xl p-8 border border-sky-300 shadow-sm space-y-6">
               <div className="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-4">
                 <div>
@@ -4200,6 +4420,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
                     <option value="شهادة اجتياز دورة">شهادة اجتياز دورة 🎓</option>
                     <option value="شهادة مشاركة فعالية">شهادة مشاركة فعالية 🗓️</option>
                     <option value="شهادة تميز قيادي">شهادة تميز قيادي 🛡️</option>
+                    <option value="شهادة خاصة">شهادة خاصة ✨</option>
                   </select>
                 </div>
 

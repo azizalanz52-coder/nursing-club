@@ -6,6 +6,7 @@ import OpeningSplash from './components/OpeningSplash';
 import ClubNoticeHost from './components/ClubNotice';
 import MonthCelebrationNotice from './components/MonthCelebrationNotice';
 import AwardPopper from './components/AwardPopper';
+import SpecialCertGreetingHost from './components/SpecialCertGreeting';
 import { warmPublicCloud } from './lib/cloudCache';
 
 const SPLASH_KEY = 'nurs_splash_seen';
@@ -40,6 +41,7 @@ export default function AppShell({
     <>
       <Navbar />
       <AwardPopper />
+      <SpecialCertGreetingHost />
       {children}
       {showSplash ? <OpeningSplash /> : null}
       <MonthCelebrationNotice />
