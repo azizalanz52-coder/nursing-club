@@ -6,10 +6,7 @@ import Image from 'next/image';
 import LoginModal from './LoginModal';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
-import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { findCertificatesByLookup } from '../lib/certificatesLookup';
-import { readStoredUniversityId } from '../lib/memberIdentity';
-import { certDisplayUrl, resolveCertificatePreview, type CertificatePreview } from '../lib/uploadFile';
+import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { emailToPhone, isAdminPhone, isDistinguishedRole, isPrivilegedRole } from '../lib/authIdentity';
 import { logoutSession } from '../lib/sessionAuth';
 import { committeeNameFromId, findListedLeadership, findMemberContext, isCommitteeLeaderRole, resolveMemberAcceptance, resolvePortalCommitteeId } from '../lib/memberAcceptance';
@@ -36,14 +33,6 @@ export default function Navbar() {
   const [showLeaderAlertBar, setShowLeaderAlertBar] = useState(true);
   
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-
-  // حالات نافذة استعراض وتحميل الشهائد من النافبار
-  const [showCertModal, setShowCertModal] = useState(false);
-  const [phoneInput, setPhoneInput] = useState('');
-  const [passwordInput, setPasswordInput] = useState('');
-  const [memberCertificates, setMemberCertificates] = useState<any[]>([]);
-  const [searchStatus, setSearchStatus] = useState('');
-  const [certPreview, setCertPreview] = useState<CertificatePreview | null>(null);
 
   useEffect(() => {
     sessionStorage.removeItem('adminToken');
@@ -175,76 +164,6 @@ export default function Navbar() {
     }
   };
 
-  const closeCertPreview = () => {
-    setCertPreview((current) => {
-      if (current?.revoke) URL.revokeObjectURL(current.revoke);
-      return null;
-    });
-  };
-
-  const handleViewOrDownloadFile = async (cert: any) => {
-    const tryPreview = (item: any) => resolveCertificatePreview(item);
-
-    try {
-      setCertPreview(tryPreview(cert));
-      return;
-    } catch (err) {
-      console.error('Error decoding file:', err);
-    }
-
-    try {
-      if (cert?.id) {
-        for (const col of ['certificates', 'site_certificates'] as const) {
-          const snap = await getDoc(doc(db, col, cert.id));
-          if (!snap.exists()) continue;
-          setCertPreview(tryPreview({ id: snap.id, ...snap.data() }));
-          return;
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
-
-    alert('ملف الشهادة غير مكتمل. تواصل مع الموارد البشرية لإعادة رفعه.');
-  };
-
-  const handleFetchCertificatesFromNav = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const lookup = phoneInput.trim();
-    const cleanPassword = passwordInput.trim();
-
-    if (!lookup) {
-      setSearchStatus('أدخل رقم الجوال أو الرقم الجامعي.');
-      return;
-    }
-
-    setSearchStatus('جاري استعلام الشهادات...');
-    try {
-      const lookups = Array.from(new Set([lookup, readStoredUniversityId()].filter(Boolean)));
-      const mapped = new Map<string, any>();
-      for (const value of lookups) {
-        const found = await findCertificatesByLookup(db, value);
-        found.forEach((cert) => mapped.set(cert.id, cert));
-      }
-      let foundCerts = Array.from(mapped.values());
-
-      if (cleanPassword) {
-        foundCerts = foundCerts.filter((cert: any) => !cert.password || cert.password === cleanPassword);
-      }
-
-      setMemberCertificates(foundCerts);
-
-      if (foundCerts.length > 0) {
-        setSearchStatus(`تم العثور على (${foundCerts.length}) شهادة معتمدة بنجاح.`);
-      } else {
-        setSearchStatus('لا توجد شهادات مسجلة لهذا الجوال أو الرقم الجامعي.');
-      }
-    } catch (err) {
-      console.error(err);
-      setSearchStatus('حدث خطأ أثناء البحث، يرجى المحاولة لاحقاً.');
-    }
-  };
-
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
@@ -350,13 +269,12 @@ export default function Navbar() {
             <Link href="/newsletter" className="hover:text-rose-900 transition-colors whitespace-nowrap">النشرة</Link>
             <Link href="/check-status" className="hover:text-rose-900 transition-colors text-[#630517] font-black whitespace-nowrap">استعلام القبول</Link>
             
-            <button
-              type="button"
-              onClick={() => setShowCertModal(true)}
-              className="px-3 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all font-black text-xs shadow-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            <Link
+              href="/certificates"
+              className="px-3 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all font-black text-xs shadow-sm flex items-center gap-1.5 whitespace-nowrap"
             >
               الشهادات
-            </button>
+            </Link>
           </nav>
 
           <div className="hidden xl:flex items-center gap-2 2xl:gap-3 shrink-0">
@@ -515,16 +433,13 @@ export default function Navbar() {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setShowCertModal(true);
-                }}
-                className="text-right text-amber-800 font-black py-1 flex items-center gap-2 cursor-pointer"
+              <Link
+                href="/certificates"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-right text-amber-800 font-black py-1 flex items-center gap-2"
               >
                 <ClubIcon name="medal" size={14} /> استعراض الشهادات
-              </button>
+              </Link>
             </nav>
 
             <div className="space-y-3 pt-1">
@@ -583,146 +498,6 @@ export default function Navbar() {
           </div>
         )}
       </header>
-
-      {/* نافذة استعراض وتحميل الشهادات المعتمدة */}
-      {showCertModal && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" dir="rtl">
-          <div className="bg-white text-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6 border-2 border-amber-400">
-            <div className="w-16 h-16 bg-amber-500 text-white rounded-2xl mx-auto flex items-center justify-center shadow-lg">
-              <ClubIcon name="medal" size={28} />
-            </div>
-            
-            <div className="space-y-1 text-center">
-              <h3 className="text-xl font-black">بوابة استعراض وتحميل الشهائد</h3>
-              <p className="text-xs text-slate-500">أدخل رقم الجوال أو الرقم الجامعي. كلمة المرور اختيارية إذا كان الاستعلام بالرقم الجامعي.</p>
-            </div>
-
-            <form onSubmit={handleFetchCertificatesFromNav} className="space-y-4">
-              <input
-                type="text"
-                placeholder="رقم الجوال أو الرقم الجامعي"
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-amber-500 bg-white"
-                dir="ltr"
-                required
-              />
-              <input
-                type="password"
-                placeholder="كلمة المرور (اختيارية للرقم الجامعي)"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500 bg-white"
-              />
-              <button
-                type="submit"
-                className="w-full py-3 rounded-xl bg-amber-600 text-white font-black text-xs shadow hover:bg-amber-700 cursor-pointer transition-all"
-              >
-                بحث واستعراض الشهائد 🔍
-              </button>
-            </form>
-
-            {searchStatus && (
-              <p className="text-xs text-amber-800 font-bold text-center bg-amber-50 p-2.5 rounded-xl border border-amber-200">
-                {searchStatus}
-              </p>
-            )}
-
-            {memberCertificates.length > 0 && (
-              <div className="space-y-3 max-h-72 overflow-y-auto pt-2">
-                {memberCertificates.map((cert) => {
-                  const certTitle = cert.title || cert.certTitle || 'شهادة شكر وتقدير';
-                  const recipientName = cert.fullName || cert.recipientName || 'المستفيد';
-                  const certFile = certDisplayUrl(cert);
-                  const category = cert.category || 'شهادة مشاركة فعالية';
-
-                  return (
-                    <div key={cert.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
-                      <span className="inline-block text-[10px] font-black px-2.5 py-1 rounded-full bg-[#630517]/10 text-[#630517]">
-                        {category}
-                      </span>
-                      <div className="flex justify-between items-center gap-3">
-                        <div className="min-w-0">
-                          <span className="font-extrabold text-slate-900 block">{certTitle}</span>
-                          <span className="text-[10px] text-slate-500">المستفيد: {recipientName}</span>
-                          {(cert.dateStr || cert.issueDate) && (
-                            <span className="text-[9px] text-slate-400 block mt-0.5">
-                              التاريخ: {cert.dateStr || cert.issueDate}
-                            </span>
-                          )}
-                        </div>
-                        {certFile && (
-                          <button
-                            type="button"
-                            onClick={() => handleViewOrDownloadFile(cert)}
-                            className="shrink-0 px-3.5 py-1.5 bg-[#630517] text-[#F5D061] font-bold rounded-xl shadow hover:brightness-110 transition-all text-xs cursor-pointer"
-                          >
-                            استعراض
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                closeCertPreview();
-                setShowCertModal(false);
-                setMemberCertificates([]);
-                setSearchStatus('');
-                setPhoneInput('');
-                setPasswordInput('');
-              }}
-              className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
-            >
-              إغلاق ✕
-            </button>
-          </div>
-        </div>
-      )}
-
-      {certPreview && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/70 p-3" dir="rtl">
-          <div className="bg-white rounded-3xl w-full max-w-lg max-h-[90dvh] overflow-hidden shadow-2xl flex flex-col">
-            <div className="px-4 py-3 bg-[#630517] text-[#F5D061] font-black text-sm flex items-center justify-between gap-3">
-              <span className="truncate">{certPreview.title}</span>
-              <button type="button" onClick={closeCertPreview} className="shrink-0 text-white text-xs font-bold">
-                إغلاق
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto bg-slate-100 min-h-[18rem] grid place-items-center p-3">
-              {certPreview.isPdf ? (
-                <iframe title={certPreview.title} src={certPreview.src} className="w-full h-[70dvh] rounded-xl bg-white" />
-              ) : (
-                <img
-                  src={certPreview.src}
-                  alt={certPreview.title}
-                  className="max-w-full max-h-[70dvh] object-contain rounded-xl"
-                  onError={() => {
-                    closeCertPreview();
-                    alert('ملف الشهادة تالف أو غير مكتمل. تواصل مع الموارد البشرية لإعادة رفعه.');
-                  }}
-                />
-              )}
-            </div>
-            <div className="p-3">
-              <a
-                href={certPreview.src}
-                download={`${certPreview.title}.${certPreview.isPdf ? 'pdf' : 'jpg'}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-center py-2.5 rounded-xl bg-[#630517] text-[#F5D061] font-black text-xs"
-              >
-                تحميل أو فتح بتبويب جديد
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
 
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </>
