@@ -1699,7 +1699,10 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
           const suggestionsSnap = await getDocs(collection(db, 'suggestions'));
           if (!cancelled && !suggestionsSnap.empty) {
             const suggestionsList: SuggestionItem[] = [];
-            suggestionsSnap.forEach((d) => { suggestionsList.push({ id: d.id, ...d.data() } as SuggestionItem); });
+            suggestionsSnap.forEach((d) => {
+              if (d.data().kind === 'consultation') return;
+              suggestionsList.push({ id: d.id, ...d.data() } as SuggestionItem);
+            });
             setSuggestions(suggestionsList);
           }
         }

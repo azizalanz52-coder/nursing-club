@@ -268,6 +268,7 @@ export default function Navbar() {
             <Link href="/games" className="hover:text-rose-900 transition-colors text-[#630517] font-black whitespace-nowrap">الألعاب والتحديات</Link>
             <Link href="/newsletter" className="hover:text-rose-900 transition-colors whitespace-nowrap">النشرة</Link>
             <Link href="/check-status" className="hover:text-rose-900 transition-colors text-[#630517] font-black whitespace-nowrap">استعلام القبول</Link>
+            <Link href="/consultations" className="hover:text-rose-900 transition-colors whitespace-nowrap">الاستشارات</Link>
             
             <Link
               href="/certificates"
@@ -412,6 +413,7 @@ export default function Navbar() {
               <Link href="/games" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">الألعاب والتحديات</Link>
               <Link href="/newsletter" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">النشرة</Link>
               <Link href="/check-status" onClick={() => setMobileMenuOpen(false)} className="text-[#630517] font-black transition-colors py-1">استعلام عن القبول</Link>
+              <Link href="/consultations" onClick={() => setMobileMenuOpen(false)} className="hover:text-rose-900 transition-colors py-1">الاستشارات</Link>
               
               <div className="py-1">
                 {!isRegistrationClosed ? (
