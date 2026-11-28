@@ -449,6 +449,33 @@ export function personPhone(sub: Record<string, any> | null | undefined) {
   return canonicalPhone(String(sub?.phone || sub?.phoneNumber || ''));
 }
 
+function foldedCaseName(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه');
+}
+
+/**
+ * حسابان لنفس المشاركة بعد تعطل الدخول: التسليمات القديمة رجع رقمها إلى 07،
+ * والحساب الحالي 0580478808. الصدارة تجمعهما في صف واحد.
+ */
+const CASE_BOARD_ALIASES: Array<{ from: string; to: string; name: string }> = [
+  { from: '07', to: '0580478808', name: 'آلاء مهدي العوامي' },
+];
+
+export function caseBoardIdentity(sub: Record<string, any> | null | undefined) {
+  const phone = personPhone(sub);
+  const studentName = String(sub?.studentName || 'مشارك').trim() || 'مشارك';
+  const alias = CASE_BOARD_ALIASES.find(
+    (item) => item.from === phone && foldedCaseName(item.name) === foldedCaseName(studentName)
+  );
+  if (!alias) return { phone, studentName };
+  return { phone: alias.to, studentName: alias.name };
+}
+
 export function adjustmentsOf(sub: Record<string, any> | null | undefined): ScoreAdjustment[] {
   return Array.isArray(sub?.scoreAdjustments) ? sub.scoreAdjustments : [];
 }
@@ -730,9 +757,7 @@ export function aggregateCaseLeaderboard(submissions: Array<Record<string, any>>
   const byKey: Record<string, CaseLeaderboardRow> = {};
 
   for (const data of submissions) {
-    const rawPhone = String(data.phone || data.phoneNumber || '').trim();
-    const phone = canonicalPhone(rawPhone);
-    const studentName = String(data.studentName || 'مشارك').trim() || 'مشارك';
+    const { phone, studentName } = caseBoardIdentity(data);
     const key = phone || `name:${studentName}`;
     const latestTs = submissionMs(data);
     if (!byKey[key]) {

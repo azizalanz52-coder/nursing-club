@@ -2,6 +2,7 @@ import {
   addDaysYmd,
   adjustmentSum,
   isCaseStudyStaffPhone,
+  caseBoardIdentity,
   personPhone,
   riyadhParts,
   submissionDayKey,
@@ -109,9 +110,8 @@ function eachYmd(start: string, end: string) {
 }
 
 function personKey(sub: Record<string, any>) {
-  const phone = personPhone(sub);
-  const name = String(sub.studentName || 'مشارك').trim() || 'مشارك';
-  return phone || `name:${name}`;
+  const { phone, studentName } = caseBoardIdentity(sub);
+  return phone || `name:${studentName}`;
 }
 
 function correctAnswersOf(sub: Record<string, any>) {
@@ -229,9 +229,10 @@ function weekStats(subs: Array<Record<string, any>>, weekStart: string, now = Da
 
   for (const sub of subs) {
     if (!inWeek(sub, weekStart)) continue;
+    const identity = caseBoardIdentity(sub);
     const key = personKey(sub);
-    const phone = personPhone(sub);
-    const name = String(sub.studentName || 'مشارك').trim() || 'مشارك';
+    const phone = identity.phone;
+    const name = identity.studentName;
     const day = submissionDayKey(sub);
     const ms = submissionMs(sub);
     if (!key || !day || !countable.has(day)) continue;

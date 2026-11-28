@@ -42,7 +42,7 @@ import {
   isRiyadhThursday,
   loadCaseSubmissions,
   loadCaseSubmissionsForPhone,
-  personPhone,
+  caseBoardIdentity,
   riyadhParts,
   scoreBreakdown,
   submissionDayKey,
@@ -1779,7 +1779,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
     const weekAgoTotals = new Map<string, number>();
 
     const take = (sub: any, intoWeekAgo = false) => {
-      const phone = personPhone(sub);
+      const phone = caseBoardIdentity(sub).phone;
       const key = phone || String(sub.id);
       if (intoWeekAgo) {
         weekAgoTotals.set(key, (weekAgoTotals.get(key) || 0) + Number(sub.score || 0));
@@ -1824,7 +1824,7 @@ const handleEditStudentAchievementClick = (ach: StudentAchievement) => {
   const caseStudyParticipantCount = useMemo(() => {
     const people = new Set<string>();
     for (const sub of caseSubmissions) {
-      people.add(personPhone(sub) || String(sub.id));
+      people.add(caseBoardIdentity(sub).phone || String(sub.id));
     }
     return people.size;
   }, [caseSubmissions]);
